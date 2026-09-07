@@ -1,4 +1,4 @@
-﻿
+
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
@@ -28,24 +28,65 @@ export async function createLeague(formData: FormData) {
   const level = parseInt(formData.get('level') as string, 10);
   const max_teams = parseInt(formData.get('max_teams') as string, 10);
   const status = formData.get('status') as string;
+  const image_file = formData.get('image_file') as File;
 
   if (!name || !season_id || isNaN(level)) return { error: 'Ad, Sezon ve Seviye zorunludur.' };
   if (level <= 0) return { error: 'Seviye pozitif olmalıdır.' };
   if (max_teams && max_teams <= 0) return { error: 'Kapasite pozitif olmalıdır.' };
 
-  const { error } = await supabase.from('leagues').insert({
+  let image_url: string | null = null;
+  let uploadedFileName: string | null = null;
+
+  if (image_file && image_file.size > 0) {
+    if (image_file.size > 5 * 1024 * 1024) {
+      return { error: 'Görsel boyutu 5MB sınırını aşıyor.' };
+    }
+    const ext = image_file.name.split('.').pop() || 'webp';
+    uploadedFileName = `league_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('league-images')
+      .upload(uploadedFileName, image_file, {
+        cacheControl: '31536000',
+        upsert: true
+      });
+
+    if (uploadError) {
+      return { error: 'Görsel yüklenemedi: ' + uploadError.message };
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('league-images')
+      .getPublicUrl(uploadedFileName);
+    image_url = urlData.publicUrl;
+  }
+
+  const insertPayload: any = {
     season_id,
     name,
     level,
     max_teams: isNaN(max_teams) ? null : max_teams,
     status: status || 'UPCOMING'
-  });
+  };
+
+  if (image_url) {
+    insertPayload.image_url = image_url;
+  }
+
+  let { error } = await supabase.from('leagues').insert(insertPayload);
 
   if (error) {
+    // Clean up uploaded image if DB insert failed
+    if (uploadedFileName) {
+      await supabase.storage.from('league-images').remove([uploadedFileName]);
+    }
     if (error.code === '23505') return { error: 'Bu sezonda aynı isimde veya seviyede lig zaten var.' };
     return { error: 'Lig oluşturulamadı: ' + error.message };
   }
+
   revalidatePath('/admin/leagues');
+  revalidatePath('/ligler');
+  revalidatePath('/', 'layout');
   return { success: 'Lig başarıyla oluşturuldu.' };
 }
 
@@ -60,22 +101,86 @@ export async function editLeague(formData: FormData) {
   const season_id = formData.get('season_id') as string;
   const level = parseInt(formData.get('level') as string, 10);
   const max_teams = parseInt(formData.get('max_teams') as string, 10);
+  const image_file = formData.get('image_file') as File;
+  const remove_image = formData.get('remove_image') === 'true';
 
   if (!id || !name || !season_id || isNaN(level)) return { error: 'Eksik bilgi.' };
   if (level <= 0) return { error: 'Seviye pozitif olmalıdır.' };
 
-  const { error } = await supabase.from('leagues').update({
+  let new_image_url: string | null = null;
+  let uploadedFileName: string | null = null;
+
+  if (image_file && image_file.size > 0) {
+    if (image_file.size > 5 * 1024 * 1024) {
+      return { error: 'Görsel boyutu 5MB sınırını aşıyor.' };
+    }
+    const ext = image_file.name.split('.').pop() || 'webp';
+    uploadedFileName = `league_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('league-images')
+      .upload(uploadedFileName, image_file, {
+        cacheControl: '31536000',
+        upsert: true
+      });
+
+    if (uploadError) {
+      return { error: 'Görsel yüklenemedi: ' + uploadError.message };
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('league-images')
+      .getPublicUrl(uploadedFileName);
+    new_image_url = urlData.publicUrl;
+  }
+
+  // Fetch current league data for cleanup
+  const { data: currentLeague } = await supabase
+    .from('leagues')
+    .select('image_url')
+    .eq('id', id)
+    .single();
+
+  const oldImageUrl = currentLeague?.image_url;
+
+  const updatePayload: any = {
     season_id,
     name,
     level,
     max_teams: isNaN(max_teams) ? null : max_teams
-  }).eq('id', id);
+  };
+
+  if (new_image_url) {
+    updatePayload.image_url = new_image_url;
+  } else if (remove_image) {
+    updatePayload.image_url = null;
+  }
+
+  let { error } = await supabase.from('leagues').update(updatePayload).eq('id', id);
 
   if (error) {
+    if (uploadedFileName) {
+      await supabase.storage.from('league-images').remove([uploadedFileName]);
+    }
     if (error.code === '23505') return { error: 'Bu sezonda aynı isimde veya seviyede lig zaten var.' };
     return { error: 'Lig güncellenemedi: ' + error.message };
   }
+
+  // Garbage collection: clean up old image if changed or removed
+  if ((new_image_url || remove_image) && oldImageUrl && oldImageUrl !== new_image_url) {
+    try {
+      const parts = oldImageUrl.split('/public/league-images/');
+      if (parts.length === 2) {
+        await supabase.storage.from('league-images').remove([parts[1]]);
+      }
+    } catch (cleanupErr) {
+      console.error('Failed to cleanup old league image:', cleanupErr);
+    }
+  }
+
   revalidatePath('/admin/leagues');
+  revalidatePath('/ligler');
+  revalidatePath('/', 'layout');
   return { success: 'Lig başarıyla güncellendi.' };
 }
 

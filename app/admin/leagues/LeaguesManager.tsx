@@ -6,13 +6,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
   Search, Plus, Filter, Edit2, Shield, Users,
-  CheckCircle2, Trash2, AlertTriangle, X, Loader2, BookOpen
+  CheckCircle2, Trash2, AlertTriangle, X, Loader2, BookOpen, Upload
 } from 'lucide-react';
 import { 
   createLeague, editLeague, 
   updateLeagueStatus, assignTeamToLeague, removeTeamFromLeague 
 } from './actions';
 import { LeagueRulesModal } from './LeagueRulesModal';
+import imageCompression from 'browser-image-compression';
 
 export function LeaguesManager({ initialLeagues, seasons, allTeams, initialLeagueTeams }: any) {
   const router = useRouter();
@@ -32,6 +33,16 @@ export function LeaguesManager({ initialLeagues, seasons, allTeams, initialLeagu
   const [rulesModal, setRulesModal] = useState<any>(null);
   const [manageTeamsModal, setManageTeamsModal] = useState<any>(null);
   const [assignTeamModal, setAssignTeamModal] = useState<any>(null); // holds league info
+
+  // League Image States
+  const [createImageFile, setCreateImageFile] = useState<File | null>(null);
+  const [createImagePreview, setCreateImagePreview] = useState<string | null>(null);
+  const [createOptimizing, setCreateOptimizing] = useState(false);
+
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
+  const [editRemoveImage, setEditRemoveImage] = useState(false);
+  const [editOptimizing, setEditOptimizing] = useState(false);
   
   const [confirmModal, setConfirmModal] = useState<any>({ isOpen: false });
   const [loading, setLoading] = useState(false);
@@ -65,24 +76,109 @@ export function LeaguesManager({ initialLeagues, seasons, allTeams, initialLeagu
 
   const closeConfirm = () => setConfirmModal({ ...confirmModal, isOpen: false });
 
+  // Image compression and selection handler
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>, isEdit: boolean = false) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 25 * 1024 * 1024) {
+      showFeedback('Dosya boyutu çok yüksek (maksimum 25MB).', 'error');
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      showFeedback('Lütfen geçerli bir görsel formatı (PNG, JPG, WEBP) seçin.', 'error');
+      return;
+    }
+
+    if (isEdit) setEditOptimizing(true);
+    else setCreateOptimizing(true);
+
+    showFeedback('Görsel optimize ediliyor...', 'success');
+
+    try {
+      const options = {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 512,
+        useWebWorker: true,
+        fileType: 'image/webp' as any,
+        initialQuality: 0.85,
+      };
+
+      let compressed = await imageCompression(file, options);
+      if (compressed.size > 1024 * 1024) {
+        options.initialQuality = 0.70;
+        compressed = await imageCompression(file, options);
+      }
+
+      const previewUrl = URL.createObjectURL(compressed);
+
+      if (isEdit) {
+        setEditImageFile(compressed);
+        setEditImagePreview(previewUrl);
+        setEditRemoveImage(false);
+      } else {
+        setCreateImageFile(compressed);
+        setCreateImagePreview(previewUrl);
+      }
+      showFeedback('Görsel optimize edildi.', 'success');
+    } catch (err) {
+      showFeedback('Görsel optimize edilirken hata oluştu.', 'error');
+    } finally {
+      if (isEdit) setEditOptimizing(false);
+      else setCreateOptimizing(false);
+    }
+  };
+
   // Handlers
   const handleCreate = async (e: any) => {
     e.preventDefault();
+    if (createOptimizing) {
+      showFeedback('Lütfen görsel optimizasyonunun tamamlanmasını bekleyin.', 'error');
+      return;
+    }
     setLoading(true);
     const formData = new FormData(e.currentTarget);
+    if (createImageFile) {
+      formData.append('image_file', createImageFile, createImageFile.name || 'league.webp');
+    }
     const res = await createLeague(formData);
-    if (res.error) showFeedback(res.error, 'error');
-    else { showFeedback(res.success || "", "success"); setCreateModal(false); router.refresh(); }
+    if (res.error) {
+      showFeedback(res.error, 'error');
+    } else {
+      showFeedback(res.success || '', 'success');
+      setCreateModal(false);
+      setCreateImageFile(null);
+      setCreateImagePreview(null);
+      router.refresh();
+    }
     setLoading(false);
   };
 
   const handleEdit = async (e: any) => {
     e.preventDefault();
+    if (editOptimizing) {
+      showFeedback('Lütfen görsel optimizasyonunun tamamlanmasını bekleyin.', 'error');
+      return;
+    }
     setLoading(true);
     const formData = new FormData(e.currentTarget);
+    if (editImageFile) {
+      formData.append('image_file', editImageFile, editImageFile.name || 'league.webp');
+    }
+    if (editRemoveImage) {
+      formData.append('remove_image', 'true');
+    }
     const res = await editLeague(formData);
-    if (res.error) showFeedback(res.error, 'error');
-    else { showFeedback(res.success || "", "success"); setEditData(null); router.refresh(); }
+    if (res.error) {
+      showFeedback(res.error, 'error');
+    } else {
+      showFeedback(res.success || '', 'success');
+      setEditData(null);
+      setEditImageFile(null);
+      setEditImagePreview(null);
+      setEditRemoveImage(false);
+      router.refresh();
+    }
     setLoading(false);
   };
 
@@ -224,9 +320,18 @@ export function LeaguesManager({ initialLeagues, seasons, allTeams, initialLeagu
               return (
                 <tr key={l.id} className='hover:bg-white/5 transition-colors group'>
                   <td className='px-4 py-4'>
-                    <Link href={'/admin/leagues/' + l.id} className='font-bold text-white hover:text-cyan-400 transition-colors'>
-                      {l.name}
-                    </Link>
+                    <div className='flex items-center gap-3'>
+                      <div className='w-8 h-8 rounded-lg border border-white/10 bg-[#060d18] overflow-hidden flex items-center justify-center shrink-0'>
+                        {l.image_url ? (
+                          <img src={l.image_url} alt={l.name} className='w-full h-full object-contain' />
+                        ) : (
+                          <Shield className='w-4 h-4 text-zinc-600' />
+                        )}
+                      </div>
+                      <Link href={'/admin/leagues/' + l.id} className='font-bold text-white hover:text-cyan-400 transition-colors'>
+                        {l.name}
+                      </Link>
+                    </div>
                   </td>
                   <td className='px-4 py-4'>{l.seasons?.name}</td>
                   <td className='px-4 py-4'>{l.level}. Seviye</td>
@@ -242,7 +347,16 @@ export function LeaguesManager({ initialLeagues, seasons, allTeams, initialLeagu
                       <button onClick={() => setRulesModal(l)} className='p-1.5 bg-white/5 hover:bg-white/10 rounded-md text-zinc-300' title='Kurallar'>
                         <BookOpen className='w-4 h-4' />
                       </button>
-                      <button onClick={() => setEditData(l)} className='p-1.5 bg-white/5 hover:bg-white/10 rounded-md text-zinc-300' title='Düzenle'>
+                      <button 
+                        onClick={() => {
+                          setEditData(l);
+                          setEditImagePreview(l.image_url || null);
+                          setEditImageFile(null);
+                          setEditRemoveImage(false);
+                        }} 
+                        className='p-1.5 bg-white/5 hover:bg-white/10 rounded-md text-zinc-300' 
+                        title='Düzenle'
+                      >
                         <Edit2 className='w-4 h-4' />
                       </button>
                       <button onClick={() => handleStatus(l)} className='p-1.5 bg-amber-500/10 hover:bg-amber-500/20 rounded-md text-amber-400' title='Durum Değiştir'>
@@ -284,6 +398,66 @@ export function LeaguesManager({ initialLeagues, seasons, allTeams, initialLeagu
                   {seasons.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.status})</option>)}
                 </select>
               </div>
+
+              {/* Lig Görseli */}
+              <div>
+                <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>
+                  Lig Görseli
+                </label>
+                {createImagePreview ? (
+                  <div className='flex items-center gap-4 p-3 bg-[#060d18] border border-white/10 rounded-xl'>
+                    <div className='w-14 h-14 rounded-lg bg-black/50 border border-cyan-500/30 overflow-hidden flex items-center justify-center shrink-0'>
+                      <img src={createImagePreview} alt='Önizleme' className='w-full h-full object-contain' />
+                    </div>
+                    <div className='flex-1 min-w-0'>
+                      <p className='text-xs font-bold text-white truncate'>Görsel Seçildi</p>
+                      <p className='text-[10px] text-cyan-400'>WebP optimize edildi</p>
+                    </div>
+                    <div className='flex gap-2 shrink-0'>
+                      <label className='cursor-pointer px-2.5 py-1.5 bg-white/10 hover:bg-white/15 text-white text-[10px] font-bold rounded-md transition-colors'>
+                        Değiştir
+                        <input
+                          type='file'
+                          accept='image/png,image/jpeg,image/webp'
+                          className='hidden'
+                          onChange={(e) => handleImageSelect(e, false)}
+                          disabled={createOptimizing}
+                        />
+                      </label>
+                      <button
+                        type='button'
+                        onClick={() => {
+                          setCreateImageFile(null);
+                          setCreateImagePreview(null);
+                        }}
+                        className='px-2.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[10px] font-bold rounded-md transition-colors'
+                      >
+                        Kaldır
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className='flex items-center justify-center gap-3 p-4 bg-[#060d18] border border-dashed border-white/15 hover:border-cyan-500/50 rounded-xl cursor-pointer transition-colors group'>
+                    <div className='w-8 h-8 rounded-lg bg-white/5 group-hover:bg-cyan-500/10 flex items-center justify-center text-zinc-400 group-hover:text-cyan-400 transition-colors'>
+                      <Upload className='w-4 h-4' />
+                    </div>
+                    <div className='text-left'>
+                      <p className='text-xs font-bold text-white group-hover:text-cyan-400 transition-colors'>
+                        {createOptimizing ? 'Görsel optimize ediliyor...' : 'Görsel Seç veya Yükle'}
+                      </p>
+                      <p className='text-[10px] text-zinc-500'>PNG, JPG, WEBP (Otomatik optimize edilir)</p>
+                    </div>
+                    <input
+                      type='file'
+                      accept='image/png,image/jpeg,image/webp'
+                      className='hidden'
+                      onChange={(e) => handleImageSelect(e, false)}
+                      disabled={createOptimizing}
+                    />
+                  </label>
+                )}
+              </div>
+
               <div className='flex gap-4'>
                 <div className='flex-1'>
                   <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>Seviye</label>
@@ -304,7 +478,7 @@ export function LeaguesManager({ initialLeagues, seasons, allTeams, initialLeagu
               </div>
               <div className='pt-4 flex gap-2'>
                 <button type='button' onClick={() => setCreateModal(false)} className='flex-1 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-xs font-bold transition-colors'>İPTAL</button>
-                <button type='submit' disabled={loading} className='flex-1 py-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg text-xs font-black transition-colors disabled:opacity-50 flex justify-center items-center gap-2'>
+                <button type='submit' disabled={loading || createOptimizing} className='flex-1 py-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg text-xs font-black transition-colors disabled:opacity-50 flex justify-center items-center gap-2'>
                   {loading && <Loader2 className='w-4 h-4 animate-spin' />} OLUŞTUR
                 </button>
               </div>
@@ -334,6 +508,69 @@ export function LeaguesManager({ initialLeagues, seasons, allTeams, initialLeagu
                 </select>
                 <p className='text-[10px] text-amber-500 mt-1'>Sezon değiştirmek lig ilişkilerini etkileyebilir, dikkatli olun.</p>
               </div>
+
+              {/* Lig Görseli */}
+              <div>
+                <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>
+                  Lig Görseli
+                </label>
+                {editImagePreview && !editRemoveImage ? (
+                  <div className='flex items-center gap-4 p-3 bg-[#060d18] border border-white/10 rounded-xl'>
+                    <div className='w-14 h-14 rounded-lg bg-black/50 border border-cyan-500/30 overflow-hidden flex items-center justify-center shrink-0'>
+                      <img src={editImagePreview} alt='Önizleme' className='w-full h-full object-contain' />
+                    </div>
+                    <div className='flex-1 min-w-0'>
+                      <p className='text-xs font-bold text-white truncate'>Mevcut Görsel</p>
+                      <p className='text-[10px] text-cyan-400'>
+                        {editImageFile ? 'Yeni görsel optimize edildi' : 'Kayıtlı görsel'}
+                      </p>
+                    </div>
+                    <div className='flex gap-2 shrink-0'>
+                      <label className='cursor-pointer px-2.5 py-1.5 bg-white/10 hover:bg-white/15 text-white text-[10px] font-bold rounded-md transition-colors'>
+                        Değiştir
+                        <input
+                          type='file'
+                          accept='image/png,image/jpeg,image/webp'
+                          className='hidden'
+                          onChange={(e) => handleImageSelect(e, true)}
+                          disabled={editOptimizing}
+                        />
+                      </label>
+                      <button
+                        type='button'
+                        onClick={() => {
+                          setEditImageFile(null);
+                          setEditImagePreview(null);
+                          setEditRemoveImage(true);
+                        }}
+                        className='px-2.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[10px] font-bold rounded-md transition-colors'
+                      >
+                        Kaldır
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className='flex items-center justify-center gap-3 p-4 bg-[#060d18] border border-dashed border-white/15 hover:border-cyan-500/50 rounded-xl cursor-pointer transition-colors group'>
+                    <div className='w-8 h-8 rounded-lg bg-white/5 group-hover:bg-cyan-500/10 flex items-center justify-center text-zinc-400 group-hover:text-cyan-400 transition-colors'>
+                      <Upload className='w-4 h-4' />
+                    </div>
+                    <div className='text-left'>
+                      <p className='text-xs font-bold text-white group-hover:text-cyan-400 transition-colors'>
+                        {editOptimizing ? 'Görsel optimize ediliyor...' : 'Görsel Seç veya Yükle'}
+                      </p>
+                      <p className='text-[10px] text-zinc-500'>PNG, JPG, WEBP (Otomatik optimize edilir)</p>
+                    </div>
+                    <input
+                      type='file'
+                      accept='image/png,image/jpeg,image/webp'
+                      className='hidden'
+                      onChange={(e) => handleImageSelect(e, true)}
+                      disabled={editOptimizing}
+                    />
+                  </label>
+                )}
+              </div>
+
               <div className='flex gap-4'>
                 <div className='flex-1'>
                   <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>Seviye</label>
@@ -346,7 +583,7 @@ export function LeaguesManager({ initialLeagues, seasons, allTeams, initialLeagu
               </div>
               <div className='pt-4 flex gap-2'>
                 <button type='button' onClick={() => setEditData(null)} className='flex-1 py-2 bg-white/5 text-white rounded-lg text-xs font-bold'>İPTAL</button>
-                <button type='submit' disabled={loading} className='flex-1 py-2 bg-cyan-500 text-black rounded-lg text-xs font-black flex justify-center items-center gap-2'>
+                <button type='submit' disabled={loading || editOptimizing} className='flex-1 py-2 bg-cyan-500 text-black rounded-lg text-xs font-black flex justify-center items-center gap-2'>
                   {loading && <Loader2 className='w-4 h-4 animate-spin' />} GÜNCELLE
                 </button>
               </div>

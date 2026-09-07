@@ -121,12 +121,13 @@ export default async function LiglerPage() {
                 
                 <div className="relative mb-8 group-hover:scale-105 transition-transform duration-700 h-[160px] flex items-center justify-center">
                   <Image 
-                    src={theme.logo} 
+                    src={league.image_url || theme.logo} 
                     alt={league.name} 
                     width={160} 
                     height={160} 
                     className="object-contain max-h-full drop-shadow-[0_0_20px_rgba(0,0,0,0.8)]"
                     priority={idx === 0}
+                    unoptimized={league.image_url?.startsWith("http")}
                   />
                 </div>
 
