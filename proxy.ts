@@ -1,4 +1,4 @@
-import { type NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/middleware";
 
 // Next.js 16: "middleware" file convention is deprecated, use "proxy" instead.
@@ -8,6 +8,19 @@ export async function proxy(request: NextRequest) {
   
   // This triggers the session refresh if needed
   await supabase.auth.getUser();
+
+  // After PKCE auth flow, Supabase redirects to /?code=XXXX
+  // The code has already been consumed by getUser() / browser client.
+  // Strip the one-time code parameter to keep the URL clean.
+  const { pathname } = request.nextUrl;
+  if (
+    request.nextUrl.searchParams.has("code") &&
+    !pathname.startsWith("/auth/callback")
+  ) {
+    const cleanUrl = request.nextUrl.clone();
+    cleanUrl.searchParams.delete("code");
+    return NextResponse.redirect(cleanUrl);
+  }
 
   return supabaseResponse;
 }

@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS public.player_achievements (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     player_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     achievement_type TEXT NOT NULL CHECK (achievement_type IN ('TOTW', 'MATCH_POTM', 'MONTH_POTM', 'POTS')),
     season_id UUID REFERENCES public.seasons(id) ON DELETE CASCADE,
