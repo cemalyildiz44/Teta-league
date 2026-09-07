@@ -16,7 +16,7 @@ export default async function PlayersPage() {
 
   // 1 & 2. Fetch profiles and approved matches concurrently
   const [ { data: profiles }, { data: approvedMatches } ] = await Promise.all([
-    supabase.from('profiles').select('id, username, current_ea_player_id, avatar_url, platform, primary_position'),
+    supabase.from('profiles').select('id, username, current_ea_player_id, avatar_url, platform, primary_position, alternative_positions'),
     supabase.from('matches').select('id, home_team_id, away_team_id, home_score, away_score').eq('status', 'APPROVED')
   ]);
 
@@ -92,6 +92,7 @@ export default async function PlayersPage() {
       avatarUrl: p.avatar_url,
       platform: p.platform || 'Bilinmiyor',
       position: p.primary_position || 'Bilinmiyor',
+      alternativePositions: p.alternative_positions || [],
       status: contractedPlayerIds.has(p.id) ? 'CONTRACTED' : 'FREE',
       wins: stats.wins,
       draws: stats.draws,

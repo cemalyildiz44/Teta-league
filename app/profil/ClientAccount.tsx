@@ -6,6 +6,7 @@ import { logoutAction } from '@/app/auth/actions';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 import { searchPlayersAction, sendTeamInviteAction, acceptTeamInviteAction, rejectTeamInviteAction, cancelTeamInviteAction } from './team-actions';
+import { POSITION_FILTER_OPTIONS } from '@/app/oyuncular/PlayerRankingsClient';
 
 export default function ClientAccount({ profile, authUser, team, league, isCaptain, achievements, pendingInvites }: any) {
   const supabase = createClient();
@@ -311,18 +312,9 @@ export default function ClientAccount({ profile, authUser, team, league, isCapta
                   <label className="block text-[10px] font-[900] text-gray-500 tracking-widest uppercase mb-2">ANA POZİSYON</label>
                   <select name="primary_position" defaultValue={profile?.primary_position || 'Belirtilmedi'} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[14px] font-[700] text-white focus:outline-none focus:border-[#00e5ff]/50 transition-colors appearance-none">
                     <option value="Belirtilmedi">Belirtilmedi</option>
-                    <option value="KL">KL (Kaleci)</option>
-                    <option value="STP">STP (Stoper)</option>
-                    <option value="SĞB">SĞB (Sağ Bek)</option>
-                    <option value="SLB">SLB (Sol Bek)</option>
-                    <option value="MDO">MDO (Defansif Orta Saha)</option>
-                    <option value="MO">MO (Merkez Orta Saha)</option>
-                    <option value="SĞO">SĞO (Sağ Orta Saha)</option>
-                    <option value="SLO">SLO (Sol Orta Saha)</option>
-                    <option value="OOS">OOS (Ofansif Orta Saha)</option>
-                    <option value="SĞK">SĞK (Sağ Kanat)</option>
-                    <option value="SLK">SLK (Sol Kanat)</option>
-                    <option value="ST">ST (Santrfor)</option>
+                    {POSITION_FILTER_OPTIONS.map(pos => (
+                      <option key={pos.value} value={pos.value}>{pos.label}</option>
+                    ))}
                   </select>
                 </div>
               </div>
