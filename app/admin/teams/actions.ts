@@ -244,28 +244,19 @@ export async function addPlayerToTeam(team_id: string, player_id: string, league
 
   if (!team_id || !player_id || !league_id || !season_id) return { error: 'Eksik bilgi (Oyuncu, Lig, Sezon).' };
 
-  // Check if active membership already exists
-  const { data: existing } = await supabase.from('team_memberships')
-    .select('id')
-    .eq('team_id', team_id)
-    .eq('player_id', player_id)
-    .eq('league_id', league_id)
-    .eq('season_id', season_id)
-    .is('left_at', null)
-    .maybeSingle();
-
-  if (existing) return { error: 'Bu oyuncu zaten bu lige/sezona ekli durumda.' };
-
-  const { error } = await supabase.from('team_memberships').insert({
-    player_id,
-    team_id,
-    league_id,
-    season_id
+  // Tek bir transaction içinde güvenli şekilde RPC ile işlemi hallediyoruz
+  const { error } = await supabase.rpc('admin_add_player_to_team', {
+    p_player_id: player_id,
+    p_team_id: team_id,
+    p_league_id: league_id,
+    p_season_id: season_id
   });
 
   if (error) return { error: 'Oyuncu eklenemedi: ' + error.message };
 
   revalidatePath('/admin/teams');
+  revalidatePath('/oyuncular');
+  revalidatePath('/');
   return { success: 'Oyuncu başarıyla takıma eklendi.' };
 }
 
