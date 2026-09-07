@@ -437,6 +437,17 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
                 <input name='name' required className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm' />
               </div>
               <div>
+                <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>
+                  Takım Kısaltması <span className='normal-case text-zinc-600 font-normal'>(2–5 karakter, örn: ABR)</span>
+                </label>
+                <input
+                  name='ea_club_name'
+                  placeholder='ABR'
+                  maxLength={5}
+                  className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm uppercase placeholder:normal-case placeholder:text-zinc-600'
+                />
+              </div>
+              <div>
                 <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>Slug (Opsiyonel)</label>
                 <input name='slug' placeholder='Otomatik oluşturulur' className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm' />
               </div>
@@ -528,6 +539,18 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
               <div>
                 <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>Takım Adı</label>
                 <input name='name' defaultValue={editData.name} required className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm' />
+              </div>
+              <div>
+                <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>
+                  Takım Kısaltması <span className='normal-case text-zinc-600 font-normal'>(2–5 karakter, örn: ABR)</span>
+                </label>
+                <input
+                  name='ea_club_name'
+                  defaultValue={editData.ea_club_name || ''}
+                  placeholder='ABR'
+                  maxLength={5}
+                  className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm uppercase placeholder:normal-case placeholder:text-zinc-600'
+                />
               </div>
               <div>
                 <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>Slug</label>

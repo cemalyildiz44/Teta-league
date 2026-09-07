@@ -235,7 +235,7 @@ export default async function TeamPage({ params }: Props) {
     });
   }
 
-  const shortTag = `#${team.slug.substring(0,3).toUpperCase()}`;
+  const shortTag = `#${(team.ea_club_name || team.slug.substring(0,3)).toUpperCase()}`;
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 lg:px-6 py-12 md:py-16">
@@ -254,7 +254,7 @@ export default async function TeamPage({ params }: Props) {
               <img 
                 src={team.logo_url} 
                 alt={team.name} 
-                className="relative w-32 h-32 md:w-44 md:h-44 rounded-3xl object-cover border border-white/10 bg-black shadow-2xl"
+                className="relative w-32 h-32 md:w-44 md:h-44 rounded-3xl object-contain border border-white/10 shadow-2xl"
               />
             ) : (
               <div className="relative w-32 h-32 md:w-44 md:h-44 rounded-3xl bg-gradient-to-br from-[#060d18] to-black border border-white/10 shadow-2xl flex items-center justify-center text-4xl md:text-5xl font-black text-[#00e5ff]">
@@ -374,8 +374,8 @@ export default async function TeamPage({ params }: Props) {
                       </span>
                     </div>
                     <div className="flex-1 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded bg-black flex items-center justify-center overflow-hidden shrink-0">
-                        {opponent?.logo_url ? <img src={opponent.logo_url} alt="" className="w-full h-full object-cover" /> : <span className="text-[10px] font-bold text-[#00e5ff]">{opponent?.name?.substring(0,2)}</span>}
+                      <div className="w-8 h-8 rounded flex items-center justify-center overflow-hidden shrink-0">
+                        {opponent?.logo_url ? <img src={opponent.logo_url} alt="" className="w-full h-full object-contain" /> : <span className="text-[10px] font-bold text-[#00e5ff]">{opponent?.name?.substring(0,2)}</span>}
                       </div>
                       <Link href={opponent?.slug ? `/takim/${opponent.slug}` : "#"} className="text-[14px] font-[800] text-gray-300 hover:text-[#00e5ff] truncate transition-colors">
                         {opponent?.name}
@@ -416,8 +416,8 @@ export default async function TeamPage({ params }: Props) {
                     </div>
                     <div className="flex-1 flex items-center justify-between">
                       <div className="flex items-center gap-3 truncate">
-                        <div className="w-8 h-8 rounded bg-black flex items-center justify-center overflow-hidden shrink-0">
-                          {opponent?.logo_url ? <img src={opponent.logo_url} alt="" className="w-full h-full object-cover" /> : <span className="text-[10px] font-bold text-[#00e5ff]">{opponent?.name?.substring(0,2)}</span>}
+                        <div className="w-8 h-8 rounded flex items-center justify-center overflow-hidden shrink-0">
+                          {opponent?.logo_url ? <img src={opponent.logo_url} alt="" className="w-full h-full object-contain" /> : <span className="text-[10px] font-bold text-[#00e5ff]">{opponent?.name?.substring(0,2)}</span>}
                         </div>
                         <span className="text-[14px] font-[800] text-gray-300 truncate group-hover:text-white transition-colors">
                           {opponent?.name}

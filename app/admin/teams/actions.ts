@@ -24,14 +24,21 @@ export async function createTeam(formData: FormData) {
 
   const name = formData.get('name') as string;
   const ea_club_id_str = formData.get('ea_club_id') as string;
+  const ea_club_name_input = (formData.get('ea_club_name') as string || '').trim().toUpperCase();
   const logo_file = (formData.get('logo_file') || formData.get('image_file')) as File;
   const logo_url_input = formData.get('logo_url') as string;
   const slugInput = formData.get('slug') as string;
 
   if (!name) return { error: 'Takım adı zorunludur.' };
+
+  // Validate abbreviation (optional, 2-5 chars)
+  if (ea_club_name_input && (ea_club_name_input.length < 2 || ea_club_name_input.length > 5)) {
+    return { error: 'Takım kısaltması 2 ile 5 karakter arasında olmalıdır.' };
+  }
   
   const ea_club_id = ea_club_id_str ? parseInt(ea_club_id_str, 10) : null;
   const slug = slugInput ? slugInput.toLowerCase().trim().replace(/[\s\W-]+/g, '-') : name.toLowerCase().trim().replace(/[\s\W-]+/g, '-');
+  const ea_club_name = ea_club_name_input || null;
 
   let logo_url: string | null = logo_url_input || null;
   let uploadedFileName: string | null = null;
@@ -64,6 +71,7 @@ export async function createTeam(formData: FormData) {
     name,
     slug,
     ea_club_id,
+    ea_club_name,
     logo_url,
     is_active: true
   });
@@ -91,6 +99,7 @@ export async function editTeam(formData: FormData) {
   const id = formData.get('id') as string;
   const name = formData.get('name') as string;
   const ea_club_id_str = formData.get('ea_club_id') as string;
+  const ea_club_name_input = (formData.get('ea_club_name') as string || '').trim().toUpperCase();
   const logo_file = (formData.get('logo_file') || formData.get('image_file')) as File;
   const remove_logo = formData.get('remove_logo') === 'true' || formData.get('remove_image') === 'true';
   const logo_url_input = formData.get('logo_url') as string;
@@ -98,8 +107,14 @@ export async function editTeam(formData: FormData) {
 
   if (!id || !name || !slugInput) return { error: 'Eksik bilgi.' };
 
+  // Validate abbreviation (optional, 2-5 chars)
+  if (ea_club_name_input && (ea_club_name_input.length < 2 || ea_club_name_input.length > 5)) {
+    return { error: 'Takım kısaltması 2 ile 5 karakter arasında olmalıdır.' };
+  }
+
   const ea_club_id = ea_club_id_str ? parseInt(ea_club_id_str, 10) : null;
   const slug = slugInput.toLowerCase().trim().replace(/[\s\W-]+/g, '-');
+  const ea_club_name = ea_club_name_input || null;
 
   // Fetch current team data for cleanup
   const { data: currentTeam } = await supabase
@@ -139,7 +154,8 @@ export async function editTeam(formData: FormData) {
   const updatePayload: any = {
     name,
     slug,
-    ea_club_id
+    ea_club_id,
+    ea_club_name
   };
 
   if (new_logo_url) {
