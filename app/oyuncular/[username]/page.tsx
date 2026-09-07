@@ -306,21 +306,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
             <div className="text-4xl lg:text-5xl font-[900] text-[#00e5ff] tracking-tighter drop-shadow-[0_0_15px_rgba(0,229,255,0.3)] z-10">
               {formatEuro(marketValue.totalValue)}
             </div>
-            {/* Ozet */}
-            <div className="mt-6 flex gap-6 text-[11px] font-[800] tracking-wider uppercase text-gray-400 z-10">
-              <div className="flex flex-col items-center">
-                <span className="text-white text-[16px] mb-0.5">{tM}</span>
-                <span className="opacity-60">Maç</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <span className="text-white text-[16px] mb-0.5">{tG}</span>
-                <span className="opacity-60">Gol</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <span className="text-white text-[16px] mb-0.5">{tA}</span>
-                <span className="opacity-60">Asist</span>
-              </div>
-            </div>
+
           </div>
 
         </section>
