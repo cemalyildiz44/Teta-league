@@ -2,10 +2,11 @@ import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { Metadata } from 'next';
 import PlayerRankingsClient, { PlayerRanking } from './PlayerRankingsClient';
+import { calculateMarketValue, MarketValueInput } from '@/app/utils/marketValueCalculator';
 
 export const metadata: Metadata = {
   title: 'Oyuncular Sıralaması | Teta League',
-  description: 'Teta League tarihindeki en başarılı oyuncular. Tüm zamanlar oyuncu sıralaması.',
+  description: 'Teta League tarihindeki en değerli oyuncular. Oyuncu piyasa değeri sıralaması.',
 };
 
 export const revalidate = 60; // 1 min cache
@@ -14,78 +15,112 @@ export default async function PlayersPage() {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  // 1 & 2. Fetch profiles and approved matches concurrently
-  const [ { data: profiles }, { data: approvedMatches } ] = await Promise.all([
-    supabase.from('profiles').select('id, username, current_ea_player_id, avatar_url, platform, primary_position, alternative_positions'),
-    supabase.from('matches').select('id, home_team_id, away_team_id, home_score, away_score').eq('status', 'APPROVED')
-  ]);
+  // 1. Fetch all profiles
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, username, current_ea_player_id, avatar_url, platform, primary_position, alternative_positions');
 
   const validProfiles = profiles || [];
   const profileIds = validProfiles.map(p => p.id);
-  const eaPlayerIds = validProfiles.map(p => p.current_ea_player_id).filter(Boolean);
+  const eaPlayerIds = validProfiles.map(p => p.current_ea_player_id).filter(Boolean) as string[];
 
-  const matchesMap = new Map();
-  const approvedMatchIds: string[] = [];
-  
-  if (approvedMatches) {
-    approvedMatches.forEach(m => {
-      approvedMatchIds.push(m.id);
-      matchesMap.set(m.id, m);
-    });
-  }
-
-  // 3 & 4. Fetch memberships and match_player_stats concurrently
-  const [ { data: memData }, { data: statsData } ] = await Promise.all([
-    profileIds.length > 0 ? supabase.from('team_memberships').select('player_id').in('player_id', profileIds).is('left_at', null) : Promise.resolve({ data: [] }),
-    (approvedMatchIds.length > 0 && eaPlayerIds.length > 0) ? supabase.from('match_player_stats').select('ea_player_id, match_id, team_id').in('match_id', approvedMatchIds).in('ea_player_id', eaPlayerIds) : Promise.resolve({ data: [] })
+  // 2, 3, 4. Fetch memberships, match stats, and achievements concurrently (Bulk Queries - No N+1)
+  const [ { data: memData }, { data: bulkStats }, { data: bulkAchievements } ] = await Promise.all([
+    profileIds.length > 0
+      ? supabase.from('team_memberships').select('player_id').in('player_id', profileIds).is('left_at', null)
+      : Promise.resolve({ data: [] }),
+    eaPlayerIds.length > 0
+      ? supabase
+          .from('match_player_stats')
+          .select('ea_player_id, team_id, goals, assists, rating, cleansheets_gk, cleansheets_def, red_cards, matches!inner(home_team_id, away_team_id, home_score, away_score, status, season_id)')
+          .in('ea_player_id', eaPlayerIds)
+          .eq('matches.status', 'APPROVED')
+      : Promise.resolve({ data: [] }),
+    profileIds.length > 0
+      ? supabase
+          .from('player_achievements')
+          .select('player_id, achievement_type, season_id')
+          .in('player_id', profileIds)
+      : Promise.resolve({ data: [] })
   ]);
 
   const memberships = memData || [];
   const contractedPlayerIds = new Set(memberships.map(m => m.player_id));
-  const rawStats = statsData || [];
 
-  // 5. Aggregate W/D/L per ea_player_id
-  const statsMap = new Map<string, { wins: number, draws: number, losses: number, played: number }>();
-  
-  eaPlayerIds.forEach(eaId => {
-    if (eaId) {
-      statsMap.set(eaId, { wins: 0, draws: 0, losses: 0, played: 0 });
-    }
-  });
+  // Index achievements by profile id
+  const achByProfile = new Map<string, any[]>();
+  if (bulkAchievements) {
+    bulkAchievements.forEach(a => {
+      if (!achByProfile.has(a.player_id)) achByProfile.set(a.player_id, []);
+      achByProfile.get(a.player_id)!.push(a);
+    });
+  }
 
-  rawStats.forEach(stat => {
-    const match = matchesMap.get(stat.match_id);
-    const eaId = stat.ea_player_id;
-    if (!match || !eaId || !stat.team_id) return;
-    
-    const ps = statsMap.get(eaId);
-    if (!ps) return;
+  // Index match stats by ea_player_id
+  const statsByEaId = new Map<string, any[]>();
+  if (bulkStats) {
+    bulkStats.forEach((s: any) => {
+      if (!statsByEaId.has(s.ea_player_id)) statsByEaId.set(s.ea_player_id, []);
+      statsByEaId.get(s.ea_player_id)!.push(s);
+    });
+  }
 
-    ps.played += 1;
-
-    // Check if player's team won, drew, or lost
-    const isHome = stat.team_id === match.home_team_id;
-    const isAway = stat.team_id === match.away_team_id;
-    
-    // Safety check just in case team_id doesn't match home/away (unlikely but possible in bad data)
-    if (!isHome && !isAway) return; 
-
-    if (match.home_score > match.away_score) {
-      if (isHome) ps.wins += 1;
-      if (isAway) ps.losses += 1;
-    } else if (match.home_score < match.away_score) {
-      if (isHome) ps.losses += 1;
-      if (isAway) ps.wins += 1;
-    } else {
-      ps.draws += 1;
-    }
-  });
-
-  // 6. Build the final array
+  // Calculate Market Value for each player
   const rankingsArray: PlayerRanking[] = validProfiles.map(p => {
     const eaId = p.current_ea_player_id as string;
-    const stats = statsMap.get(eaId) || { wins: 0, draws: 0, losses: 0, played: 0 };
-    
+    const pStatsList = eaId ? statsByEaId.get(eaId) || [] : [];
+
+    let tM = 0, tW = 0, tD = 0, tL = 0, tG = 0, tA = 0, tCGK = 0, tCDEF = 0, tRC = 0;
+    const sMap = new Map<string, { season_id: string, rating_sum: number, rating_count: number }>();
+
+    pStatsList.forEach((s: any) => {
+      tM++;
+      tG += s.goals || 0;
+      tA += s.assists || 0;
+      tRC += s.red_cards || 0;
+      tCGK += s.cleansheets_gk || 0;
+      tCDEF += s.cleansheets_def || 0;
+
+      const m = s.matches;
+      if (m) {
+        const isHome = s.team_id === m.home_team_id;
+        const my = isHome ? m.home_score : m.away_score;
+        const opp = isHome ? m.away_score : m.home_score;
+        if (my > opp) tW++;
+        else if (my < opp) tL++;
+        else tD++;
+
+        if (m.season_id) {
+          const sid = m.season_id;
+          if (!sMap.has(sid)) {
+            sMap.set(sid, { season_id: sid, rating_sum: 0, rating_count: 0 });
+          }
+          const item = sMap.get(sid)!;
+          item.rating_sum += parseFloat(s.rating) || 0;
+          item.rating_count++;
+        }
+      }
+    });
+
+    const mvInput: MarketValueInput = {
+      profile: { primary_position: p.primary_position },
+      careerStats: {
+        matches_played: tM,
+        wins: tW,
+        draws: tD,
+        losses: tL,
+        goals: tG,
+        assists: tA,
+        cleansheets_gk: tCGK,
+        cleansheets_def: tCDEF,
+        red_cards: tRC
+      },
+      seasonStats: Array.from(sMap.values()),
+      achievements: achByProfile.get(p.id) || []
+    };
+
+    const mvResult = calculateMarketValue(mvInput);
+
     return {
       id: p.id,
       username: p.username,
@@ -94,25 +129,22 @@ export default async function PlayersPage() {
       position: p.primary_position || 'Bilinmiyor',
       alternativePositions: p.alternative_positions || [],
       status: contractedPlayerIds.has(p.id) ? 'CONTRACTED' : 'FREE',
-      wins: stats.wins,
-      draws: stats.draws,
-      losses: stats.losses,
-      played: stats.played,
+      marketValue: mvResult.totalValue,
+      wins: tW,
+      draws: tD,
+      losses: tL,
+      played: tM,
     };
   });
 
-  // 7. Sort Rankings
-  // Primary: Wins (DESC)
-  // Secondary: Played (DESC)
-  // Tertiary: Losses (ASC)
-  // Quaternary: Draws (DESC)
-  // Quinary: Name (ASC)
+  // Sort Rankings:
+  // Primary: Market Value (DESC)
+  // Secondary: Username (ASC, deterministic)
   rankingsArray.sort((a, b) => {
-    if (b.wins !== a.wins) return b.wins - a.wins;
-    if (b.played !== a.played) return b.played - a.played;
-    if (a.losses !== b.losses) return a.losses - b.losses; // ASC for losses
-    if (b.draws !== a.draws) return b.draws - a.draws;
-    return a.username.localeCompare(b.username);
+    if (b.marketValue !== a.marketValue) {
+      return b.marketValue - a.marketValue;
+    }
+    return a.username.localeCompare(b.username, 'tr', { sensitivity: 'base' });
   });
 
   return (
@@ -126,7 +158,7 @@ export default async function PlayersPage() {
           OYUNCULAR
         </h1>
         <p className="text-[#a0b0c0] font-medium max-w-2xl mx-auto text-[15px] md:text-[17px] leading-relaxed">
-          Teta League tarihindeki en başarılı oyuncular.
+          Teta League tarihindeki en değerli oyuncular.
         </p>
       </div>
 

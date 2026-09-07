@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { formatEuro } from '@/app/utils/marketValueCalculator';
 
 export const PLATFORM_OPTIONS = [
   'PS5',
@@ -41,10 +42,11 @@ export type PlayerRanking = {
   position: string;
   alternativePositions?: string[] | null;
   status: string;
-  wins: number;
-  draws: number;
-  losses: number;
-  played: number;
+  marketValue: number;
+  wins?: number;
+  draws?: number;
+  losses?: number;
+  played?: number;
 };
 
 // Pozisyon alias haritası: Hem Türkçe hem İngilizce kayıtları doğru Türkçe karşılığıyla eşleştirir
@@ -152,6 +154,11 @@ export default function PlayerRankingsClient({ rankings }: { rankings: PlayerRan
       if (statusFilter !== 'ALL' && player.status !== statusFilter) return false;
 
       return true;
+    }).sort((a, b) => {
+      if (b.marketValue !== a.marketValue) {
+        return b.marketValue - a.marketValue;
+      }
+      return a.username.localeCompare(b.username, 'tr', { sensitivity: 'base' });
     });
   }, [rankings, searchTerm, platformFilter, positionFilter, statusFilter]);
 
@@ -275,15 +282,12 @@ export default function PlayerRankingsClient({ rankings }: { rankings: PlayerRan
       ) : (
         <div className="client-glass rounded-2xl border border-white/5 overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.5)]">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse whitespace-nowrap min-w-[700px]">
+            <table className="w-full text-left border-collapse whitespace-nowrap min-w-[500px]">
               <thead>
                 <tr className="bg-black/40 border-b border-white/5">
-                  <th className="py-5 px-6 text-[12px] font-[900] text-gray-500 tracking-[0.2em] uppercase text-center w-20">SIRA</th>
+                  <th className="py-5 px-6 text-[12px] font-[900] text-gray-500 tracking-[0.2em] uppercase text-center w-24">SIRA</th>
                   <th className="py-5 px-6 text-[12px] font-[900] text-gray-500 tracking-[0.2em] uppercase">OYUNCU</th>
-                  <th className="py-5 px-4 text-[12px] font-[900] text-[#00e5ff] tracking-[0.2em] uppercase text-center w-20">G</th>
-                  <th className="py-5 px-4 text-[12px] font-[900] text-gray-500 tracking-[0.2em] uppercase text-center w-16">B</th>
-                  <th className="py-5 px-4 text-[12px] font-[900] text-gray-500 tracking-[0.2em] uppercase text-center w-16">M</th>
-                  <th className="py-5 px-6 text-[12px] font-[900] text-gray-500 tracking-[0.2em] uppercase text-center w-24">MAÇ</th>
+                  <th className="py-5 px-6 text-[12px] font-[900] text-[#00e5ff] tracking-[0.2em] uppercase text-right w-48 md:w-60">PİYASA DEĞERİ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -293,20 +297,20 @@ export default function PlayerRankingsClient({ rankings }: { rankings: PlayerRan
                   // Top 3 specific styles
                   let rankStyle = "text-gray-400";
                   let rowStyle = "hover:bg-white/5";
-                  let winsStyle = "text-white";
+                  let valueStyle = "text-gray-200 font-[800]";
                   
                   if (rank === 1) {
                     rankStyle = "text-[#00e5ff] drop-shadow-[0_0_8px_rgba(0,229,255,0.8)] font-[900]";
                     rowStyle = "bg-[#00e5ff]/[0.03] border-l-4 border-l-[#00e5ff] hover:bg-[#00e5ff]/[0.06]";
-                    winsStyle = "text-[#00e5ff] drop-shadow-[0_0_8px_rgba(0,229,255,0.8)] font-[900]";
+                    valueStyle = "text-[#00e5ff] drop-shadow-[0_0_8px_rgba(0,229,255,0.8)] font-[900]";
                   } else if (rank === 2) {
                     rankStyle = "text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.5)] font-[900]";
                     rowStyle = "bg-white/[0.02] border-l-4 border-l-gray-400 hover:bg-white/[0.04]";
-                    winsStyle = "text-[#00e5ff] drop-shadow-[0_0_5px_rgba(0,229,255,0.5)] font-[900]";
+                    valueStyle = "text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.5)] font-[900]";
                   } else if (rank === 3) {
                     rankStyle = "text-orange-300 drop-shadow-[0_0_5px_rgba(253,186,116,0.3)] font-[900]";
                     rowStyle = "bg-orange-500/[0.015] border-l-4 border-l-orange-900/50 hover:bg-orange-500/[0.03]";
-                    winsStyle = "text-[#00e5ff] drop-shadow-[0_0_5px_rgba(0,229,255,0.3)] font-[900]";
+                    valueStyle = "text-orange-300 drop-shadow-[0_0_5px_rgba(253,186,116,0.3)] font-[900]";
                   }
                   
                   return (
@@ -346,27 +350,10 @@ export default function PlayerRankingsClient({ rankings }: { rankings: PlayerRan
                         </Link>
                       </td>
                       
-                      {/* WINS */}
-                      <td className="py-4 px-4 text-center">
-                        <span className={`text-[18px] font-[900] ${winsStyle}`}>
-                          {player.wins}
-                        </span>
-                      </td>
-                      
-                      {/* DRAWS */}
-                      <td className="py-4 px-4 text-center">
-                        <span className="text-[14px] font-[700] text-gray-400">{player.draws}</span>
-                      </td>
-                      
-                      {/* LOSSES */}
-                      <td className="py-4 px-4 text-center">
-                        <span className="text-[14px] font-[700] text-gray-500">{player.losses}</span>
-                      </td>
-                      
-                      {/* TOTAL MATCHES */}
-                      <td className="py-4 px-6 text-center">
-                        <span className="text-[15px] font-[800] text-white">
-                          {player.played}
+                      {/* MARKET VALUE */}
+                      <td className="py-4 px-6 text-right">
+                        <span className={`text-[15px] md:text-[17px] tracking-wider ${valueStyle}`}>
+                          {formatEuro(player.marketValue)}
                         </span>
                       </td>
                     </tr>
