@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { Trophy } from "lucide-react";
+import { calculateMarketValue, formatEuro, MarketValueInput } from "@/app/utils/marketValueCalculator";
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }) {
   const resolvedParams = await params;
@@ -12,25 +13,7 @@ export async function generateMetadata({ params }: { params: Promise<{ username:
   };
 }
 
-// ── EA Character Visual ──────────────────────────────────────────────
-function PlayerCardVisual({ url, username }: { url: string | null; username: string }) {
-  return (
-    <div className="relative w-full h-[320px] md:h-[360px] lg:h-[400px] rounded-2xl overflow-hidden group border border-white/5 bg-gradient-to-br from-[#01060b] to-[#03070c] shadow-[inset_0_0_40px_rgba(0,0,0,0.8)]">
-      <div className="absolute inset-0 bg-gradient-to-t from-[#01060b] via-[#01060b]/20 to-transparent z-10 pointer-events-none" />
-      {url ? (
-        <img src={url} alt={username} className="w-full h-full object-cover object-top opacity-90 group-hover:scale-105 transition-transform duration-700" />
-      ) : (
-        <div className="w-full h-full flex flex-col items-center justify-center relative z-0">
-          <div className="absolute inset-0 bg-gradient-to-tr from-[#00e5ff]/5 to-transparent blur-2xl opacity-40" />
-          <svg className="w-32 h-32 text-white/5" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2C9.243 2 7 4.243 7 7s2.243 5 5 5 5-2.243 5-5-2.243-5-5-5zm0 8c-1.654 0-3-1.346-3-3s1.346-3 3-3 3 1.346 3 3-1.346 3-3 3zm9 11v-1c0-3.859-3.141-7-7-7h-4c-3.859 0-7 3.141-7 7v1h2v-1c0-2.757 2.243-5 5-5h4c2.757 0 5 2.243 5 5v1h2z"/>
-          </svg>
-          <span className="text-white/20 font-[900] tracking-[0.3em] mt-2 text-[10px] uppercase">Karakter Yok</span>
-        </div>
-      )}
-    </div>
-  );
-}
+// Visuals removed as per market value requirement
 
 export default async function PlayerProfilePage({ params, searchParams }: { params: Promise<{ username: string }>, searchParams: Promise<{ tab?: string }> }) {
   const resolvedParams = await params;
@@ -54,17 +37,31 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   if (!profile) notFound();
 
   // ── 2. Parallel Fetches ────────────────────────────────────────────
-  const [{ data: membershipsData }, { data: approvedMatchesData }, { data: allSeasonsData }, { data: allLeaguesData }] = await Promise.all([
+  let playerStats: any[] = [];
+  let approvedMatches: any[] = [];
+  if (profile.current_ea_player_id) {
+    const { data: statsWithMatches } = await supabase
+      .from("match_player_stats")
+      .select("*, matches!inner(id, home_team_id, away_team_id, home_score, away_score, season_id, league_id, played_at, status, fixtures(week_number))")
+      .eq("ea_player_id", profile.current_ea_player_id)
+      .eq("matches.status", "APPROVED");
+      
+    if (statsWithMatches) {
+      playerStats = statsWithMatches;
+      approvedMatches = statsWithMatches.map((s: any) => s.matches);
+    }
+  }
+
+  const [{ data: membershipsData }, { data: allSeasonsData }, { data: allLeaguesData }, { data: playerAchievementsData }] = await Promise.all([
     supabase.from("team_memberships").select("*, teams(id, name, slug, logo_url)").eq("player_id", profile.id).order("joined_at", { ascending: false }),
-    supabase.from("matches").select("id, home_team_id, away_team_id, home_score, away_score, season_id, league_id, played_at, seasons(id, name), leagues(id, name), fixtures(week_number)").eq("status", "APPROVED"),
     supabase.from("seasons").select("id, name, slug"),
     supabase.from("leagues").select("id, name, season_id"),
+    supabase.from('player_achievements').select('achievement_type, season_id').eq('player_id', profile.id)
   ]);
 
   const memberships = membershipsData || [];
   const activeMembership = memberships.find((m) => !m.left_at);
   const activeTeam = activeMembership?.teams ? (activeMembership.teams as any) : null;
-  const approvedMatches = approvedMatchesData || [];
   const matchMap = new Map(approvedMatches.map((m) => [m.id, m]));
   const seasonsMap = new Map((allSeasonsData || []).map((s) => [s.id, s]));
   const leaguesMap = new Map((allLeaguesData || []).map((l) => [l.id, l]));
@@ -76,15 +73,8 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   const { data: allTeamsData } = await supabase.from("teams").select("id, name, slug, logo_url").in("id", teamIds.size > 0 ? Array.from(teamIds) : ["00000000-0000-0000-0000-000000000000"]);
   const teamsMap = new Map((allTeamsData || []).map((t) => [t.id, t]));
 
-  // ── 3. Player Stats ────────────────────────────────────────────────
-  let playerStats: any[] = [];
-  if (approvedMatches.length > 0 && profile.current_ea_player_id) {
-    const { data } = await supabase.from("match_player_stats").select("*").in("match_id", approvedMatches.map((m) => m.id)).eq("ea_player_id", profile.current_ea_player_id);
-    playerStats = data || [];
-  }
-
   // ── 4. Aggregate ───────────────────────────────────────────────────
-  let tM = 0, tG = 0, tA = 0, tR = 0, tW = 0, tSh = 0, tPM = 0, tPA = 0, tTM = 0, tTA = 0, tSv = 0, tGC = 0, tMOM = 0, tRC = 0;
+  let tM = 0, tG = 0, tA = 0, tR = 0, tW = 0, tD = 0, tL = 0, tSh = 0, tPM = 0, tPA = 0, tTM = 0, tTA = 0, tSv = 0, tGC = 0, tMOM = 0, tRC = 0, tCGK = 0, tCDEF = 0;
   const slMap = new Map<string, any>();
   const matchLevel: any[] = [];
 
@@ -95,12 +85,15 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     tSh += s.shots || 0; tPM += s.passes_made || 0; tPA += s.pass_attempts || 0;
     tTM += s.tackles_made || 0; tTA += s.tackle_attempts || 0; tSv += s.saves || 0;
     tGC += s.goals_conceded || 0; tMOM += s.is_mom ? 1 : 0; tRC += s.red_cards || 0;
+    tCGK += s.cleansheets_gk || 0; tCDEF += s.cleansheets_def || 0;
 
     const isHome = s.team_id === m.home_team_id;
     const my = isHome ? m.home_score : m.away_score;
     const opp = isHome ? m.away_score : m.home_score;
     let res: "W" | "D" | "L" = "D";
-    if (my > opp) { res = "W"; tW++; } else if (my < opp) { res = "L"; }
+    if (my > opp) { res = "W"; tW++; } 
+    else if (my < opp) { res = "L"; tL++; } 
+    else { res = "D"; tD++; }
 
     matchLevel.push({
       matchId: m.id, playedAt: m.played_at, rating: parseFloat(s.rating) || 0,
@@ -123,6 +116,15 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
       if (res === "W") p.wins++;
     }
   }
+
+  // Market Value Calculation
+  const mvInput: MarketValueInput = {
+    profile: { primary_position: profile.primary_position },
+    careerStats: { matches_played: tM, wins: tW, draws: tD, losses: tL, goals: tG, assists: tA, cleansheets_gk: tCGK, cleansheets_def: tCDEF, red_cards: tRC },
+    seasonStats: Array.from(slMap.values()).map(s => ({ season_id: s.seasonId, rating_sum: s.ratingSum, rating_count: s.matches })),
+    achievements: playerAchievementsData || []
+  };
+  const marketValue = calculateMarketValue(mvInput);
 
   const avgRating = tM > 0 ? (tR / tM).toFixed(2) : "0.00";
   const passAcc = tPA > 0 ? ((tPM / tPA) * 100).toFixed(0) : "0";
@@ -160,8 +162,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   // Achievements
   const [
     { data: tournamentsData },
-    { data: ncData },
-    { data: playerAchievementsData }
+    { data: ncData }
   ] = await Promise.all([
     supabase
       .from('tournament_winners')
@@ -172,12 +173,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     supabase
       .from('tournament_application_players')
       .select('application_id, tournament_applications(team_name, tournament_winners(id, placement, tournaments(name, type, image_url, seasons(name))))')
-      .eq('profile_id', profile.id),
-
-    supabase
-      .from('player_achievements')
-      .select('achievement_type')
-      .eq('player_id', profile.id)
+      .eq('profile_id', profile.id)
   ]);
 
   const directTournaments = tournamentsData || [];
@@ -291,9 +287,28 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
             )}
           </div>
 
-          {/* SAĞ: EA Karakter */}
-          <div className="hidden lg:block w-full">
-            <PlayerCardVisual url={null} username={profile.username} />
+          {/* SAĞ: PİYASA DEĞERİ */}
+          <div className="bg-[#03070c] border border-white/5 rounded-2xl p-6 lg:p-8 flex flex-col justify-center items-center text-center relative overflow-hidden h-full min-h-[220px]">
+            <div className="absolute inset-0 bg-gradient-to-br from-[#00e5ff]/5 via-transparent to-transparent opacity-50" />
+            <div className="text-[12px] font-[900] text-gray-500 tracking-[0.3em] uppercase mb-4 z-10">PİYASA DEĞERİ</div>
+            <div className="text-4xl lg:text-5xl font-[900] text-[#00e5ff] tracking-tighter drop-shadow-[0_0_15px_rgba(0,229,255,0.3)] z-10">
+              {formatEuro(marketValue.totalValue)}
+            </div>
+            {/* Ozet */}
+            <div className="mt-6 flex gap-6 text-[11px] font-[800] tracking-wider uppercase text-gray-400 z-10">
+              <div className="flex flex-col items-center">
+                <span className="text-white text-[16px] mb-0.5">{tM}</span>
+                <span className="opacity-60">Maç</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-white text-[16px] mb-0.5">{tG}</span>
+                <span className="opacity-60">Gol</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-white text-[16px] mb-0.5">{tA}</span>
+                <span className="opacity-60">Asist</span>
+              </div>
+            </div>
           </div>
 
         </section>

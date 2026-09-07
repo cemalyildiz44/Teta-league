@@ -169,6 +169,72 @@ export default async function TeamPage({ params }: Props) {
     }
   }
 
+  // 6. Market Value Bulk Fetch
+  let totalTeamValue = 0;
+  if (roster.length > 0) {
+    const eaPlayerIds = roster.map(r => r.current_ea_player_id).filter(Boolean);
+    const profileIds = roster.map(r => r.id);
+    
+    const [{ data: bulkStats }, { data: bulkAchievements }] = await Promise.all([
+      supabase.from("match_player_stats").select("ea_player_id, team_id, goals, assists, rating, cleansheets_gk, cleansheets_def, red_cards, matches!inner(home_team_id, away_team_id, home_score, away_score, status, season_id)").in("ea_player_id", eaPlayerIds).eq("matches.status", "APPROVED"),
+      supabase.from("player_achievements").select("player_id, achievement_type, season_id").in("player_id", profileIds)
+    ]);
+
+    const achByProfile = new Map();
+    if (bulkAchievements) {
+      bulkAchievements.forEach(a => {
+        if (!achByProfile.has(a.player_id)) achByProfile.set(a.player_id, []);
+        achByProfile.get(a.player_id).push(a);
+      });
+    }
+
+    const statsByEaId = new Map();
+    if (bulkStats) {
+      bulkStats.forEach(s => {
+        if (!statsByEaId.has(s.ea_player_id)) statsByEaId.set(s.ea_player_id, []);
+        statsByEaId.get(s.ea_player_id).push(s);
+      });
+    }
+
+    // Dynamic import to use the calculator without importing at the top if it causes issues, but we can just import it.
+    // Wait, let's just do it directly or use require if it's simpler. I'll import it at the top later.
+    const { calculateMarketValue } = await import("@/app/utils/marketValueCalculator");
+
+    roster.forEach(r => {
+      let tM=0, tW=0, tD=0, tL=0, tG=0, tA=0, tCGK=0, tCDEF=0, tRC=0;
+      const sMap = new Map();
+      const pStatsList = r.current_ea_player_id ? statsByEaId.get(r.current_ea_player_id) || [] : [];
+      
+      pStatsList.forEach((s: any) => {
+        tM++; tG += s.goals || 0; tA += s.assists || 0; tRC += s.red_cards || 0;
+        tCGK += s.cleansheets_gk || 0; tCDEF += s.cleansheets_def || 0;
+        
+        const m = s.matches;
+        const isHome = s.team_id === m.home_team_id;
+        const my = isHome ? m.home_score : m.away_score;
+        const opp = isHome ? m.away_score : m.home_score;
+        if (my > opp) tW++; else if (my < opp) tL++; else tD++;
+
+        const sid = m.season_id;
+        if (!sMap.has(sid)) sMap.set(sid, { season_id: sid, rating_sum: 0, rating_count: 0 });
+        const p = sMap.get(sid);
+        p.rating_sum += parseFloat(s.rating) || 0;
+        p.rating_count++;
+      });
+
+      const mvInput = {
+        profile: { primary_position: r.primary_position },
+        careerStats: { matches_played: tM, wins: tW, draws: tD, losses: tL, goals: tG, assists: tA, cleansheets_gk: tCGK, cleansheets_def: tCDEF, red_cards: tRC },
+        seasonStats: Array.from(sMap.values()),
+        achievements: achByProfile.get(r.id) || []
+      };
+      
+      const res = calculateMarketValue(mvInput);
+      r.marketValue = res.totalValue;
+      totalTeamValue += res.totalValue;
+    });
+  }
+
   const shortTag = `#${team.slug.substring(0,3).toUpperCase()}`;
 
   return (
@@ -233,6 +299,15 @@ export default async function TeamPage({ params }: Props) {
               ) : (
                 <div className="px-5 py-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-xl">
                   <span className="text-[13px] text-gray-500 font-bold uppercase tracking-widest">Kayıtlı Aktif Lig Yok</span>
+                </div>
+              )}
+
+              {/* Team Market Value Badge */}
+              {totalTeamValue > 0 && (
+                <div className="px-6 py-3 bg-gradient-to-br from-[#00e5ff]/10 to-transparent backdrop-blur-md border border-[#00e5ff]/30 rounded-xl flex flex-col shadow-[0_0_15px_rgba(0,229,255,0.1)] relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-[#00e5ff] opacity-0 group-hover:opacity-[0.05] transition-opacity" />
+                  <span className="text-[10px] text-[#00e5ff] font-[900] uppercase tracking-[0.2em] mb-1 z-10">KADRO DEĞERİ</span>
+                  <span className="text-[16px] text-white font-[900] tracking-wider uppercase z-10">{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(totalTeamValue)}</span>
                 </div>
               )}
             </div>
