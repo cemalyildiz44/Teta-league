@@ -1,4 +1,4 @@
-﻿
+
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { TeamsManager } from './TeamsManager';
@@ -20,13 +20,13 @@ export default async function AdminTeamsPage() {
   // Fetch team memberships
   const { data: memberships } = await supabase
     .from('team_memberships')
-    .select('id, team_id, player_id, league_id, season_id, joined_at, left_at, profiles!team_memberships_player_id_fkey(username), leagues(name), seasons(name)')
+    .select('id, team_id, player_id, league_id, season_id, joined_at, left_at, profiles!team_memberships_player_id_fkey(username), league_teams(leagues(name, seasons(name)))')
     .order('joined_at', { ascending: false });
 
   // Fetch league_teams for assignments
   const { data: leagueTeams } = await supabase
     .from('league_teams')
-    .select('team_id, league_id, season_id, is_active, leagues(name), seasons(name)')
+    .select('team_id, league_id, season_id, is_active, leagues(name, seasons(name))')
     .eq('is_active', true);
 
   // Fetch all profiles for assigning players/captains

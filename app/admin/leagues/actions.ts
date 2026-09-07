@@ -219,6 +219,7 @@ export async function assignTeamToLeague(league_id: string, season_id: string, t
   }
 
   revalidatePath('/admin/leagues');
+  revalidatePath('/admin/teams');
   return { success: 'Takım lige başarıyla eklendi.' };
 }
 
@@ -239,6 +240,7 @@ export async function removeTeamFromLeague(league_id: string, team_id: string) {
   }
 
   revalidatePath('/admin/leagues');
+  revalidatePath('/admin/teams');
   return { success: 'Takım ligden başarıyla çıkarıldı.' };
 }
 

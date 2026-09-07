@@ -680,7 +680,7 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
                   <option value=''>Seçiniz...</option>
                   {initialLeagueTeams.filter((lt:any) => lt.team_id === addPlayerModal.id).map((lt:any) => (
                     <option key={lt.league_id + lt.season_id} value={lt.league_id + '|' + lt.season_id}>
-                      {lt.leagues?.name} ({lt.seasons?.name})
+                      {lt.leagues?.name || 'Lig Bilinmiyor'} ({lt.leagues?.seasons?.name || 'Sezon Bilinmiyor'})
                     </option>
                   ))}
                 </select>
@@ -729,7 +729,9 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
                   <div key={m.id} className='flex items-center justify-between p-4 hover:bg-white/5 group transition-colors'>
                     <div>
                       <div className='font-bold text-white text-sm'>{m.profiles?.username}</div>
-                      <div className='text-xs text-zinc-500 mt-0.5'>{m.leagues?.name} ({m.seasons?.name})</div>
+                      <div className='text-xs text-zinc-500 mt-0.5'>
+                        {m.league_teams?.leagues?.name || 'Lig Bilinmiyor'} ({m.league_teams?.leagues?.seasons?.name || 'Sezon Bilinmiyor'})
+                      </div>
                     </div>
                     <div className='flex items-center gap-4'>
                       <div className='text-xs text-emerald-400 font-mono'>{new Date(m.joined_at).toLocaleDateString('tr-TR')}</div>
