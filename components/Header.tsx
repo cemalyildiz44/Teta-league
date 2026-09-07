@@ -5,17 +5,24 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { logoutAction } from '@/app/auth/actions';
+import { Lock } from 'lucide-react';
 
-const leftLinks = [
+interface NavLink {
+  label: string;
+  href: string;
+  locked?: boolean;
+}
+
+const leftLinks: NavLink[] = [
   { label: 'LİGLER', href: '/ligler' },
   { label: 'TURNUVALAR', href: '/turnuvalar' },
   { label: 'TAKIMLAR', href: '/takimlar' },
   { label: 'OYUNCULAR', href: '/oyuncular' },
 ];
 
-const rightLinks = [
+const rightLinks: NavLink[] = [
   { label: 'SOSYAL', href: '/sosyal' },
-  { label: 'MAĞAZA', href: '/magaza' },
+  { label: 'MAĞAZA', href: '/magaza', locked: true },
 ];
 
 export default function Header({ user, userProfile, activeTeam, unreadCount = 0 }: { user: any, userProfile?: any, activeTeam?: any, unreadCount?: number }) {
@@ -68,6 +75,19 @@ export default function Header({ user, userProfile, activeTeam, unreadCount = 0 
         {/* Desktop Nav - Right */}
         <div className="hidden xl:flex items-center gap-8 flex-1 justify-start pl-8 min-w-0">
           {rightLinks.map((link) => {
+            if (link.locked) {
+              return (
+                <div
+                  key={link.label}
+                  className="relative flex items-center gap-1.5 text-[14px] font-[800] uppercase tracking-[0.1em] text-gray-500/70 hover:text-gray-400 cursor-not-allowed select-none transition-colors duration-200 group"
+                  aria-disabled="true"
+                  title="Mağaza Çok Yakında"
+                >
+                  <span>{link.label}</span>
+                  <Lock size={13} className="text-gray-500 group-hover:text-gray-400 transition-colors" />
+                </div>
+              );
+            }
             const isActive = pathname === link.href || pathname.startsWith(link.href + '/');
             return (
               <Link
@@ -186,6 +206,18 @@ export default function Header({ user, userProfile, activeTeam, unreadCount = 0 
         <div className="xl:hidden fixed top-[90px] left-0 w-full border-t border-[#00E5FF]/20 bg-[#03070C]/98 backdrop-blur-xl shadow-[0_10px_50px_rgba(0,0,0,0.9)] h-[calc(100vh-90px)]">
           <nav className="flex flex-col px-6 py-6 gap-6 h-full pb-12 overflow-y-auto">
             {[...leftLinks, ...rightLinks].map((link) => {
+              if (link.locked) {
+                return (
+                  <div
+                    key={link.label}
+                    className="flex items-center gap-2 text-[16px] font-[800] uppercase tracking-widest text-gray-500/70 cursor-not-allowed select-none"
+                    aria-disabled="true"
+                  >
+                    <span>{link.label}</span>
+                    <Lock size={14} className="text-gray-500" />
+                  </div>
+                );
+              }
               const isActive = pathname === link.href || pathname.startsWith(link.href + '/');
               return (
                 <Link
