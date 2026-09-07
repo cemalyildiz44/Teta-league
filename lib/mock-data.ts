@@ -1,4 +1,4 @@
-﻿// Mock data for Pro Clubs League homepage
+// Mock data for Pro Clubs League homepage
 // This file contains all static/mock data used on the homepage.
 // Replace with real Supabase queries when backend integration begins.
 
@@ -278,8 +278,8 @@ export const footerLinks = {
     { label: 'Sosyal', href: '/sosyal' },
   ],
   about: [
-    { label: 'Hakkımızda', href: '/hakkimizda' },
-    { label: 'İletişim', href: '/iletisim' },
+    { label: 'Ekip', href: '/ekip' },
+    { label: 'İletişim', href: 'https://discord.gg/Cd9b4jpcAZ' },
   ],
   legal: [
     { label: 'Gizlilik', href: '/gizlilik' },

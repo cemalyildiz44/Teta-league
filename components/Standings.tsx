@@ -20,11 +20,14 @@ export default async function Standings({ compact = false }: StandingsProps) {
 
   if (!activeSeason) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-[20px] font-[800] tracking-wider text-white">PUAN DURUMU</h2>
+          <h2 className="text-[28px] font-[800] tracking-wide text-white">PUAN DURUMU</h2>
         </div>
-        <div className="empty-state"><span className="empty-state-title text-[18px]">Sezon Yok</span><span className="empty-state-desc">Henüz aktif sezon bulunmuyor.</span></div>
+        <div className="empty-state !py-8">
+          <span className="empty-state-title">Sezon Yok</span>
+          <span className="empty-state-desc">Henüz aktif sezon bulunmuyor.</span>
+        </div>
       </div>
     );
   }
@@ -41,11 +44,14 @@ export default async function Standings({ compact = false }: StandingsProps) {
 
   if (!activeLeague) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-[20px] font-[800] tracking-wider text-white">PUAN DURUMU</h2>
+          <h2 className="text-[28px] font-[800] tracking-wide text-white">PUAN DURUMU</h2>
         </div>
-        <div className="empty-state"><span className="empty-state-title text-[18px]">Lig Yok</span><span className="empty-state-desc">Henüz aktif lig bulunmuyor.</span></div>
+        <div className="empty-state !py-8">
+          <span className="empty-state-title">Lig Yok</span>
+          <span className="empty-state-desc">Henüz aktif lig bulunmuyor.</span>
+        </div>
       </div>
     );
   }
@@ -94,31 +100,39 @@ export default async function Standings({ compact = false }: StandingsProps) {
 
   if (sortedStats.length === 0) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-[20px] font-[800] tracking-wider text-white">PUAN DURUMU</h2>
+          <h2 className="text-[28px] font-[800] tracking-wide text-white">PUAN DURUMU</h2>
         </div>
-        <div className="empty-state"><span className="empty-state-title text-[18px]">Veri Yok</span><span className="empty-state-desc">Henüz puan durumu verisi bulunmuyor.</span></div>
+        <div className="empty-state !py-8">
+          <span className="empty-state-title">Veri Bekleniyor</span>
+          <span className="empty-state-desc">Henüz puan durumu verisi bulunmuyor.</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-[20px] font-[800] tracking-wider text-white">PUAN DURUMU</h2>
-        <Link href="/siralama" className="text-[10px] font-bold text-[#00e5ff] hover:text-white transition-colors tracking-widest uppercase">
+        <h2 className="text-[28px] font-[800] tracking-wide text-white">PUAN DURUMU</h2>
+        <Link href="/ligler" className="text-[13px] font-[700] text-[#00e5ff] hover:text-white transition-colors tracking-widest uppercase">
           Tümünü Gör →
         </Link>
       </div>
 
-      <div className="card-surface rounded-xl overflow-hidden">
+      <div className="card-surface rounded-xl overflow-hidden border border-white/5">
         <table className="w-full text-left text-sm whitespace-nowrap">
-          <thead className="bg-black/40 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-white/5">
+          <thead className="bg-black/40 text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-white/5">
             <tr>
-              <th className="px-3 py-3 w-8 text-center">#</th>
-              <th className="px-2 py-3">TAKIM</th>
-              <th className="px-2 py-3 text-center w-8">P</th>
+              <th className="px-4 py-3.5 w-12 text-center">#</th>
+              <th className="px-3 py-3.5">TAKIM</th>
+              <th className="px-3 py-3.5 text-center w-12 hidden sm:table-cell" title="Oynanan Maç">O</th>
+              <th className="px-3 py-3.5 text-center w-12 hidden md:table-cell" title="Galibiyet">G</th>
+              <th className="px-3 py-3.5 text-center w-12 hidden md:table-cell" title="Beraberlik">B</th>
+              <th className="px-3 py-3.5 text-center w-12 hidden md:table-cell" title="Mağlubiyet">M</th>
+              <th className="px-3 py-3.5 text-center w-14 hidden sm:table-cell" title="Averaj">AV</th>
+              <th className="px-4 py-3.5 text-center w-14 font-black text-[#00e5ff]">P</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
@@ -126,32 +140,47 @@ export default async function Standings({ compact = false }: StandingsProps) {
               const rank = index + 1;
               return (
                 <tr key={row.team?.slug || index} className={`hover:bg-white/5 transition-colors ${rank === 1 ? 'bg-[#00e5ff]/5' : ''}`}>
-                  <td className="px-3 py-3 text-center">
+                  <td className="px-4 py-3.5 text-center">
                     <span className={`font-black ${rank === 1 ? 'text-[#00e5ff]' : 'text-gray-500'}`}>
                       {rank}
                     </span>
                   </td>
-                  <td className="px-2 py-3 min-w-0 max-w-[120px] sm:max-w-none">
-                    <div className="flex items-center gap-2 min-w-0">
+                  <td className="px-3 py-3.5 min-w-0">
+                    <div className="flex items-center gap-3 min-w-0">
                       {row.team?.logo_url ? (
-                        <img src={row.team.logo_url} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
+                        <img src={row.team.logo_url} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
                       ) : (
-                        <div className="w-5 h-5 rounded-full bg-[#0a1628] border border-white/10 flex items-center justify-center text-[8px] font-black text-white shrink-0">
+                        <div className="w-6 h-6 rounded-full bg-[#0a1628] border border-white/10 flex items-center justify-center text-[9px] font-black text-white shrink-0">
                           {row.team?.name?.charAt(0) || '?'}
                         </div>
                       )}
                       {row.team?.slug ? (
-                        <Link href={`/takim/${row.team.slug}`} className={`font-bold text-xs whitespace-normal break-words min-w-0 hover:text-[#00e5ff] transition-colors ${rank === 1 ? 'text-white' : 'text-gray-300'}`}>
+                        <Link href={`/takim/${row.team.slug}`} className={`font-bold text-sm truncate hover:text-[#00e5ff] transition-colors ${rank === 1 ? 'text-white' : 'text-gray-300'}`}>
                           {row.team.name}
                         </Link>
                       ) : (
-                        <span className={`font-bold text-xs whitespace-normal break-words min-w-0 ${rank === 1 ? 'text-white' : 'text-gray-300'}`}>
+                        <span className={`font-bold text-sm truncate ${rank === 1 ? 'text-white' : 'text-gray-300'}`}>
                           {row.team?.name || 'Bilinmeyen'}
                         </span>
                       )}
                     </div>
                   </td>
-                  <td className="px-2 py-3 text-center font-black text-[#00e5ff]">
+                  <td className="px-3 py-3.5 text-center text-gray-400 font-medium hidden sm:table-cell">
+                    {row.matches_played}
+                  </td>
+                  <td className="px-3 py-3.5 text-center text-gray-400 font-medium hidden md:table-cell">
+                    {row.wins}
+                  </td>
+                  <td className="px-3 py-3.5 text-center text-gray-400 font-medium hidden md:table-cell">
+                    {row.draws}
+                  </td>
+                  <td className="px-3 py-3.5 text-center text-gray-400 font-medium hidden md:table-cell">
+                    {row.losses}
+                  </td>
+                  <td className="px-3 py-3.5 text-center text-gray-400 font-medium hidden sm:table-cell">
+                    {row.goal_diff > 0 ? `+${row.goal_diff}` : row.goal_diff}
+                  </td>
+                  <td className="px-4 py-3.5 text-center font-black text-base text-[#00e5ff]">
                     {row.points}
                   </td>
                 </tr>

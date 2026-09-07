@@ -33,12 +33,14 @@ export default function Hero() {
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto px-4 sm:px-0">
-          <Link 
-            href="/takim/yonet"
+          <a 
+            href="https://discord.gg/Cd9b4jpcAZ"
+            target="_blank"
+            rel="noopener noreferrer"
             className="w-full sm:w-auto px-10 py-4 lg:py-5 bg-[#00e5ff] text-black font-black text-[13px] lg:text-[14px] tracking-[0.2em] uppercase rounded-xl hover:bg-white transition-all duration-300 shadow-[0_0_20px_rgba(0,229,255,0.3)] hover:shadow-[0_0_35px_rgba(0,229,255,0.6)] hover:scale-[1.02] active:scale-95 flex items-center justify-center"
           >
             TAKIMINI OLUŞTUR
-          </Link>
+          </a>
           
           <Link 
             href="/ligler"

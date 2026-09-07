@@ -1,7 +1,7 @@
 import NewsSection from "@/components/NewsSection";
 import UpcomingMatches from "@/components/UpcomingMatches";
 import MiniStats from "@/components/MiniStats";
-import LiveStream from "@/components/LiveStream";
+import Rewards from "@/components/Rewards";
 import Standings from "@/components/Standings";
 import RecentTransfers from "@/components/RecentTransfers";
 import SocialFeed from "@/components/SocialFeed";
@@ -14,17 +14,17 @@ export default async function Home() {
       <div className="mx-auto max-w-[1500px] w-full px-4 lg:px-6 py-12 md:py-16">
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_380px] gap-8 xl:gap-12">
         
-          {/* MAIN COLUMN: News, Matches, Stats */}
+          {/* MAIN COLUMN: MiniStats, News, Standings, UpcomingMatches */}
           <div className="space-y-12 xl:space-y-16">
-            <NewsSection />
-            <UpcomingMatches />
             <MiniStats />
+            <NewsSection />
+            <Standings />
+            <UpcomingMatches />
           </div>
 
-          {/* RIGHT SIDEBAR: Stream, Standings, Transfers, Social */}
+          {/* RIGHT SIDEBAR: Rewards, Transfers, Social */}
           <div className="space-y-10 xl:space-y-12">
-            <LiveStream />
-            <Standings compact={true} />
+            <Rewards />
             <RecentTransfers />
             <SocialFeed />
           </div>

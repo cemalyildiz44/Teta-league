@@ -17,7 +17,7 @@ export default function Footer() {
                 </span>
               </Link>
               <p className="text-sm text-gray-500 leading-relaxed">
-                EA FC Pro Clubs rekabetinin adresi. Türkiye&apos;nin en profesyonel esports lig platformu.
+                EA FC Pro Clubs rekabetinin zirvesi. Türkiye&apos;nin yenilikçi e-spor lig platformu.
               </p>
             </div>
             
@@ -75,17 +75,25 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* About */}
+          {/* Ekip */}
           <div>
-            <h4 className="text-[13px] font-[700] tracking-widest text-gray-400 uppercase mb-4">Hakkımızda</h4>
+            <h4 className="text-[13px] font-[700] tracking-widest text-gray-400 uppercase mb-4">Ekip</h4>
             <ul className="space-y-2.5">
-              {footerLinks.about.map((link) => (
-                <li key={link.href}>
-                  <Link href={link.href} className="text-sm text-gray-500 hover:text-[#00e5ff] transition-colors">
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
+              <li>
+                <Link href="/ekip" className="text-sm text-gray-500 hover:text-[#00e5ff] transition-colors">
+                  Ekip
+                </Link>
+              </li>
+              <li>
+                <a 
+                  href="https://discord.gg/Cd9b4jpcAZ" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-sm text-gray-500 hover:text-[#00e5ff] transition-colors"
+                >
+                  İletişim
+                </a>
+              </li>
             </ul>
           </div>
 
