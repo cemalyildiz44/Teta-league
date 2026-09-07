@@ -14,12 +14,12 @@ export default async function Home() {
       <div className="mx-auto max-w-[1500px] w-full px-4 lg:px-6 py-12 md:py-16">
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_380px] gap-8 xl:gap-12">
         
-          {/* MAIN COLUMN: MiniStats, News, Standings, UpcomingMatches */}
-          <div className="space-y-12 xl:space-y-16">
-            <MiniStats />
-            <NewsSection />
+          {/* MAIN COLUMN: Standings, UpcomingMatches, MiniStats, News */}
+          <div className="space-y-10 xl:space-y-12">
             <Standings />
             <UpcomingMatches />
+            <MiniStats />
+            <NewsSection />
           </div>
 
           {/* RIGHT SIDEBAR: Rewards, Transfers, Social */}

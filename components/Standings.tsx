@@ -20,9 +20,12 @@ export default async function Standings({ compact = false }: StandingsProps) {
 
   if (!activeSeason) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[28px] font-[800] tracking-wide text-white">PUAN DURUMU</h2>
+      <div className="space-y-5">
+        <div className="flex items-center gap-3">
+          <div className="w-1.5 h-6 bg-[#00e5ff] rounded-full shadow-[0_0_12px_#00e5ff]" />
+          <h2 className="text-[26px] sm:text-[28px] font-[900] tracking-wide text-white uppercase">
+            PUAN <span className="text-[#00e5ff]">DURUMU</span>
+          </h2>
         </div>
         <div className="empty-state !py-8">
           <span className="empty-state-title">Sezon Yok</span>
@@ -44,9 +47,12 @@ export default async function Standings({ compact = false }: StandingsProps) {
 
   if (!activeLeague) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[28px] font-[800] tracking-wide text-white">PUAN DURUMU</h2>
+      <div className="space-y-5">
+        <div className="flex items-center gap-3">
+          <div className="w-1.5 h-6 bg-[#00e5ff] rounded-full shadow-[0_0_12px_#00e5ff]" />
+          <h2 className="text-[26px] sm:text-[28px] font-[900] tracking-wide text-white uppercase">
+            PUAN <span className="text-[#00e5ff]">DURUMU</span>
+          </h2>
         </div>
         <div className="empty-state !py-8">
           <span className="empty-state-title">Lig Yok</span>
@@ -100,9 +106,12 @@ export default async function Standings({ compact = false }: StandingsProps) {
 
   if (sortedStats.length === 0) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[28px] font-[800] tracking-wide text-white">PUAN DURUMU</h2>
+      <div className="space-y-5">
+        <div className="flex items-center gap-3">
+          <div className="w-1.5 h-6 bg-[#00e5ff] rounded-full shadow-[0_0_12px_#00e5ff]" />
+          <h2 className="text-[26px] sm:text-[28px] font-[900] tracking-wide text-white uppercase">
+            PUAN <span className="text-[#00e5ff]">DURUMU</span>
+          </h2>
         </div>
         <div className="empty-state !py-8">
           <span className="empty-state-title">Veri Bekleniyor</span>
@@ -113,15 +122,20 @@ export default async function Standings({ compact = false }: StandingsProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-[28px] font-[800] tracking-wide text-white">PUAN DURUMU</h2>
-        <Link href="/ligler" className="text-[13px] font-[700] text-[#00e5ff] hover:text-white transition-colors tracking-widest uppercase">
+        <div className="flex items-center gap-3">
+          <div className="w-1.5 h-6 bg-[#00e5ff] rounded-full shadow-[0_0_12px_#00e5ff]" />
+          <h2 className="text-[26px] sm:text-[28px] font-[900] tracking-wide text-white uppercase">
+            PUAN <span className="text-[#00e5ff]">DURUMU</span>
+          </h2>
+        </div>
+        <Link href="/ligler" className="text-[12px] sm:text-[13px] font-[700] text-[#00e5ff] hover:text-white transition-colors tracking-widest uppercase">
           Tümünü Gör →
         </Link>
       </div>
 
-      <div className="card-surface rounded-xl overflow-hidden border border-white/5">
+      <div className="card-surface rounded-xl overflow-hidden border border-white/5 shadow-[0_0_30px_rgba(0,229,255,0.03)]">
         <table className="w-full text-left text-sm whitespace-nowrap">
           <thead className="bg-black/40 text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-white/5">
             <tr>
