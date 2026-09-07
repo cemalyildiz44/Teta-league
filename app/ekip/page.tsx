@@ -27,14 +27,6 @@ const teamMembers: TeamMember[] = [
   { role: "TETA Creative // Yorumcu", name: "Batuhan Yılmaz" },
 ];
 
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  }
-  return name.slice(0, 2).toUpperCase();
-}
-
 export default function EkipPage() {
   return (
     <div className="mx-auto max-w-[1400px] w-full px-4 lg:px-6 py-12 md:py-16">
@@ -52,28 +44,25 @@ export default function EkipPage() {
       </div>
 
       {/* Team Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
         {teamMembers.map((member, idx) => (
           <div
             key={idx}
-            className="client-glass group relative overflow-hidden rounded-xl p-5 border border-white/5 hover:border-[#00e5ff]/40 bg-[#020813]/70 transition-all duration-300 hover:shadow-[0_0_25px_rgba(0,229,255,0.08)] hover:-translate-y-0.5 flex flex-col justify-between min-h-[110px]"
+            className="client-glass group relative overflow-hidden rounded-xl p-6 sm:p-7 border border-white/5 hover:border-[#00e5ff]/40 bg-[#020813]/70 transition-all duration-300 hover:shadow-[0_0_25px_rgba(0,229,255,0.08)] hover:-translate-y-1 flex flex-col justify-between min-h-[130px] sm:min-h-[140px]"
           >
             {/* Ambient top light */}
-            <div className="absolute -top-6 -right-6 w-20 h-20 bg-[#00e5ff]/5 rounded-full blur-xl pointer-events-none group-hover:bg-[#00e5ff]/20 transition-all duration-500" />
+            <div className="absolute -top-6 -right-6 w-24 h-24 bg-[#00e5ff]/5 rounded-full blur-xl pointer-events-none group-hover:bg-[#00e5ff]/15 transition-all duration-500" />
 
-            {/* Role & Initials */}
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <span className="text-[10px] sm:text-[11px] font-extrabold tracking-wider text-[#00e5ff] uppercase truncate">
+            {/* Role */}
+            <div className="mb-4">
+              <span className="text-xs sm:text-[12px] font-black tracking-wider text-[#00e5ff] uppercase block truncate">
                 {member.role}
               </span>
-              <div className="w-7 h-7 rounded-full bg-[#061120] border border-white/10 flex items-center justify-center text-[10px] font-black text-gray-300 group-hover:border-[#00e5ff]/40 group-hover:text-[#00e5ff] group-hover:shadow-[0_0_10px_rgba(0,229,255,0.2)] transition-all shrink-0">
-                {getInitials(member.name)}
-              </div>
             </div>
 
             {/* Name */}
             <div>
-              <h3 className="text-[15px] sm:text-[17px] font-black text-white tracking-wide uppercase group-hover:text-white transition-colors">
+              <h3 className="text-lg sm:text-[20px] font-black text-white tracking-wide uppercase group-hover:text-white transition-colors drop-shadow-sm leading-tight">
                 {member.name}
               </h3>
             </div>
