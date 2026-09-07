@@ -6,7 +6,7 @@ import { logoutAction } from '@/app/auth/actions';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 import { searchPlayersAction, sendTeamInviteAction, acceptTeamInviteAction, rejectTeamInviteAction, cancelTeamInviteAction } from './team-actions';
-import { POSITION_FILTER_OPTIONS } from '@/app/oyuncular/PlayerRankingsClient';
+import { PLATFORM_OPTIONS, POSITION_FILTER_OPTIONS } from '@/app/oyuncular/PlayerRankingsClient';
 
 export default function ClientAccount({ profile, authUser, team, league, isCaptain, achievements, pendingInvites }: any) {
   const supabase = createClient();
@@ -151,7 +151,9 @@ export default function ClientAccount({ profile, authUser, team, league, isCapta
             {profile?.username}
           </h1>
           <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-4">
-            <span className="px-2.5 py-0.5 bg-white/5 border border-white/10 text-[10px] font-[900] tracking-widest text-gray-400 uppercase rounded">{profile?.platform || 'BELİRTİLMEDİ'}</span>
+            <span className="px-2.5 py-0.5 bg-white/5 border border-white/10 text-[10px] font-[900] tracking-widest text-gray-400 uppercase rounded">
+              {profile?.platform && PLATFORM_OPTIONS.includes(profile.platform) ? profile.platform : 'BELİRTİLMEDİ'}
+            </span>
             <span className="px-2.5 py-0.5 bg-[#00e5ff]/10 border border-[#00e5ff]/20 text-[10px] font-[900] tracking-widest text-[#00e5ff] uppercase rounded">{profile?.primary_position || 'BELİRTİLMEDİ'}</span>
             {profile?.current_ea_player_id && (
               <span className="px-2.5 py-0.5 bg-purple-500/10 border border-purple-500/20 text-[10px] font-[900] tracking-widest text-purple-400 uppercase rounded">EA: {profile.current_ea_player_id}</span>
@@ -302,10 +304,15 @@ export default function ClientAccount({ profile, authUser, team, league, isCapta
                 </div>
                 <div>
                   <label className="block text-[10px] font-[900] text-gray-500 tracking-widest uppercase mb-2">PLATFORM</label>
-                  <select name="platform" defaultValue={profile?.platform || 'common-gen5'} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[14px] font-[700] text-white focus:outline-none focus:border-[#00e5ff]/50 transition-colors appearance-none">
-                    <option value="common-gen5">Common Gen 5 (PS5/XboxX/PC)</option>
-                    <option value="ps4">PS4</option>
-                    <option value="xboxone">Xbox One</option>
+                  <select 
+                    name="platform" 
+                    defaultValue={profile?.platform && PLATFORM_OPTIONS.includes(profile.platform) ? profile.platform : ''} 
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[14px] font-[700] text-white focus:outline-none focus:border-[#00e5ff]/50 transition-colors appearance-none cursor-pointer"
+                  >
+                    <option value="">Platform seçiniz</option>
+                    {PLATFORM_OPTIONS.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
                   </select>
                 </div>
                 <div>

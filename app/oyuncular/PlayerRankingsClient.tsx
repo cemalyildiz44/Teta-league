@@ -4,13 +4,12 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 
-export const PLATFORM_FILTER_OPTIONS = [
-  { value: 'PS', label: 'PlayStation (PS5 / PS4)' },
-  { value: 'XBOX', label: 'Xbox (Series X/S / One)' },
-  { value: 'PC', label: 'PC' },
+export const PLATFORM_OPTIONS = [
+  'PS5',
+  'Xbox Series X',
+  'Xbox Series S',
+  'PC'
 ];
-
-export const PLATFORM_OPTIONS = ['PS', 'XBOX', 'PC', 'common-gen5', 'PS5', 'Xbox Series X', 'Xbox Series S'];
 
 export const POSITION_FILTER_OPTIONS = [
   { value: 'KL', label: 'KL (Kaleci)' },
@@ -105,27 +104,13 @@ function matchesPlatform(playerPlatform: string | null | undefined, filterValue:
   const p = playerPlatform.toLowerCase().trim();
   const f = filterValue.toLowerCase().trim();
 
-  if (p === f) return true;
-
-  if (p === 'common-gen5' || p === 'common_gen5') {
-    if (['ps', 'ps5', 'playstation', 'xbox', 'xbox series x', 'xbox series s', 'pc'].includes(f)) {
-      return true;
-    }
+  // Eski/belirsiz kayıtlar (common-gen5, bilinmiyor vb.) spesifik platform filtrelerinde GÖRÜNMEZ
+  if (p === 'common-gen5' || p === 'common_gen5' || p === 'bilinmiyor' || p === 'belirtilmedi') {
+    return false;
   }
 
-  if (f === 'ps' || f === 'playstation') {
-    return p.includes('ps') || p.includes('playstation') || p === 'common-gen5';
-  }
-
-  if (f === 'xbox') {
-    return p.includes('xbox') || p === 'common-gen5';
-  }
-
-  if (f === 'pc') {
-    return p === 'pc' || p.includes('pc') || p === 'common-gen5';
-  }
-
-  return p.includes(f) || f.includes(p);
+  // Birebir tam eşleşme (örn: 'ps5' === 'ps5', 'pc' === 'pc', 'xbox series x' === 'xbox series x', 'xbox series s' === 'xbox series s')
+  return p === f;
 }
 
 export function formatPosition(pos: string | null | undefined): string {
@@ -139,11 +124,9 @@ export function formatPosition(pos: string | null | undefined): string {
 }
 
 export function formatPlatform(platform: string | null | undefined): string {
-  if (!platform || platform === 'Bilinmiyor') return 'Bilinmiyor';
-  if (platform === 'common-gen5') return 'PS5 / Xbox Series / PC';
-  if (platform === 'ps4') return 'PS4';
-  if (platform === 'ps5') return 'PS5';
-  if (platform === 'xboxone' || platform === 'xbox-one') return 'Xbox One';
+  if (!platform || platform === 'Bilinmiyor' || platform === 'common-gen5' || platform === 'common_gen5') {
+    return 'Belirtilmedi';
+  }
   return platform;
 }
 
@@ -210,8 +193,8 @@ export default function PlayerRankingsClient({ rankings }: { rankings: PlayerRan
                 className="w-full bg-[#03070c] border border-white/10 rounded-xl px-4 py-3 text-[14px] font-[500] text-white focus:outline-none focus:border-[#00e5ff]/50 transition-all appearance-none cursor-pointer"
               >
                 <option value="TÜMÜ">TÜMÜ</option>
-                {PLATFORM_FILTER_OPTIONS.map(p => (
-                  <option key={p.value} value={p.value}>{p.label}</option>
+                {PLATFORM_OPTIONS.map(p => (
+                  <option key={p} value={p}>{p}</option>
                 ))}
               </select>
               <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">

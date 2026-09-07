@@ -21,7 +21,7 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
     const bio = (formData.get('bio') as string)?.trim();
     const avatar_url = (formData.get('avatar_url') as string)?.trim();
     const primary_position = (formData.get('primary_position') as string)?.trim();
-    const platform = (formData.get('platform') as string)?.trim() || 'common-gen5';
+    const platform = (formData.get('platform') as string)?.trim() || null;
     let current_ea_player_id = (formData.get('current_ea_player_id') as string)?.trim();
     
     // Alternative positions (JSON parsed)
