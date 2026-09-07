@@ -31,6 +31,16 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
   const [addPlayerModal, setAddPlayerModal] = useState<any>(null); // holds team info
   const [logoModal, setLogoModal] = useState<any>(null); // holds team info
   
+  // Team Logo States
+  const [createImageFile, setCreateImageFile] = useState<File | null>(null);
+  const [createImagePreview, setCreateImagePreview] = useState<string | null>(null);
+  const [createOptimizing, setCreateOptimizing] = useState(false);
+
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
+  const [editRemoveImage, setEditRemoveImage] = useState(false);
+  const [editOptimizing, setEditOptimizing] = useState(false);
+
   const [confirmModal, setConfirmModal] = useState<any>({ isOpen: false });
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
@@ -55,22 +65,109 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
   };
   const closeConfirm = () => setConfirmModal({ ...confirmModal, isOpen: false });
 
+  // Logo compression and selection handler
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>, isEdit: boolean = false) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 25 * 1024 * 1024) {
+      showFeedback('Dosya boyutu çok yüksek (maksimum 25MB).', 'error');
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      showFeedback('Lütfen geçerli bir görsel formatı (PNG, JPG, WEBP) seçin.', 'error');
+      return;
+    }
+
+    if (isEdit) setEditOptimizing(true);
+    else setCreateOptimizing(true);
+
+    showFeedback('Logo optimize ediliyor...', 'success');
+
+    try {
+      const options = {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 512,
+        useWebWorker: true,
+        fileType: 'image/webp' as any,
+        initialQuality: 0.85,
+      };
+
+      let compressed = await imageCompression(file, options);
+      if (compressed.size > 1024 * 1024) {
+        options.initialQuality = 0.70;
+        compressed = await imageCompression(file, options);
+      }
+
+      const previewUrl = URL.createObjectURL(compressed);
+
+      if (isEdit) {
+        setEditImageFile(compressed);
+        setEditImagePreview(previewUrl);
+        setEditRemoveImage(false);
+      } else {
+        setCreateImageFile(compressed);
+        setCreateImagePreview(previewUrl);
+      }
+      showFeedback('Logo optimize edildi.', 'success');
+    } catch (err) {
+      showFeedback('Logo optimize edilirken hata oluştu.', 'error');
+    } finally {
+      if (isEdit) setEditOptimizing(false);
+      else setCreateOptimizing(false);
+    }
+  };
+
   // Handlers
   const handleCreate = async (e: any) => {
     e.preventDefault();
+    if (createOptimizing) {
+      showFeedback('Lütfen logo optimizasyonunun tamamlanmasını bekleyin.', 'error');
+      return;
+    }
     setLoading(true);
-    const res = await createTeam(new FormData(e.currentTarget));
-    if (res.error) showFeedback(res.error, 'error');
-    else { showFeedback(res.success || '', 'success'); setCreateModal(false); router.refresh(); }
+    const formData = new FormData(e.currentTarget);
+    if (createImageFile) {
+      formData.append('logo_file', createImageFile, createImageFile.name || 'logo.webp');
+    }
+    const res = await createTeam(formData);
+    if (res.error) {
+      showFeedback(res.error, 'error');
+    } else {
+      showFeedback(res.success || '', 'success');
+      setCreateModal(false);
+      setCreateImageFile(null);
+      setCreateImagePreview(null);
+      router.refresh();
+    }
     setLoading(false);
   };
 
   const handleEdit = async (e: any) => {
     e.preventDefault();
+    if (editOptimizing) {
+      showFeedback('Lütfen logo optimizasyonunun tamamlanmasını bekleyin.', 'error');
+      return;
+    }
     setLoading(true);
-    const res = await editTeam(new FormData(e.currentTarget));
-    if (res.error) showFeedback(res.error, 'error');
-    else { showFeedback(res.success || '', 'success'); setEditData(null); router.refresh(); }
+    const formData = new FormData(e.currentTarget);
+    if (editImageFile) {
+      formData.append('logo_file', editImageFile, editImageFile.name || 'logo.webp');
+    }
+    if (editRemoveImage) {
+      formData.append('remove_logo', 'true');
+    }
+    const res = await editTeam(formData);
+    if (res.error) {
+      showFeedback(res.error, 'error');
+    } else {
+      showFeedback(res.success || '', 'success');
+      setEditData(null);
+      setEditImageFile(null);
+      setEditImagePreview(null);
+      setEditRemoveImage(false);
+      router.refresh();
+    }
     setLoading(false);
   };
 
@@ -300,7 +397,16 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
                       <button onClick={() => setRosterModal(t)} className='p-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 rounded-md text-indigo-400' title='Kadro Yönetimi'>
                         <Users className='w-4 h-4' />
                       </button>
-                      <button onClick={() => setEditData(t)} className='p-1.5 bg-white/5 hover:bg-white/10 rounded-md text-zinc-300' title='Düzenle'>
+                      <button 
+                        onClick={() => {
+                          setEditData(t);
+                          setEditImagePreview(t.logo_url || null);
+                          setEditImageFile(null);
+                          setEditRemoveImage(false);
+                        }} 
+                        className='p-1.5 bg-white/5 hover:bg-white/10 rounded-md text-zinc-300' 
+                        title='Düzenle'
+                      >
                         <Edit2 className='w-4 h-4' />
                       </button>
                     </div>
@@ -323,7 +429,7 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
           <div className='card-surface w-full max-w-md rounded-2xl border border-white/10 overflow-hidden'>
             <div className='flex justify-between items-center p-4 border-b border-white/5 bg-[#0a1628]'>
               <h2 className='text-sm font-black text-white tracking-widest'>YENİ TAKIM</h2>
-              <button onClick={() => setCreateModal(false)} className='text-zinc-400 hover:text-white'><X className='w-5 h-5'/></button>
+              <button onClick={() => { setCreateModal(false); setCreateImageFile(null); setCreateImagePreview(null); }} className='text-zinc-400 hover:text-white'><X className='w-5 h-5'/></button>
             </div>
             <form onSubmit={handleCreate} className='p-6 space-y-4'>
               <div>
@@ -338,13 +444,69 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
                 <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>EA Club ID</label>
                 <input name='ea_club_id' type='number' className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm' />
               </div>
+
+              {/* Takım Logosu */}
               <div>
-                <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>Logo URL</label>
-                <input name='logo_url' className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm' />
+                <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>
+                  Takım Logosu
+                </label>
+                {createImagePreview ? (
+                  <div className='flex items-center gap-4 p-3 bg-[#060d18] border border-white/10 rounded-xl'>
+                    <div className='w-14 h-14 rounded-lg bg-black/50 border border-cyan-500/30 overflow-hidden flex items-center justify-center shrink-0'>
+                      <img src={createImagePreview} alt='Önizleme' className='w-full h-full object-contain' />
+                    </div>
+                    <div className='flex-1 min-w-0'>
+                      <p className='text-xs font-bold text-white truncate'>Logo Seçildi</p>
+                      <p className='text-[10px] text-cyan-400'>WebP optimize edildi</p>
+                    </div>
+                    <div className='flex gap-2 shrink-0'>
+                      <label className='cursor-pointer px-2.5 py-1.5 bg-white/10 hover:bg-white/15 text-white text-[10px] font-bold rounded-md transition-colors'>
+                        Değiştir
+                        <input
+                          type='file'
+                          accept='image/png,image/jpeg,image/webp'
+                          className='hidden'
+                          onChange={(e) => handleImageSelect(e, false)}
+                          disabled={createOptimizing}
+                        />
+                      </label>
+                      <button
+                        type='button'
+                        onClick={() => {
+                          setCreateImageFile(null);
+                          setCreateImagePreview(null);
+                        }}
+                        className='px-2.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[10px] font-bold rounded-md transition-colors'
+                      >
+                        Kaldır
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className='flex items-center justify-center gap-3 p-4 bg-[#060d18] border border-dashed border-white/15 hover:border-cyan-500/50 rounded-xl cursor-pointer transition-colors group'>
+                    <div className='w-8 h-8 rounded-lg bg-white/5 group-hover:bg-cyan-500/10 flex items-center justify-center text-zinc-400 group-hover:text-cyan-400 transition-colors'>
+                      <Upload className='w-4 h-4' />
+                    </div>
+                    <div className='text-left'>
+                      <p className='text-xs font-bold text-white group-hover:text-cyan-400 transition-colors'>
+                        {createOptimizing ? 'Logo optimize ediliyor...' : 'Logo Seç veya Yükle'}
+                      </p>
+                      <p className='text-[10px] text-zinc-500'>PNG, JPG, WEBP (Otomatik optimize edilir)</p>
+                    </div>
+                    <input
+                      type='file'
+                      accept='image/png,image/jpeg,image/webp'
+                      className='hidden'
+                      onChange={(e) => handleImageSelect(e, false)}
+                      disabled={createOptimizing}
+                    />
+                  </label>
+                )}
               </div>
+
               <div className='pt-4 flex gap-2'>
-                <button type='button' onClick={() => setCreateModal(false)} className='flex-1 py-2 bg-white/5 text-white rounded-lg text-xs font-bold'>İPTAL</button>
-                <button type='submit' disabled={loading} className='flex-1 py-2 bg-cyan-500 text-black rounded-lg text-xs font-black flex justify-center items-center gap-2'>
+                <button type='button' onClick={() => { setCreateModal(false); setCreateImageFile(null); setCreateImagePreview(null); }} className='flex-1 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-xs font-bold transition-colors'>İPTAL</button>
+                <button type='submit' disabled={loading || createOptimizing} className='flex-1 py-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg text-xs font-black transition-colors disabled:opacity-50 flex justify-center items-center gap-2'>
                   {loading && <Loader2 className='w-4 h-4 animate-spin' />} OLUŞTUR
                 </button>
               </div>
@@ -359,7 +521,7 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
           <div className='card-surface w-full max-w-md rounded-2xl border border-white/10 overflow-hidden'>
             <div className='flex justify-between items-center p-4 border-b border-white/5 bg-[#0a1628]'>
               <h2 className='text-sm font-black text-white tracking-widest'>TAKIM DÜZENLE</h2>
-              <button onClick={() => setEditData(null)} className='text-zinc-400 hover:text-white'><X className='w-5 h-5'/></button>
+              <button onClick={() => { setEditData(null); setEditImageFile(null); setEditImagePreview(null); setEditRemoveImage(false); }} className='text-zinc-400 hover:text-white'><X className='w-5 h-5'/></button>
             </div>
             <form onSubmit={handleEdit} className='p-6 space-y-4'>
               <input type='hidden' name='id' value={editData.id} />
@@ -375,13 +537,72 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
                 <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>EA Club ID</label>
                 <input name='ea_club_id' type='number' defaultValue={editData.ea_club_id || ''} className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm' />
               </div>
+
+              {/* Takım Logosu */}
               <div>
-                <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>Logo URL</label>
-                <input name='logo_url' defaultValue={editData.logo_url || ''} className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm' />
+                <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>
+                  Takım Logosu
+                </label>
+                {editImagePreview && !editRemoveImage ? (
+                  <div className='flex items-center gap-4 p-3 bg-[#060d18] border border-white/10 rounded-xl'>
+                    <div className='w-14 h-14 rounded-lg bg-black/50 border border-cyan-500/30 overflow-hidden flex items-center justify-center shrink-0'>
+                      <img src={editImagePreview} alt='Önizleme' className='w-full h-full object-contain' />
+                    </div>
+                    <div className='flex-1 min-w-0'>
+                      <p className='text-xs font-bold text-white truncate'>Mevcut Logo</p>
+                      <p className='text-[10px] text-cyan-400'>
+                        {editImageFile ? 'Yeni logo optimize edildi' : 'Kayıtlı logo'}
+                      </p>
+                    </div>
+                    <div className='flex gap-2 shrink-0'>
+                      <label className='cursor-pointer px-2.5 py-1.5 bg-white/10 hover:bg-white/15 text-white text-[10px] font-bold rounded-md transition-colors'>
+                        Değiştir
+                        <input
+                          type='file'
+                          accept='image/png,image/jpeg,image/webp'
+                          className='hidden'
+                          onChange={(e) => handleImageSelect(e, true)}
+                          disabled={editOptimizing}
+                        />
+                      </label>
+                      <button
+                        type='button'
+                        onClick={() => {
+                          setEditImageFile(null);
+                          setEditImagePreview(null);
+                          setEditRemoveImage(true);
+                        }}
+                        className='px-2.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[10px] font-bold rounded-md transition-colors'
+                      >
+                        Kaldır
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className='flex items-center justify-center gap-3 p-4 bg-[#060d18] border border-dashed border-white/15 hover:border-cyan-500/50 rounded-xl cursor-pointer transition-colors group'>
+                    <div className='w-8 h-8 rounded-lg bg-white/5 group-hover:bg-cyan-500/10 flex items-center justify-center text-zinc-400 group-hover:text-cyan-400 transition-colors'>
+                      <Upload className='w-4 h-4' />
+                    </div>
+                    <div className='text-left'>
+                      <p className='text-xs font-bold text-white group-hover:text-cyan-400 transition-colors'>
+                        {editOptimizing ? 'Logo optimize ediliyor...' : 'Logo Seç veya Yükle'}
+                      </p>
+                      <p className='text-[10px] text-zinc-500'>PNG, JPG, WEBP (Otomatik optimize edilir)</p>
+                    </div>
+                    <input
+                      type='file'
+                      accept='image/png,image/jpeg,image/webp'
+                      className='hidden'
+                      onChange={(e) => handleImageSelect(e, true)}
+                      disabled={editOptimizing}
+                    />
+                  </label>
+                )}
               </div>
+
               <div className='pt-4 flex gap-2'>
-                <button type='button' onClick={() => setEditData(null)} className='flex-1 py-2 bg-white/5 text-white rounded-lg text-xs font-bold'>İPTAL</button>
-                <button type='submit' disabled={loading} className='flex-1 py-2 bg-cyan-500 text-black rounded-lg text-xs font-black flex justify-center items-center gap-2'>
+                <button type='button' onClick={() => { setEditData(null); setEditImageFile(null); setEditImagePreview(null); setEditRemoveImage(false); }} className='flex-1 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-xs font-bold transition-colors'>İPTAL</button>
+                <button type='submit' disabled={loading || editOptimizing} className='flex-1 py-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg text-xs font-black transition-colors disabled:opacity-50 flex justify-center items-center gap-2'>
                   {loading && <Loader2 className='w-4 h-4 animate-spin' />} GÜNCELLE
                 </button>
               </div>
