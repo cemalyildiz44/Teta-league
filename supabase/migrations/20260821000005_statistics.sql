@@ -1,0 +1,68 @@
+-- 005_statistics.sql
+CREATE TABLE player_season_stats (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    player_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    season_id UUID NOT NULL REFERENCES seasons(id) ON DELETE RESTRICT,
+    matches_played INTEGER NOT NULL DEFAULT 0,
+    goals INTEGER NOT NULL DEFAULT 0,
+    assists INTEGER NOT NULL DEFAULT 0,
+    rating_sum NUMERIC(10,2) NOT NULL DEFAULT 0,
+    rating_count INTEGER NOT NULL DEFAULT 0,
+    shots INTEGER NOT NULL DEFAULT 0,
+    passes_made INTEGER NOT NULL DEFAULT 0,
+    pass_attempts INTEGER NOT NULL DEFAULT 0,
+    tackles_made INTEGER NOT NULL DEFAULT 0,
+    tackle_attempts INTEGER NOT NULL DEFAULT 0,
+    saves INTEGER NOT NULL DEFAULT 0,
+    goals_conceded INTEGER NOT NULL DEFAULT 0,
+    cleansheets_gk INTEGER NOT NULL DEFAULT 0,
+    cleansheets_def INTEGER NOT NULL DEFAULT 0,
+    red_cards INTEGER NOT NULL DEFAULT 0,
+    mom_count INTEGER NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (player_id, season_id)
+);
+
+CREATE TABLE player_team_season_stats (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    player_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    team_id UUID NOT NULL,
+    league_id UUID NOT NULL,
+    season_id UUID NOT NULL,
+    matches_played INTEGER NOT NULL DEFAULT 0,
+    goals INTEGER NOT NULL DEFAULT 0,
+    assists INTEGER NOT NULL DEFAULT 0,
+    rating_sum NUMERIC(10,2) NOT NULL DEFAULT 0,
+    rating_count INTEGER NOT NULL DEFAULT 0,
+    shots INTEGER NOT NULL DEFAULT 0,
+    passes_made INTEGER NOT NULL DEFAULT 0,
+    pass_attempts INTEGER NOT NULL DEFAULT 0,
+    tackles_made INTEGER NOT NULL DEFAULT 0,
+    tackle_attempts INTEGER NOT NULL DEFAULT 0,
+    saves INTEGER NOT NULL DEFAULT 0,
+    goals_conceded INTEGER NOT NULL DEFAULT 0,
+    cleansheets_gk INTEGER NOT NULL DEFAULT 0,
+    cleansheets_def INTEGER NOT NULL DEFAULT 0,
+    red_cards INTEGER NOT NULL DEFAULT 0,
+    mom_count INTEGER NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    FOREIGN KEY (league_id, season_id, team_id) REFERENCES league_teams(league_id, season_id, team_id) ON DELETE RESTRICT,
+    UNIQUE (player_id, team_id, season_id)
+);
+
+CREATE TABLE team_season_stats (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    team_id UUID NOT NULL,
+    league_id UUID NOT NULL,
+    season_id UUID NOT NULL,
+    matches_played INTEGER NOT NULL DEFAULT 0,
+    wins INTEGER NOT NULL DEFAULT 0,
+    draws INTEGER NOT NULL DEFAULT 0,
+    losses INTEGER NOT NULL DEFAULT 0,
+    goals_for INTEGER NOT NULL DEFAULT 0,
+    goals_against INTEGER NOT NULL DEFAULT 0,
+    points INTEGER NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    FOREIGN KEY (league_id, season_id, team_id) REFERENCES league_teams(league_id, season_id, team_id) ON DELETE RESTRICT,
+    UNIQUE (team_id, league_id, season_id)
+);

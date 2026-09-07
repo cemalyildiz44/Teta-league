@@ -39,3 +39,52 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local Supabase
+/supabase/.temp/
+/supabase/.branches/
+/supabase/logs/
+
+# IDE
+.idea/
+.vscode/
+
+# Local testing and scratch scripts
+*.sql
+!supabase/migrations/*.sql
+!supabase/seed.sql
+test*.js
+test*.mjs
+check*.js
+write*.js
+fix*.js
+fix*.py
+payload.json
+ea_match.json
+scratch_*.sql
+temp_out/
+*.txt
+*.md
+!README.md
+!pre_launch_audit_report.md
+
+# Exclude local test directories
+test-ssr/
+temp_out/
+node_modules/
+
+# Exclude specific temp JS files containing secrets or local tests
+build-test.js
+clean_fake_data.js
+fetch_email.js
+inject.js
+integration-tests.js
+pg_seed.js
+pg_seed2.js
+promote_admin.js
+scripts/bootstrap-local.js
+temp-actions.js
+update_actions.js
+update_page1.js
+update_route.js
+app/test-url/route.js
