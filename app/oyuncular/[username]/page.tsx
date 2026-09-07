@@ -118,10 +118,22 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   }
 
   // Market Value Calculation
+  // We aggregate ratings strictly by season_id to prevent double counting
+  // for players who played in multiple teams/leagues in the same season.
+  const mvSeasonStatsMap = new Map<string, { season_id: string, rating_sum: number, rating_count: number }>();
+  for (const s of slMap.values()) {
+    if (!mvSeasonStatsMap.has(s.seasonId)) {
+      mvSeasonStatsMap.set(s.seasonId, { season_id: s.seasonId, rating_sum: 0, rating_count: 0 });
+    }
+    const mvS = mvSeasonStatsMap.get(s.seasonId)!;
+    mvS.rating_sum += s.ratingSum;
+    mvS.rating_count += s.matches;
+  }
+
   const mvInput: MarketValueInput = {
     profile: { primary_position: profile.primary_position },
     careerStats: { matches_played: tM, wins: tW, draws: tD, losses: tL, goals: tG, assists: tA, cleansheets_gk: tCGK, cleansheets_def: tCDEF, red_cards: tRC },
-    seasonStats: Array.from(slMap.values()).map(s => ({ season_id: s.seasonId, rating_sum: s.ratingSum, rating_count: s.matches })),
+    seasonStats: Array.from(mvSeasonStatsMap.values()),
     achievements: playerAchievementsData || []
   };
   const marketValue = calculateMarketValue(mvInput);
