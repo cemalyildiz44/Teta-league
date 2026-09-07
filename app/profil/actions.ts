@@ -82,6 +82,13 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
       updated_at: new Date().toISOString(),
     };
 
+    // Fetch existing profile to handle avatar cleanup
+    const { data: currentProfile } = await supabase
+      .from('profiles')
+      .select('avatar_url')
+      .eq('id', user.id)
+      .single();
+
     // 5. Veritabanına yazma
     const { error } = await supabase
       .from('profiles')
@@ -93,6 +100,20 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
         return { error: 'Bu Kullanıcı Adı veya EA kimliği zaten kullanımda.' };
       }
       return { error: 'Profil güncellenirken bir hata oluştu: ' + error.message };
+    }
+
+    // Garbage collection: delete old avatar from storage if it changed
+    if (avatar_url && currentProfile?.avatar_url && currentProfile.avatar_url !== avatar_url) {
+      try {
+        const oldUrl = currentProfile.avatar_url;
+        const parts = oldUrl.split('/public/avatars/');
+        if (parts.length === 2) {
+          const oldPath = parts[1];
+          await supabase.storage.from('avatars').remove([oldPath]);
+        }
+      } catch (cleanupError) {
+        console.error('Failed to clean up old avatar:', cleanupError);
+      }
     }
 
     // 6. Cache yenileme

@@ -8,6 +8,8 @@ import Link from 'next/link';
 import { searchPlayersAction, sendTeamInviteAction, acceptTeamInviteAction, rejectTeamInviteAction, cancelTeamInviteAction } from './team-actions';
 import { PLATFORM_OPTIONS, POSITION_FILTER_OPTIONS } from '@/app/oyuncular/PlayerRankingsClient';
 
+import imageCompression from 'browser-image-compression';
+
 export default function ClientAccount({ profile, authUser, team, league, isCaptain, achievements, pendingInvites }: any) {
   const supabase = createClient();
   
@@ -37,15 +39,36 @@ export default function ClientAccount({ profile, authUser, team, league, isCapta
       setProfileMsg(null);
       const file = e.target.files?.[0];
       if (!file) return;
-      if (file.size > 5 * 1024 * 1024) throw new Error("Dosya boyutu en fazla 5MB olabilir.");
-      const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
-      if (!validTypes.includes(file.type)) throw new Error("Yalnızca JPEG, PNG veya WEBP formatları kabul edilir.");
+      
+      // Hard limit for safety
+      if (file.size > 25 * 1024 * 1024) throw new Error("Dosya boyutu çok yüksek (maksimum 25MB).");
+      if (!file.type.startsWith('image/')) throw new Error("Geçerli bir görsel formatı yükleyin.");
 
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      setProfileMsg({ type: 'success', text: 'Fotoğraf optimize ediliyor...' });
+
+      const options = {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 512,
+        useWebWorker: true,
+        fileType: 'image/webp',
+        initialQuality: 0.85,
+      };
+
+      let compressedFile = await imageCompression(file, options);
+      
+      // Failsafe if still over 1MB
+      if (compressedFile.size > 1024 * 1024) {
+        options.initialQuality = 0.70;
+        compressedFile = await imageCompression(file, options);
+      }
+
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.webp`;
       const filePath = `${profile.id}/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file);
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, compressedFile, {
+        cacheControl: '31536000',
+        upsert: false
+      });
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);

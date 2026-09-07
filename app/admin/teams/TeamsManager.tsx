@@ -13,6 +13,8 @@ import {
   assignCaptain, addPlayerToTeam, removePlayerFromTeam, uploadTeamLogoAction
 } from './actions';
 
+import imageCompression from 'browser-image-compression';
+
 export function TeamsManager({ initialTeams, initialCaptains, initialMemberships, initialLeagueTeams, allProfiles }: any) {
   const router = useRouter();
   const [teams, setTeams] = useState(initialTeams);
@@ -134,15 +136,46 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
   const handleUploadLogo = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
-    const fd = new FormData(e.currentTarget);
-    fd.append('teamId', logoModal.id);
-    const res = await uploadTeamLogoAction(fd);
-    setLoading(false);
-    if (res.error) {
-      alert(res.error);
-    } else {
-      setLogoModal(null);
-      router.refresh();
+    try {
+      const fileInput = e.currentTarget.elements.namedItem('file') as HTMLInputElement;
+      const file = fileInput.files?.[0];
+      if (!file) throw new Error("Dosya seçilmedi.");
+
+      if (file.size > 25 * 1024 * 1024) throw new Error("Dosya boyutu çok yüksek (maksimum 25MB).");
+      if (!file.type.startsWith('image/')) throw new Error("Geçerli bir görsel formatı yükleyin.");
+
+      showFeedback('Logo optimize ediliyor...', 'success');
+
+      const options = {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 512,
+        useWebWorker: true,
+        fileType: 'image/webp',
+        initialQuality: 0.85,
+      };
+
+      let compressedFile = await imageCompression(file, options);
+      if (compressedFile.size > 1024 * 1024) {
+        options.initialQuality = 0.70;
+        compressedFile = await imageCompression(file, options);
+      }
+
+      const fd = new FormData();
+      fd.append('teamId', logoModal.id);
+      fd.append('file', compressedFile, compressedFile.name || 'logo.webp');
+
+      const res = await uploadTeamLogoAction(fd);
+      if (res.error) {
+        showFeedback(res.error, 'error');
+      } else {
+        setLogoModal(null);
+        showFeedback('Logo başarıyla yüklendi.', 'success');
+        router.refresh();
+      }
+    } catch (error: any) {
+      showFeedback(error.message || 'Yükleme hatası.', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 

@@ -184,21 +184,39 @@ export async function uploadTeamLogoAction(formData: FormData) {
 
   if (!file || !teamId) return { error: 'Eksik dosya veya takım.' };
   
-  if (file.size > 5 * 1024 * 1024) return { error: 'Dosya boyutu 5MB limitini aşıyor.' };
+  if (file.size > 5 * 1024 * 1024) return { error: 'Dosya boyutu limitini aşıyor.' };
   
-  const ext = file.name.split('.').pop() || 'png';
+  const ext = file.name.split('.').pop() || 'webp';
   const fileName = `team_${teamId}_${Date.now()}.${ext}`;
 
   const { error: uploadError } = await supabase.storage
     .from('team-logos')
-    .upload(fileName, file, { upsert: true });
+    .upload(fileName, file, { 
+      cacheControl: '31536000',
+      upsert: true 
+    });
 
   if (uploadError) return { error: 'Logo yüklenirken hata oluştu: ' + uploadError.message };
 
   const { data } = supabase.storage.from('team-logos').getPublicUrl(fileName);
 
+  // Fetch old logo url for garbage collection
+  const { data: oldTeam } = await supabase.from('teams').select('logo_url').eq('id', teamId).single();
+
   const { error: updateError } = await supabase.from('teams').update({ logo_url: data.publicUrl }).eq('id', teamId);
   if (updateError) return { error: "Takım logosu DB'ye kaydedilemedi." };
+
+  // Garbage collection
+  if (oldTeam?.logo_url && oldTeam.logo_url !== data.publicUrl) {
+    try {
+      const parts = oldTeam.logo_url.split('/public/team-logos/');
+      if (parts.length === 2) {
+        await supabase.storage.from('team-logos').remove([parts[1]]);
+      }
+    } catch (e) {
+      console.error('Failed to cleanup old team logo:', e);
+    }
+  }
 
   revalidatePath('/', 'layout');
   return { success: 'Logo başarıyla yüklendi.' };
