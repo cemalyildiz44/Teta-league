@@ -86,11 +86,11 @@ export default function Header({ user, userProfile, activeTeam, unreadCount = 0 
           {/* OYUNCUM */}
           {user ? (
             <Link
-              href="/profil"
-              className={`relative text-[14px] font-[800] uppercase tracking-[0.1em] transition-all duration-300 ${pathname === '/profil' ? 'text-[#00E5FF] drop-shadow-[0_0_8px_rgba(0,229,255,0.5)]' : 'text-gray-300 hover:text-[#00E5FF]'}`}
+              href={userProfile?.username ? `/oyuncular/${userProfile.username}` : '/profil'}
+              className={`relative text-[14px] font-[800] uppercase tracking-[0.1em] transition-all duration-300 ${pathname === (userProfile?.username ? `/oyuncular/${userProfile.username}` : '/profil') ? 'text-[#00E5FF] drop-shadow-[0_0_8px_rgba(0,229,255,0.5)]' : 'text-gray-300 hover:text-[#00E5FF]'}`}
             >
               OYUNCUM
-              {pathname === '/profil' && (
+              {pathname === (userProfile?.username ? `/oyuncular/${userProfile.username}` : '/profil') && (
                 <span className="absolute -bottom-[35px] left-0 right-0 h-[2px] bg-[#00E5FF] shadow-[0_0_10px_rgba(0,229,255,1)]" />
               )}
             </Link>
@@ -117,9 +117,9 @@ export default function Header({ user, userProfile, activeTeam, unreadCount = 0 
                   )}
                 </Link>
                 <Link 
-                  href={`/oyuncular/${userProfile.username}`} 
+                  href="/profil" 
                   className="client-glass flex items-center gap-3 p-1.5 pr-4 rounded-full border border-white/5 bg-[#03070c]/50 hover:border-[#00e5ff]/40 hover:bg-[#00e5ff]/5 transition-all group shrink-0"
-                  title="Profilime Git"
+                  title="Hesap Ayarları"
                 >
                   <div className="w-8 h-8 rounded-full overflow-hidden bg-black border border-white/10 shrink-0 group-hover:border-[#00e5ff]/30 transition-colors">
                     {userProfile.avatar_url ? (
@@ -217,9 +217,9 @@ export default function Header({ user, userProfile, activeTeam, unreadCount = 0 
                   )}
                 </Link>
                 <Link
-                  href="/profil"
+                  href={userProfile?.username ? `/oyuncular/${userProfile.username}` : '/profil'}
                   onClick={() => setMobileOpen(false)}
-                  className={`text-[16px] font-[800] uppercase tracking-widest ${pathname === '/profil' ? 'text-[#00E5FF] drop-shadow-[0_0_8px_rgba(0,229,255,0.5)]' : 'text-gray-300 hover:text-[#00E5FF]'}`}
+                  className={`text-[16px] font-[800] uppercase tracking-widest ${pathname === (userProfile?.username ? `/oyuncular/${userProfile.username}` : '/profil') ? 'text-[#00E5FF] drop-shadow-[0_0_8px_rgba(0,229,255,0.5)]' : 'text-gray-300 hover:text-[#00E5FF]'}`}
                 >
                   OYUNCUM
                 </Link>
@@ -240,7 +240,7 @@ export default function Header({ user, userProfile, activeTeam, unreadCount = 0 
             {user && userProfile ? (
               <div className="flex flex-col gap-4">
                 <Link 
-                  href={`/oyuncular/${userProfile.username}`}
+                  href="/profil"
                   onClick={() => setMobileOpen(false)}
                   className="client-glass flex items-center justify-between p-3 rounded-xl border border-white/5 bg-[#03070c]/50 hover:border-[#00e5ff]/40 transition-all group"
                 >
