@@ -21,6 +21,7 @@ const leftLinks: NavLink[] = [
 ];
 
 const rightLinks: NavLink[] = [
+  { label: 'HABERLER', href: '/haberler' },
   { label: 'SOSYAL', href: '/sosyal' },
   { label: 'MAĞAZA', href: '/magaza', locked: true },
 ];

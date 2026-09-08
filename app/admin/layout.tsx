@@ -60,6 +60,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </Link>
           <div className="pt-4 mt-4 border-t border-white/5">
             <h3 className="px-4 text-[10px] font-black tracking-widest text-zinc-500 mb-2 uppercase">İçerik Yönetimi</h3>
+            <Link href="/admin/news" className="block px-4 py-3 rounded-lg text-sm font-bold text-gray-400 hover:text-[#00e5ff] hover:bg-[#00e5ff]/10 transition-colors">
+              Haberler
+            </Link>
             <Link href="/admin/tournaments" className="block px-4 py-3 rounded-lg text-sm font-bold text-gray-400 hover:text-[#00e5ff] hover:bg-[#00e5ff]/10 transition-colors">
               Turnuvalar
             </Link>

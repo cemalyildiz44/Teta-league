@@ -275,6 +275,7 @@ export const footerLinks = {
     { label: 'Ligler', href: '/ligler' },
     { label: 'Takımlar', href: '/takimlar' },
     { label: 'Oyuncular', href: '/oyuncular' },
+    { label: 'Haberler', href: '/haberler' },
     { label: 'Sosyal', href: '/sosyal' },
   ],
   about: [
