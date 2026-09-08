@@ -1,8 +1,8 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Kullanım Şartları | Teta League',
-  description: 'Teta League Kullanım Şartları ve Topluluk Kuralları',
+  title: 'Kullanım Şartları | TETA League',
+  description: 'TETA League Kullanım Şartları ve Topluluk Kuralları',
 };
 
 export default function TermsOfUsePage() {
@@ -20,7 +20,7 @@ export default function TermsOfUsePage() {
           <section>
             <h2 className="text-[#00e5ff] text-lg font-bold tracking-widest uppercase mb-3">1. Hizmetin Tanımı ve Kabul</h2>
             <p>
-              Teta League, oyuncuların EA FC Pro Clubs modunda takımlar kurmasını, transferler yapmasını ve düzenlenen liglere/turnuvalara katılmasını sağlayan bağımsız bir topluluk ve istatistik platformudur. Platforma kayıt olan her kullanıcı bu Kullanım Şartları'nı okuduğunu, anladığını ve bu kurallara uymayı kabul ettiğini beyan eder.
+              TETA League, oyuncuların EA FC Pro Clubs modunda takımlar kurmasını, transferler yapmasını ve düzenlenen liglere/turnuvalara katılmasını sağlayan bağımsız bir topluluk ve istatistik platformudur. Platforma kayıt olan her kullanıcı bu Kullanım Şartları'nı okuduğunu, anladığını ve bu kurallara uymayı kabul ettiğini beyan eder.
             </p>
           </section>
 
@@ -35,7 +35,7 @@ export default function TermsOfUsePage() {
 
           <section>
             <h2 className="text-[#00e5ff] text-lg font-bold tracking-widest uppercase mb-3">3. Davranış Kuralları ve Fair-Play</h2>
-            <p className="mb-3">Teta League, rekabetçi ancak saygılı bir e-spor ortamı sağlamayı hedefler. Aşağıdaki davranışlar kesinlikle yasaktır:</p>
+            <p className="mb-3">TETA League, rekabetçi ancak saygılı bir e-spor ortamı sağlamayı hedefler. Aşağıdaki davranışlar kesinlikle yasaktır:</p>
             <ul className="list-disc list-inside space-y-2 ml-4">
               <li>Diğer oyunculara, takımlara veya yöneticilere karşı hakaret, küfür, tehdit veya ayrımcı (ırkçı, cinsiyetçi vb.) söylemlerde bulunmak.</li>
               <li>Lig veya maç sonuçlarını kasten manipüle etmek, şike yapmak veya sistemi kandırmaya yönelik yanlış istatistik/skor girmek.</li>
@@ -53,19 +53,19 @@ export default function TermsOfUsePage() {
           <section>
             <h2 className="text-[#00e5ff] text-lg font-bold tracking-widest uppercase mb-3">5. Fikri Mülkiyet ve İçerikler</h2>
             <p>
-              Platformdaki logolar, kodlar, tasarımlar ve veritabanı Teta League'e aittir. Kullanıcıların yüklediği logolar, takım isimleri ve metin içerikleri (bio, sosyal gönderiler) yürürlükteki yasalara aykırı olmamalıdır. Kullanıcı, yüklediği içeriklerin tüm yasal sorumluluğunun kendisine ait olduğunu kabul eder. <em>Not: "EA FC", "Pro Clubs" ve ilgili tüm marka hakları Electronic Arts Inc.'e aittir. Teta League, Electronic Arts ile resmi bir bağa sahip değildir.</em>
+              Platformdaki logolar, kodlar, tasarımlar ve veritabanı TETA League'e aittir. Kullanıcıların yüklediği logolar, takım isimleri ve metin içerikleri (bio, sosyal gönderiler) yürürlükteki yasalara aykırı olmamalıdır. Kullanıcı, yüklediği içeriklerin tüm yasal sorumluluğunun kendisine ait olduğunu kabul eder. <em>Not: "EA FC", "Pro Clubs" ve ilgili tüm marka hakları Electronic Arts Inc.'e aittir. TETA League, Electronic Arts ile resmi bir bağa sahip değildir.</em>
             </p>
           </section>
 
           <section>
             <h2 className="text-[#00e5ff] text-lg font-bold tracking-widest uppercase mb-3">6. Sorumluluğun Sınırlandırılması</h2>
             <p>
-              Teta League hizmeti "olduğu gibi" sunulmaktadır. Kesintisiz erişim, hata olmaması veya sunucu kapanmalarından dolayı yaşanacak olası veri (istatistik/maç) kayıplarından platform yönetimi sorumlu tutulamaz.
+              TETA League hizmeti "olduğu gibi" sunulmaktadır. Kesintisiz erişim, hata olmaması veya sunucu kapanmalarından dolayı yaşanacak olası veri (istatistik/maç) kayıplarından platform yönetimi sorumlu tutulamaz.
             </p>
           </section>
 
           <div className="mt-12 p-4 bg-[#00e5ff]/5 border border-[#00e5ff]/20 rounded text-xs text-gray-400">
-            Bu metinler Teta League platformunun mevcut kullanım yapısına göre hazırlanmıştır. Hukuki danışmanlık yerine geçmez.
+            Bu metinler TETA League platformunun mevcut kullanım yapısına göre hazırlanmıştır. Hukuki danışmanlık yerine geçmez.
           </div>
         </div>
       </div>

@@ -327,7 +327,7 @@ export function SeasonsManager({ initialSeasons }: { initialSeasons: Season[] })
             <form onSubmit={handleCreate} className='p-6 space-y-4'>
               <div>
                 <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>Sezon Adı</label>
-                <input name='name' required className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500/50 focus:outline-none' placeholder='Örn: Teta League 7. Sezon' />
+                <input name='name' required className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500/50 focus:outline-none' placeholder='Örn: TETA League 7. Sezon' />
               </div>
               <div>
                 <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>Slug</label>

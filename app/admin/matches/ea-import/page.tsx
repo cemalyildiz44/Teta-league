@@ -1,4 +1,4 @@
-﻿
+
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { EAImportManager } from './EAImportManager';
@@ -22,7 +22,7 @@ export default async function EAImportPage() {
     <div className='max-w-[1600px] mx-auto'>
       <div className='mb-8'>
         <h1 className='text-2xl font-black text-white tracking-widest uppercase mb-1'>EA MAÇ İÇE AKTARMA</h1>
-        <p className='text-sm text-zinc-400'>EA FC Pro Clubs karşılaşmalarından gelen verileri Teta League sistemine güvenli şekilde aktar.</p>
+        <p className='text-sm text-zinc-400'>EA FC Pro Clubs karşılaşmalarından gelen verileri TETA League sistemine güvenli şekilde aktar.</p>
       </div>
       
       <EAImportManager 

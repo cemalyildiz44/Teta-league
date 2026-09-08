@@ -1,4 +1,4 @@
-﻿
+
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { LeaguesManager } from './LeaguesManager';
@@ -21,7 +21,7 @@ export default async function AdminLeaguesPage() {
       <div className='flex items-center justify-between mb-8'>
         <div>
           <h1 className='text-2xl font-black text-white tracking-widest'>LİG YÖNETİM MERKEZİ</h1>
-          <p className='text-sm text-zinc-400 mt-1'>Teta League liglerini ve katılımcı takımları yönetin</p>
+          <p className='text-sm text-zinc-400 mt-1'>TETA League liglerini ve katılımcı takımları yönetin</p>
         </div>
       </div>
 

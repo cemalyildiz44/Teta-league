@@ -64,7 +64,7 @@ export default async function AdminDashboard() {
       <div className='flex flex-col md:flex-row md:items-end justify-between gap-4'>
         <div>
           <h1 className='text-3xl font-black text-white tracking-widest'>GENEL BAKIŞ</h1>
-          <p className='text-sm text-zinc-400 mt-1'>Teta League operasyonunun tüm önemli verilerini tek merkezden takip et.</p>
+          <p className='text-sm text-zinc-400 mt-1'>TETA League operasyonunun tüm önemli verilerini tek merkezden takip et.</p>
         </div>
         <div className='text-right'>
           <p className='text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1'>AKTİF SEZON</p>
@@ -409,7 +409,7 @@ export default async function AdminDashboard() {
           </div>
         </div>
 
-        {/* Teta Network */}
+        {/* TETA Network */}
         <div className='card-surface rounded-xl border border-white/5 overflow-hidden flex flex-col'>
           <div className='p-4 border-b border-white/5 bg-[#0a1628] flex items-center justify-between'>
             <h3 className='text-xs font-black text-white tracking-widest uppercase flex items-center gap-2'>

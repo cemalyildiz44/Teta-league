@@ -11,13 +11,13 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const supabase = createClient(cookieStore);
 
   const { data: match } = await supabase.from("matches").select("home_team_id, away_team_id, home_score, away_score, status").eq("id", matchId).maybeSingle();
-  if (!match || match.status !== "APPROVED") return { title: "Maç Bulunamadı | Teta League" };
+  if (!match || match.status !== "APPROVED") return { title: "Maç Bulunamadı | TETA League" };
 
   const { data: ht } = await supabase.from("teams").select("name").eq("id", match.home_team_id).maybeSingle();
   const { data: at } = await supabase.from("teams").select("name").eq("id", match.away_team_id).maybeSingle();
 
   return {
-    title: `${ht?.name || "Ev Sahibi"} ${match.home_score} - ${match.away_score} ${at?.name || "Deplasman"} | Teta League`,
+    title: `${ht?.name || "Ev Sahibi"} ${match.home_score} - ${match.away_score} ${at?.name || "Deplasman"} | TETA League`,
   };
 }
 

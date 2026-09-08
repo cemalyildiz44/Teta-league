@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import NotificationsClient from './NotificationsClient';
 
 export const metadata = {
-  title: "Bildirimler | Teta League"
+  title: "Bildirimler | TETA League"
 };
 
 export default async function NotificationsPage() {

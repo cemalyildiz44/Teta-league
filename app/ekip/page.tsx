@@ -1,8 +1,8 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Ekip | Teta League',
-  description: 'Teta League yönetim ve organizasyon ekibi.',
+  title: 'Ekip | TETA League',
+  description: 'TETA League yönetim ve organizasyon ekibi.',
 };
 
 interface TeamMember {
@@ -39,7 +39,7 @@ export default function EkipPage() {
           </h1>
         </div>
         <p className="text-gray-400 text-sm sm:text-base font-medium">
-          Teta League ekibi
+          TETA League ekibi
         </p>
       </div>
 

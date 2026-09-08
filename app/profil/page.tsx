@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import ClientAccount from './ClientAccount';
 
 export const metadata = {
-  title: "Hesabım | Teta League"
+  title: "Hesabım | TETA League"
 };
 
 export default async function ProfilPage() {

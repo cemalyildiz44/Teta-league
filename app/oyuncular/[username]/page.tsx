@@ -9,7 +9,7 @@ export async function generateMetadata({ params }: { params: Promise<{ username:
   const resolvedParams = await params;
   const username = decodeURIComponent(resolvedParams.username);
   return {
-    title: `${username} | Teta League`,
+    title: `${username} | TETA League`,
   };
 }
 

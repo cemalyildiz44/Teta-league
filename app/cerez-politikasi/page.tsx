@@ -1,8 +1,8 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Çerez Politikası | Teta League',
-  description: 'Teta League Çerez Politikası',
+  title: 'Çerez Politikası | TETA League',
+  description: 'TETA League Çerez Politikası',
 };
 
 export default function CookiePolicyPage() {
@@ -26,7 +26,7 @@ export default function CookiePolicyPage() {
           <section>
             <h2 className="text-[#00e5ff] text-lg font-bold tracking-widest uppercase mb-3">2. Kullandığımız Çerezler</h2>
             <p className="mb-3">
-              Teta League platformu, yapısı gereği <strong>yalnızca zorunlu (kesinlikle gerekli) çerezler</strong> kullanmaktadır.
+              TETA League platformu, yapısı gereği <strong>yalnızca zorunlu (kesinlikle gerekli) çerezler</strong> kullanmaktadır.
             </p>
             <ul className="list-disc list-inside space-y-2 ml-4">
               <li>
@@ -48,7 +48,7 @@ export default function CookiePolicyPage() {
           <section>
             <h2 className="text-[#00e5ff] text-lg font-bold tracking-widest uppercase mb-3">4. Çerez Tercihleri ve Yönetimi</h2>
             <p>
-              Kullandığımız çerezler sitenin çalışması için kesinlikle gerekli olduğundan kapatılamaz. Çerez kullanımını tamamen reddetmek isterseniz, tarayıcınızın ayarlarından tüm çerezleri engelleyebilirsiniz, ancak bu durumda Teta League'e giriş yapamaz ve hesabınızı kullanamazsınız.
+              Kullandığımız çerezler sitenin çalışması için kesinlikle gerekli olduğundan kapatılamaz. Çerez kullanımını tamamen reddetmek isterseniz, tarayıcınızın ayarlarından tüm çerezleri engelleyebilirsiniz, ancak bu durumda TETA League'e giriş yapamaz ve hesabınızı kullanamazsınız.
             </p>
           </section>
 
@@ -60,7 +60,7 @@ export default function CookiePolicyPage() {
           </section>
 
           <div className="mt-12 p-4 bg-[#00e5ff]/5 border border-[#00e5ff]/20 rounded text-xs text-gray-400">
-            Bu metin Teta League platformunun mevcut kullanım yapısına göre hazırlanmıştır.
+            Bu metin TETA League platformunun mevcut kullanım yapısına göre hazırlanmıştır.
           </div>
         </div>
       </div>

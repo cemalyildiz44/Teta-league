@@ -11,7 +11,7 @@ export default function Footer() {
           <div className="space-y-6">
             <div className="space-y-4">
               <Link href="/" className="flex items-center gap-3">
-                <Image src="/logo.jpg" alt="Teta League" width={32} height={32} className="rounded" />
+                <Image src="/logo.jpg" alt="TETA League" width={32} height={32} className="rounded" />
                 <span className="text-sm font-black tracking-widest text-white">
                   TETA<span className="text-[#00e5ff]"> LEAGUE</span>
                 </span>
@@ -114,7 +114,7 @@ export default function Footer() {
 
         {/* Bottom */}
         <div className="mt-10 pt-6 border-t border-white/5 text-center">
-          <p className="text-xs text-gray-600">© 2026 Teta League. Tüm hakları saklıdır.</p>
+          <p className="text-xs text-gray-600">© 2026 TETA League. Tüm hakları saklıdır.</p>
         </div>
       </div>
     </footer>

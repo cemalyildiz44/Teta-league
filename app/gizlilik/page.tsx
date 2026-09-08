@@ -1,8 +1,8 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Gizlilik ve Aydınlatma Metni | Teta League',
-  description: 'Teta League Kişisel Verilerin İşlenmesine İlişkin Aydınlatma Metni',
+  title: 'Gizlilik ve Aydınlatma Metni | TETA League',
+  description: 'TETA League Kişisel Verilerin İşlenmesine İlişkin Aydınlatma Metni',
 };
 
 export default function PrivacyPolicyPage() {
@@ -20,7 +20,7 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-[#00e5ff] text-lg font-bold tracking-widest uppercase mb-3">1. Veri Sorumlusu</h2>
             <p>
-              Teta League ("Platform"), elektronik sporlar ve sanal lig yönetimi alanında faaliyet gösteren bir hizmettir. 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında, kullanıcılarımızın ("Veri Sahibi") kişisel verilerinin güvenliğine ve hukuka uygun şekilde işlenmesine büyük önem veriyoruz. İşbu aydınlatma metni, hangi kişisel verilerinizin ne amaçla işlendiğini açıklamaktadır.
+              TETA League ("Platform"), elektronik sporlar ve sanal lig yönetimi alanında faaliyet gösteren bir hizmettir. 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında, kullanıcılarımızın ("Veri Sahibi") kişisel verilerinin güvenliğine ve hukuka uygun şekilde işlenmesine büyük önem veriyoruz. İşbu aydınlatma metni, hangi kişisel verilerinizin ne amaçla işlendiğini açıklamaktadır.
             </p>
           </section>
 
@@ -49,7 +49,7 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-[#00e5ff] text-lg font-bold tracking-widest uppercase mb-3">4. Kişisel Verilerin Aktarımı</h2>
             <p>
-              Teta League, kişisel verilerinizi reklam, pazarlama veya ticari profilleme amaçlarıyla <strong className="text-white">hiçbir üçüncü taraf ile paylaşmaz veya satmaz.</strong>
+              TETA League, kişisel verilerinizi reklam, pazarlama veya ticari profilleme amaçlarıyla <strong className="text-white">hiçbir üçüncü taraf ile paylaşmaz veya satmaz.</strong>
               Ancak verileriniz, sistemin barındırılması ve teknik güvenliğin sağlanması amacıyla bulut altyapı hizmeti aldığımız güvenli servis sağlayıcılarında (Supabase, Vercel) ve e-posta gönderimi için (Resend) hizmet aldığımız sunucularda (yurtdışı bulut sistemleri) muhafaza edilmektedir.
               Kullanıcı adı, EA ID, takım, istatistik ve avatar gibi oyun içi performans verileriniz platformun doğası gereği <strong>diğer kullanıcılara ve site ziyaretçilerine açık</strong> olarak yayınlanır.
             </p>
@@ -63,7 +63,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <div className="mt-12 p-4 bg-[#00e5ff]/5 border border-[#00e5ff]/20 rounded text-xs text-gray-400">
-            Bu metin Teta League platformunun mevcut kullanım ve veri işleme yapısına göre hazırlanmıştır. Hukuki danışmanlık yerine geçmez.
+            Bu metin TETA League platformunun mevcut kullanım ve veri işleme yapısına göre hazırlanmıştır. Hukuki danışmanlık yerine geçmez.
           </div>
         </div>
       </div>

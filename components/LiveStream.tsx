@@ -23,7 +23,7 @@ export default function LiveStream() {
         {/* Soft Vignette Overlay */}
         <div className="absolute inset-0 shadow-[inset_0_0_60px_rgba(0,0,0,0.5)] pointer-events-none z-10" />
 
-        {/* Big Teta Logo Watermark */}
+        {/* Big TETA Logo Watermark */}
         <div className="absolute inset-0 flex items-center justify-center z-0 opacity-[0.12] pointer-events-none mix-blend-screen">
           <img 
             src="/logo.jpg" 

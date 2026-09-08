@@ -14,8 +14,8 @@ const exo2 = Exo_2({
 });
 
 export const metadata: Metadata = {
-  title: "Teta League",
-  description: "Teta League - EA FC Pro Clubs rekabetinin yeni adresi. Ligler, takımlar, istatistikler ve daha fazlası.",
+  title: "TETA League",
+  description: "TETA League - EA FC Pro Clubs rekabetinin yeni adresi. Ligler, takımlar, istatistikler ve daha fazlası.",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

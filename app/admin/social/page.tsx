@@ -87,7 +87,7 @@ export default async function AdminSocialPage({ searchParams }: any) {
           SOSYAL MODERASYON
         </h1>
         <p className="text-sm md:text-base text-zinc-400 max-w-2xl font-medium">
-          Teta Network üzerindeki gönderileri ve yorumları güvenli şekilde yönet.
+          TETA Network üzerindeki gönderileri ve yorumları güvenli şekilde yönet.
         </p>
       </div>
 

@@ -67,7 +67,7 @@ export default async function SocialPage() {
           TETA <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00e5ff] to-[#00aaff] drop-shadow-[0_0_12px_rgba(0,229,255,0.4)]">NETWORK</span>
         </h1>
         <p className="text-gray-400 text-[15px] md:text-[16px] font-[500] tracking-wide max-w-lg px-4">
-          Teta League topluluğunun buluşma noktası.
+          TETA League topluluğunun buluşma noktası.
         </p>
       </div>
 
@@ -140,7 +140,7 @@ export default async function SocialPage() {
                   <div className="w-6 h-6 flex items-center justify-center transition-colors">
                     <img src="/kick-logo.png" alt="Kick" className="w-[14px] h-[14px] object-contain opacity-70 group-hover:opacity-100 group-hover:drop-shadow-[0_0_5px_rgba(83,252,24,0.6)] transition-all" />
                   </div>
-                  <span className="text-[12px] font-[800] tracking-widest text-gray-400 group-hover:text-white transition-colors">Teta League</span>
+                  <span className="text-[12px] font-[800] tracking-widest text-gray-400 group-hover:text-white transition-colors">TETA League</span>
                 </a>
                 <a href="https://discord.gg/Cd9b4jpcAZ" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors group">
                   <div className="w-6 h-6 flex items-center justify-center text-gray-400 group-hover:text-[#5865F2] transition-colors">

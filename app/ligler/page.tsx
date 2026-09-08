@@ -6,8 +6,8 @@ import LeagueRulesButton from "@/components/LeagueRulesButton";
 import { slugify } from "@/app/lig/utils";
 
 export const metadata = {
-  title: "Ligler | Teta League",
-  description: "Teta League resmi ligleri ve güncel sezon bilgileri.",
+  title: "Ligler | TETA League",
+  description: "TETA League resmi ligleri ve güncel sezon bilgileri.",
 };
 
 export default async function LiglerPage() {
@@ -68,7 +68,7 @@ export default async function LiglerPage() {
           RESMİ <span className="text-[#00e5ff]">LİGLER</span>
         </h1>
         <p className="text-[#a0b0c0] max-w-2xl text-[15px] leading-relaxed font-medium">
-          Teta League ekosistemindeki profesyonel ligler. Dünyanın en iyi sanal futbol takımlarının kıyasıya mücadelesine tanık olun.
+          TETA League ekosistemindeki profesyonel ligler. Dünyanın en iyi sanal futbol takımlarının kıyasıya mücadelesine tanık olun.
         </p>
       </div>
 
@@ -87,7 +87,7 @@ export default async function LiglerPage() {
                 bgAccent: "bg-[#ff0044]/10",
                 bgAccentHover: "hover:bg-[#ff0044]/20",
                 logo: "/ecl-logo.png",
-                desc: "Teta League'in rekabetçi 2. seviye ligi. Geleceğin şampiyonlarının Süper Lig'e yükselme mücadelesi.",
+                desc: "TETA League'in rekabetçi 2. seviye ligi. Geleceğin şampiyonlarının Süperlig'e yükselme mücadelesi.",
                 levelText: "2. SEVİYE LİG"
               }
             : {
@@ -98,7 +98,7 @@ export default async function LiglerPage() {
                 bgAccent: "bg-[#00e5ff]/10",
                 bgAccentHover: "hover:bg-[#00e5ff]/20",
                 logo: "/teta-superlig-logo.png",
-                desc: "Teta League'in en üst düzey profesyonel mücadele alanı. Sadece en iyi takımlar burada kalabilir.",
+                desc: "TETA League'in en üst düzey profesyonel mücadele alanı. Sadece en iyi takımlar burada kalabilir.",
                 levelText: "1. SEVİYE LİG"
               };
 
@@ -189,7 +189,7 @@ export default async function LiglerPage() {
         }) : (
           <div className="col-span-1 lg:col-span-2 empty-state !py-24 fade-in-up">
             <span className="empty-state-title text-[24px]">AKTİF LİG BULUNAMADI</span>
-            <span className="empty-state-desc">Teta League'de şu anda aktif bir lig bulunmuyor.</span>
+            <span className="empty-state-desc">TETA League'de şu anda aktif bir lig bulunmuyor.</span>
           </div>
         )}
       </div>
@@ -201,7 +201,7 @@ export default async function LiglerPage() {
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg>
           </div>
           <h4 className="text-[15px] font-black tracking-widest text-white uppercase mb-2">2 Resmi Lig</h4>
-          <p className="text-[#a0b0c0] text-[13px] leading-relaxed font-medium">Süper Lig ve ECL 1. Lig olmak üzere iki ayrı seviyede profesyonel sanal futbol deneyimi.</p>
+          <p className="text-[#a0b0c0] text-[13px] leading-relaxed font-medium">Süperlig ve ECL 1. Lig olmak üzere iki ayrı seviyede profesyonel sanal futbol deneyimi.</p>
         </div>
 
         <div className="client-glass p-6 md:p-8 rounded-2xl border border-white/5 flex flex-col items-center text-center fade-in-up" style={{ animationDelay: "0.3s" }}>
@@ -225,7 +225,7 @@ export default async function LiglerPage() {
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 15V3"></path><path d="m8.5 6.5 3.5-3.5 3.5 3.5"></path><path d="M2 21h20"></path></svg>
           </div>
           <h4 className="text-[15px] font-black tracking-widest text-white uppercase mb-2">Prestij & Ödüller</h4>
-          <p className="text-[#a0b0c0] text-[13px] leading-relaxed font-medium">Şampiyonluk kupaları, gol krallığı ve sezon sonu resmi Teta ödülleri seni bekliyor.</p>
+          <p className="text-[#a0b0c0] text-[13px] leading-relaxed font-medium">Şampiyonluk kupaları, gol krallığı ve sezon sonu resmi TETA ödülleri seni bekliyor.</p>
         </div>
       </div>
     </div>

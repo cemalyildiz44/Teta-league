@@ -5,8 +5,8 @@ import PlayerRankingsClient, { PlayerRanking } from './PlayerRankingsClient';
 import { calculateMarketValue, MarketValueInput } from '@/app/utils/marketValueCalculator';
 
 export const metadata: Metadata = {
-  title: 'Oyuncular Sıralaması | Teta League',
-  description: 'Teta League tarihindeki en değerli oyuncular. Oyuncu piyasa değeri sıralaması.',
+  title: 'Oyuncular Sıralaması | TETA League',
+  description: 'TETA League tarihindeki en değerli oyuncular. Oyuncu piyasa değeri sıralaması.',
 };
 
 export const revalidate = 60; // 1 min cache
@@ -158,7 +158,7 @@ export default async function PlayersPage() {
           OYUNCULAR
         </h1>
         <p className="text-[#a0b0c0] font-medium max-w-2xl mx-auto text-[15px] md:text-[17px] leading-relaxed">
-          Teta League tarihindeki en değerli oyuncular.
+          TETA League tarihindeki en değerli oyuncular.
         </p>
       </div>
 

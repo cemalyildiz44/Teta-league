@@ -1,4 +1,4 @@
-﻿
+
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { MatchesManager } from './MatchesManager';
@@ -22,7 +22,7 @@ export default async function AdminMatchesPage() {
       <div className='flex items-center justify-between mb-8'>
         <div>
           <h1 className='text-2xl font-black text-white tracking-widest'>MAÇ YÖNETİM MERKEZİ</h1>
-          <p className='text-sm text-zinc-400 mt-1'>Teta League karşılaşmalarını görüntüle, incele, düzenle ve onayla.</p>
+          <p className='text-sm text-zinc-400 mt-1'>TETA League karşılaşmalarını görüntüle, incele, düzenle ve onayla.</p>
         </div>
       </div>
 

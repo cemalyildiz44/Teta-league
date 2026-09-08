@@ -63,11 +63,11 @@ export default function Header({ user, userProfile, activeTeam, unreadCount = 0 
 
         {/* Center Logo */}
         <Link href="/" className="flex items-center justify-center shrink-0 mx-4 relative group">
-          <Image 
-            src="/logo-t.png" 
-            alt="Teta League" 
-            width={64} 
-            height={64} 
+          <Image
+            src="/logo-t.png"
+            alt="TETA League"
+            width={64}
+            height={64}
             className="object-contain drop-shadow-[0_0_10px_rgba(0,229,255,0.2)] group-hover:drop-shadow-[0_0_20px_rgba(0,229,255,0.6)] group-hover:scale-105 transition-all duration-300"
           />
         </Link>

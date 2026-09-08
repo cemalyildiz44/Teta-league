@@ -20,7 +20,7 @@ export default function RegisterPage() {
         <div className="card-surface rounded-2xl p-8 relative z-10 glow-cyan">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-black text-white tracking-widest">KAYIT OL</h1>
-            <p className="text-sm text-gray-400 mt-2">Teta League'e katıl</p>
+            <p className="text-sm text-gray-400 mt-2">TETA League'e katıl</p>
           </div>
 
           <form action={formAction} className="space-y-4">
@@ -92,7 +92,7 @@ export default function RegisterPage() {
                 </label>
               </div>
               <div className="text-[11px] text-gray-500 pl-7 leading-relaxed">
-                Teta League platformuna kayıt olarak <Link href="/gizlilik" target="_blank" className="text-[#00e5ff] hover:underline">Kişisel Verilerin İşlenmesine İlişkin Aydınlatma Metni</Link>'ni okuduğunuzu ve kişisel verilerinizin işlenmesi hakkında bilgilendirildiğinizi teyit etmiş olursunuz.
+                TETA League platformuna kayıt olarak <Link href="/gizlilik" target="_blank" className="text-[#00e5ff] hover:underline">Kişisel Verilerin İşlenmesine İlişkin Aydınlatma Metni</Link>'ni okuduğunuzu ve kişisel verilerinizin işlenmesi hakkında bilgilendirildiğinizi teyit etmiş olursunuz.
               </div>
             </div>
 

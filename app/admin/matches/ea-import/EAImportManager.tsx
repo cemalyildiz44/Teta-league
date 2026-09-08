@@ -1,4 +1,4 @@
-﻿
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -287,7 +287,7 @@ export function EAImportManager({ seasons, leagues, recentImports }: any) {
                   </div>
                   
                   <p className='text-sm text-zinc-300'>
-                    Bu işlem, seçili maçı ve <strong>{confirmModal.match.home_team.players.length + confirmModal.match.away_team.players.length} oyuncunun istatistiğini</strong> Teta League veritabanına PENDING_REVIEW statüsüyle ekleyecektir.
+                    Bu işlem, seçili maçı ve <strong>{confirmModal.match.home_team.players.length + confirmModal.match.away_team.players.length} oyuncunun istatistiğini</strong> TETA League veritabanına PENDING_REVIEW statüsüyle ekleyecektir.
                   </p>
 
                   <div className='flex gap-3 pt-2'>

@@ -118,7 +118,7 @@ export default async function SupabaseTestPage() {
                 (message){" "}
                 <span className="text-blue-400">VALUES</span> (
                 <span className="text-orange-400">
-                  &apos;Teta League bağlantısı başarılı!&apos;
+                  &apos;TETA League bağlantısı başarılı!&apos;
                 </span>
                 );
               </p>

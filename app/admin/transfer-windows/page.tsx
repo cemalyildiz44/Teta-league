@@ -4,7 +4,7 @@ import { TransferWindowsManager } from './TransferWindowsManager';
 
 export const metadata = {
   title: 'Transfer Pencereleri | PCL Yönetim',
-  description: 'Teta League transfer ve tescil pencerelerini yönetin'
+  description: 'TETA League transfer ve tescil pencerelerini yönetin'
 };
 
 export default async function AdminTransferWindowsPage() {

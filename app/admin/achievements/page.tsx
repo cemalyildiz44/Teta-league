@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import AchievementsClient from './AchievementsClient';
 
 export const metadata = {
-  title: 'Başarı Yönetimi | Teta League Admin',
+  title: 'Başarı Yönetimi | TETA League Admin',
 };
 
 export default async function AchievementsPage() {

@@ -23,8 +23,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!team) return { title: 'Takım Bulunamadı' };
 
   return {
-    title: `${team.name} | Teta League`,
-    description: `${team.name} takımının aktif kadrosu, güncel lig durumu ve kaptanlık detayları. Teta League e-spor platformu.`,
+    title: `${team.name} | TETA League`,
+    description: `${team.name} takımının aktif kadrosu, güncel lig durumu ve kaptanlık detayları. TETA League e-spor platformu.`,
   };
 }
 

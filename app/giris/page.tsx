@@ -25,7 +25,7 @@ function LoginForm() {
       <div className="card-surface rounded-2xl p-8 relative z-10 glow-cyan">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-black text-white tracking-widest">GİRİŞ YAP</h1>
-          <p className="text-sm text-gray-400 mt-2">Teta League hesabınıza erişin</p>
+          <p className="text-sm text-gray-400 mt-2">TETA League hesabınıza erişin</p>
         </div>
 
         {urlError && (

@@ -32,7 +32,7 @@ export default function CookieBanner() {
             <span className="text-[#00e5ff]">TETA LEAGUE</span> ÇEREZ TERCİHLERİ
           </p>
           <p>
-            Teta League platformunun güvenli ve düzgün çalışması, üye girişlerinin sağlanması ve temel işlevlerin yerine getirilebilmesi için <span className="text-white font-medium">zorunlu çerezler</span> kullanılmaktadır. Platformumuzda halihazırda reklam veya analiz amaçlı üçüncü taraf çerezler kullanılmamaktadır. Detaylı bilgi için <Link href="/cerez-politikasi" className="text-[#00e5ff] hover:underline whitespace-nowrap">Çerez Politikamızı</Link> inceleyebilirsiniz.
+            TETA League platformunun güvenli ve düzgün çalışması, üye girişlerinin sağlanması ve temel işlevlerin yerine getirilebilmesi için <span className="text-white font-medium">zorunlu çerezler</span> kullanılmaktadır. Platformumuzda halihazırda reklam veya analiz amaçlı üçüncü taraf çerezler kullanılmamaktadır. Detaylı bilgi için <Link href="/cerez-politikasi" className="text-[#00e5ff] hover:underline whitespace-nowrap">Çerez Politikamızı</Link> inceleyebilirsiniz.
           </p>
         </div>
         

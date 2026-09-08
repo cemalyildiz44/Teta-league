@@ -4,8 +4,8 @@ import { Metadata } from 'next';
 import TeamRankingsClient, { TeamRanking } from './TeamRankingsClient';
 
 export const metadata: Metadata = {
-  title: 'Takımlar Sıralaması | Teta League',
-  description: 'Teta League tarihindeki en başarılı takımlar. Tüm zamanlar başarı sıralaması.',
+  title: 'Takımlar Sıralaması | TETA League',
+  description: 'TETA League tarihindeki en başarılı takımlar. Tüm zamanlar başarı sıralaması.',
 };
 
 export const revalidate = 60; // Cache for 1 min
@@ -113,7 +113,7 @@ export default async function TeamsPage() {
           TAKIMLAR
         </h1>
         <p className="text-[#a0b0c0] font-medium max-w-2xl mx-auto text-[15px] md:text-[17px] leading-relaxed">
-          Teta League tarihindeki en başarılı takımlar.
+          TETA League tarihindeki en başarılı takımlar.
         </p>
       </div>
 
