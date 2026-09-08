@@ -31,13 +31,18 @@ export default async function ProfilPage() {
   // 2. Fetch Team Memberships & League
   const { data: membershipsData } = await supabase
     .from('team_memberships')
-    .select('*, teams(id, name, slug, logo_url)')
+    .select('*')
     .eq('player_id', user.id)
     .order('joined_at', { ascending: false });
 
   const memberships = membershipsData || [];
   const activeMembership = memberships.find(m => !m.left_at);
-  const team = activeMembership?.teams ? (activeMembership.teams as any) : null;
+
+  let team = null;
+  if (activeMembership?.team_id) {
+    const { data: tData } = await supabase.from('teams').select('id, name, slug, logo_url').eq('id', activeMembership.team_id).maybeSingle();
+    team = tData;
+  }
 
   // Active League
   let league = null;

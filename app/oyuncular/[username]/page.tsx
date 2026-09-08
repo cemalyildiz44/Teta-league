@@ -53,7 +53,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   }
 
   const [{ data: membershipsData }, { data: allSeasonsData }, { data: allLeaguesData }, { data: playerAchievementsData }] = await Promise.all([
-    supabase.from("team_memberships").select("*, teams(id, name, slug, logo_url)").eq("player_id", profile.id).order("joined_at", { ascending: false }),
+    supabase.from("team_memberships").select("*").eq("player_id", profile.id).order("joined_at", { ascending: false }),
     supabase.from("seasons").select("id, name, slug"),
     supabase.from("leagues").select("id, name, season_id"),
     supabase.from('player_achievements').select('achievement_type, season_id').eq('player_id', profile.id)
@@ -61,7 +61,6 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
 
   const memberships = membershipsData || [];
   const activeMembership = memberships.find((m) => !m.left_at);
-  const activeTeam = activeMembership?.teams ? (activeMembership.teams as any) : null;
   const matchMap = new Map(approvedMatches.map((m) => [m.id, m]));
   const seasonsMap = new Map((allSeasonsData || []).map((s) => [s.id, s]));
   const leaguesMap = new Map((allLeaguesData || []).map((l) => [l.id, l]));
@@ -69,9 +68,11 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   // Teams
   const teamIds = new Set<string>();
   approvedMatches.forEach((m) => { teamIds.add(m.home_team_id); teamIds.add(m.away_team_id); });
-  memberships.forEach((m) => { const t = m.teams as any; if (t?.id) teamIds.add(t.id); });
+  memberships.forEach((m) => { if (m.team_id) teamIds.add(m.team_id); });
   const { data: allTeamsData } = await supabase.from("teams").select("id, name, slug, logo_url").in("id", teamIds.size > 0 ? Array.from(teamIds) : ["00000000-0000-0000-0000-000000000000"]);
   const teamsMap = new Map((allTeamsData || []).map((t) => [t.id, t]));
+
+  const activeTeam = activeMembership ? teamsMap.get(activeMembership.team_id) : null;
 
   // ── 4. Aggregate ───────────────────────────────────────────────────
   let tM = 0, tG = 0, tA = 0, tR = 0, tW = 0, tD = 0, tL = 0, tSh = 0, tPM = 0, tPA = 0, tTM = 0, tTA = 0, tSv = 0, tGC = 0, tMOM = 0, tRC = 0, tCGK = 0, tCDEF = 0;
@@ -158,7 +159,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
 
   // Career timeline
   const timeline = memberships.map((m) => {
-    const t = m.teams as any;
+    const t = teamsMap.get(m.team_id);
     const lg = leaguesMap.get(m.league_id);
     const sn = seasonsMap.get(m.season_id);
     return {

@@ -274,6 +274,8 @@ export async function removePlayerFromTeam(membership_id: string) {
   if (error) return { error: 'Oyuncu çıkarılamadı: ' + error.message };
 
   revalidatePath('/admin/teams');
+  revalidatePath('/oyuncular');
+  revalidatePath('/');
   return { success: 'Oyuncu başarıyla takımdan çıkarıldı.' };
 }
 
