@@ -5,7 +5,7 @@ import { updateProfileAction, changePasswordAction } from './actions';
 import { logoutAction } from '@/app/auth/actions';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
-import { Crown, ArrowRight } from 'lucide-react';
+import { Crown } from 'lucide-react';
 import { acceptTeamInviteAction, rejectTeamInviteAction } from './team-actions';
 import { PLATFORM_OPTIONS, POSITION_FILTER_OPTIONS } from '@/app/oyuncular/PlayerRankingsClient';
 
@@ -233,38 +233,6 @@ export default function ClientAccount({ profile, authUser, team, league, isCapta
                   </div>
                 ))}
               </div>
-            </section>
-          )}
-
-          {/* CAPTAIN: TEAM MANAGEMENT */}
-          {/* CAPTAIN: QUICK ACCESS BANNER */}
-          {isCaptain && (
-            <section className="bg-gradient-to-r from-[#0a1628] to-[#03070c] border border-amber-500/30 rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-[0_0_20px_rgba(245,158,11,0.06)]">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0">
-                  <Crown className="w-6 h-6 text-amber-400" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-[14px] font-[900] text-white tracking-widest uppercase">KAPTAN PANELİ</h2>
-                    {team?.name && (
-                      <span className="px-2 py-0.5 text-[9px] font-black bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded uppercase tracking-wider">
-                        {team.name}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-gray-400 mt-1">
-                    Kadro yönetimi, oyuncu davetleri, fikstür maçları ve skor girişleri tek merkezde.
-                  </p>
-                </div>
-              </div>
-              <Link
-                href="/takim/yonet"
-                className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black text-[10px] font-[900] tracking-[0.2em] uppercase rounded-xl transition-all text-center shrink-0 shadow-[0_0_15px_rgba(245,158,11,0.25)] flex items-center justify-center gap-2 group"
-              >
-                <span>KAPTAN PANELİNE GİT</span>
-                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
             </section>
           )}
 
