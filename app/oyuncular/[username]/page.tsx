@@ -304,7 +304,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 {(profile.discord_url || profile.social_links?.discord) && (
                   <a
-                    href={profile.discord_url || profile.social_links.discord}
+                    href={profile.discord_url || profile.social_links?.discord}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#5865F2]/10 hover:bg-[#5865F2]/20 border border-[#5865F2]/30 transition-colors text-[#5865F2] text-[12px] font-[800] uppercase tracking-wider"
@@ -317,7 +317,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                 )}
                 {(profile.instagram_url || profile.social_links?.instagram) && (
                   <a
-                    href={profile.instagram_url || profile.social_links.instagram}
+                    href={profile.instagram_url || profile.social_links?.instagram}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-pink-500/10 hover:bg-pink-500/20 border border-pink-500/30 transition-colors text-pink-400 text-[12px] font-[800] uppercase tracking-wider"

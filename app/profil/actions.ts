@@ -73,7 +73,15 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
       }
     }
 
-    // 4. Güncellenecek veri objesi
+    // Fetch existing profile to handle avatar cleanup and preserve existing social links
+    const { data: currentProfile } = await supabase
+      .from('profiles')
+      .select('avatar_url, social_links')
+      .eq('id', user.id)
+      .single();
+
+    const existingSocials = currentProfile?.social_links || {};
+
     const updates: any = {
       username,
       full_name: full_name || null,
@@ -86,20 +94,14 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
       discord_url: discord || null,
       instagram_url: instagram || null,
       social_links: {
-        twitter: twitter || '',
-        twitch: twitch || '',
+        ...existingSocials,
+        twitter: twitter !== undefined && twitter !== '' ? twitter : (existingSocials.twitter || ''),
+        twitch: twitch !== undefined && twitch !== '' ? twitch : (existingSocials.twitch || ''),
         discord: discord || '',
         instagram: instagram || ''
       },
       updated_at: new Date().toISOString(),
     };
-
-    // Fetch existing profile to handle avatar cleanup
-    const { data: currentProfile } = await supabase
-      .from('profiles')
-      .select('avatar_url')
-      .eq('id', user.id)
-      .single();
 
     // 5. Veritabanına yazma
     let { error } = await supabase
@@ -107,7 +109,7 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
       .update(updates)
       .eq('id', user.id);
 
-    if (error && error.message?.includes('does not exist')) {
+    if (error && (error.message?.includes('does not exist') || error.message?.includes('schema cache'))) {
       delete updates.discord_url;
       delete updates.instagram_url;
       const retry = await supabase

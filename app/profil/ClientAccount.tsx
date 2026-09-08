@@ -279,6 +279,28 @@ export default function ClientAccount({ profile, authUser, team, league, isCapta
                   </select>
                 </div>
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
+                <div>
+                  <label className="block text-[10px] font-[900] text-gray-500 tracking-widest uppercase mb-2">DISCORD BAĞLANTISI</label>
+                  <input
+                    type="url"
+                    name="discord"
+                    placeholder="https://discord.gg/..."
+                    defaultValue={profile?.discord_url || profile?.social_links?.discord || ''}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[14px] font-[700] text-white placeholder:text-gray-600 focus:outline-none focus:border-[#00e5ff]/50 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-[900] text-gray-500 tracking-widest uppercase mb-2">INSTAGRAM PROFİLİ</label>
+                  <input
+                    type="url"
+                    name="instagram"
+                    placeholder="https://instagram.com/..."
+                    defaultValue={profile?.instagram_url || profile?.social_links?.instagram || ''}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[14px] font-[700] text-white placeholder:text-gray-600 focus:outline-none focus:border-[#00e5ff]/50 transition-colors"
+                  />
+                </div>
+              </div>
               <div>
                 <label className="block text-[10px] font-[900] text-gray-500 tracking-widest uppercase mb-2">BİYOGRAFİ</label>
                 <textarea name="bio" defaultValue={profile?.bio || ''} rows={3} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[14px] font-[700] text-white focus:outline-none focus:border-[#00e5ff]/50 transition-colors resize-none" />
