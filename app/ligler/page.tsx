@@ -51,7 +51,7 @@ export default async function LiglerPage() {
   const activeLeagueIds = leaguesToDisplay.map(l => l.id);
   const [ { data: leagueTeams }, { data: teamMemberships } ] = await Promise.all([
     activeLeagueIds.length > 0
-      ? supabase.from("league_teams").select("league_id, season_id, team_id").in("league_id", activeLeagueIds)
+      ? supabase.from("league_teams").select("league_id, season_id, team_id").in("league_id", activeLeagueIds).eq("is_active", true)
       : Promise.resolve({ data: [] }),
     activeLeagueIds.length > 0
       ? supabase.from("team_memberships").select("league_id, season_id, player_id").in("league_id", activeLeagueIds).is("left_at", null)

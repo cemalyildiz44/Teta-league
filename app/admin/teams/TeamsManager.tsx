@@ -10,7 +10,8 @@ import {
 } from 'lucide-react';
 import { 
   createTeam, editTeam, updateTeamStatus,
-  assignCaptain, addPlayerToTeam, removePlayerFromTeam, uploadTeamLogoAction
+  assignCaptain, addPlayerToTeam, removePlayerFromTeam, uploadTeamLogoAction,
+  deleteTeamAction
 } from './actions';
 
 import imageCompression from 'browser-image-compression';
@@ -230,6 +231,27 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
     });
   };
 
+  const handleDeleteTeam = (t: any) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Takımı Sil',
+      message: `"${t.name}" takımını silmek istediğinize emin misiniz? Takımın geçmiş maç, fikstür veya transfer kaydı varsa veri bütünlüğünü korumak adına arşivlenecektir (inaktif yapılacaktır). Geçmiş kaydı yoksa tamamen silinecektir.`,
+      type: 'danger',
+      action: async () => {
+        setLoading(true);
+        const res = await deleteTeamAction(t.id);
+        if (res.error) {
+          showFeedback(res.error, 'error');
+        } else {
+          showFeedback(res.success || 'İşlem tamamlandı.', 'success');
+          router.refresh();
+        }
+        setLoading(false);
+        closeConfirm();
+      }
+    });
+  };
+
   const handleUploadLogo = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
@@ -408,6 +430,13 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
                         title='Düzenle'
                       >
                         <Edit2 className='w-4 h-4' />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteTeam(t)}
+                        className='p-1.5 bg-red-500/10 hover:bg-red-500/20 rounded-md text-red-400'
+                        title='Takımı Sil'
+                      >
+                        <Trash2 className='w-4 h-4' />
                       </button>
                     </div>
                   </td>

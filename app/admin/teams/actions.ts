@@ -328,3 +328,95 @@ export async function uploadTeamLogoAction(formData: FormData) {
   revalidatePath('/', 'layout');
   return { success: 'Logo başarıyla yüklendi.' };
 }
+
+export async function deleteTeamAction(teamId: string) {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!(await checkAdmin(supabase, user)) || !user) return { error: 'Yetkisiz erişim.' };
+
+  if (!teamId) return { error: 'Takım ID zorunludur.' };
+
+  // Fetch team details
+  const { data: team } = await supabase
+    .from('teams')
+    .select('id, name, logo_url, is_active')
+    .eq('id', teamId)
+    .single();
+
+  if (!team) return { error: 'Takım bulunamadı.' };
+
+  // 1. Check for historical/critical data that would break integrity if physically deleted
+  const [
+    { count: matchCount },
+    { count: statCount },
+    { count: fixtureCount },
+    { count: transferCount }
+  ] = await Promise.all([
+    supabase.from('matches').select('id', { count: 'exact', head: true }).or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`),
+    supabase.from('match_player_stats').select('id', { count: 'exact', head: true }).eq('team_id', teamId),
+    supabase.from('fixtures').select('id', { count: 'exact', head: true }).or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`),
+    supabase.from('transfers').select('id', { count: 'exact', head: true }).or(`from_team_id.eq.${teamId},to_team_id.eq.${teamId}`)
+  ]);
+
+  const hasHistory = (matchCount && matchCount > 0) ||
+                     (statCount && statCount > 0) ||
+                     (fixtureCount && fixtureCount > 0) ||
+                     (transferCount && transferCount > 0);
+
+  if (hasHistory) {
+    // Soft-delete / archive: preserve historical matches, standings and player history
+    const { error: archiveError } = await supabase
+      .from('teams')
+      .update({ is_active: false })
+      .eq('id', teamId);
+
+    if (archiveError) return { error: 'Takım arşivlenemedi: ' + archiveError.message };
+
+    // Deactivate active captains
+    await supabase.from('user_roles')
+      .update({ is_active: false, revoked_at: new Date().toISOString() })
+      .eq('team_id', teamId)
+      .eq('role', 'CAPTAIN');
+
+    // Deactivate league assignments
+    await supabase.from('league_teams')
+      .update({ is_active: false })
+      .eq('team_id', teamId);
+
+    revalidatePath('/admin/teams');
+    revalidatePath('/takimlar');
+    revalidatePath('/', 'layout');
+
+    return {
+      success: `"${team.name}" takımının geçmiş maç, fikstür veya transfer kaydı bulunduğu için veri bütünlüğünü korumak adına tamamen silinmedi; arşivlendi (inaktif yapıldı).`
+    };
+  }
+
+  // 2. No historical data: clean up transient setup records and physically delete
+  await supabase.from('team_memberships').delete().eq('team_id', teamId);
+  await supabase.from('league_teams').delete().eq('team_id', teamId);
+  await supabase.from('user_roles').delete().eq('team_id', teamId);
+  await supabase.from('team_season_stats').delete().eq('team_id', teamId);
+  await supabase.from('player_team_season_stats').delete().eq('team_id', teamId);
+
+  const { error: deleteError } = await supabase.from('teams').delete().eq('id', teamId);
+  if (deleteError) return { error: 'Takım silinemedi: ' + deleteError.message };
+
+  // Garbage collect team logo
+  if (team.logo_url) {
+    try {
+      const parts = team.logo_url.split('/public/team-logos/');
+      if (parts.length === 2) {
+        await supabase.storage.from('team-logos').remove([parts[1]]);
+      }
+    } catch (cleanupErr) {
+      console.error('Failed to cleanup team logo:', cleanupErr);
+    }
+  }
+
+  revalidatePath('/admin/teams');
+  revalidatePath('/takimlar');
+  revalidatePath('/', 'layout');
+  return { success: `"${team.name}" takımı başarıyla tamamen silindi.` };
+}

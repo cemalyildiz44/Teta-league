@@ -205,6 +205,35 @@ export async function assignTeamToLeague(league_id: string, season_id: string, t
 
   if (!season_id || !league_id || !team_id) return { error: 'Tüm alanlar zorunludur.' };
 
+  // Check if league_teams entry already exists (e.g. inactive)
+  const { data: existingLT } = await supabase
+    .from('league_teams')
+    .select('id, is_active')
+    .eq('league_id', league_id)
+    .eq('season_id', season_id)
+    .eq('team_id', team_id)
+    .maybeSingle();
+
+  if (existingLT) {
+    if (existingLT.is_active) {
+      return { error: 'Takım zaten bu sezon/lige eklenmiş.' };
+    }
+    // Reactivate if it was soft-deleted
+    const { error: reactivateError } = await supabase
+      .from('league_teams')
+      .update({ is_active: true })
+      .eq('id', existingLT.id);
+
+    if (reactivateError) return { error: 'Takım tekrar lige eklenemedi: ' + reactivateError.message };
+
+    revalidatePath('/admin/leagues');
+    revalidatePath('/admin/teams');
+    revalidatePath('/admin/fixtures');
+    revalidatePath('/ligler');
+    revalidatePath('/', 'layout');
+    return { success: 'Takım lige başarıyla eklendi.' };
+  }
+
   const { error } = await supabase.rpc('admin_assign_team_to_league', {
     p_league_id: league_id,
     p_season_id: season_id,
@@ -220,6 +249,9 @@ export async function assignTeamToLeague(league_id: string, season_id: string, t
 
   revalidatePath('/admin/leagues');
   revalidatePath('/admin/teams');
+  revalidatePath('/admin/fixtures');
+  revalidatePath('/ligler');
+  revalidatePath('/', 'layout');
   return { success: 'Takım lige başarıyla eklendi.' };
 }
 
@@ -229,18 +261,57 @@ export async function removeTeamFromLeague(league_id: string, team_id: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!(await checkAdmin(supabase, user))) return { error: 'Yetkisiz erişim.' };
 
-  const { error } = await supabase.from('league_teams')
+  if (!league_id || !team_id) return { error: 'Lig ve Takım bilgisi zorunludur.' };
+
+  // 1. Check if the team has matches in this league
+  const { count: matchCount } = await supabase
+    .from('matches')
+    .select('id', { count: 'exact', head: true })
+    .eq('league_id', league_id)
+    .or(`home_team_id.eq.${team_id},away_team_id.eq.${team_id}`);
+
+  if (matchCount && matchCount > 0) {
+    return { error: 'Bu takımın bu ligde oynanmış maçı bulunduğu için ligden çıkarılamaz. Önce maç kayıtlarını inceleyiniz.' };
+  }
+
+  // 2. Check if the team has fixtures in this league
+  const { count: fixtureCount } = await supabase
+    .from('fixtures')
+    .select('id', { count: 'exact', head: true })
+    .eq('league_id', league_id)
+    .or(`home_team_id.eq.${team_id},away_team_id.eq.${team_id}`);
+
+  if (fixtureCount && fixtureCount > 0) {
+    return { error: 'Bu takımın bu ligde planlanmış fikstürü bulunduğu için ligden çıkarılamaz. Önce fikstürleri düzenlemelisiniz.' };
+  }
+
+  // 3. Try physical delete first; if blocked by player memberships (FK constraint), soft-delete
+  const { error: deleteError } = await supabase.from('league_teams')
     .delete()
     .eq('league_id', league_id)
     .eq('team_id', team_id);
 
-  if (error) {
-    if (error.code === '23503') return { error: 'Bu takımın ligde fikstür veya istatistik verisi olduğu için çıkarılamaz.' };
-    return { error: 'Takım çıkarılamadı: ' + error.message };
+  if (deleteError) {
+    if (deleteError.code === '23503') {
+      // FK exists (e.g. team_memberships active roster). Soft-delete league_teams so players' memberships are not broken
+      const { error: updateError } = await supabase.from('league_teams')
+        .update({ is_active: false })
+        .eq('league_id', league_id)
+        .eq('team_id', team_id);
+
+      if (updateError) {
+        return { error: 'Takım ligden çıkarılamadı: ' + updateError.message };
+      }
+    } else {
+      return { error: 'Takım çıkarılamadı: ' + deleteError.message };
+    }
   }
 
   revalidatePath('/admin/leagues');
   revalidatePath('/admin/teams');
+  revalidatePath('/admin/fixtures');
+  revalidatePath('/ligler');
+  revalidatePath('/', 'layout');
   return { success: 'Takım ligden başarıyla çıkarıldı.' };
 }
 

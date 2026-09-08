@@ -26,7 +26,8 @@ export default async function LeagueStandingsPage({
   const { data: leagueTeamsData } = await supabase
     .from("league_teams")
     .select("team_id")
-    .eq("league_id", league.id);
+    .eq("league_id", league.id)
+    .eq("is_active", true);
     
   const leagueTeams = leagueTeamsData || [];
 

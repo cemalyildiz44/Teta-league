@@ -14,7 +14,10 @@ export default async function AdminLeaguesPage() {
     .order('level', { ascending: true });
     
   const { data: allTeams } = await supabase.from('teams').select('id, name, logo_url').order('name');
-  const { data: leagueTeams } = await supabase.from('league_teams').select('league_id, team_id, teams(name, logo_url)');
+  const { data: leagueTeams } = await supabase
+    .from('league_teams')
+    .select('league_id, team_id, teams(name, logo_url)')
+    .eq('is_active', true);
 
   return (
     <div className='max-w-6xl mx-auto'>
