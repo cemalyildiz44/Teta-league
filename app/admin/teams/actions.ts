@@ -346,26 +346,69 @@ export async function deleteTeamAction(teamId: string) {
 
   if (!team) return { error: 'Takım bulunamadı.' };
 
-  // 1. Check for historical/critical data that would break integrity if physically deleted
+  // 1. Fetch all active memberships for this team to get affected player usernames for cache revalidation
+  const { data: activeMemberships } = await supabase
+    .from('team_memberships')
+    .select('player_id, profiles!team_memberships_player_id_fkey(username)')
+    .eq('team_id', teamId)
+    .is('left_at', null);
+
+  const affectedUsernames = (activeMemberships || [])
+    .map((m: any) => m.profiles?.username)
+    .filter(Boolean);
+
+  const nowIso = new Date().toISOString();
+
+  // 2. Automatically close all active memberships for this team (set left_at)
+  // Career history is 100% PRESERVED; players without another active team become FREE (SERBEST)
+  const { error: closeMembershipError } = await supabase
+    .from('team_memberships')
+    .update({ left_at: nowIso })
+    .eq('team_id', teamId)
+    .is('left_at', null);
+
+  if (closeMembershipError) {
+    return { error: 'Takım oyuncularının sözleşmeleri sonlandırılamadı: ' + closeMembershipError.message };
+  }
+
+  // 3. Deactivate active captain roles for this team
+  await supabase
+    .from('user_roles')
+    .update({ is_active: false, revoked_at: nowIso })
+    .eq('team_id', teamId)
+    .eq('role', 'CAPTAIN');
+
+  // 4. Deactivate league assignments for this team
+  await supabase
+    .from('league_teams')
+    .update({ is_active: false })
+    .eq('team_id', teamId);
+
+  // 5. Check if the team has any career history or historical records (matches, stats, fixtures, transfers, or memberships)
   const [
     { count: matchCount },
     { count: statCount },
     { count: fixtureCount },
-    { count: transferCount }
+    { count: transferCount },
+    { count: membershipCount }
   ] = await Promise.all([
     supabase.from('matches').select('id', { count: 'exact', head: true }).or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`),
     supabase.from('match_player_stats').select('id', { count: 'exact', head: true }).eq('team_id', teamId),
     supabase.from('fixtures').select('id', { count: 'exact', head: true }).or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`),
-    supabase.from('transfers').select('id', { count: 'exact', head: true }).or(`from_team_id.eq.${teamId},to_team_id.eq.${teamId}`)
+    supabase.from('transfers').select('id', { count: 'exact', head: true }).or(`from_team_id.eq.${teamId},to_team_id.eq.${teamId}`),
+    supabase.from('team_memberships').select('id', { count: 'exact', head: true }).eq('team_id', teamId)
   ]);
 
-  const hasHistory = (matchCount && matchCount > 0) ||
-                     (statCount && statCount > 0) ||
-                     (fixtureCount && fixtureCount > 0) ||
-                     (transferCount && transferCount > 0);
+  const hasCareerOrHistory = (matchCount && matchCount > 0) ||
+                             (statCount && statCount > 0) ||
+                             (fixtureCount && fixtureCount > 0) ||
+                             (transferCount && transferCount > 0) ||
+                             (membershipCount && membershipCount > 0);
 
-  if (hasHistory) {
-    // Soft-delete / archive: preserve historical matches, standings and player history
+  let successMsg = '';
+
+  if (hasCareerOrHistory) {
+    // Soft-delete / archive: preserve historical matches, standings and player career history
     const { error: archiveError } = await supabase
       .from('teams')
       .update({ is_active: false })
@@ -373,50 +416,42 @@ export async function deleteTeamAction(teamId: string) {
 
     if (archiveError) return { error: 'Takım arşivlenemedi: ' + archiveError.message };
 
-    // Deactivate active captains
-    await supabase.from('user_roles')
-      .update({ is_active: false, revoked_at: new Date().toISOString() })
-      .eq('team_id', teamId)
-      .eq('role', 'CAPTAIN');
+    successMsg = `"${team.name}" takımı silindi / arşivlendi. Takıma bağlı tüm oyuncuların aktif sözleşmeleri kapatılarak oyuncular serbest bırakıldı, kariyer geçmişleri korundu.`;
+  } else {
+    // Completely empty team with zero memberships and zero history: clean up and physically delete
+    await supabase.from('league_teams').delete().eq('team_id', teamId);
+    await supabase.from('user_roles').delete().eq('team_id', teamId);
+    await supabase.from('team_season_stats').delete().eq('team_id', teamId);
+    await supabase.from('player_team_season_stats').delete().eq('team_id', teamId);
 
-    // Deactivate league assignments
-    await supabase.from('league_teams')
-      .update({ is_active: false })
-      .eq('team_id', teamId);
+    const { error: deleteError } = await supabase.from('teams').delete().eq('id', teamId);
+    if (deleteError) return { error: 'Takım silinemedi: ' + deleteError.message };
 
-    revalidatePath('/admin/teams');
-    revalidatePath('/takimlar');
-    revalidatePath('/', 'layout');
-
-    return {
-      success: `"${team.name}" takımının geçmiş maç, fikstür veya transfer kaydı bulunduğu için veri bütünlüğünü korumak adına tamamen silinmedi; arşivlendi (inaktif yapıldı).`
-    };
-  }
-
-  // 2. No historical data: clean up transient setup records and physically delete
-  await supabase.from('team_memberships').delete().eq('team_id', teamId);
-  await supabase.from('league_teams').delete().eq('team_id', teamId);
-  await supabase.from('user_roles').delete().eq('team_id', teamId);
-  await supabase.from('team_season_stats').delete().eq('team_id', teamId);
-  await supabase.from('player_team_season_stats').delete().eq('team_id', teamId);
-
-  const { error: deleteError } = await supabase.from('teams').delete().eq('id', teamId);
-  if (deleteError) return { error: 'Takım silinemedi: ' + deleteError.message };
-
-  // Garbage collect team logo
-  if (team.logo_url) {
-    try {
-      const parts = team.logo_url.split('/public/team-logos/');
-      if (parts.length === 2) {
-        await supabase.storage.from('team-logos').remove([parts[1]]);
+    // Garbage collect team logo
+    if (team.logo_url) {
+      try {
+        const parts = team.logo_url.split('/public/team-logos/');
+        if (parts.length === 2) {
+          await supabase.storage.from('team-logos').remove([parts[1]]);
+        }
+      } catch (cleanupErr) {
+        console.error('Failed to cleanup team logo:', cleanupErr);
       }
-    } catch (cleanupErr) {
-      console.error('Failed to cleanup team logo:', cleanupErr);
     }
+
+    successMsg = `"${team.name}" takımı başarıyla tamamen silindi.`;
   }
 
+  // 6. Comprehensive cache invalidation
   revalidatePath('/admin/teams');
   revalidatePath('/takimlar');
+  revalidatePath('/oyuncular');
+  revalidatePath('/profil');
   revalidatePath('/', 'layout');
-  return { success: `"${team.name}" takımı başarıyla tamamen silindi.` };
+
+  for (const uname of affectedUsernames) {
+    revalidatePath(`/oyuncular/${uname}`);
+  }
+
+  return { success: successMsg };
 }

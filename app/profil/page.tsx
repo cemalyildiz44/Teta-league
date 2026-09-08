@@ -40,13 +40,15 @@ export default async function ProfilPage() {
 
   let team = null;
   if (activeMembership?.team_id) {
-    const { data: tData } = await supabase.from('teams').select('id, name, slug, logo_url').eq('id', activeMembership.team_id).maybeSingle();
-    team = tData;
+    const { data: tData } = await supabase.from('teams').select('id, name, slug, logo_url, is_active').eq('id', activeMembership.team_id).maybeSingle();
+    if (tData && tData.is_active !== false) {
+      team = tData;
+    }
   }
 
   // Active League
   let league = null;
-  if (activeMembership?.league_id) {
+  if (team && activeMembership?.league_id) {
     const { data: lData } = await supabase.from('leagues').select('name').eq('id', activeMembership.league_id).maybeSingle();
     league = lData;
   }
@@ -64,8 +66,8 @@ export default async function ProfilPage() {
   if (captainRole?.team_id) {
     isCaptain = true;
     if (!team) {
-      const { data: cTeam } = await supabase.from('teams').select('id, name, slug, logo_url').eq('id', captainRole.team_id).maybeSingle();
-      if (cTeam) team = cTeam;
+      const { data: cTeam } = await supabase.from('teams').select('id, name, slug, logo_url, is_active').eq('id', captainRole.team_id).maybeSingle();
+      if (cTeam && cTeam.is_active !== false) team = cTeam;
     }
   }
 

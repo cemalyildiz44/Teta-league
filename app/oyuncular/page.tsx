@@ -24,10 +24,10 @@ export default async function PlayersPage() {
   const profileIds = validProfiles.map(p => p.id);
   const eaPlayerIds = validProfiles.map(p => p.current_ea_player_id).filter(Boolean) as string[];
 
-  // 2, 3, 4. Fetch memberships, match stats, and achievements concurrently (Bulk Queries - No N+1)
-  const [ { data: memData }, { data: bulkStats }, { data: bulkAchievements } ] = await Promise.all([
+  // 2, 3, 4. Fetch memberships, match stats, achievements, and active teams concurrently (Bulk Queries - No N+1)
+  const [ { data: memData }, { data: bulkStats }, { data: bulkAchievements }, { data: activeTeamsData } ] = await Promise.all([
     profileIds.length > 0
-      ? supabase.from('team_memberships').select('player_id').in('player_id', profileIds).is('left_at', null)
+      ? supabase.from('team_memberships').select('player_id, team_id').in('player_id', profileIds).is('left_at', null)
       : Promise.resolve({ data: [] }),
     eaPlayerIds.length > 0
       ? supabase
@@ -41,11 +41,17 @@ export default async function PlayersPage() {
           .from('player_achievements')
           .select('player_id, achievement_type, season_id')
           .in('player_id', profileIds)
-      : Promise.resolve({ data: [] })
+      : Promise.resolve({ data: [] }),
+    supabase.from('teams').select('id').eq('is_active', true)
   ]);
 
   const memberships = memData || [];
-  const contractedPlayerIds = new Set(memberships.map(m => m.player_id));
+  const activeTeamIdSet = new Set((activeTeamsData || []).map(t => t.id));
+  const contractedPlayerIds = new Set(
+    memberships
+      .filter(m => activeTeamIdSet.has(m.team_id))
+      .map(m => m.player_id)
+  );
 
   // Index achievements by profile id
   const achByProfile = new Map<string, any[]>();

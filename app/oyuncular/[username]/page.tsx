@@ -69,10 +69,11 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   const teamIds = new Set<string>();
   approvedMatches.forEach((m) => { teamIds.add(m.home_team_id); teamIds.add(m.away_team_id); });
   memberships.forEach((m) => { if (m.team_id) teamIds.add(m.team_id); });
-  const { data: allTeamsData } = await supabase.from("teams").select("id, name, slug, logo_url").in("id", teamIds.size > 0 ? Array.from(teamIds) : ["00000000-0000-0000-0000-000000000000"]);
+  const { data: allTeamsData } = await supabase.from("teams").select("id, name, slug, logo_url, is_active").in("id", teamIds.size > 0 ? Array.from(teamIds) : ["00000000-0000-0000-0000-000000000000"]);
   const teamsMap = new Map((allTeamsData || []).map((t) => [t.id, t]));
 
-  const activeTeam = activeMembership ? teamsMap.get(activeMembership.team_id) : null;
+  const activeTeamRaw = activeMembership ? teamsMap.get(activeMembership.team_id) : null;
+  const activeTeam = (activeTeamRaw && activeTeamRaw.is_active !== false) ? activeTeamRaw : null;
 
   // ── 4. Aggregate ───────────────────────────────────────────────────
   let tM = 0, tG = 0, tA = 0, tR = 0, tW = 0, tD = 0, tL = 0, tSh = 0, tPM = 0, tPA = 0, tTM = 0, tTA = 0, tSv = 0, tGC = 0, tMOM = 0, tRC = 0, tCGK = 0, tCDEF = 0;
@@ -207,7 +208,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     }
   }
 
-  const currentLeague = activeMembership ? leaguesMap.get(activeMembership.league_id) : null;
+  const currentLeague = (activeTeam && activeMembership) ? leaguesMap.get(activeMembership.league_id) : null;
 
   // Achievements
   const [
