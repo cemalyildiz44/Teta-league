@@ -103,15 +103,21 @@ export default async function LeagueFixturesPage({
                         </Link>
 
                         {/* Score Block */}
-                        <div className="shrink-0 w-20 h-12 bg-[#060d18] border border-white/10 rounded-lg flex items-center justify-center">
-                          {hasResult ? (
-                            <span className="text-[28px] font-[900] tracking-tight text-white tracking-widest">
+                        {hasResult ? (
+                          <Link
+                            href={`/mac/${approvedMatch.id}`}
+                            className="shrink-0 px-3 h-12 bg-[#060d18] hover:bg-[#00e5ff]/10 border border-white/10 hover:border-[#00e5ff]/30 rounded-lg flex items-center justify-center transition-colors group/score"
+                            title="Maç Detayı"
+                          >
+                            <span className="text-[22px] md:text-[26px] font-[900] tracking-tight text-white group-hover/score:text-[#00e5ff] tracking-widest transition-colors">
                               {approvedMatch.home_score} - {approvedMatch.away_score}
                             </span>
-                          ) : (
+                          </Link>
+                        ) : (
+                          <div className="shrink-0 w-20 h-12 bg-[#060d18] border border-white/10 rounded-lg flex items-center justify-center">
                             <span className="text-gray-500 font-bold">- : -</span>
-                          )}
-                        </div>
+                          </div>
+                        )}
 
                         {/* Away Team */}
                         <Link href={`/takim/${awayTeam?.slug}`} className="flex-1 flex items-center justify-start gap-3 group">
@@ -138,8 +144,8 @@ export default async function LeagueFixturesPage({
       ) : (
         <div className="empty-state w-full">
           <svg className="w-12 h-12 text-muted mb-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-          <span className="empty-state-title">FikstÃ¼r BulunamadÄ±</span>
-          <span className="empty-state-desc">Bu lige ait fikstÃ¼r henÃ¼z oluÅŸturulmadÄ±.</span>
+          <span className="empty-state-title">Fikstür Bulunamadı</span>
+          <span className="empty-state-desc">Bu lige ait fikstür henüz oluşturulmadı.</span>
         </div>
       )}
     </div>

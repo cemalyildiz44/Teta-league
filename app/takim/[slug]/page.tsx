@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { Calendar, ChevronRight } from 'lucide-react';
 import TeamRosterCarousel from '../TeamRosterCarousel';
 
 interface Props {
@@ -115,55 +116,126 @@ export default async function TeamPage({ params }: Props) {
       .single();
     stats = s;
 
-    // Matches
-    const { data: matches } = await supabase
-      .from('matches')
+    // Fetch fixtures for this team in active season
+    const { data: teamFixtures } = await supabase
+      .from('fixtures')
       .select(`
-        id, match_date, status, home_score, away_score,
-        home_team:teams!matches_home_team_id_fkey(name, slug, logo_url),
-        away_team:teams!matches_away_team_id_fkey(name, slug, logo_url)
+        id,
+        week_number,
+        scheduled_at,
+        status,
+        home_team_id,
+        away_team_id,
+        matches (
+          id,
+          home_score,
+          away_score,
+          status,
+          played_at
+        )
       `)
       .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
       .eq('season_id', activeSeason.id)
-      .order('match_date', { ascending: false });
+      .order('week_number', { ascending: true });
 
-    if (matches) {
-      recentMatches = matches.filter(m => m.status === 'APPROVED').slice(0, 5);
-      upcomingMatches = matches.filter(m => m.status === 'SCHEDULED' || m.status === 'PENDING_REVIEW').slice(0, 5).reverse();
-      
-      const approvedMatchIds = matches.filter(m => m.status === 'APPROVED').map(m => m.id);
-      
-      if (approvedMatchIds.length > 0 && roster.length > 0) {
-        // Find player stats for the roster
-        const eaPlayerIds = roster.map(r => r.current_ea_player_id).filter(Boolean);
-        if (eaPlayerIds.length > 0) {
-          const { data: pStats } = await supabase
-            .from('match_player_stats')
-            .select('ea_player_id, goals, assists, rating')
-            .in('match_id', approvedMatchIds)
-            .in('ea_player_id', eaPlayerIds);
-            
-          if (pStats && pStats.length > 0) {
-            roster = roster.map(r => {
-              const myStats = pStats.filter(s => s.ea_player_id === r.current_ea_player_id);
-              if (myStats.length > 0) {
-                let matches = myStats.length;
-                let goals = myStats.reduce((sum, s) => sum + (s.goals || 0), 0);
-                let assists = myStats.reduce((sum, s) => sum + (s.assists || 0), 0);
-                let totalRating = myStats.reduce((sum, s) => sum + (parseFloat(s.rating) || 0), 0);
-                return {
-                  ...r,
-                  stats: {
-                    matches,
-                    goals,
-                    assists,
-                    avgRating: (totalRating / matches).toFixed(2)
-                  }
-                };
-              }
-              return r;
-            });
-          }
+    // Fetch team details for opponent mapping
+    const { data: allTeamsData } = await supabase
+      .from('teams')
+      .select('id, name, slug, logo_url');
+    const teamMap = new Map((allTeamsData || []).map(t => [t.id, t]));
+
+    // Also fetch all approved matches for this team in active season (to ensure roster stats get all matches)
+    const { data: seasonApprovedMatches } = await supabase
+      .from('matches')
+      .select('id')
+      .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
+      .eq('season_id', activeSeason.id)
+      .eq('status', 'APPROVED');
+
+    const approvedMatchIds = (seasonApprovedMatches || []).map(m => m.id);
+
+    if (teamFixtures && teamFixtures.length > 0) {
+      const completed: any[] = [];
+      const upcoming: any[] = [];
+
+      teamFixtures.forEach(f => {
+        const isHome = f.home_team_id === team.id;
+        const opponentId = isHome ? f.away_team_id : f.home_team_id;
+        const opponent = teamMap.get(opponentId);
+        const matchesList = Array.isArray(f.matches) ? f.matches : f.matches ? [f.matches] : [];
+        const appMatch = matchesList.find((m: any) => m.status === 'APPROVED');
+        const pendingMatch = matchesList.find((m: any) => m.status === 'PENDING_REVIEW');
+
+        if (appMatch) {
+          completed.push({
+            id: appMatch.id,
+            fixture_id: f.id,
+            date: appMatch.played_at || f.scheduled_at,
+            isHome,
+            opponent,
+            myScore: isHome ? (appMatch.home_score ?? 0) : (appMatch.away_score ?? 0),
+            oppScore: isHome ? (appMatch.away_score ?? 0) : (appMatch.home_score ?? 0),
+            status: 'APPROVED',
+            week_number: f.week_number,
+          });
+        } else if (f.status !== 'CANCELLED') {
+          upcoming.push({
+            id: pendingMatch ? pendingMatch.id : f.id,
+            fixture_id: f.id,
+            date: f.scheduled_at,
+            isHome,
+            opponent,
+            status: pendingMatch ? 'PENDING_REVIEW' : f.status || 'SCHEDULED',
+            week_number: f.week_number,
+          });
+        }
+      });
+
+      // Recent matches: sorted by date desc or week desc
+      completed.sort((a, b) => {
+        if (a.date && b.date) return new Date(b.date).getTime() - new Date(a.date).getTime();
+        return b.week_number - a.week_number;
+      });
+      recentMatches = completed.slice(0, 5);
+
+      // Upcoming matches: sorted by date asc or week asc
+      upcoming.sort((a, b) => {
+        if (a.date && b.date) return new Date(a.date).getTime() - new Date(b.date).getTime();
+        return a.week_number - b.week_number;
+      });
+      upcomingMatches = upcoming.slice(0, 5);
+    }
+
+    if (approvedMatchIds.length > 0 && roster.length > 0) {
+      // Find player stats for the roster
+      const eaPlayerIds = roster.map(r => r.current_ea_player_id).filter(Boolean);
+      if (eaPlayerIds.length > 0) {
+        const { data: pStats } = await supabase
+          .from('match_player_stats')
+          .select('ea_player_id, goals, assists, rating')
+          .in('match_id', approvedMatchIds)
+          .in('ea_player_id', eaPlayerIds);
+
+        if (pStats && pStats.length > 0) {
+          roster = roster.map(r => {
+            const myStats = pStats.filter(s => s.ea_player_id === r.current_ea_player_id);
+            if (myStats.length > 0) {
+              let matches = myStats.length;
+              let goals = myStats.reduce((sum, s) => sum + (s.goals || 0), 0);
+              let assists = myStats.reduce((sum, s) => sum + (s.assists || 0), 0);
+              let totalRating = myStats.reduce((sum, s) => sum + (parseFloat(s.rating) || 0), 0);
+              return {
+                ...r,
+                stats: {
+                  matches,
+                  goals,
+                  assists,
+                  avgRating: (totalRating / matches).toFixed(2)
+                }
+              };
+            }
+            return r;
+          });
         }
       }
     }
@@ -383,6 +455,16 @@ export default async function TeamPage({ params }: Props) {
                   <span className="text-red-400">{allTimeLosses} <span className="text-[10px] text-gray-400 font-bold">M</span></span>
                 </div>
               </div>
+
+              {/* FİKSTÜR HIZLI ERİŞİM BUTONU */}
+              <Link
+                href={`/takim/${team.slug}/fikstur`}
+                className="px-5 py-3 bg-[#00e5ff]/10 hover:bg-[#00e5ff]/20 border border-[#00e5ff]/30 rounded-xl flex items-center gap-2 text-[#00e5ff] hover:text-white transition-all shadow-[0_0_15px_rgba(0,229,255,0.1)] group"
+              >
+                <Calendar className="w-4 h-4 text-[#00e5ff] group-hover:scale-110 transition-transform" />
+                <span className="text-[12px] font-[900] uppercase tracking-wider">FİKSTÜR</span>
+                <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </Link>
             </div>
           </div>
         </div>
@@ -433,92 +515,167 @@ export default async function TeamPage({ params }: Props) {
       </div>
 
       {/* MATCHES SECTION */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
-        {/* Upcoming Matches */}
-        <div className="client-glass rounded-xl border border-white/5 p-6 md:p-8">
-          <h3 className="text-[12px] font-[900] text-gray-400 tracking-[0.2em] uppercase mb-6 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-amber-500" />
-            Yaklaşan Maçlar
-          </h3>
-          <div className="space-y-3">
-            {upcomingMatches.length > 0 ? (
-              upcomingMatches.map(match => {
-                const isHome = match.home_team?.slug === team.slug;
-                const opponent = isHome ? match.away_team : match.home_team;
-                return (
-                  <div key={match.id} className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/5">
-                    <div className="flex flex-col items-center justify-center min-w-[60px] pr-4 border-r border-white/10">
-                      <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">
-                        {new Date(match.match_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
-                      </span>
-                      <span className="text-[12px] text-white font-black">
-                        {new Date(match.match_date).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                    <div className="flex-1 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded flex items-center justify-center overflow-hidden shrink-0">
-                        {opponent?.logo_url ? <img src={opponent.logo_url} alt="" className="w-full h-full object-contain" /> : <span className="text-[10px] font-bold text-[#00e5ff]">{opponent?.name?.substring(0,2)}</span>}
-                      </div>
-                      <Link href={opponent?.slug ? `/takim/${opponent.slug}` : "#"} className="text-[14px] font-[800] text-gray-300 hover:text-[#00e5ff] truncate transition-colors">
-                        {opponent?.name}
-                      </Link>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="text-[13px] text-gray-500 italic p-4 bg-white/[0.02] rounded-xl border border-white/5">Yaklaşan maç bulunmuyor.</div>
-            )}
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-2 border-b border-white/5">
+          <div className="flex items-center gap-3">
+            <Calendar className="w-5 h-5 text-[#00e5ff]" />
+            <h2 className="text-[18px] md:text-[20px] font-[900] text-white tracking-wider uppercase">
+              FİKSTÜR & MAÇLAR
+            </h2>
           </div>
+          <Link
+            href={`/takim/${team.slug}/fikstur`}
+            className="inline-flex items-center gap-2 text-[12px] font-[900] text-[#00e5ff] hover:text-white bg-[#00e5ff]/10 hover:bg-[#00e5ff]/20 border border-[#00e5ff]/30 px-4 py-2 rounded-xl transition-all group tracking-wider uppercase"
+          >
+            <span>TÜM FİKSTÜRÜ GÖR</span>
+            <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+          </Link>
         </div>
 
-        {/* Recent Matches */}
-        <div className="client-glass rounded-xl border border-white/5 p-6 md:p-8">
-          <h3 className="text-[12px] font-[900] text-gray-400 tracking-[0.2em] uppercase mb-6 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#00e5ff]" />
-            Son Maçlar
-          </h3>
-          <div className="space-y-3">
-            {recentMatches.length > 0 ? (
-              recentMatches.map(match => {
-                const isHome = match.home_team?.slug === team.slug;
-                const opponent = isHome ? match.away_team : match.home_team;
-                const myScore = isHome ? match.home_score : match.away_score;
-                const oppScore = isHome ? match.away_score : match.home_score;
-                let resultClass = "text-gray-400 bg-white/5"; // draw
-                if (myScore > oppScore) resultClass = "text-emerald-400 bg-emerald-500/10"; // win
-                else if (myScore < oppScore) resultClass = "text-red-400 bg-red-500/10"; // loss
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-                return (
-                  <Link href={`/mac/${match.id}`} key={match.id} className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/20 transition-colors group">
-                    <div className="flex flex-col items-center justify-center min-w-[60px] pr-4 border-r border-white/10">
-                      <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">
-                        {new Date(match.match_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
-                      </span>
-                    </div>
-                    <div className="flex-1 flex items-center justify-between">
-                      <div className="flex items-center gap-3 truncate">
-                        <div className="w-8 h-8 rounded flex items-center justify-center overflow-hidden shrink-0">
-                          {opponent?.logo_url ? <img src={opponent.logo_url} alt="" className="w-full h-full object-contain" /> : <span className="text-[10px] font-bold text-[#00e5ff]">{opponent?.name?.substring(0,2)}</span>}
-                        </div>
-                        <span className="text-[14px] font-[800] text-gray-300 truncate group-hover:text-white transition-colors">
-                          {opponent?.name}
+          {/* Upcoming Matches */}
+          <div className="client-glass rounded-xl border border-white/5 p-6 md:p-8">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-[12px] font-[900] text-gray-400 tracking-[0.2em] uppercase flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                Yaklaşan Maçlar
+              </h3>
+              <Link
+                href={`/takim/${team.slug}/fikstur?filter=upcoming`}
+                className="text-[11px] font-[800] text-gray-500 hover:text-[#00e5ff] uppercase tracking-wider transition-colors"
+              >
+                TÜMÜ →
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {upcomingMatches.length > 0 ? (
+                upcomingMatches.map(match => {
+                  const opponent = match.opponent;
+                  const dateStr = match.date
+                    ? new Intl.DateTimeFormat('tr-TR', {
+                        timeZone: 'Europe/Istanbul',
+                        day: 'numeric',
+                        month: 'short',
+                      }).format(new Date(match.date))
+                    : `${match.week_number}. Hafta`;
+                  const timeStr = match.date
+                    ? new Intl.DateTimeFormat('tr-TR', {
+                        timeZone: 'Europe/Istanbul',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      }).format(new Date(match.date))
+                    : (match.status === 'PENDING_REVIEW' ? 'İNCELEMEDE' : 'VS');
+
+                  return (
+                    <div key={match.id || match.fixture_id} className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                      <div className="flex flex-col items-center justify-center min-w-[65px] pr-4 border-r border-white/10">
+                        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">
+                          {dateStr}
+                        </span>
+                        <span className={`text-[11px] font-black uppercase ${match.status === 'PENDING_REVIEW' ? 'text-amber-400' : 'text-white'}`}>
+                          {timeStr}
                         </span>
                       </div>
-                      <div className={`px-3 py-1 rounded ml-3 shrink-0 flex items-center justify-center font-[900] text-[14px] tracking-wider ${resultClass}`}>
-                        {myScore} - {oppScore}
+                      <div className="flex-1 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 truncate">
+                          <div className="w-8 h-8 rounded flex items-center justify-center overflow-hidden shrink-0 bg-white/5 border border-white/10">
+                            {opponent?.logo_url ? (
+                              <img src={opponent.logo_url} alt="" className="w-full h-full object-contain" />
+                            ) : (
+                              <span className="text-[10px] font-bold text-[#00e5ff]">
+                                {opponent?.name?.substring(0,2) || 'R'}
+                              </span>
+                            )}
+                          </div>
+                          <Link href={opponent?.slug ? `/takim/${opponent.slug}` : "#"} className="text-[14px] font-[800] text-gray-300 hover:text-[#00e5ff] truncate transition-colors">
+                            {opponent?.name || 'Rakip Takım'}
+                          </Link>
+                        </div>
+                        <span className="text-[10px] font-bold text-gray-500 uppercase px-2 py-0.5 rounded bg-white/5 shrink-0">
+                          {match.isHome ? 'EV' : 'DEP'}
+                        </span>
                       </div>
                     </div>
-                  </Link>
-                );
-              })
-            ) : (
-              <div className="text-[13px] text-gray-500 italic p-4 bg-white/[0.02] rounded-xl border border-white/5">Son maç bulunmuyor.</div>
-            )}
+                  );
+                })
+              ) : (
+                <div className="text-[13px] text-gray-500 italic p-4 bg-white/[0.02] rounded-xl border border-white/5">Yaklaşan maç bulunmuyor.</div>
+              )}
+            </div>
           </div>
-        </div>
 
+          {/* Recent Matches */}
+          <div className="client-glass rounded-xl border border-white/5 p-6 md:p-8">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-[12px] font-[900] text-gray-400 tracking-[0.2em] uppercase flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#00e5ff]" />
+                Son Maçlar
+              </h3>
+              <Link
+                href={`/takim/${team.slug}/fikstur?filter=completed`}
+                className="text-[11px] font-[800] text-gray-500 hover:text-[#00e5ff] uppercase tracking-wider transition-colors"
+              >
+                TÜMÜ →
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {recentMatches.length > 0 ? (
+                recentMatches.map(match => {
+                  const opponent = match.opponent;
+                  const myScore = match.myScore;
+                  const oppScore = match.oppScore;
+                  let resultClass = "text-gray-400 bg-white/5"; // draw
+                  if (myScore > oppScore) resultClass = "text-emerald-400 bg-emerald-500/10"; // win
+                  else if (myScore < oppScore) resultClass = "text-red-400 bg-red-500/10"; // loss
+
+                  const dateStr = match.date
+                    ? new Intl.DateTimeFormat('tr-TR', {
+                        timeZone: 'Europe/Istanbul',
+                        day: 'numeric',
+                        month: 'short',
+                      }).format(new Date(match.date))
+                    : `${match.week_number}. Hafta`;
+
+                  return (
+                    <Link href={`/mac/${match.id}`} key={match.id} className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/20 transition-colors group">
+                      <div className="flex flex-col items-center justify-center min-w-[65px] pr-4 border-r border-white/10">
+                        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">
+                          {dateStr}
+                        </span>
+                        <span className="text-[9px] font-bold text-gray-500 uppercase">
+                          {match.isHome ? 'EV' : 'DEP'}
+                        </span>
+                      </div>
+                      <div className="flex-1 flex items-center justify-between">
+                        <div className="flex items-center gap-3 truncate">
+                          <div className="w-8 h-8 rounded flex items-center justify-center overflow-hidden shrink-0 bg-white/5 border border-white/10">
+                            {opponent?.logo_url ? (
+                              <img src={opponent.logo_url} alt="" className="w-full h-full object-contain" />
+                            ) : (
+                              <span className="text-[10px] font-bold text-[#00e5ff]">
+                                {opponent?.name?.substring(0,2) || 'R'}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[14px] font-[800] text-gray-300 truncate group-hover:text-white transition-colors">
+                            {opponent?.name || 'Rakip Takım'}
+                          </span>
+                        </div>
+                        <div className={`px-3 py-1 rounded ml-3 shrink-0 flex items-center justify-center font-[900] text-[14px] tracking-wider ${resultClass}`}>
+                          {myScore} - {oppScore}
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })
+              ) : (
+                <div className="text-[13px] text-gray-500 italic p-4 bg-white/[0.02] rounded-xl border border-white/5">Son maç bulunmuyor.</div>
+              )}
+            </div>
+          </div>
+
+        </div>
       </div>
     </div>
   );

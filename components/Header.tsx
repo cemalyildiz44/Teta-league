@@ -15,6 +15,7 @@ interface NavLink {
 
 const leftLinks: NavLink[] = [
   { label: 'LİGLER', href: '/ligler' },
+  { label: 'FİKSTÜR', href: '/fikstur' },
   { label: 'TURNUVALAR', href: '/turnuvalar' },
   { label: 'TAKIMLAR', href: '/takimlar' },
   { label: 'OYUNCULAR', href: '/oyuncular' },
