@@ -169,6 +169,33 @@ export default async function TeamPage({ params }: Props) {
     }
   }
 
+  // 5b. All-Time APPROVED matches for the team across all seasons & leagues
+  const { data: allTimeMatches } = await supabase
+    .from('matches')
+    .select('id, home_team_id, away_team_id, home_score, away_score')
+    .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
+    .eq('status', 'APPROVED');
+
+  let allTimeWins = 0;
+  let allTimeDraws = 0;
+  let allTimeLosses = 0;
+
+  if (allTimeMatches) {
+    for (const m of allTimeMatches) {
+      const isHome = m.home_team_id === team.id;
+      const teamScore = isHome ? (m.home_score ?? 0) : (m.away_score ?? 0);
+      const oppScore = isHome ? (m.away_score ?? 0) : (m.home_score ?? 0);
+
+      if (teamScore > oppScore) {
+        allTimeWins++;
+      } else if (teamScore === oppScore) {
+        allTimeDraws++;
+      } else {
+        allTimeLosses++;
+      }
+    }
+  }
+
   // 6. Market Value Bulk Fetch
   let totalTeamValue = 0;
   if (roster.length > 0) {
@@ -280,9 +307,43 @@ export default async function TeamPage({ params }: Props) {
               )}
             </div>
             
-            <p className="text-[#00e5ff] text-[14px] font-[700] tracking-[0.2em] mb-8 uppercase">
-              EA CLUB ID: <span className="text-white">{team.ea_club_id || "BİLİNMİYOR"}</span>
-            </p>
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mb-6">
+              <p className="text-[#00e5ff] text-[14px] font-[700] tracking-[0.2em] uppercase">
+                EA CLUB ID: <span className="text-white">{team.ea_club_id || "BİLİNMİYOR"}</span>
+              </p>
+
+              {(team.stream_url || team.instagram_url) && (
+                <div className="flex items-center gap-2">
+                  {team.stream_url && (
+                    <a
+                      href={team.stream_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-[#00e5ff]/10 hover:bg-[#00e5ff]/20 border border-[#00e5ff]/30 text-[#00e5ff] text-[12px] font-[800] uppercase tracking-wider transition-all shadow-[0_0_12px_rgba(0,229,255,0.15)] group"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-[#00e5ff] animate-pulse" />
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M5 3l14 9-14 9V3z" />
+                      </svg>
+                      YAYIN
+                    </a>
+                  )}
+                  {team.instagram_url && (
+                    <a
+                      href={team.instagram_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-pink-500/10 hover:bg-pink-500/20 border border-pink-500/30 text-pink-400 text-[12px] font-[800] uppercase tracking-wider transition-all"
+                    >
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                      </svg>
+                      Instagram
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-4">
               {activeLeague && activeSeason ? (
@@ -310,6 +371,18 @@ export default async function TeamPage({ params }: Props) {
                   <span className="text-[16px] text-white font-[900] tracking-wider uppercase z-10">{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(totalTeamValue)}</span>
                 </div>
               )}
+
+              {/* TÜM ZAMANLAR STATS BADGE */}
+              <div className="px-5 py-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-xl flex flex-col">
+                <span className="text-[10px] text-gray-400 font-[900] uppercase tracking-[0.2em] mb-1">TÜM ZAMANLAR</span>
+                <div className="flex items-center gap-2 text-[14px] font-[900]">
+                  <span className="text-emerald-400">{allTimeWins} <span className="text-[10px] text-gray-400 font-bold">G</span></span>
+                  <span className="text-white/20">•</span>
+                  <span className="text-gray-300">{allTimeDraws} <span className="text-[10px] text-gray-400 font-bold">B</span></span>
+                  <span className="text-white/20">•</span>
+                  <span className="text-red-400">{allTimeLosses} <span className="text-[10px] text-gray-400 font-bold">M</span></span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -317,7 +390,16 @@ export default async function TeamPage({ params }: Props) {
 
       {/* TEAM STATS ROW */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-12">
+        <div className="mb-12">
+          <div className="flex items-center justify-between mb-3 px-1">
+            <h3 className="text-[11px] font-[900] text-gray-500 uppercase tracking-[0.2em]">
+              SEZON İSTATİSTİKLERİ ({activeSeason?.name || 'GÜNCEL'})
+            </h3>
+            <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">
+              TÜM ZAMANLAR: {allTimeWins}G / {allTimeDraws}B / {allTimeLosses}M
+            </span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
           {[
             { label: "OYNANAN", value: stats.matches_played },
             { label: "GALİBİYET", value: stats.wins, color: "text-emerald-400" },
@@ -333,6 +415,7 @@ export default async function TeamPage({ params }: Props) {
               <span className={`text-xl lg:text-2xl font-[900] ${stat.highlight ? 'text-[#00e5ff] drop-shadow-[0_0_10px_rgba(0,229,255,0.4)]' : (stat.color || 'text-white')}`}>{stat.value}</span>
             </div>
           ))}
+          </div>
         </div>
       )}
 

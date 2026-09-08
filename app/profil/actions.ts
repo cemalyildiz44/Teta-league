@@ -4,6 +4,8 @@ import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
+import { isValidHttpUrl } from '@/app/utils/urlValidator';
+
 export async function updateProfileAction(prevState: any, formData: FormData) {
   try {
     const cookieStore = await cookies();
@@ -38,6 +40,7 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
     const twitter = (formData.get('twitter') as string)?.trim();
     const twitch = (formData.get('twitch') as string)?.trim();
     const discord = (formData.get('discord') as string)?.trim();
+    const instagram = (formData.get('instagram') as string)?.trim();
 
     // 3. Validasyon
     if (!username) {
@@ -45,6 +48,12 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
     }
     if (bio && bio.length > 300) {
       return { error: 'Biyografi en fazla 300 karakter olabilir.' };
+    }
+    if (discord && !isValidHttpUrl(discord)) {
+      return { error: 'Geçersiz Discord bağlantısı. Bağlantı http:// veya https:// ile başlamalıdır.' };
+    }
+    if (instagram && !isValidHttpUrl(instagram)) {
+      return { error: 'Geçersiz Instagram bağlantısı. Bağlantı http:// veya https:// ile başlamalıdır.' };
     }
 
     // Boş stringleri NULL'a çevir
@@ -65,7 +74,7 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
     }
 
     // 4. Güncellenecek veri objesi
-    const updates = {
+    const updates: any = {
       username,
       full_name: full_name || null,
       bio: bio || null,
@@ -74,10 +83,13 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
       alternative_positions: alternative_positions,
       platform,
       current_ea_player_id: current_ea_player_id || null,
+      discord_url: discord || null,
+      instagram_url: instagram || null,
       social_links: {
         twitter: twitter || '',
         twitch: twitch || '',
-        discord: discord || ''
+        discord: discord || '',
+        instagram: instagram || ''
       },
       updated_at: new Date().toISOString(),
     };
@@ -90,10 +102,20 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
       .single();
 
     // 5. Veritabanına yazma
-    const { error } = await supabase
+    let { error } = await supabase
       .from('profiles')
       .update(updates)
       .eq('id', user.id);
+
+    if (error && error.message?.includes('does not exist')) {
+      delete updates.discord_url;
+      delete updates.instagram_url;
+      const retry = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', user.id);
+      error = retry.error;
+    }
 
     if (error) {
       if (error.code === '23505') {
@@ -120,6 +142,7 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
     revalidatePath('/profil');
     revalidatePath('/');
     revalidatePath('/oyuncular');
+    revalidatePath(`/oyuncular/${username}`);
     revalidatePath('/istatistikler');
     
     return { success: 'Profil başarıyla kaydedildi.' };

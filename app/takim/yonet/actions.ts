@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { isValidHttpUrl } from '@/app/utils/urlValidator';
 
 export async function invitePlayer(formData: FormData) {
   const cookieStore = await cookies();
@@ -113,4 +114,88 @@ export async function searchPlayers(query: string, seasonId: string) {
       is_free_agent: !playerTeamId
     };
   });
+}
+
+export async function updateTeamSocialsAction(formData: FormData) {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'Oturum açmanız gerekiyor.' };
+
+  const teamId = formData.get('teamId') as string;
+  const streamUrl = (formData.get('stream_url') as string)?.trim() || null;
+  const instagramUrl = (formData.get('instagram_url') as string)?.trim() || null;
+
+  if (!teamId) return { error: 'Takım ID zorunludur.' };
+
+  // Authorization: must be CAPTAIN of this team or ADMIN/SUPER_ADMIN
+  const { data: captainRole } = await supabase
+    .from('user_roles')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('team_id', teamId)
+    .eq('role', 'CAPTAIN')
+    .eq('is_active', true)
+    .maybeSingle();
+
+  const { data: adminRole } = await supabase
+    .from('user_roles')
+    .select('id')
+    .eq('user_id', user.id)
+    .in('role', ['ADMIN', 'SUPER_ADMIN'])
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (!captainRole && !adminRole) {
+    return { error: 'Bu takımın sosyal bağlantılarını düzenleme yetkiniz yok.' };
+  }
+
+  // URL Validation
+  if (streamUrl && !isValidHttpUrl(streamUrl)) {
+    return { error: 'Yayın linki geçerli bir http:// veya https:// bağlantısı olmalıdır.' };
+  }
+
+  if (instagramUrl && !isValidHttpUrl(instagramUrl)) {
+    return { error: 'Instagram linki geçerli bir http:// veya https:// bağlantısı olmalıdır.' };
+  }
+
+  // Fetch team slug for revalidation
+  const { data: team } = await supabase
+    .from('teams')
+    .select('slug')
+    .eq('id', teamId)
+    .single();
+
+  // 1. Try RPC update_team_socials
+  const { data: rpcData, error: rpcError } = await supabase.rpc('update_team_socials', {
+    p_team_id: teamId,
+    p_stream_url: streamUrl,
+    p_instagram_url: instagramUrl
+  });
+
+  if (rpcError) {
+    // If RPC is not available yet (migration not yet applied to remote DB), fallback to direct update
+    const { error: directError } = await supabase
+      .from('teams')
+      .update({
+        stream_url: streamUrl,
+        instagram_url: instagramUrl,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', teamId);
+
+    if (directError) {
+      return { error: 'Bağlantılar kaydedilemedi: ' + directError.message };
+    }
+  } else if (rpcData && !rpcData.success) {
+    return { error: rpcData.error || 'Güncelleme yetkiniz yok.' };
+  }
+
+  revalidatePath('/takim/yonet');
+  if (team?.slug) {
+    revalidatePath(`/takim/${team.slug}`);
+  }
+
+  return { success: true };
 }

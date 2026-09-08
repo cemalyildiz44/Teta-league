@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { PlayerSearch } from './PlayerSearch';
 import { RosterManagement } from './RosterManagement';
+import { TeamSocialsForm } from './TeamSocialsForm';
 import Link from 'next/link';
 
 export default async function TeamManagementPage() {
@@ -49,7 +50,7 @@ export default async function TeamManagementPage() {
   // Team Details
   const { data: team } = await supabase
     .from('teams')
-    .select('name, logo_url')
+    .select('name, logo_url, stream_url, instagram_url')
     .eq('id', teamId)
     .single();
 
@@ -143,8 +144,14 @@ export default async function TeamManagementPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column: Search & Roster */}
+          {/* Left Column: Search & Roster & Socials */}
           <div className="lg:col-span-2 space-y-8">
+            <TeamSocialsForm
+              teamId={teamId}
+              initialStreamUrl={team?.stream_url}
+              initialInstagramUrl={team?.instagram_url}
+            />
+
             <PlayerSearch 
               teamId={teamId} 
               seasonId={activeSeason.id} 

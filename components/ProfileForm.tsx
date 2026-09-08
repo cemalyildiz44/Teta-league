@@ -149,6 +149,30 @@ export default function ProfileForm({ profile }: { profile: any }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-white/5">
           <div>
             <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+              Discord Bağlantısı
+            </label>
+            <input
+              type="url"
+              name="discord"
+              placeholder="https://discord.gg/..."
+              defaultValue={profile.discord_url || profile.social_links?.discord || ''}
+              className="w-full bg-[#060d18] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#00e5ff]/50 focus:ring-1 focus:ring-[#00e5ff]/50 transition-all text-sm placeholder:text-gray-600"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+              Instagram Bağlantısı
+            </label>
+            <input
+              type="url"
+              name="instagram"
+              placeholder="https://instagram.com/..."
+              defaultValue={profile.instagram_url || profile.social_links?.instagram || ''}
+              className="w-full bg-[#060d18] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#00e5ff]/50 focus:ring-1 focus:ring-[#00e5ff]/50 transition-all text-sm placeholder:text-gray-600"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
               Twitter Kullanıcı Adı
             </label>
             <div className="relative">
