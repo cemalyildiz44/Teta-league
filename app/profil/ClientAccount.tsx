@@ -5,7 +5,8 @@ import { updateProfileAction, changePasswordAction } from './actions';
 import { logoutAction } from '@/app/auth/actions';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
-import { searchPlayersAction, sendTeamInviteAction, acceptTeamInviteAction, rejectTeamInviteAction, cancelTeamInviteAction } from './team-actions';
+import { Crown, ArrowRight } from 'lucide-react';
+import { acceptTeamInviteAction, rejectTeamInviteAction } from './team-actions';
 import { PLATFORM_OPTIONS, POSITION_FILTER_OPTIONS } from '@/app/oyuncular/PlayerRankingsClient';
 
 import imageCompression from 'browser-image-compression';
@@ -25,12 +26,7 @@ export default function ClientAccount({ profile, authUser, team, league, isCapta
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || '');
   const [uploading, setUploading] = useState(false);
 
-  // Team Invite State
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [invitePending, setInvitePending] = useState<string | null>(null);
-  const [actionMsg, setActionMsg] = useState<{ type: 'error' | 'success', text: string } | null>(null);
+  // Pending Invite State
   const [resolvingInvite, setResolvingInvite] = useState<string | null>(null);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -109,29 +105,6 @@ export default function ClientAccount({ profile, authUser, team, league, isCapta
     });
   };
 
-  const handleSearch = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const query = e.target.value;
-    setSearchQuery(query);
-    if (query.length < 3) {
-      setSearchResults([]);
-      return;
-    }
-    setSearching(true);
-    const { data } = await searchPlayersAction(query);
-    setSearchResults(data || []);
-    setSearching(false);
-  };
-
-  const handleSendInvite = async (playerId: string) => {
-    if (!confirm('Bu oyuncuyu takımına davet etmek istediğine emin misin?')) return;
-    setInvitePending(playerId);
-    setActionMsg(null);
-    const res = await sendTeamInviteAction(playerId);
-    if (res?.error) setActionMsg({ type: 'error', text: res.error });
-    else if (res?.success) setActionMsg({ type: 'success', text: res.success });
-    setInvitePending(null);
-  };
-
   const handleAcceptInvite = async (transferId: string) => {
     if (!confirm('Bu daveti kabul etmek ve takıma katılmak istiyor musun?')) return;
     setResolvingInvite(transferId);
@@ -191,11 +164,24 @@ export default function ClientAccount({ profile, authUser, team, league, isCapta
               </Link>
             ) : <span>SERBEST OYUNCU</span>}
             {league && <span className="border-l border-white/10 pl-4">{league.name}</span>}
-            {isCaptain && <span className="text-amber-400 border-l border-white/10 pl-4">KAPTAN</span>}
+            {isCaptain && (
+              <span className="text-amber-400 border-l border-white/10 pl-4 font-black inline-flex items-center gap-1">
+                <Crown className="w-3.5 h-3.5" /> KAPTAN
+              </span>
+            )}
           </div>
         </div>
 
-        <div className="shrink-0 flex flex-col gap-2">
+        <div className="shrink-0 flex flex-col gap-2 w-full md:w-auto">
+          {isCaptain && (
+            <Link
+              href="/takim/yonet"
+              className="px-6 py-3 bg-gradient-to-r from-amber-500/20 to-amber-600/10 border border-amber-500/40 text-amber-400 hover:text-amber-300 hover:border-amber-400 hover:bg-amber-500/25 text-[10px] font-[900] tracking-[0.2em] uppercase rounded-xl transition-all text-center flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(245,158,11,0.15)] group"
+            >
+              <Crown className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+              <span>KAPTAN PANELİ</span>
+            </Link>
+          )}
           <Link href={`/oyuncular/${profile?.username}`} className="px-6 py-3 bg-[#00e5ff]/10 border border-[#00e5ff]/30 text-[#00e5ff] hover:bg-[#00e5ff]/20 text-[10px] font-[900] tracking-[0.2em] uppercase rounded-xl transition-all text-center">
             PROFİLİMİ GÖR
           </Link>
@@ -251,57 +237,34 @@ export default function ClientAccount({ profile, authUser, team, league, isCapta
           )}
 
           {/* CAPTAIN: TEAM MANAGEMENT */}
+          {/* CAPTAIN: QUICK ACCESS BANNER */}
           {isCaptain && (
-            <section className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-6 lg:p-8">
-              <h2 className="text-[14px] font-[900] text-emerald-500 tracking-[0.2em] uppercase mb-6 pb-4 border-b border-emerald-500/10">TAKIM YÖNETİMİ / OYUNCU DAVET ET</h2>
-              
-              {actionMsg && (
-                <div className={`p-4 rounded-xl text-[12px] font-[700] mb-6 border ${actionMsg.type === 'error' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}`}>
-                  {actionMsg.text}
+            <section className="bg-gradient-to-r from-[#0a1628] to-[#03070c] border border-amber-500/30 rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-[0_0_20px_rgba(245,158,11,0.06)]">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0">
+                  <Crown className="w-6 h-6 text-amber-400" />
                 </div>
-              )}
-
-              <div className="mb-4">
-                <input 
-                  type="text" 
-                  value={searchQuery}
-                  onChange={handleSearch}
-                  placeholder="Kullanıcı adı ile oyuncu ara (en az 3 harf)..." 
-                  className="w-full bg-black/40 border border-emerald-500/20 rounded-xl px-4 py-3 text-[14px] font-[700] text-white focus:outline-none focus:border-emerald-500/50 transition-colors" 
-                />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-[14px] font-[900] text-white tracking-widest uppercase">KAPTAN PANELİ</h2>
+                    {team?.name && (
+                      <span className="px-2 py-0.5 text-[9px] font-black bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded uppercase tracking-wider">
+                        {team.name}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Kadro yönetimi, oyuncu davetleri, fikstür maçları ve skor girişleri tek merkezde.
+                  </p>
+                </div>
               </div>
-
-              {searching && <div className="text-[10px] text-gray-500 tracking-widest font-[700] uppercase py-2">Aranıyor...</div>}
-              
-              {!searching && searchResults.length > 0 && (
-                <div className="space-y-2 mt-4">
-                  {searchResults.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between p-3 bg-black/40 border border-white/5 rounded-xl">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-white/10 overflow-hidden flex items-center justify-center shrink-0">
-                          {p.avatar_url ? <img src={p.avatar_url} className="w-full h-full object-cover" /> : <span className="text-[10px] font-bold text-gray-400">{p.username.substring(0, 2).toUpperCase()}</span>}
-                        </div>
-                        <div>
-                          <div className="text-[13px] font-[900] text-white leading-tight">{p.username}</div>
-                          <div className="text-[9px] font-[900] text-gray-500 tracking-widest uppercase mt-0.5">
-                            {p.primary_position} • {p.platform} {p.active_team_id && p.active_team_id !== team?.id ? '• BAŞKA TAKIMDA' : ''} {p.active_team_id === team?.id ? '• TAKIMDA' : ''}
-                          </div>
-                        </div>
-                      </div>
-                      <button 
-                        onClick={() => handleSendInvite(p.id)}
-                        disabled={invitePending === p.id || p.active_team_id === team?.id}
-                        className="px-4 py-2 bg-white/5 border border-white/10 hover:bg-emerald-500/20 hover:border-emerald-500/30 text-white hover:text-emerald-400 text-[9px] font-[900] tracking-widest uppercase rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        {invitePending === p.id ? '...' : p.active_team_id === team?.id ? 'TAKIMDA' : 'DAVET ET'}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {!searching && searchQuery.length >= 3 && searchResults.length === 0 && (
-                 <div className="text-[10px] text-gray-500 tracking-widest font-[700] uppercase py-2">Bu aramayla eşleşen oyuncu bulunamadı.</div>
-              )}
+              <Link
+                href="/takim/yonet"
+                className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black text-[10px] font-[900] tracking-[0.2em] uppercase rounded-xl transition-all text-center shrink-0 shadow-[0_0_15px_rgba(245,158,11,0.25)] flex items-center justify-center gap-2 group"
+              >
+                <span>KAPTAN PANELİNE GİT</span>
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </Link>
             </section>
           )}
 

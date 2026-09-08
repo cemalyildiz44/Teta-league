@@ -51,17 +51,22 @@ export default async function ProfilPage() {
     league = lData;
   }
 
-  // Captain Status
+  // Captain Status (PLAYER + CAPTAIN, PLAYER + CAPTAIN + SUPER_ADMIN)
   let isCaptain = false;
-  if (team) {
-    const { data: roleData } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('team_id', team.id)
-      .eq('role', 'CAPTAIN')
-      .maybeSingle();
-    if (roleData) isCaptain = true;
+  const { data: captainRole } = await supabase
+    .from('user_roles')
+    .select('team_id')
+    .eq('user_id', user.id)
+    .eq('role', 'CAPTAIN')
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (captainRole?.team_id) {
+    isCaptain = true;
+    if (!team) {
+      const { data: cTeam } = await supabase.from('teams').select('id, name, slug, logo_url').eq('id', captainRole.team_id).maybeSingle();
+      if (cTeam) team = cTeam;
+    }
   }
 
   // 3. Fetch Achievements (Summary)
