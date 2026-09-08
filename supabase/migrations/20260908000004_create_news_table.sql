@@ -19,7 +19,11 @@ CREATE INDEX IF NOT EXISTS idx_news_published_at ON public.news(published_at DES
 CREATE INDEX IF NOT EXISTS idx_news_slug ON public.news(slug);
 CREATE INDEX IF NOT EXISTS idx_news_category ON public.news(category);
 
--- 3. Row Level Security
+-- 3. Table Grants
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.news TO authenticated;
+GRANT SELECT ON TABLE public.news TO anon;
+
+-- 4. Row Level Security
 ALTER TABLE public.news ENABLE ROW LEVEL SECURITY;
 
 -- Public can read published news
@@ -29,25 +33,11 @@ USING (is_published = true);
 
 -- Admins can read, insert, update, and delete all news
 CREATE POLICY "Admin all access for news"
-ON public.news FOR ALL
-USING (
-  EXISTS (
-    SELECT 1 FROM public.user_roles
-    WHERE user_id = auth.uid()
-    AND role IN ('ADMIN', 'SUPER_ADMIN')
-    AND is_active = true
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM public.user_roles
-    WHERE user_id = auth.uid()
-    AND role IN ('ADMIN', 'SUPER_ADMIN')
-    AND is_active = true
-  )
-);
+ON public.news FOR ALL TO authenticated
+USING (has_role('ADMIN') OR has_role('SUPER_ADMIN'))
+WITH CHECK (has_role('ADMIN') OR has_role('SUPER_ADMIN'));
 
--- 4. Storage Bucket for news images
+-- 5. Storage Bucket for news images
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
   'news-images',
@@ -67,37 +57,22 @@ ON storage.objects FOR SELECT
 USING (bucket_id = 'news-images');
 
 CREATE POLICY "Admin insert news images"
-ON storage.objects FOR INSERT
+ON storage.objects FOR INSERT TO authenticated
 WITH CHECK (
   bucket_id = 'news-images'
-  AND EXISTS (
-    SELECT 1 FROM public.user_roles
-    WHERE user_id = auth.uid()
-    AND role IN ('ADMIN', 'SUPER_ADMIN')
-    AND is_active = true
-  )
+  AND (has_role('ADMIN') OR has_role('SUPER_ADMIN'))
 );
 
 CREATE POLICY "Admin update news images"
-ON storage.objects FOR UPDATE
+ON storage.objects FOR UPDATE TO authenticated
 WITH CHECK (
   bucket_id = 'news-images'
-  AND EXISTS (
-    SELECT 1 FROM public.user_roles
-    WHERE user_id = auth.uid()
-    AND role IN ('ADMIN', 'SUPER_ADMIN')
-    AND is_active = true
-  )
+  AND (has_role('ADMIN') OR has_role('SUPER_ADMIN'))
 );
 
 CREATE POLICY "Admin delete news images"
-ON storage.objects FOR DELETE
+ON storage.objects FOR DELETE TO authenticated
 USING (
   bucket_id = 'news-images'
-  AND EXISTS (
-    SELECT 1 FROM public.user_roles
-    WHERE user_id = auth.uid()
-    AND role IN ('ADMIN', 'SUPER_ADMIN')
-    AND is_active = true
-  )
+  AND (has_role('ADMIN') OR has_role('SUPER_ADMIN'))
 );
