@@ -1,7 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { getLeagueBySlugs } from "../../utils";
+import { getLeagueBySlugs, compareTeamStats } from "../../utils";
 import { notFound } from "next/navigation";
 
 export default async function LeagueStandingsPage({
@@ -65,23 +65,7 @@ export default async function LeagueStandingsPage({
   let sortedStats: any[] = [];
   
   if (combinedStats && combinedStats.length > 0) {
-    sortedStats = [...combinedStats].sort((a, b) => {
-      // 1. Puan
-      if (b.points !== a.points) return b.points - a.points;
-      
-      // 2. Averaj
-      const gdA = a.goals_for - a.goals_against;
-      const gdB = b.goals_for - b.goals_against;
-      if (gdB !== gdA) return gdB - gdA;
-      
-      // 3. Atılan Gol
-      if (b.goals_for !== a.goals_for) return b.goals_for - a.goals_for;
-      
-      // 4. Galibiyet
-      if (b.wins !== a.wins) return b.wins - a.wins;
-      
-      return 0;
-    });
+    sortedStats = [...combinedStats].sort(compareTeamStats);
   }
 
   return (

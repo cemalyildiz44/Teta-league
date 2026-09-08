@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
-import Link from 'next/link';
+import { slugify, compareTeamStats } from '@/app/lig/utils';
+import StandingsClient, { StandingsLeagueInfo, StandingsTeamRow } from './StandingsClient';
 
 interface StandingsProps {
   compact?: boolean;
@@ -10,17 +11,27 @@ export default async function Standings({ compact = false }: StandingsProps) {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  // 1. Aktif sezonu bul
-  const { data: activeSeason } = await supabase
+  // 1. Aktif sezonu bul (veya en son sezon)
+  const { data: activeSeason, error: seasonError } = await supabase
     .from('seasons')
-    .select('id, name')
+    .select('id, name, slug, status')
     .eq('status', 'ACTIVE')
-    .limit(1)
-    .single();
+    .maybeSingle();
 
-  if (!activeSeason) {
+  let season = activeSeason;
+  if (!season) {
+    const { data: latestSeason } = await supabase
+      .from('seasons')
+      .select('id, name, slug, status')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    season = latestSeason;
+  }
+
+  if (seasonError || !season) {
     return (
-      <div className="space-y-5">
+      <div className="space-y-4">
         <div className="flex items-center gap-3">
           <div className="w-1.5 h-6 bg-[#00e5ff] rounded-full shadow-[0_0_12px_#00e5ff]" />
           <h2 className="text-[26px] sm:text-[28px] font-[900] tracking-wide text-white uppercase">
@@ -28,26 +39,29 @@ export default async function Standings({ compact = false }: StandingsProps) {
           </h2>
         </div>
         <div className="empty-state !py-8">
-          <span className="empty-state-title">Sezon Yok</span>
-          <span className="empty-state-desc">Henüz aktif sezon bulunmuyor.</span>
+          <span className="empty-state-title">
+            {seasonError ? 'Veri Alınamadı' : 'Sezon Yok'}
+          </span>
+          <span className="empty-state-desc">
+            {seasonError ? 'Puan durumu yüklenirken bir sorun oluştu.' : 'Henüz aktif sezon bulunmuyor.'}
+          </span>
         </div>
       </div>
     );
   }
 
-  // 2. Aktif sezondaki ACTIVE ligleri bul (level 1 = en üst lig)
-  const { data: activeLeague } = await supabase
+  const currentSeason = season;
+
+  // 2. Aktif sezondaki ligleri çek
+  const { data: leagues, error: leaguesError } = await supabase
     .from('leagues')
-    .select('id, name')
-    .eq('season_id', activeSeason.id)
-    .eq('status', 'ACTIVE')
-    .order('level', { ascending: true })
-    .limit(1)
-    .single();
+    .select('*')
+    .eq('season_id', currentSeason.id)
+    .order('level', { ascending: true });
 
-  if (!activeLeague) {
+  if (leaguesError || !leagues || leagues.length === 0) {
     return (
-      <div className="space-y-5">
+      <div className="space-y-4">
         <div className="flex items-center gap-3">
           <div className="w-1.5 h-6 bg-[#00e5ff] rounded-full shadow-[0_0_12px_#00e5ff]" />
           <h2 className="text-[26px] sm:text-[28px] font-[900] tracking-wide text-white uppercase">
@@ -55,154 +69,115 @@ export default async function Standings({ compact = false }: StandingsProps) {
           </h2>
         </div>
         <div className="empty-state !py-8">
-          <span className="empty-state-title">Lig Yok</span>
-          <span className="empty-state-desc">Henüz aktif lig bulunmuyor.</span>
+          <span className="empty-state-title">
+            {leaguesError ? 'Veri Alınamadı' : 'Lig Yok'}
+          </span>
+          <span className="empty-state-desc">
+            {leaguesError ? 'Lig bilgileri alınırken bir sorun oluştu.' : 'Henüz aktif lig bulunmuyor.'}
+          </span>
         </div>
       </div>
     );
   }
 
-  // 3. Puan verilerini çek — team_season_stats composite FK ile league_teams'e bağlı
-  //    league_teams ise teams tablosuna doğrudan FK (team_id -> teams.id) ile bağlı
-  const { data: stats } = await supabase
-    .from('team_season_stats')
-    .select(`
-      matches_played,
-      wins,
-      draws,
-      losses,
-      goals_for,
-      goals_against,
-      points,
-      league_teams!inner (
-        teams ( name, slug, logo_url )
-      )
-    `)
-    .eq('league_id', activeLeague.id)
-    .eq('season_id', activeSeason.id)
-    .order('points', { ascending: false })
-    .order('goals_for', { ascending: false });
+  // 3. Süperlig ve ECL liglerini belirle
+  const superLigLeague = leagues.find(
+    (l) => l.level === 1 || l.name.toLowerCase().includes('süper') || l.name.toLowerCase().includes('super')
+  ) || leagues[0];
 
-  // 4. Sıralama: Puan > Averaj > Atılan Gol
-  const sortedStats = (stats || [])
-    .map((row: any) => ({
-      team: row.league_teams?.teams,
-      matches_played: row.matches_played,
-      wins: row.wins,
-      draws: row.draws,
-      losses: row.losses,
-      goals_for: row.goals_for,
-      goals_against: row.goals_against,
-      goal_diff: row.goals_for - row.goals_against,
-      points: row.points,
-    }))
-    .sort((a: any, b: any) => {
-      if (b.points !== a.points) return b.points - a.points;
-      if (b.goal_diff !== a.goal_diff) return b.goal_diff - a.goal_diff;
-      return b.goals_for - a.goals_for;
+  const eclLeague = leagues.find(
+    (l) => l.level === 2 || l.name.toLowerCase().includes('ecl')
+  ) || leagues.find((l) => l.id !== superLigLeague?.id) || null;
+
+  // 4. Takım bilgilerini toplu çek (N+1 engellemek için)
+  const { data: allTeams } = await supabase
+    .from('teams')
+    .select('id, name, slug, logo_url');
+  const teamMap = new Map((allTeams || []).map((t) => [t.id, t]));
+
+  // 5. Lig bazında puan durumu hesaplama yardımcısı
+  async function fetchLeagueStandings(league: any): Promise<StandingsLeagueInfo> {
+    const leagueSlug = (league as any).slug || slugify(league.name);
+
+    // Aktif takım eşleşmelerini çek
+    const { data: ltData } = await supabase
+      .from('league_teams')
+      .select('team_id')
+      .eq('league_id', league.id)
+      .eq('season_id', currentSeason.id)
+      .eq('is_active', true);
+
+    const leagueTeams = ltData || [];
+
+    // İlgili sezon ve lige ait istatistikleri çek
+    const { data: statsData } = await supabase
+      .from('team_season_stats')
+      .select('*')
+      .eq('league_id', league.id)
+      .eq('season_id', currentSeason.id);
+
+    const stats = statsData || [];
+
+    // league_teams'teki ancak henüz istatistiği oluşmamış takımlar için 0 varsayılanı
+    const combinedStats = leagueTeams.map((lt) => {
+      const existing = stats.find((s) => s.team_id === lt.team_id);
+      if (existing) return existing;
+      return {
+        league_id: league.id,
+        season_id: currentSeason.id,
+        team_id: lt.team_id,
+        matches_played: 0,
+        wins: 0,
+        draws: 0,
+        losses: 0,
+        goals_for: 0,
+        goals_against: 0,
+        points: 0,
+      };
     });
 
-  const displayCount = compact ? 5 : sortedStats.length;
+    // Ortak tiebreaker comparator ile birebir sırala
+    const sortedStats = [...combinedStats].sort(compareTeamStats);
 
-  if (sortedStats.length === 0) {
-    return (
-      <div className="space-y-5">
-        <div className="flex items-center gap-3">
-          <div className="w-1.5 h-6 bg-[#00e5ff] rounded-full shadow-[0_0_12px_#00e5ff]" />
-          <h2 className="text-[26px] sm:text-[28px] font-[900] tracking-wide text-white uppercase">
-            PUAN <span className="text-[#00e5ff]">DURUMU</span>
-          </h2>
-        </div>
-        <div className="empty-state !py-8">
-          <span className="empty-state-title">Veri Bekleniyor</span>
-          <span className="empty-state-desc">Henüz puan durumu verisi bulunmuyor.</span>
-        </div>
-      </div>
-    );
+    const formattedTeams: StandingsTeamRow[] = sortedStats.map((s) => {
+      const team = teamMap.get(s.team_id);
+      return {
+        team_id: s.team_id,
+        team_name: team?.name || 'Bilinmeyen Takım',
+        team_slug: team?.slug || '',
+        team_logo_url: team?.logo_url || null,
+        matches_played: s.matches_played || 0,
+        wins: s.wins || 0,
+        draws: s.draws || 0,
+        losses: s.losses || 0,
+        goals_for: s.goals_for || 0,
+        goals_against: s.goals_against || 0,
+        goal_diff: (s.goals_for || 0) - (s.goals_against || 0),
+        points: s.points || 0,
+      };
+    });
+
+    return {
+      id: league.id,
+      name: league.name,
+      slug: leagueSlug,
+      level: league.level,
+      seasonSlug: currentSeason.slug,
+      seasonName: currentSeason.name,
+      teams: formattedTeams,
+    };
   }
 
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-1.5 h-6 bg-[#00e5ff] rounded-full shadow-[0_0_12px_#00e5ff]" />
-          <h2 className="text-[26px] sm:text-[28px] font-[900] tracking-wide text-white uppercase">
-            PUAN <span className="text-[#00e5ff]">DURUMU</span>
-          </h2>
-        </div>
-        <Link href="/ligler" className="text-[12px] sm:text-[13px] font-[700] text-[#00e5ff] hover:text-white transition-colors tracking-widest uppercase">
-          Tümünü Gör →
-        </Link>
-      </div>
+  // 6. Her iki ligi paralel çek
+  const [superLigData, eclData] = await Promise.all([
+    superLigLeague ? fetchLeagueStandings(superLigLeague) : Promise.resolve(null),
+    eclLeague ? fetchLeagueStandings(eclLeague) : Promise.resolve(null),
+  ]);
 
-      <div className="card-surface rounded-xl overflow-hidden border border-white/5 shadow-[0_0_30px_rgba(0,229,255,0.03)]">
-        <table className="w-full text-left text-sm whitespace-nowrap">
-          <thead className="bg-black/40 text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-white/5">
-            <tr>
-              <th className="px-4 py-3.5 w-12 text-center">#</th>
-              <th className="px-3 py-3.5">TAKIM</th>
-              <th className="px-3 py-3.5 text-center w-12 hidden sm:table-cell" title="Oynanan Maç">O</th>
-              <th className="px-3 py-3.5 text-center w-12 hidden md:table-cell" title="Galibiyet">G</th>
-              <th className="px-3 py-3.5 text-center w-12 hidden md:table-cell" title="Beraberlik">B</th>
-              <th className="px-3 py-3.5 text-center w-12 hidden md:table-cell" title="Mağlubiyet">M</th>
-              <th className="px-3 py-3.5 text-center w-14 hidden sm:table-cell" title="Averaj">AV</th>
-              <th className="px-4 py-3.5 text-center w-14 font-black text-[#00e5ff]">P</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
-            {sortedStats.slice(0, displayCount).map((row: any, index: number) => {
-              const rank = index + 1;
-              return (
-                <tr key={row.team?.slug || index} className={`hover:bg-white/5 transition-colors ${rank === 1 ? 'bg-[#00e5ff]/5' : ''}`}>
-                  <td className="px-4 py-3.5 text-center">
-                    <span className={`font-black ${rank === 1 ? 'text-[#00e5ff]' : 'text-gray-500'}`}>
-                      {rank}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3.5 min-w-0">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {row.team?.logo_url ? (
-                        <img src={row.team.logo_url} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
-                      ) : (
-                        <div className="w-6 h-6 rounded-full bg-[#0a1628] border border-white/10 flex items-center justify-center text-[9px] font-black text-white shrink-0">
-                          {row.team?.name?.charAt(0) || '?'}
-                        </div>
-                      )}
-                      {row.team?.slug ? (
-                        <Link href={`/takim/${row.team.slug}`} className={`font-bold text-sm truncate hover:text-[#00e5ff] transition-colors ${rank === 1 ? 'text-white' : 'text-gray-300'}`}>
-                          {row.team.name}
-                        </Link>
-                      ) : (
-                        <span className={`font-bold text-sm truncate ${rank === 1 ? 'text-white' : 'text-gray-300'}`}>
-                          {row.team?.name || 'Bilinmeyen'}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3.5 text-center text-gray-400 font-medium hidden sm:table-cell">
-                    {row.matches_played}
-                  </td>
-                  <td className="px-3 py-3.5 text-center text-gray-400 font-medium hidden md:table-cell">
-                    {row.wins}
-                  </td>
-                  <td className="px-3 py-3.5 text-center text-gray-400 font-medium hidden md:table-cell">
-                    {row.draws}
-                  </td>
-                  <td className="px-3 py-3.5 text-center text-gray-400 font-medium hidden md:table-cell">
-                    {row.losses}
-                  </td>
-                  <td className="px-3 py-3.5 text-center text-gray-400 font-medium hidden sm:table-cell">
-                    {row.goal_diff > 0 ? `+${row.goal_diff}` : row.goal_diff}
-                  </td>
-                  <td className="px-4 py-3.5 text-center font-black text-base text-[#00e5ff]">
-                    {row.points}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
+  return (
+    <StandingsClient
+      superLig={superLigData}
+      ecl={eclData}
+    />
   );
 }
