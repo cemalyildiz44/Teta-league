@@ -105,7 +105,7 @@ export async function submitPlayerStatsAction(matchId: string, statsPayload: any
   // Validate match
   const { data: match } = await supabase
     .from('matches')
-    .select('id, status, home_team_id, away_team_id')
+    .select('id, status, home_team_id, away_team_id, season_id')
     .eq('id', matchId)
     .single();
 
@@ -113,6 +113,29 @@ export async function submitPlayerStatsAction(matchId: string, statsPayload: any
   if (match.status !== 'PENDING_REVIEW') return { error: 'Sadece inceleme bekleyen maçlara istatistik girilebilir.' };
   if (match.home_team_id !== ctx.teamId && match.away_team_id !== ctx.teamId) {
     return { error: 'Bu maç sizin takımınıza ait değil.' };
+  }
+
+  // 1. Foreign Player Stats Server-Side Check:
+  // Validate that all submitted player_ids actually belong to the captain's active team roster for this season
+  const submittedPlayerIds = (statsPayload || [])
+    .filter(stat => stat.played !== false && stat.player_id)
+    .map(stat => stat.player_id);
+
+  if (submittedPlayerIds.length > 0) {
+    const { data: validMemberships } = await supabase
+      .from('team_memberships')
+      .select('player_id')
+      .eq('team_id', ctx.teamId)
+      .eq('season_id', match.season_id)
+      .is('left_at', null)
+      .in('player_id', submittedPlayerIds);
+
+    const validPlayerSet = new Set((validMemberships || []).map(m => m.player_id));
+    const hasInvalidPlayer = submittedPlayerIds.some(id => !validPlayerSet.has(id));
+
+    if (hasInvalidPlayer) {
+      return { error: 'Takımınızın aktif kadrosunda yer almayan oyuncular için istatistik girilemez.' };
+    }
   }
 
   // Format payload - only include players that actually participated

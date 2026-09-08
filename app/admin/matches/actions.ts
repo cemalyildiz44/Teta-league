@@ -1,9 +1,10 @@
-﻿
+
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { slugify } from '@/app/lig/utils';
 
 async function checkAdmin(supabase: any, user: any) {
   if (!user) return false;
@@ -18,6 +19,20 @@ export async function reviewMatchAction(matchId: string, status: 'APPROVED' | 'R
 
   if (!(await checkAdmin(supabase, user)) || !user) return { error: 'Yetkisiz erişim.' };
 
+  // Fetch current match to guard against re-approval and collect route info for revalidation
+  const { data: existingMatch } = await supabase
+    .from('matches')
+    .select('id, status, season_id, league_id, seasons(slug), leagues(name)')
+    .eq('id', matchId)
+    .single();
+
+  if (!existingMatch) return { error: 'Maç bulunamadı.' };
+
+  // 2. Re-Approve Protection: Guard against re-approving an already approved match
+  if (existingMatch.status === 'APPROVED' && status === 'APPROVED') {
+    return { error: 'Bu maç zaten onaylanmış.' };
+  }
+
   const { error } = await supabase.from('matches').update({
     status,
     approved_by: status === 'APPROVED' ? user.id : null,
@@ -26,7 +41,26 @@ export async function reviewMatchAction(matchId: string, status: 'APPROVED' | 'R
   }).eq('id', matchId);
 
   if (error) return { error: error.message };
+
+  // 3. Cache Invalidation: Revalidate necessary public paths and admin paths
   revalidatePath('/admin/matches');
+
+  if (status === 'APPROVED' || existingMatch.status === 'APPROVED') {
+    revalidatePath('/');
+    revalidatePath('/ligler');
+    revalidatePath('/oyuncular');
+    revalidatePath(`/mac/${matchId}`);
+
+    const seasonSlug = (existingMatch.seasons as any)?.slug;
+    const leagueName = (existingMatch.leagues as any)?.name;
+    if (seasonSlug && leagueName) {
+      const leagueSlug = slugify(leagueName);
+      revalidatePath(`/lig/${seasonSlug}/${leagueSlug}`);
+      revalidatePath(`/lig/${seasonSlug}/${leagueSlug}/istatistikler`);
+      revalidatePath(`/lig/${seasonSlug}/${leagueSlug}/fikstur`);
+    }
+  }
+
   return { success: 'Maç durumu güncellendi.' };
 }
 
