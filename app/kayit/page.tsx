@@ -94,6 +94,19 @@ export default function RegisterPage() {
               <div className="text-[11px] text-gray-500 pl-7 leading-relaxed">
                 TETA League platformuna kayıt olarak <Link href="/gizlilik" target="_blank" className="text-[#00e5ff] hover:underline">Kişisel Verilerin İşlenmesine İlişkin Aydınlatma Metni</Link>'ni okuduğunuzu ve kişisel verilerinizin işlenmesi hakkında bilgilendirildiğinizi teyit etmiş olursunuz.
               </div>
+
+              <div className="flex items-start space-x-3 pt-2">
+                <input
+                  type="checkbox"
+                  name="beta_registered"
+                  id="beta_registered"
+                  defaultChecked={false}
+                  className="mt-1 w-4 h-4 bg-[#060d18] border border-white/20 rounded focus:ring-2 focus:ring-[#00e5ff]/50 text-[#00e5ff] cursor-pointer"
+                />
+                <label htmlFor="beta_registered" className="text-xs text-gray-400 hover:text-gray-300 leading-relaxed cursor-pointer select-none">
+                  BETA Websitesinde kaydım var. İstatistik ve piyasa değerimin TETA League sistemine aktarılmasına izin veriyorum.
+                </label>
+              </div>
             </div>
 
             {state?.error && (

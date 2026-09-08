@@ -3,12 +3,22 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
-export function MiniStatsClient({ topScorers, topAssisters, cleanSheetPlayers }: { topScorers: any[], topAssisters: any[], cleanSheetPlayers: any[] }) {
-  const [activeTab, setActiveTab] = useState<'gol' | 'asist' | 'cleansheet'>('gol');
+export function MiniStatsClient({
+  topScorers,
+  topAssisters,
+  cleanSheetPlayers,
+  topRatedPlayers = []
+}: {
+  topScorers: any[],
+  topAssisters: any[],
+  cleanSheetPlayers: any[],
+  topRatedPlayers?: any[]
+}) {
+  const [activeTab, setActiveTab] = useState<'gol' | 'asist' | 'cleansheet' | 'rating'>('gol');
 
   const renderList = (players: any[], valueKey: string) => (
     <div className="divide-y divide-white/5">
-      {players.length > 0 ? players.map((player, idx) => (
+      {players && players.length > 0 ? players.map((player, idx) => (
         <div key={idx} className="flex items-center justify-between p-4 hover:bg-[#00E5FF]/5 hover:shadow-[inset_4px_0_0_#00E5FF] transition-colors">
           <div className="flex items-center gap-4">
             <span className={`text-[24px] font-[900] w-8 text-center ${idx === 0 ? 'text-[#00e5ff]' : 'text-gray-600'}`}>
@@ -39,23 +49,29 @@ export function MiniStatsClient({ topScorers, topAssisters, cleanSheetPlayers }:
       <div className="client-glass rounded-xl overflow-hidden">
         {/* Tabs */}
         <div className="flex border-b border-white/5">
-          <button 
+          <button
             onClick={() => setActiveTab('gol')}
-            className={`flex-1 py-3 text-[13px] font-[800] tracking-widest uppercase transition-colors ${activeTab === 'gol' ? 'text-[#00e5ff] border-b-2 border-[#00E5FF] text-[#00E5FF] drop-shadow-[0_0_8px_rgba(0,229,255,0.4)]' : 'text-gray-500 hover:text-gray-300'}`}
+            className={`flex-1 py-3 text-[11px] sm:text-[13px] font-[800] tracking-widest uppercase transition-colors ${activeTab === 'gol' ? 'text-[#00e5ff] border-b-2 border-[#00E5FF] drop-shadow-[0_0_8px_rgba(0,229,255,0.4)]' : 'text-gray-500 hover:text-gray-300'}`}
           >
             GOL
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('asist')}
-            className={`flex-1 py-3 text-[13px] font-[800] tracking-widest uppercase transition-colors ${activeTab === 'asist' ? 'text-[#00e5ff] border-b-2 border-[#00E5FF] text-[#00E5FF] drop-shadow-[0_0_8px_rgba(0,229,255,0.4)]' : 'text-gray-500 hover:text-gray-300'}`}
+            className={`flex-1 py-3 text-[11px] sm:text-[13px] font-[800] tracking-widest uppercase transition-colors ${activeTab === 'asist' ? 'text-[#00e5ff] border-b-2 border-[#00E5FF] drop-shadow-[0_0_8px_rgba(0,229,255,0.4)]' : 'text-gray-500 hover:text-gray-300'}`}
           >
             ASİST
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('cleansheet')}
-            className={`flex-1 py-3 text-[13px] font-[800] tracking-widest uppercase transition-colors ${activeTab === 'cleansheet' ? 'text-[#00e5ff] border-b-2 border-[#00E5FF] text-[#00E5FF] drop-shadow-[0_0_8px_rgba(0,229,255,0.4)]' : 'text-gray-500 hover:text-gray-300'}`}
+            className={`flex-1 py-3 text-[11px] sm:text-[13px] font-[800] tracking-widest uppercase transition-colors ${activeTab === 'cleansheet' ? 'text-[#00e5ff] border-b-2 border-[#00E5FF] drop-shadow-[0_0_8px_rgba(0,229,255,0.4)]' : 'text-gray-500 hover:text-gray-300'}`}
           >
             CLEAN SHEET
+          </button>
+          <button
+            onClick={() => setActiveTab('rating')}
+            className={`flex-1 py-3 text-[11px] sm:text-[13px] font-[800] tracking-widest uppercase transition-colors ${activeTab === 'rating' ? 'text-[#00e5ff] border-b-2 border-[#00E5FF] drop-shadow-[0_0_8px_rgba(0,229,255,0.4)]' : 'text-gray-500 hover:text-gray-300'}`}
+          >
+            ORT. REYTİNG
           </button>
         </div>
 
@@ -64,6 +80,7 @@ export function MiniStatsClient({ topScorers, topAssisters, cleanSheetPlayers }:
           {activeTab === 'gol' && renderList(topScorers, 'goals')}
           {activeTab === 'asist' && renderList(topAssisters, 'assists')}
           {activeTab === 'cleansheet' && renderList(cleanSheetPlayers, 'cleanSheets')}
+          {activeTab === 'rating' && renderList(topRatedPlayers, 'ratingFormatted')}
         </div>
         
         {/* Footer Link */}

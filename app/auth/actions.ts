@@ -33,6 +33,7 @@ export async function registerAction(prevState: any, formData: FormData) {
   const password = formData.get('password') as string;
   const confirmPassword = formData.get('confirmPassword') as string;
   const legalAccept = formData.get('legalAccept');
+  const betaRegistered = formData.get('beta_registered') === 'on' || formData.get('beta_registered') === 'true';
 
   if (!legalAccept) {
     return { error: "Kayıt olmak için Kullanım Koşulları'nı kabul etmelisiniz." };
@@ -66,6 +67,7 @@ export async function registerAction(prevState: any, formData: FormData) {
       data: {
         username: username,
         terms_accepted_at: new Date().toISOString(),
+        beta_registered: betaRegistered,
       },
       emailRedirectTo: siteUrl + '/',
     },

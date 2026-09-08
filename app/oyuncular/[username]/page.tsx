@@ -449,7 +449,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                     { label: "KURTARIŞ", value: tSv, sub: null },
                     { label: "YENEN GOL", value: tGC, sub: null, danger: true },
                     { label: "KIRMIZI KART", value: tRC, sub: null, danger: true },
-                    { label: "ADAM OF MATCH", value: tMOM, sub: null, accent: true },
+                    { label: "MAÇIN ADAMI", value: tMOM, sub: null, accent: true },
                     { label: "TOPLAM KATKI", value: tG + tA, sub: `${tG}G + ${tA}A` },
                   ].map((s, i) => (
                     <div key={i} className="bg-[#03070c] border border-white/5 rounded-2xl p-5 hover:border-white/10 transition-colors text-center">
