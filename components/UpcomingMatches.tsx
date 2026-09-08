@@ -1,6 +1,5 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
-import Link from 'next/link';
 
 function getShortName(name: string): string {
   return name.slice(0, 3).toUpperCase();
@@ -100,9 +99,6 @@ export default async function UpcomingMatches() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-[28px] font-[800] tracking-wide text-white">HAFTANIN MAÇLARI</h2>
-          <Link href="/fikstur" className="text-[13px] font-[700] text-[#00e5ff] hover:text-white transition-colors tracking-widest uppercase">
-            Tümünü Gör →
-          </Link>
         </div>
         <div className="empty-state !py-8"><span className="empty-state-title">Veri Bekleniyor</span><span className="empty-state-desc">Yaklaşan maç bulunmuyor.</span></div>
       </div>
@@ -113,9 +109,6 @@ export default async function UpcomingMatches() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-[28px] font-[800] tracking-wide text-white">HAFTANIN MAÇLARI</h2>
-        <Link href="/fikstur" className="text-[13px] font-[700] text-[#00e5ff] hover:text-white transition-colors tracking-widest uppercase">
-          Tümünü Gör →
-        </Link>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
