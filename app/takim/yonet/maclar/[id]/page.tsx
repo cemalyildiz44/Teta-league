@@ -113,9 +113,14 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
             <div>
               <h4 className="text-[10px] font-black text-gray-500 tracking-widest uppercase mb-2">Kanıt (Screenshot)</h4>
               {match.screenshot_url ? (
-                <a href={match.screenshot_url} target="_blank" rel="noopener noreferrer" className="text-[#00e5ff] text-sm font-bold hover:underline">
-                  Kanıtı Görüntüle
-                </a>
+                <div className="space-y-2">
+                  <div className="relative max-h-48 max-w-sm rounded-lg overflow-hidden border border-white/10 bg-black/40">
+                    <img src={match.screenshot_url} alt="Kanıt Görseli" className="max-h-48 w-auto object-contain rounded-lg" />
+                  </div>
+                  <a href={match.screenshot_url} target="_blank" rel="noopener noreferrer" className="text-[#00e5ff] text-xs font-bold hover:underline inline-flex items-center gap-1">
+                    Tam Boyut Aç &rarr;
+                  </a>
+                </div>
               ) : (
                 <p className="text-sm text-gray-500">-</p>
               )}

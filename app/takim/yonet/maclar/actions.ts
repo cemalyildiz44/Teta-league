@@ -39,8 +39,8 @@ export async function submitMatchAction(prevState: any, formData: FormData) {
   const home_score = parseInt(formData.get('home_score') as string, 10);
   const away_score = parseInt(formData.get('away_score') as string, 10);
   const played_at = formData.get('played_at') as string;
-  const notes = formData.get('notes') as string;
-  const screenshot_url = formData.get('screenshot_url') as string;
+  const notes = (formData.get('notes') as string)?.trim() || null;
+  const screenshot_url = (formData.get('screenshot_url') as string)?.trim() || null;
 
   if (!fixture_id || isNaN(home_score) || isNaN(away_score) || !played_at) {
     return { error: 'Gerekli alanları doldurun.' };
@@ -55,13 +55,24 @@ export async function submitMatchAction(prevState: any, formData: FormData) {
 
   if (!fixture) return { error: 'Fikstür bulunamadı.' };
 
+  // Check if a match already exists for this fixture
+  const { data: existingMatch } = await supabase
+    .from('matches')
+    .select('id')
+    .eq('fixture_id', fixture_id)
+    .maybeSingle();
+
+  if (existingMatch) {
+    return { error: 'Bu fikstür için zaten bir maç sonucu girilmiş.' };
+  }
+
   // Verify the captain's team is part of the fixture
   if (fixture.home_team_id !== ctx.teamId && fixture.away_team_id !== ctx.teamId) {
     return { error: 'Sadece kendi takımınızın maçlarını girebilirsiniz.' };
   }
 
   // Insert match
-  const { error } = await supabase.from('matches').insert({
+  const { data: insertedMatch, error } = await supabase.from('matches').insert({
     fixture_id,
     season_id: ctx.seasonId,
     league_id: fixture.league_id,
@@ -75,12 +86,12 @@ export async function submitMatchAction(prevState: any, formData: FormData) {
     notes,
     screenshot_url,
     submitted_by: user!.id
-  });
+  }).select('id').single();
 
   if (error) return { error: error.message };
 
   revalidatePath('/takim/yonet/maclar');
-  return { success: 'Maç başarıyla gönderildi.' };
+  return { success: 'Maç başarıyla gönderildi.', matchId: insertedMatch?.id };
 }
 
 export async function submitPlayerStatsAction(matchId: string, statsPayload: any[]) {
@@ -104,34 +115,39 @@ export async function submitPlayerStatsAction(matchId: string, statsPayload: any
     return { error: 'Bu maç sizin takımınıza ait değil.' };
   }
 
-  // Format payload
-  const upsertData = statsPayload.map(stat => ({
-    match_id: matchId,
-    player_id: stat.player_id,
-    team_id: ctx.teamId,
-    position: stat.position || null,
-    goals: stat.goals || 0,
-    assists: stat.assists || 0,
-    rating: stat.rating || null,
-    shots: stat.shots || 0,
-    passes_made: stat.passes_made || 0,
-    pass_attempts: stat.pass_attempts || 0,
-    tackles_made: stat.tackles_made || 0,
-    tackle_attempts: stat.tackle_attempts || 0,
-    saves: stat.saves || 0,
-    goals_conceded: stat.goals_conceded || 0,
-    cleansheets_gk: stat.cleansheets_gk || 0,
-    cleansheets_def: stat.cleansheets_def || 0,
-    red_cards: stat.red_cards || 0,
-    is_mom: stat.is_mom || false,
-  }));
+  // Format payload - only include players that actually participated
+  const upsertData = (statsPayload || [])
+    .filter(stat => stat.played !== false && stat.player_id)
+    .map(stat => ({
+      match_id: matchId,
+      player_id: stat.player_id,
+      team_id: ctx.teamId,
+      position: stat.position || null,
+      goals: Math.max(0, parseInt(stat.goals, 10) || 0),
+      assists: Math.max(0, parseInt(stat.assists, 10) || 0),
+      rating: stat.rating && Number(stat.rating) > 0 ? Math.min(10, Math.max(0, Number(stat.rating))) : null,
+      shots: Math.max(0, parseInt(stat.shots, 10) || 0),
+      passes_made: Math.max(0, parseInt(stat.passes_made, 10) || 0),
+      pass_attempts: Math.max(0, parseInt(stat.pass_attempts, 10) || 0),
+      tackles_made: Math.max(0, parseInt(stat.tackles_made, 10) || 0),
+      tackle_attempts: Math.max(0, parseInt(stat.tackle_attempts, 10) || 0),
+      saves: Math.max(0, parseInt(stat.saves, 10) || 0),
+      goals_conceded: Math.max(0, parseInt(stat.goals_conceded, 10) || 0),
+      cleansheets_gk: Math.max(0, parseInt(stat.cleansheets_gk, 10) || 0),
+      cleansheets_def: Math.max(0, parseInt(stat.cleansheets_def, 10) || 0),
+      red_cards: Math.max(0, parseInt(stat.red_cards, 10) || 0),
+      is_mom: Boolean(stat.is_mom),
+    }));
 
   // Clean old stats for this team in this match and insert new ones
   await supabase.from('match_player_stats').delete().eq('match_id', matchId).eq('team_id', ctx.teamId);
   
-  const { error } = await supabase.from('match_player_stats').insert(upsertData);
-  if (error) return { error: error.message };
+  if (upsertData.length > 0) {
+    const { error } = await supabase.from('match_player_stats').insert(upsertData);
+    if (error) return { error: error.message };
+  }
 
   revalidatePath(`/takim/yonet/maclar/${matchId}`);
+  revalidatePath('/takim/yonet/maclar');
   return { success: 'İstatistikler başarıyla kaydedildi.' };
 }
