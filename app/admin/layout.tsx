@@ -39,6 +39,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <Link href="/admin/seasons" className="block px-4 py-3 rounded-lg text-sm font-bold text-gray-400 hover:text-[#00e5ff] hover:bg-[#00e5ff]/10 transition-colors">
             Sezonlar
           </Link>
+          <Link href="/admin/transfer-windows" className="block px-4 py-3 rounded-lg text-sm font-bold text-gray-400 hover:text-[#00e5ff] hover:bg-[#00e5ff]/10 transition-colors">
+            Transfer Pencereleri
+          </Link>
           <Link href="/admin/matches" className="block px-4 py-3 rounded-lg text-sm font-bold text-gray-400 hover:text-[#00e5ff] hover:bg-[#00e5ff]/10 transition-colors">
             Maç Onayları
           </Link>
