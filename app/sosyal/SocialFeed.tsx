@@ -18,6 +18,20 @@ export function SocialFeed({ initialPosts, userProfile, currentUser }: { initial
 
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
+  useEffect(() => {
+    setPosts(initialPosts);
+  }, [initialPosts]);
+
+  const handlePostCreated = (newPost: any) => {
+    if (newPost) {
+      setPosts(prev => [newPost, ...prev]);
+    }
+  };
+
+  const handleDeletePost = (deletedPostId: string) => {
+    setPosts(prev => prev.filter(p => p.id !== deletedPostId));
+  };
+
   const fetchPosts = useCallback(async (reset: boolean, currentTab: string, query: string, currentPage: number) => {
     setErrorMsg(null);
     if (reset) {
@@ -111,7 +125,7 @@ export function SocialFeed({ initialPosts, userProfile, currentUser }: { initial
 
       {/* COMPOSER */}
       {currentUser ? (
-        <PostForm userProfile={userProfile} />
+        <PostForm userProfile={userProfile} onPostCreated={handlePostCreated} />
       ) : (
         <div className="client-glass p-6 rounded-xl text-center border border-white/5 bg-[#03070c]">
           <p className="text-gray-400 text-[13px] font-medium tracking-wide uppercase">Gönderi paylaşmak için giriş yapmalısınız.</p>
@@ -171,7 +185,12 @@ export function SocialFeed({ initialPosts, userProfile, currentUser }: { initial
         ) : (
           <>
             {posts.map((post) => (
-              <PostItem key={post.id} post={post} currentUser={currentUser} />
+              <PostItem
+                key={post.id}
+                post={post}
+                currentUser={currentUser}
+                onDeletePost={handleDeletePost}
+              />
             ))}
             
             {hasMore && (

@@ -14,15 +14,27 @@ export async function createPostAction(prevState: any, formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: 'Giriş yapmalısınız.' };
 
-  const { error } = await supabase.from('posts').insert({
-    content,
-    author_id: user.id
-  });
+  const { data: insertedPost, error } = await supabase
+    .from('posts')
+    .insert({
+      content: content.trim(),
+      author_id: user.id
+    })
+    .select(`
+      id, content, created_at,
+      author:profiles!posts_author_id_fkey ( id, username, avatar_url, full_name, primary_position ),
+      likes ( id, user_id ),
+      comments (
+        id, content, created_at,
+        author:profiles!comments_author_id_fkey ( id, username, avatar_url )
+      )
+    `)
+    .single();
 
   if (error) return { error: error.message };
 
   revalidatePath('/sosyal');
-  return { success: 'Gönderi paylaşıldı.' };
+  return { success: 'Gönderi paylaşıldı.', post: insertedPost };
 }
 
 export async function deletePostAction(postId: string) {
@@ -45,7 +57,7 @@ export async function deletePostAction(postId: string) {
   }
 
   revalidatePath('/sosyal');
-  return { success: 'Gönderi silindi.' };
+  return { success: 'Gönderi silindi.', postId };
 }
 
 export async function toggleLikeAction(postId?: string, commentId?: string) {
@@ -60,12 +72,15 @@ export async function toggleLikeAction(postId?: string, commentId?: string) {
   if (postId) query.eq('post_id', postId);
   if (commentId) query.eq('comment_id', commentId);
 
-  const { data: existingLikes } = await query;
+  const { data: existingLikes, error: checkError } = await query;
+  if (checkError) return { error: checkError.message };
 
   if (existingLikes && existingLikes.length > 0) {
     // Unlike
     const { error } = await supabase.from('likes').delete().eq('id', existingLikes[0].id);
     if (error) return { error: error.message };
+    revalidatePath('/sosyal');
+    return { success: 'Beğeni kaldırıldı.', liked: false };
   } else {
     // Like
     const { error } = await supabase.from('likes').insert({
@@ -74,18 +89,31 @@ export async function toggleLikeAction(postId?: string, commentId?: string) {
       comment_id: commentId || null
     });
     if (error) return { error: error.message };
+    revalidatePath('/sosyal');
+    return { success: 'Beğenildi.', liked: true };
   }
-
-  revalidatePath('/sosyal');
-  return { success: 'İşlem başarılı.' };
 }
 
-export async function createCommentAction(prevState: any, formData: FormData) {
+export async function createCommentAction(
+  postIdOrPrevState: any,
+  contentOrFormData?: FormData | string
+) {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  const content = formData.get('content') as string;
-  const postId = formData.get('post_id') as string;
+  let content = '';
+  let postId = '';
+
+  if (contentOrFormData instanceof FormData) {
+    content = (contentOrFormData.get('content') as string) || '';
+    postId = (contentOrFormData.get('post_id') as string) || '';
+  } else if (typeof postIdOrPrevState === 'string' && typeof contentOrFormData === 'string') {
+    postId = postIdOrPrevState;
+    content = contentOrFormData;
+  } else if (postIdOrPrevState instanceof FormData) {
+    content = (postIdOrPrevState.get('content') as string) || '';
+    postId = (postIdOrPrevState.get('post_id') as string) || '';
+  }
 
   if (!content || content.trim().length === 0) return { error: 'Yorum boş olamaz.' };
   if (!postId) return { error: 'Post ID eksik.' };
@@ -93,16 +121,23 @@ export async function createCommentAction(prevState: any, formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: 'Giriş yapmalısınız.' };
 
-  const { error } = await supabase.from('comments').insert({
-    content,
-    post_id: postId,
-    author_id: user.id
-  });
+  const { data: insertedComment, error } = await supabase
+    .from('comments')
+    .insert({
+      content: content.trim(),
+      post_id: postId,
+      author_id: user.id
+    })
+    .select(`
+      id, content, created_at, post_id,
+      author:profiles!comments_author_id_fkey ( id, username, avatar_url )
+    `)
+    .single();
 
   if (error) return { error: error.message };
 
   revalidatePath('/sosyal');
-  return { success: 'Yorum paylaşıldı.' };
+  return { success: 'Yorum paylaşıldı.', comment: insertedComment };
 }
 
 export async function deleteCommentAction(commentId: string) {
@@ -122,7 +157,7 @@ export async function deleteCommentAction(commentId: string) {
   }
 
   revalidatePath('/sosyal');
-  return { success: 'Yorum silindi.' };
+  return { success: 'Yorum silindi.', commentId };
 }
 
 

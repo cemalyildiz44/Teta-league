@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { toggleLikeAction, deletePostAction, createCommentAction, deleteCommentAction } from './actions';
 
 function timeAgo(dateString: string) {
@@ -14,25 +15,139 @@ function timeAgo(dateString: string) {
   return `${Math.floor(hours / 24)} gün`;
 }
 
-export function PostItem({ post, currentUser }: { post: any, currentUser: any }) {
-  const [showComments, setShowComments] = useState(false);
-  const [isLiking, setIsLiking] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState('');
-  const formRef = useRef<HTMLFormElement>(null);
+interface PostItemProps {
+  post: any;
+  currentUser: any;
+  onDeletePost?: (postId: string) => void;
+}
 
-  const hasLiked = currentUser && post.likes?.some((l: any) => l.user_id === currentUser.id);
-  const likeCount = post.likes?.length || 0;
-  const commentCount = post.comments?.length || 0;
-  const isAuthor = currentUser && post.author?.id === currentUser.id;
+export function PostItem({ post, currentUser, onDeletePost }: PostItemProps) {
+  const router = useRouter();
 
+  // Likes state
+  const initialHasLiked = Boolean(currentUser && post.likes?.some((l: any) => l.user_id === currentUser.id));
+  const initialLikeCount = post.likes?.length || 0;
+
+  const [hasLiked, setHasLiked] = useState<boolean>(initialHasLiked);
+  const [likeCount, setLikeCount] = useState<number>(initialLikeCount);
+  const [isLiking, setIsLiking] = useState<boolean>(false);
+
+  // Comments state
+  const [showComments, setShowComments] = useState<boolean>(false);
+  const [comments, setComments] = useState<any[]>(post.comments || []);
+  const [commentCount, setCommentCount] = useState<number>(post.comments?.length || 0);
+  const [commentText, setCommentText] = useState<string>('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState<boolean>(false);
+  const [commentError, setCommentError] = useState<string>('');
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
+
+  // Post delete state
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [deleteError, setDeleteError] = useState<string>('');
+
+  const isAuthor = Boolean(currentUser && post.author?.id === currentUser.id);
+
+  // Sync state if post prop changes (e.g. tab change or pagination)
+  useEffect(() => {
+    setHasLiked(Boolean(currentUser && post.likes?.some((l: any) => l.user_id === currentUser.id)));
+    setLikeCount(post.likes?.length || 0);
+  }, [post.id, post.likes, currentUser]);
+
+  useEffect(() => {
+    setComments(post.comments || []);
+    setCommentCount(post.comments?.length || 0);
+  }, [post.id, post.comments]);
+
+  // Handle Like Toggle with Optimistic UI & Rollback
   const handleLike = async () => {
     if (!currentUser || isLiking) return;
     setIsLiking(true);
-    await toggleLikeAction(post.id);
-    setIsLiking(false);
+
+    const prevHasLiked = hasLiked;
+    const prevLikeCount = likeCount;
+
+    // Optimistic UI update
+    const nextHasLiked = !prevHasLiked;
+    const nextLikeCount = nextHasLiked ? prevLikeCount + 1 : Math.max(0, prevLikeCount - 1);
+
+    setHasLiked(nextHasLiked);
+    setLikeCount(nextLikeCount);
+
+    try {
+      const res = await toggleLikeAction(post.id);
+      if (res?.error) {
+        // Rollback on server error
+        setHasLiked(prevHasLiked);
+        setLikeCount(prevLikeCount);
+      } else if (typeof res?.liked === 'boolean') {
+        // Sync with verified server outcome
+        setHasLiked(res.liked);
+        router.refresh();
+      }
+    } catch {
+      // Rollback on network failure
+      setHasLiked(prevHasLiked);
+      setLikeCount(prevLikeCount);
+    } finally {
+      setIsLiking(false);
+    }
   };
 
+  // Handle Comment Submission without Page Reload
+  const handleCommentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser || isSubmittingComment) return;
+
+    const trimmed = commentText.trim();
+    if (!trimmed) return;
+
+    setIsSubmittingComment(true);
+    setCommentError('');
+
+    try {
+      const res = await createCommentAction(post.id, trimmed);
+      if (res?.error) {
+        setCommentError(res.error);
+        // Note: commentText is intentionally kept on error so user doesn't lose their input
+      } else if (res?.comment) {
+        // Clear input on success
+        setCommentText('');
+        // Add newly created comment directly to current list
+        setComments((prev) => [...prev, res.comment]);
+        setCommentCount((prev) => prev + 1);
+        setShowComments(true);
+        router.refresh();
+      }
+    } catch (err: any) {
+      setCommentError(err?.message || 'Yorum gönderilirken bir sorun oluştu.');
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  // Handle Delete Comment without Page Reload
+  const handleDeleteComment = async (commentId: string) => {
+    if (deletingCommentId) return;
+    if (!confirm('Yorumu silmek istediğinize emin misiniz?')) return;
+    setDeletingCommentId(commentId);
+
+    try {
+      const res = await deleteCommentAction(commentId);
+      if (res?.error) {
+        alert('Yorum silinemedi: ' + res.error);
+      } else {
+        setComments((prev) => prev.filter((c) => c.id !== commentId));
+        setCommentCount((prev) => Math.max(0, prev - 1));
+        router.refresh();
+      }
+    } catch {
+      alert('Yorum silinirken hata oluştu.');
+    } finally {
+      setDeletingCommentId(null);
+    }
+  };
+
+  // Handle Delete Post
   const handleDelete = async () => {
     if (!confirm('Bu gönderiyi kalıcı olarak silmek istediğinize emin misiniz?')) return;
     setIsDeleting(true);
@@ -40,8 +155,11 @@ export function PostItem({ post, currentUser }: { post: any, currentUser: any })
     const res = await deletePostAction(post.id);
     if (res?.error) {
       setDeleteError(res.error);
+      setIsDeleting(false);
+    } else {
+      onDeletePost?.(post.id);
+      router.refresh();
     }
-    setIsDeleting(false);
   };
 
   return (
@@ -51,7 +169,7 @@ export function PostItem({ post, currentUser }: { post: any, currentUser: any })
           {deleteError}
         </div>
       )}
-      
+
       {/* HEADER */}
       <div className="flex justify-between items-start mb-3">
         <Link href={`/oyuncular/${post.author?.username}`} className="flex items-center gap-3 group min-w-0 flex-1">
@@ -112,7 +230,8 @@ export function PostItem({ post, currentUser }: { post: any, currentUser: any })
           <button 
             onClick={handleLike}
             disabled={!currentUser || isLiking}
-            className={`flex items-center gap-2 text-[12px] font-bold tracking-widest transition-colors group ${hasLiked ? 'text-pink-500' : 'text-gray-500 hover:text-pink-400'}`}
+            className={`flex items-center gap-2 text-[12px] font-bold tracking-widest transition-colors group ${hasLiked ? 'text-pink-500' : 'text-gray-500 hover:text-pink-400'} disabled:opacity-75`}
+            title={!currentUser ? 'Beğenmek için giriş yapın' : (hasLiked ? 'Beğeniyi geri al' : 'Beğen')}
           >
             <div className={`p-2 rounded-lg transition-colors ${hasLiked ? 'bg-pink-500/10' : 'group-hover:bg-pink-500/10'}`}>
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill={hasLiked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path></svg>
@@ -153,37 +272,54 @@ export function PostItem({ post, currentUser }: { post: any, currentUser: any })
             
             {/* New Comment Input */}
             {currentUser ? (
-              <form ref={formRef} action={async (fd) => { await createCommentAction({}, fd); formRef.current?.reset(); }} className="flex gap-3">
-                <input type="hidden" name="post_id" value={post.id} />
-                <input 
-                  type="text" 
-                  name="content"
-                  required
-                  placeholder="Yorum yaz..."
-                  className="flex-1 bg-[#03070c] border border-white/10 rounded-lg px-4 py-2.5 text-[13px] text-white focus:outline-none focus:border-[#00e5ff]/50 transition-colors"
-                  autoComplete="off"
-                />
-                <button 
-                  type="submit"
-                  className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[11px] font-[900] text-white hover:bg-white hover:text-black uppercase tracking-widest transition-colors shrink-0"
-                >
-                  GÖNDER
-                </button>
-              </form>
+              <div className="space-y-2">
+                {commentError && (
+                  <div className="text-[12px] font-bold text-red-400 bg-red-500/10 border border-red-500/30 p-2 rounded-lg">
+                    {commentError}
+                  </div>
+                )}
+                <form onSubmit={handleCommentSubmit} className="flex gap-3">
+                  <input
+                    type="text"
+                    name="content"
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    disabled={isSubmittingComment}
+                    required
+                    placeholder="Yorum yaz..."
+                    className="flex-1 bg-[#03070c] border border-white/10 rounded-lg px-4 py-2.5 text-[13px] text-white focus:outline-none focus:border-[#00e5ff]/50 transition-colors disabled:opacity-50"
+                    autoComplete="off"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isSubmittingComment || commentText.trim().length === 0}
+                    className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[11px] font-[900] text-white hover:bg-white hover:text-black uppercase tracking-widest transition-colors shrink-0 disabled:opacity-50 disabled:hover:bg-white/5 disabled:hover:text-white flex items-center gap-2"
+                  >
+                    {isSubmittingComment ? (
+                      <>
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        GÖNDERİLİYOR...
+                      </>
+                    ) : (
+                      'GÖNDER'
+                    )}
+                  </button>
+                </form>
+              </div>
             ) : (
               <p className="text-[11px] text-gray-500 italic uppercase tracking-widest">Yorum yapmak için giriş yapın.</p>
             )}
 
             {/* Comments List */}
             <div className="space-y-3 mt-4">
-              {post.comments?.map((comment: any) => (
+              {comments.map((comment: any) => (
                 <div key={comment.id} className="flex items-start gap-3 group/comment bg-white/[0.02] p-3 rounded-lg border border-white/5">
                   <Link href={`/oyuncular/${comment.author?.username}`} className="shrink-0">
                     {comment.author?.avatar_url ? (
                       <img src={comment.author.avatar_url} alt="" className="w-8 h-8 rounded-full border border-white/10 object-cover" />
                     ) : (
                       <div className="w-8 h-8 rounded-full bg-[#0a1628] border border-white/10 flex items-center justify-center font-bold text-[10px] text-[#00e5ff]">
-                        {comment.author?.username?.charAt(0)?.toUpperCase()}
+                        {comment.author?.username?.charAt(0)?.toUpperCase() || '?'}
                       </div>
                     )}
                   </Link>
@@ -199,12 +335,15 @@ export function PostItem({ post, currentUser }: { post: any, currentUser: any })
                     <p className="text-gray-300 text-[13px] mt-0.5 break-words whitespace-pre-wrap">{comment.content}</p>
                   </div>
                   {currentUser && comment.author?.id === currentUser.id && (
-                    <form action={async () => { await deleteCommentAction(comment.id); }} className="opacity-0 group-hover/comment:opacity-100 transition-opacity">
-                      <input type="hidden" name="comment_id" value={comment.id} />
-                      <button type="submit" className="text-gray-500 hover:text-red-400 p-1" title="Sil">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
-                      </button>
-                    </form>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteComment(comment.id)}
+                      disabled={deletingCommentId === comment.id}
+                      className="opacity-0 group-hover/comment:opacity-100 transition-opacity text-gray-500 hover:text-red-400 p-1 disabled:opacity-50"
+                      title="Sil"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+                    </button>
                   )}
                 </div>
               ))}

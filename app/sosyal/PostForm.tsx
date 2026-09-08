@@ -3,26 +3,51 @@
 import { useActionState, useState } from 'react';
 import { createPostAction } from './actions';
 
-export function PostForm({ userProfile }: { userProfile?: any }) {
-  const [state, formAction] = useActionState(createPostAction as any, { error: '', success: '' } as any);
+export function PostForm({
+  userProfile,
+  onPostCreated
+}: {
+  userProfile?: any;
+  onPostCreated?: (post: any) => void;
+}) {
   const [isPending, setIsPending] = useState(false);
   const [content, setContent] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = content.trim();
+    if (!trimmed || isPending) return;
+
+    setIsPending(true);
+    setError('');
+
+    const fd = new FormData();
+    fd.set('content', trimmed);
+
+    try {
+      const res = await createPostAction({}, fd);
+      if (res?.error) {
+        setError(res.error);
+      } else {
+        setContent('');
+        if (res?.post) {
+          onPostCreated?.(res.post);
+        }
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Gönderi paylaşılırken bir sorun oluştu.');
+    } finally {
+      setIsPending(false);
+    }
+  };
 
   return (
     <div className="client-glass p-5 md:p-6 rounded-xl border border-white/5 bg-[#01060b] shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
-      <form 
-        action={(fd: FormData) => {
-          setIsPending(true);
-          (formAction as any)(fd);
-          setTimeout(() => {
-            setIsPending(false);
-            if (!state?.error) setContent('');
-          }, 500);
-        }}
-      >
-        {state?.error && (
+      <form onSubmit={handleSubmit}>
+        {error && (
           <div className="mb-4 text-[12px] font-bold text-red-400 bg-red-500/10 border border-red-500/30 p-3 rounded-lg">
-            {state.error}
+            {error}
           </div>
         )}
         
@@ -44,8 +69,9 @@ export function PostForm({ userProfile }: { userProfile?: any }) {
               rows={2}
               value={content}
               onChange={(e) => setContent(e.target.value)}
+              disabled={isPending}
               placeholder="Toplulukla bir şeyler paylaş..."
-              className="w-full bg-transparent text-[14px] md:text-[15px] text-white placeholder:text-gray-500 focus:outline-none resize-none min-h-[50px]"
+              className="w-full bg-transparent text-[14px] md:text-[15px] text-white placeholder:text-gray-500 focus:outline-none resize-none min-h-[50px] disabled:opacity-50"
             />
             
             <div className="mt-2 pt-3 border-t border-white/5 flex items-center justify-between">
