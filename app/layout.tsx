@@ -39,14 +39,22 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     if (profile) {
       const { data: membership } = await supabase
         .from('team_memberships')
-        .select('team_id, teams ( id, name, logo_url )')
+        .select('team_id')
         .eq('player_id', profile.id)
         .is('left_at', null)
+        .order('joined_at', { ascending: false })
         .limit(1)
-        .single();
-        
-      if (membership && membership.teams) {
-        activeTeam = Array.isArray(membership.teams) ? membership.teams[0] : membership.teams;
+        .maybeSingle();
+
+      if (membership?.team_id) {
+        const { data: teamData } = await supabase
+          .from('teams')
+          .select('id, name, logo_url')
+          .eq('id', membership.team_id)
+          .maybeSingle();
+        if (teamData) {
+          activeTeam = teamData;
+        }
       }
 
       const { count } = await supabase
