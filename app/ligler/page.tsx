@@ -31,6 +31,7 @@ export default async function LiglerPage() {
           .filter(l => l.status === "ACTIVE" || l.status === "UPCOMING")
           .map(l => ({
             ...l,
+            seasonId: season.id,
             seasonName: season.name,
             seasonSlug: season.slug,
           }));
@@ -48,15 +49,27 @@ export default async function LiglerPage() {
   }
   
   const activeLeagueIds = leaguesToDisplay.map(l => l.id);
-  const [ { data: teamSeasonStats }, { data: playerSeasonStats } ] = await Promise.all([
-    supabase.from("team_season_stats").select("league_id, team_id").in("league_id", activeLeagueIds),
-    supabase.from("player_team_season_stats").select("league_id, player_id").in("league_id", activeLeagueIds)
+  const [ { data: leagueTeams }, { data: teamMemberships } ] = await Promise.all([
+    activeLeagueIds.length > 0
+      ? supabase.from("league_teams").select("league_id, season_id, team_id").in("league_id", activeLeagueIds)
+      : Promise.resolve({ data: [] }),
+    activeLeagueIds.length > 0
+      ? supabase.from("team_memberships").select("league_id, season_id, player_id").in("league_id", activeLeagueIds).is("left_at", null)
+      : Promise.resolve({ data: [] })
   ]);
 
-  // Precalculate stats per league
-  const getLeagueStats = (leagueId: string) => {
-    const teams = new Set(teamSeasonStats?.filter(s => s.league_id === leagueId).map(s => s.team_id)).size;
-    const players = new Set(playerSeasonStats?.filter(s => s.league_id === leagueId).map(s => s.player_id)).size;
+  // Precalculate stats per league & season
+  const getLeagueStats = (leagueId: string, seasonId?: string) => {
+    const teams = new Set(
+      (leagueTeams || [])
+        .filter(s => s.league_id === leagueId && (!seasonId || s.season_id === seasonId))
+        .map(s => s.team_id)
+    ).size;
+    const players = new Set(
+      (teamMemberships || [])
+        .filter(s => s.league_id === leagueId && (!seasonId || s.season_id === seasonId))
+        .map(s => s.player_id)
+    ).size;
     return { teams, players };
   };
 
@@ -102,7 +115,7 @@ export default async function LiglerPage() {
                 levelText: "1. SEVİYE LİG"
               };
 
-          const stats = getLeagueStats(league.id);
+          const stats = getLeagueStats(league.id, league.seasonId);
 
           return (
             <div 

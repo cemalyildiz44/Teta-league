@@ -16,6 +16,9 @@ export default async function LeagueStandingsPage({
     notFound();
   }
 
+  const isLevel1 = league.level === 1 || resolvedParams.leagueSlug.includes("super");
+  const isLevel2 = league.level === 2 || resolvedParams.leagueSlug.includes("ecl");
+
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
@@ -108,12 +111,11 @@ export default async function LeagueStandingsPage({
               const team = teamMap.get(stat.team_id);
               const gd = stat.goals_for - stat.goals_against;
               const rank = idx + 1;
-              const leagueSlug = resolvedParams.leagueSlug;
               
               let rowBg = "hover:bg-white/5";
               let tdLeftBorder = "border-l-[3px] border-l-transparent";
 
-              if (leagueSlug === "teta-super-lig") {
+              if (isLevel1) {
                 if (rank === 1 || rank === 2) { 
                   rowBg = "bg-[#3b82f6]/10 hover:bg-[#3b82f6]/20"; 
                   tdLeftBorder = "border-l-[3px] border-l-[#3b82f6] shadow-[-2px_0_10px_rgba(59,130,246,0.3)]"; 
@@ -124,7 +126,7 @@ export default async function LeagueStandingsPage({
                   rowBg = "bg-[#ef4444]/10 hover:bg-[#ef4444]/20"; 
                   tdLeftBorder = "border-l-[3px] border-l-[#ef4444] shadow-[-2px_0_10px_rgba(239,68,68,0.3)]"; 
                 }
-              } else if (leagueSlug === "ecl-1-lig") {
+              } else if (isLevel2) {
                 if (rank === 1) { 
                   rowBg = "bg-[#22c55e]/10 hover:bg-[#22c55e]/20"; 
                   tdLeftBorder = "border-l-[3px] border-l-[#22c55e] shadow-[-2px_0_10px_rgba(34,197,94,0.3)]"; 
@@ -174,7 +176,7 @@ export default async function LeagueStandingsPage({
 
       {/* Legend */}
       <div className="mt-6 flex flex-wrap gap-4 md:gap-6 text-[11px] md:text-[12px] font-[800] uppercase tracking-widest text-gray-400">
-        {resolvedParams.leagueSlug === "teta-super-lig" && (
+        {isLevel1 && (
           <>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-sm bg-[#3b82f6] shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
@@ -190,7 +192,7 @@ export default async function LeagueStandingsPage({
             </div>
           </>
         )}
-        {resolvedParams.leagueSlug === "ecl-1-lig" && (
+        {isLevel2 && (
           <>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-sm bg-[#22c55e] shadow-[0_0_8px_rgba(34,197,94,0.5)]"></div>
