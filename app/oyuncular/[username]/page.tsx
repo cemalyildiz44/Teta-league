@@ -157,18 +157,55 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     return { ...p, teamName: t?.name || "?", teamSlug: t?.slug, teamLogo: t?.logo_url, avgRating: p.matches > 0 ? p.ratingSum / p.matches : 0 };
   }).sort((a, b) => b.seasonName.localeCompare(a.seasonName, "tr", { numeric: true }));
 
-  // Career timeline
-  const timeline = memberships.map((m) => {
-    const t = teamsMap.get(m.team_id);
-    const lg = leaguesMap.get(m.league_id);
-    const sn = seasonsMap.get(m.season_id);
-    return {
-      teamName: t?.name || "?", teamSlug: t?.slug, teamLogo: t?.logo_url,
-      joinedAt: m.joined_at, leftAt: m.left_at, isCurrent: !m.left_at,
-      joinedFmt: new Date(m.joined_at).getFullYear().toString(),
-      leagueName: lg?.name || null, seasonName: sn?.name || null,
-    };
-  });
+  // Career timeline (consolidate consecutive memberships for the same team, league, and season)
+  interface TimelineItem {
+    teamId: string;
+    leagueId: string;
+    seasonId: string;
+    teamName: string;
+    teamSlug?: string;
+    teamLogo?: string | null;
+    joinedAt: string;
+    leftAt: string | null;
+    isCurrent: boolean;
+    joinedFmt: string;
+    leagueName: string | null;
+    seasonName: string | null;
+  }
+
+  const timeline: TimelineItem[] = [];
+  for (const m of memberships) {
+    const prev = timeline[timeline.length - 1];
+    if (prev && prev.teamId === m.team_id && prev.leagueId === m.league_id && prev.seasonId === m.season_id) {
+      // Merge consecutive memberships for same team, league and season
+      if (new Date(m.joined_at) < new Date(prev.joinedAt)) {
+        prev.joinedAt = m.joined_at;
+        prev.joinedFmt = new Date(m.joined_at).getFullYear().toString();
+      }
+      if (!m.left_at) {
+        prev.isCurrent = true;
+        prev.leftAt = null;
+      }
+    } else {
+      const t = teamsMap.get(m.team_id);
+      const lg = leaguesMap.get(m.league_id);
+      const sn = seasonsMap.get(m.season_id);
+      timeline.push({
+        teamId: m.team_id,
+        leagueId: m.league_id,
+        seasonId: m.season_id,
+        teamName: t?.name || "?",
+        teamSlug: t?.slug,
+        teamLogo: t?.logo_url,
+        joinedAt: m.joined_at,
+        leftAt: m.left_at,
+        isCurrent: !m.left_at,
+        joinedFmt: new Date(m.joined_at).getFullYear().toString(),
+        leagueName: lg?.name || null,
+        seasonName: sn?.name || null,
+      });
+    }
+  }
 
   const currentLeague = activeMembership ? leaguesMap.get(activeMembership.league_id) : null;
 
