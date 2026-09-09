@@ -1,8 +1,10 @@
-﻿
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+
+import LeagueRulesViewer from './LeagueRulesViewer';
 
 interface Props {
   leagueName: string;
@@ -34,22 +36,20 @@ export default function LeagueRulesButton({ leagueName, seasonName, rules, class
     };
   }, [isOpen]);
 
-  const hasRules = rules && Object.keys(rules).length > 0 && rules.description;
-
   const modalContent = isOpen ? (
-    <div className='fixed inset-0 z-[100] flex items-center justify-center bg-[#01060b]/80 backdrop-blur-md p-3'>
+    <div className='fixed inset-0 z-[100] flex items-center justify-center bg-[#01060b]/85 backdrop-blur-md p-3 sm:p-4'>
       {/* Click-away backdrop */}
       <div className='absolute inset-0 z-0' onClick={() => setIsOpen(false)} />
       
       {/* Modal Container */}
-      <div className='relative z-10 w-full max-w-[800px] max-h-[85vh] flex flex-col client-glass bg-[#03070c] border border-[#00e5ff]/30 rounded-2xl shadow-[0_0_50px_rgba(0,229,255,0.15)] overflow-hidden'>
+      <div className='relative z-10 w-full max-w-[850px] max-h-[85vh] flex flex-col bg-[#03070c] border border-white/10 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] overflow-hidden'>
         {/* Header */}
         <div className='flex items-center justify-between p-5 md:p-6 border-b border-white/10 bg-black/60 shrink-0'>
           <div>
-            <h2 className='text-[18px] md:text-[22px] font-[900] text-white tracking-widest uppercase drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]'>
+            <h2 className='text-[18px] md:text-[22px] font-black text-white tracking-widest uppercase'>
               {leagueName}
             </h2>
-            <p className='text-[11px] font-[800] text-[#00e5ff] tracking-[0.2em] uppercase mt-1'>
+            <p className='text-[11px] font-bold text-[#00e5ff] tracking-[0.2em] uppercase mt-1'>
               KURALLARI ({seasonName})
             </p>
           </div>
@@ -62,72 +62,8 @@ export default function LeagueRulesButton({ leagueName, seasonName, rules, class
         </div>
 
         {/* Content Area */}
-        <div className='p-6 md:p-8 overflow-y-auto custom-scrollbar flex-1 relative bg-gradient-to-b from-[#03070c] to-[#010408]'>
-          {!hasRules ? (
-            <div className='empty-state !py-20 !border-0 bg-transparent flex flex-col items-center justify-center'>
-              <span className='text-[48px] mb-6 drop-shadow-[0_0_15px_rgba(0,229,255,0.2)]'>⚖️</span>
-              <span className='empty-state-title text-[20px] text-white tracking-widest uppercase mb-3 drop-shadow-md'>Kurallar Henüz Eklenmedi</span>
-              <span className='empty-state-desc text-[14px] max-w-sm mx-auto text-gray-400'>Bu ligin kuralları henüz yayınlanmamıştır. Daha sonra tekrar kontrol edin.</span>
-            </div>
-          ) : (
-            <div className='space-y-8 text-gray-300 text-[15px] leading-relaxed'>
-              {rules.description && (
-                <section>
-                  <h3 className='text-cyan-400 font-bold uppercase tracking-widest text-xs mb-3'>Genel Açıklama</h3>
-                  <p className='whitespace-pre-wrap text-sm text-zinc-300'>{rules.description}</p>
-                </section>
-              )}
-              {rules.participation && rules.participation.length > 0 && (
-                <section>
-                  <h3 className='text-cyan-400 font-bold uppercase tracking-widest text-xs mb-3'>Katılım Şartları</h3>
-                  <ul className='list-disc pl-5 space-y-2 text-sm text-zinc-300'>
-                    {rules.participation.map((r: string, i: number) => <li key={i}>{r}</li>)}
-                  </ul>
-                </section>
-              )}
-              {rules.match_rules && rules.match_rules.length > 0 && (
-                <section>
-                  <h3 className='text-cyan-400 font-bold uppercase tracking-widest text-xs mb-3'>Maç Kuralları</h3>
-                  <ul className='list-disc pl-5 space-y-2 text-sm text-zinc-300'>
-                    {rules.match_rules.map((r: string, i: number) => <li key={i}>{r}</li>)}
-                  </ul>
-                </section>
-              )}
-              {rules.points && (
-                <section>
-                  <h3 className='text-cyan-400 font-bold uppercase tracking-widest text-xs mb-3'>Puanlama Sistemi</h3>
-                  <div className='grid grid-cols-3 gap-4 max-w-sm'>
-                    <div className='bg-white/5 p-3 rounded-lg border border-white/5 text-center'>
-                      <div className='text-[10px] uppercase font-bold text-emerald-400 mb-1'>Galibiyet</div>
-                      <div className='text-2xl font-black text-white'>{rules.points.win}</div>
-                    </div>
-                    <div className='bg-white/5 p-3 rounded-lg border border-white/5 text-center'>
-                      <div className='text-[10px] uppercase font-bold text-amber-400 mb-1'>Beraberlik</div>
-                      <div className='text-2xl font-black text-white'>{rules.points.draw}</div>
-                    </div>
-                    <div className='bg-white/5 p-3 rounded-lg border border-white/5 text-center'>
-                      <div className='text-[10px] uppercase font-bold text-red-400 mb-1'>Mağlubiyet</div>
-                      <div className='text-2xl font-black text-white'>{rules.points.loss}</div>
-                    </div>
-                  </div>
-                </section>
-              )}
-              {rules.promotion_relegation && (
-                <section>
-                  <h3 className='text-cyan-400 font-bold uppercase tracking-widest text-xs mb-3'>Yükselme / Küme Düşme</h3>
-                  <p className='whitespace-pre-wrap text-sm text-zinc-300'>{rules.promotion_relegation}</p>
-                </section>
-              )}
-              {rules.additional_rules && rules.additional_rules.length > 0 && (
-                <section>
-                  <h3 className='text-cyan-400 font-bold uppercase tracking-widest text-xs mb-3'>Ek Kurallar</h3>
-                  <ul className='list-disc pl-5 space-y-2 text-sm text-zinc-300'>
-                    {rules.additional_rules.map((r: string, i: number) => <li key={i}>{r}</li>)}
-                  </ul>
-                </section>
-              )}
-            </div>
-          )}
+        <div className='p-6 md:p-8 overflow-y-auto custom-scrollbar flex-1 relative'>
+          <LeagueRulesViewer rules={rules} leagueName={leagueName} seasonName={seasonName} />
         </div>
       </div>
     </div>

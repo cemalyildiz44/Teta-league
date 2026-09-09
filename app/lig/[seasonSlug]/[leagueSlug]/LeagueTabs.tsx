@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -12,6 +12,7 @@ export default function LeagueTabs({ seasonSlug, leagueSlug }: { seasonSlug: str
     { label: "PUAN DURUMU", href: `${baseUrl}` },
     { label: "İSTATİSTİKLER", href: `${baseUrl}/istatistikler` },
     { label: "FİKSTÜR & SONUÇLAR", href: `${baseUrl}/fikstur` },
+    { label: "LİG KURALLARI", href: `${baseUrl}/kurallar` },
   ];
 
   return (

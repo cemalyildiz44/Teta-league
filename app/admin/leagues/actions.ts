@@ -327,7 +327,9 @@ export async function saveLeagueRulesAction(league_id: string, rules: any) {
   if (error) return { error: 'Kurallar kaydedilemedi: ' + error.message };
 
   revalidatePath('/admin/leagues');
-  revalidatePath('/', 'layout'); // Invalidate public layout since rules modal might be anywhere
+  revalidatePath('/ligler');
+  revalidatePath('/lig', 'layout');
+  revalidatePath('/', 'layout');
   return { success: 'Lig kuralları başarıyla güncellendi.' };
 }
 
