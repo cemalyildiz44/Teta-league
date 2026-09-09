@@ -265,6 +265,25 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     { id: 'basarilar', label: 'BAŞARILAR' },
   ];
 
+  // Beta Old Stats Parsing (Isolated from official statistics)
+  const betaStats = (profile.beta_old_stats && typeof profile.beta_old_stats === 'object' && !Array.isArray(profile.beta_old_stats))
+    ? profile.beta_old_stats as Record<string, any>
+    : null;
+
+  const hasBetaStats = Boolean(
+    betaStats && (
+      (typeof betaStats.matches_played === 'number' && betaStats.matches_played > 0) ||
+      (typeof betaStats.goals === 'number' && betaStats.goals > 0) ||
+      (typeof betaStats.assists === 'number' && betaStats.assists > 0) ||
+      (typeof betaStats.rating_avg === 'number' && betaStats.rating_avg > 0) ||
+      (typeof betaStats.clean_sheets === 'number' && betaStats.clean_sheets > 0) ||
+      (typeof betaStats.red_cards === 'number' && betaStats.red_cards > 0) ||
+      (typeof betaStats.market_value === 'number' && betaStats.market_value > 0) ||
+      (typeof betaStats.notes === 'string' && betaStats.notes.trim().length > 0) ||
+      (betaStats.updated_at && (betaStats.matches_played !== undefined || betaStats.goals !== undefined))
+    ) && Object.keys(betaStats).length > 0
+  );
+
   return (
     <main className="min-h-screen bg-[#01060b] pt-8 pb-20">
       <div className="max-w-[1200px] mx-auto px-4 lg:px-6">
@@ -483,6 +502,76 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                   ))}
                 </div>
               </section>
+
+              {/* BETA DÖNEMİ ESKİ KAYDI */}
+              {hasBetaStats && betaStats && (
+                <section className="bg-[#03070c] border border-amber-500/20 rounded-2xl p-6 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shadow-[0_0_8px_rgba(251,191,36,0.6)]" />
+                      <h2 className="text-[14px] font-[900] text-amber-400 tracking-widest uppercase">
+                        BETA DÖNEMİ ESKİ KAYDI
+                      </h2>
+                      <span className="px-2 py-0.5 rounded text-[9px] font-[900] tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/30 uppercase">
+                        ARŞİV
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 font-[500] leading-tight">
+                      Bu veriler Beta dönemine ait arşiv kaydıdır. Resmi TETA League istatistiklerine dahil değildir.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                    <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 text-center">
+                      <div className="text-[9px] font-[900] tracking-[0.15em] text-gray-500 uppercase mb-1.5">Oynanan Maç</div>
+                      <div className="text-[20px] font-[900] text-white leading-none">{Number(betaStats.matches_played) || 0}</div>
+                    </div>
+                    <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 text-center">
+                      <div className="text-[9px] font-[900] tracking-[0.15em] text-gray-500 uppercase mb-1.5">Gol</div>
+                      <div className="text-[20px] font-[900] text-emerald-400 leading-none">{Number(betaStats.goals) || 0}</div>
+                    </div>
+                    <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 text-center">
+                      <div className="text-[9px] font-[900] tracking-[0.15em] text-gray-500 uppercase mb-1.5">Asist</div>
+                      <div className="text-[20px] font-[900] text-[#00e5ff] leading-none">{Number(betaStats.assists) || 0}</div>
+                    </div>
+                    <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 text-center">
+                      <div className="text-[9px] font-[900] tracking-[0.15em] text-gray-500 uppercase mb-1.5">Ort. Rating</div>
+                      <div className="text-[20px] font-[900] text-amber-400 leading-none">
+                        {betaStats.rating_avg !== undefined && betaStats.rating_avg !== null && !isNaN(Number(betaStats.rating_avg))
+                          ? Number(betaStats.rating_avg).toFixed(1)
+                          : "0.0"}
+                      </div>
+                    </div>
+                    <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 text-center">
+                      <div className="text-[9px] font-[900] tracking-[0.15em] text-gray-500 uppercase mb-1.5">Gol Yememe</div>
+                      <div className="text-[20px] font-[900] text-blue-400 leading-none">{Number(betaStats.clean_sheets) || 0}</div>
+                    </div>
+                    <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 text-center">
+                      <div className="text-[9px] font-[900] tracking-[0.15em] text-gray-500 uppercase mb-1.5">Kırmızı Kart</div>
+                      <div className="text-[20px] font-[900] text-red-400 leading-none">{Number(betaStats.red_cards) || 0}</div>
+                    </div>
+                    <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 text-center col-span-2 sm:col-span-1">
+                      <div className="text-[9px] font-[900] tracking-[0.15em] text-gray-500 uppercase mb-1.5">Eski Piyasa Değeri</div>
+                      <div className="text-[16px] font-[900] text-[#00e5ff] leading-none truncate mt-0.5">
+                        {formatEuro(Number(betaStats.market_value) || 0)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {Boolean(betaStats.notes && typeof betaStats.notes === 'string' && betaStats.notes.trim().length > 0) && (
+                    <div className="mt-4 pt-3.5 border-t border-white/5 flex flex-col sm:flex-row sm:items-center gap-2">
+                      <span className="text-[10px] font-[900] text-amber-400/80 tracking-widest uppercase shrink-0">
+                        BETA NOTU / SEZON BİLGİSİ:
+                      </span>
+                      <span className="text-[12px] text-gray-300 font-[500] leading-relaxed">
+                        {betaStats.notes.trim()}
+                      </span>
+                    </div>
+                  )}
+                </section>
+              )}
             </div>
           )}
 
