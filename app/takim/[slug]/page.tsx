@@ -455,16 +455,6 @@ export default async function TeamPage({ params }: Props) {
                   <span className="text-red-400">{allTimeLosses} <span className="text-[10px] text-gray-400 font-bold">M</span></span>
                 </div>
               </div>
-
-              {/* FİKSTÜR HIZLI ERİŞİM BUTONU */}
-              <Link
-                href={`/takim/${team.slug}/fikstur`}
-                className="px-5 py-3 bg-[#00e5ff]/10 hover:bg-[#00e5ff]/20 border border-[#00e5ff]/30 rounded-xl flex items-center gap-2 text-[#00e5ff] hover:text-white transition-all shadow-[0_0_15px_rgba(0,229,255,0.1)] group"
-              >
-                <Calendar className="w-4 h-4 text-[#00e5ff] group-hover:scale-110 transition-transform" />
-                <span className="text-[12px] font-[900] uppercase tracking-wider">FİKSTÜR</span>
-                <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
             </div>
           </div>
         </div>
@@ -515,24 +505,7 @@ export default async function TeamPage({ params }: Props) {
       </div>
 
       {/* MATCHES SECTION */}
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-2 border-b border-white/5">
-          <div className="flex items-center gap-3">
-            <Calendar className="w-5 h-5 text-[#00e5ff]" />
-            <h2 className="text-[18px] md:text-[20px] font-[900] text-white tracking-wider uppercase">
-              FİKSTÜR & MAÇLAR
-            </h2>
-          </div>
-          <Link
-            href={`/takim/${team.slug}/fikstur`}
-            className="inline-flex items-center gap-2 text-[12px] font-[900] text-[#00e5ff] hover:text-white bg-[#00e5ff]/10 hover:bg-[#00e5ff]/20 border border-[#00e5ff]/30 px-4 py-2 rounded-xl transition-all group tracking-wider uppercase"
-          >
-            <span>TÜM FİKSTÜRÜ GÖR</span>
-            <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
           {/* Upcoming Matches */}
           <div className="client-glass rounded-xl border border-white/5 p-6 md:p-8">
@@ -541,12 +514,6 @@ export default async function TeamPage({ params }: Props) {
                 <span className="w-2 h-2 rounded-full bg-amber-500" />
                 Yaklaşan Maçlar
               </h3>
-              <Link
-                href={`/takim/${team.slug}/fikstur?filter=upcoming`}
-                className="text-[11px] font-[800] text-gray-500 hover:text-[#00e5ff] uppercase tracking-wider transition-colors"
-              >
-                TÜMÜ →
-              </Link>
             </div>
             <div className="space-y-3">
               {upcomingMatches.length > 0 ? (
@@ -612,12 +579,6 @@ export default async function TeamPage({ params }: Props) {
                 <span className="w-2 h-2 rounded-full bg-[#00e5ff]" />
                 Son Maçlar
               </h3>
-              <Link
-                href={`/takim/${team.slug}/fikstur?filter=completed`}
-                className="text-[11px] font-[800] text-gray-500 hover:text-[#00e5ff] uppercase tracking-wider transition-colors"
-              >
-                TÜMÜ →
-              </Link>
             </div>
             <div className="space-y-3">
               {recentMatches.length > 0 ? (
@@ -676,7 +637,6 @@ export default async function TeamPage({ params }: Props) {
           </div>
 
         </div>
-      </div>
     </div>
   );
 }
