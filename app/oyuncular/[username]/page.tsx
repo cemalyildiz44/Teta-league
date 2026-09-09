@@ -694,86 +694,144 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
           {/* SEZONLAR TAB */}
           {activeTab === 'sezonlar' && (
             <div className="space-y-4">
-              <h2 className="text-[14px] font-[900] text-gray-500 tracking-widest uppercase mb-3">SEZON PERFORMANSLARI</h2>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-[14px] font-[900] text-gray-500 tracking-widest uppercase">SEZON PERFORMANSLARI</h2>
+                {allSeasonStats.length > 0 && (
+                  <span className="text-[11px] font-bold text-gray-600 font-mono">
+                    {allSeasonStats.length} SEZON KAYDI
+                  </span>
+                )}
+              </div>
+
               {allSeasonStats.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5">
                   {allSeasonStats.map((s, idx) => {
                     const contribution = s.matches > 0 ? ((s.goals + s.assists) / s.matches).toFixed(2) : "0.00";
+                    const hasWDL = s.wins !== undefined && (s.draws !== undefined || s.losses !== undefined);
+                    const hasDefStats = (s.cleanSheets !== undefined && s.cleanSheets > 0) || (s.redCards !== undefined && s.redCards > 0);
+
                     return (
-                      <div key={idx} className={`bg-[#03070c] border ${s.isLegacy ? 'border-amber-500/20 hover:border-amber-500/40' : 'border-white/5 hover:border-white/10'} rounded-2xl p-6 transition-colors relative overflow-hidden`}>
-                        {s.isLegacy && (
-                          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
+                      <div
+                        key={idx}
+                        className={`group relative flex flex-col justify-between bg-gradient-to-b from-[#060e1c] to-[#02060c] rounded-2xl border transition-all duration-300 hover:-translate-y-1 p-5 overflow-hidden ${
+                          s.isLegacy
+                            ? 'border-amber-500/20 hover:border-amber-500/50 hover:shadow-[0_8px_30px_rgba(245,158,11,0.08)]'
+                            : 'border-white/10 hover:border-[#00e5ff]/40 hover:shadow-[0_8px_30px_rgba(0,229,255,0.08)]'
+                        }`}
+                      >
+                        {/* Ambient ambient glow */}
+                        {s.isLegacy ? (
+                          <div className="absolute -top-10 -right-10 w-28 h-28 bg-amber-500/5 rounded-full blur-2xl pointer-events-none group-hover:bg-amber-500/10 transition-colors" />
+                        ) : (
+                          <div className="absolute -top-10 -right-10 w-28 h-28 bg-[#00e5ff]/5 rounded-full blur-2xl pointer-events-none group-hover:bg-[#00e5ff]/10 transition-colors" />
                         )}
-                        <div className="flex items-start justify-between mb-5 relative z-10">
-                          <div className="flex flex-col">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[16px] font-[900] text-white tracking-wide leading-tight">{s.seasonName}</span>
-                              {s.isLegacy && (
-                                <span className="px-2 py-0.5 rounded text-[9px] font-[900] tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/30 uppercase">
-                                  ARŞİV
-                                </span>
+
+                        {/* Top: Header & Team Badge */}
+                        <div className="relative z-10">
+                          <div className="flex items-start justify-between gap-3 mb-4">
+                            <div className="flex flex-col min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-[15px] font-[900] text-white tracking-wide truncate">
+                                  {s.seasonName}
+                                </h3>
+                                {s.isLegacy && (
+                                  <span className="px-2 py-0.5 rounded text-[9px] font-[900] tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/30 uppercase shrink-0">
+                                    ARŞİV
+                                  </span>
+                                )}
+                              </div>
+                              <span className={`text-[11px] font-[800] tracking-wider uppercase truncate mt-0.5 ${s.isLegacy ? 'text-amber-400/80' : 'text-[#00e5ff]/80'}`}>
+                                {s.leagueName}
+                              </span>
+                            </div>
+
+                            {/* Team logo / badge pill */}
+                            <div className="flex items-center gap-2 px-2.5 py-1.5 bg-black/40 rounded-xl border border-white/10 shrink-0 max-w-[140px]">
+                              <div className="w-5 h-5 rounded-md bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
+                                {s.teamLogo ? (
+                                  <img src={s.teamLogo} alt={s.teamName} className="w-full h-full object-contain p-0.5" />
+                                ) : (
+                                  <span className="text-[9px] font-black text-zinc-400">{s.teamName.substring(0, 2).toUpperCase()}</span>
+                                )}
+                              </div>
+                              {s.teamSlug ? (
+                                <Link href={`/takim/${s.teamSlug}`} className="text-[11px] font-[800] text-zinc-300 hover:text-white transition-colors truncate">
+                                  {s.teamName}
+                                </Link>
+                              ) : (
+                                <span className="text-[11px] font-[800] text-zinc-300 truncate">{s.teamName}</span>
                               )}
                             </div>
-                            <span className="text-[11px] font-[700] text-[#00e5ff]/70 tracking-wider uppercase mt-1">{s.leagueName}</span>
                           </div>
-                          <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border border-white/5">
-                            {s.teamLogo && <img src={s.teamLogo} alt="" className="w-4 h-4 object-contain" />}
-                            {s.teamSlug ? (
-                              <Link href={`/takim/${s.teamSlug}`} className="text-[11px] font-[800] text-gray-300 hover:text-white transition-colors">
-                                {s.teamName}
-                              </Link>
-                            ) : (
-                              <span className="text-[11px] font-[800] text-gray-300">{s.teamName}</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-4 gap-y-4 gap-x-2 pt-4 border-t border-white/5 relative z-10">
-                          <div className="flex flex-col">
-                            <span className="text-[9px] font-[900] text-gray-500 tracking-wider">MAÇ</span>
-                            <span className="text-[18px] font-[900] text-white">{s.matches}</span>
-                            {s.isLegacy && s.wins !== undefined && (
-                              <span className="text-[9px] font-bold text-gray-500 mt-0.5">({s.wins}G {s.draws}B {s.losses}M)</span>
-                            )}
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="text-[9px] font-[900] text-gray-500 tracking-wider">GOL</span>
-                            <span className="text-[18px] font-[900] text-white">{s.goals}</span>
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="text-[9px] font-[900] text-gray-500 tracking-wider">ASİST</span>
-                            <span className="text-[18px] font-[900] text-white">{s.assists}</span>
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="text-[9px] font-[900] text-[#00e5ff]/50 tracking-wider">RTG</span>
-                            <span className="text-[18px] font-[900] text-[#00e5ff]">{s.avgRating.toFixed(2)}</span>
+
+                          {/* 4 Key Primary Stats Grid */}
+                          <div className="grid grid-cols-4 gap-2 my-2">
+                            <div className="bg-white/[0.02] border border-white/5 rounded-xl p-2.5 text-center flex flex-col justify-center">
+                              <span className="text-[9px] font-[900] text-zinc-500 tracking-wider uppercase mb-1">MAÇ</span>
+                              <span className="text-[18px] font-[900] text-white leading-none">{s.matches}</span>
+                            </div>
+                            <div className="bg-white/[0.02] border border-white/5 rounded-xl p-2.5 text-center flex flex-col justify-center">
+                              <span className="text-[9px] font-[900] text-zinc-500 tracking-wider uppercase mb-1">GOL</span>
+                              <span className="text-[18px] font-[900] text-white leading-none">{s.goals}</span>
+                            </div>
+                            <div className="bg-white/[0.02] border border-white/5 rounded-xl p-2.5 text-center flex flex-col justify-center">
+                              <span className="text-[9px] font-[900] text-zinc-500 tracking-wider uppercase mb-1">ASİST</span>
+                              <span className="text-[18px] font-[900] text-white leading-none">{s.assists}</span>
+                            </div>
+                            <div className="bg-[#00e5ff]/5 border border-[#00e5ff]/20 rounded-xl p-2.5 text-center flex flex-col justify-center">
+                              <span className="text-[9px] font-[900] text-[#00e5ff]/70 tracking-wider uppercase mb-1">RTG</span>
+                              <span className="text-[18px] font-[900] text-[#00e5ff] leading-none">{s.avgRating.toFixed(2)}</span>
+                            </div>
                           </div>
                         </div>
 
-                        {s.isLegacy && (
-                          <div className="mt-4 pt-3 border-t border-white/5 space-y-2 relative z-10">
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="text-gray-500 font-bold uppercase">Katkı / Maç</span>
-                              <span className="font-bold text-emerald-400">{contribution} / maç</span>
+                        {/* Bottom: Secondary Stats & Details */}
+                        <div className="relative z-10 mt-3 pt-3 border-t border-white/5 space-y-1.5">
+                          {/* W/D/L if available */}
+                          {hasWDL && (
+                            <div className="flex items-center justify-between text-[11px] pb-1 border-b border-white/[0.03]">
+                              <span className="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Sonuçlar</span>
+                              <div className="flex items-center gap-2 font-mono font-bold text-[11px]">
+                                <span className="text-emerald-400">{s.wins}G</span>
+                                <span className="text-amber-400">{s.draws ?? 0}B</span>
+                                <span className="text-red-400">{s.losses ?? 0}M</span>
+                              </div>
                             </div>
-                            {(s.cleanSheets !== undefined || s.redCards !== undefined) && (
-                              <div className="flex items-center justify-between text-[11px]">
-                                <span className="text-gray-500 font-bold uppercase">CS / Kırmızı Kart</span>
-                                <span className="font-medium text-gray-300">{s.cleanSheets || 0} CS • {s.redCards || 0} K.Kart</span>
-                              </div>
-                            )}
-                            {Boolean(s.marketValue && s.marketValue > 0) && (
-                              <div className="flex items-center justify-between text-[11px]">
-                                <span className="text-gray-500 font-bold uppercase">Arşiv Değeri</span>
-                                <span className="font-mono font-bold text-[#00e5ff]">{formatEuro(s.marketValue!)}</span>
-                              </div>
-                            )}
-                            {Boolean(s.notes) && (
-                              <p className="text-[11px] text-gray-400 italic pt-1 border-t border-white/5">
-                                &quot;{s.notes}&quot;
-                              </p>
-                            )}
+                          )}
+
+                          {/* Katkı / Maç */}
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Katkı / Maç</span>
+                            <span className="font-bold text-emerald-400">{contribution}</span>
                           </div>
-                        )}
+
+                          {/* CS & Red cards if recorded */}
+                          {hasDefStats && (
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">CS • K.Kart</span>
+                              <span className="font-medium text-zinc-300">
+                                <span className="text-white font-bold">{s.cleanSheets || 0}</span> CS
+                                <span className="text-zinc-600 mx-1.5">•</span>
+                                <span className={s.redCards ? 'text-red-400 font-bold' : 'text-zinc-400'}>{s.redCards || 0} Kırmızı</span>
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Legacy Arşiv Değeri */}
+                          {Boolean(s.marketValue && s.marketValue > 0) && (
+                            <div className="flex items-center justify-between text-[11px] pt-0.5">
+                              <span className="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Arşiv Değeri</span>
+                              <span className="font-mono font-bold text-[#00e5ff]">{formatEuro(s.marketValue!)}</span>
+                            </div>
+                          )}
+
+                          {/* Legacy Notlar */}
+                          {Boolean(s.notes) && (
+                            <p className="text-[10px] text-zinc-400 italic pt-1 border-t border-white/5 line-clamp-2">
+                              &quot;{s.notes}&quot;
+                            </p>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
