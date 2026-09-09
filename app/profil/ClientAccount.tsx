@@ -6,6 +6,7 @@ import { logoutAction } from '@/app/auth/actions';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 import { Crown } from 'lucide-react';
+import TeamLogo from '@/components/TeamLogo';
 import { acceptTeamInviteAction, rejectTeamInviteAction } from './team-actions';
 import { PLATFORM_OPTIONS, POSITION_FILTER_OPTIONS } from '@/app/oyuncular/PlayerRankingsClient';
 
@@ -159,7 +160,7 @@ export default function ClientAccount({ profile, authUser, team, league, isCapta
           <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-[12px] font-[700] text-gray-500 uppercase tracking-widest">
             {team ? (
               <Link href={`/takim/${team.slug}`} className="flex items-center gap-2 hover:text-white transition-colors">
-                {team.logo_url && <img src={team.logo_url} className="w-4 h-4 object-contain" />}
+                <TeamLogo src={team.logo_url} name={team.name} size="xs" />
                 {team.name}
               </Link>
             ) : <span>SERBEST OYUNCU</span>}

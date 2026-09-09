@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getLeagueBySlugs } from "../../../utils";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import TeamLogo from "@/components/TeamLogo";
 
 export default async function LeagueStatsPage({ params }: { params: Promise<{ seasonSlug: string; leagueSlug: string }> }) {
   const resolvedParams = await params;
@@ -147,8 +148,8 @@ export default async function LeagueStatsPage({ params }: { params: Promise<{ se
       <div className="flex items-center gap-4">
         <span className={`text-[16px] font-[900] w-5 text-center ${idx === 0 ? 'text-[#00e5ff] drop-shadow-[0_0_5px_rgba(0,229,255,0.5)]' : 'text-gray-600'}`}>{idx + 1}</span>
         <div className="flex items-center gap-3">
-          <Link href={`/takim/${player.teamSlug}`} className="w-8 h-8 rounded-full bg-[#0a1628] border border-white/10 flex items-center justify-center shrink-0 overflow-hidden group-hover:border-[#00e5ff]/30 transition-all">
-            {player.teamLogo ? <img src={player.teamLogo} alt="" className="w-full h-full object-cover" /> : <span className="text-[10px] font-black text-[#00e5ff]">{player.teamName.charAt(0)}</span>}
+          <Link href={`/takim/${player.teamSlug}`} className="shrink-0 group-hover:drop-shadow-[0_0_8px_rgba(0,229,255,0.4)] transition-all">
+            <TeamLogo src={player.teamLogo} name={player.teamName} size="sm" />
           </Link>
           <div className="flex flex-col">
             <Link href={`/oyuncular/${player.username}`} className="text-[15px] font-[800] text-white hover:text-[#00e5ff] transition-colors tracking-wide">
@@ -170,8 +171,8 @@ export default async function LeagueStatsPage({ params }: { params: Promise<{ se
       <div className="flex items-center gap-4">
         <span className={`text-[16px] font-[900] w-5 text-center ${idx === 0 ? 'text-[#00e5ff] drop-shadow-[0_0_5px_rgba(0,229,255,0.5)]' : 'text-gray-600'}`}>{idx + 1}</span>
         <div className="flex items-center gap-3">
-          <Link href={`/takim/${team.slug}`} className="w-8 h-8 rounded-full bg-[#0a1628] border border-white/10 flex items-center justify-center shrink-0 overflow-hidden group-hover:border-[#00e5ff]/30 transition-all">
-            {team.logo ? <img src={team.logo} alt="" className="w-full h-full object-cover" /> : <span className="text-[10px] font-black text-[#00e5ff]">{team.name?.charAt(0) || '?'}</span>}
+          <Link href={`/takim/${team.slug}`} className="shrink-0 flex items-center justify-center">
+            <TeamLogo src={team.logo} name={team.name} size="sm" />
           </Link>
           <div className="flex flex-col">
             <Link href={`/takim/${team.slug}`} className="text-[15px] font-[800] text-white hover:text-[#00e5ff] transition-colors tracking-wide">

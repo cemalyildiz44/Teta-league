@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import Image from 'next/image';
+import TeamLogo from '@/components/TeamLogo';
 import { updateProfileAction } from './actions';
 import { PLATFORM_OPTIONS, POSITION_OPTIONS } from '../oyuncular/PlayerRankingsClient';
 import { useRouter } from 'next/navigation';
@@ -254,13 +255,7 @@ export default function ProfileDashboardClient({
             <h3 className="text-[10px] font-[900] text-gray-500 tracking-widest uppercase mb-4 text-center">Mevcut Takım</h3>
             {team ? (
               <div className="flex items-center justify-center gap-4">
-                <div className="w-14 h-14 rounded-xl bg-black border border-white/10 p-1 flex items-center justify-center shrink-0">
-                  {team.logo_url ? (
-                    <Image src={team.logo_url} alt={team.name} width={48} height={48} className="w-full h-full object-contain" />
-                  ) : (
-                    <span className="text-xl font-bold text-gray-500">{team.name.substring(0,2).toUpperCase()}</span>
-                  )}
-                </div>
+                <TeamLogo src={team.logo_url} name={team.name} size="md" className="w-14 h-14" />
                 <div className="flex flex-col min-w-0">
                   <span className="text-[16px] font-[800] text-white truncate min-w-0">{team.name}</span>
                   <span className="text-[11px] text-[#00e5ff] font-[600] mt-1">Sözleşmeli Oyuncu</span>

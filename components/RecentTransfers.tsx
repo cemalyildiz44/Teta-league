@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { ArrowRight, ArrowRightLeft } from 'lucide-react';
+import TeamLogo from '@/components/TeamLogo';
 
 export default async function RecentTransfers() {
   const cookieStore = await cookies();
@@ -162,20 +163,8 @@ export default async function RecentTransfers() {
                   </span>
                 )}
 
-                {/* Hedef Takım Logosu (24x24) */}
-                <div className="w-6 h-6 rounded-full bg-[#0d1a2d] border border-white/10 overflow-hidden shrink-0 flex items-center justify-center">
-                  {transfer.toTeamLogo ? (
-                    <img
-                      src={transfer.toTeamLogo}
-                      alt={transfer.toTeamName}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-[9px] font-black text-[#00e5ff]">
-                      {transfer.toTeamName.substring(0, 2).toUpperCase()}
-                    </span>
-                  )}
-                </div>
+                {/* Hedef Takım Logosu */}
+                <TeamLogo src={transfer.toTeamLogo} name={transfer.toTeamName} size="xs" />
               </div>
             </div>
           </div>

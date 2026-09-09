@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useTransition } from 'react';
 import { issuePenaltyAction, revokePenaltyAction, getEscalationPreview } from './actions';
+import TeamLogo from '@/components/TeamLogo';
 
 interface Penalty {
   id: string;
@@ -429,9 +430,7 @@ export default function PenaltiesManager({ penalties, teams, leagues, seasons, p
                   {/* Center: Details */}
                   <div className="flex-1 space-y-2 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      {team?.logo_url && (
-                        <img src={team.logo_url} alt="" className="w-5 h-5 rounded-full object-cover" />
-                      )}
+                      <TeamLogo src={team?.logo_url} name={team?.name} size="xs" />
                       <span className="text-sm font-bold text-white">{team?.name || 'Bilinmeyen'}</span>
                       <span className="text-[10px] text-gray-500">•</span>
                       <span className="text-xs text-gray-400">{league?.name}</span>

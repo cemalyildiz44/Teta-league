@@ -15,6 +15,7 @@ import {
 } from './actions';
 
 import imageCompression from 'browser-image-compression';
+import TeamLogo from '@/components/TeamLogo';
 
 export function TeamsManager({ initialTeams, initialCaptains, initialMemberships, initialLeagueTeams, allProfiles }: any) {
   const router = useRouter();
@@ -380,9 +381,7 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
                 <tr key={t.id} className='hover:bg-white/5 transition-colors group'>
                   <td className='px-4 py-4'>
                     <div className='flex items-center gap-3'>
-                      <div className='w-8 h-8 rounded-full border border-white/10 bg-[#060d18] overflow-hidden flex items-center justify-center'>
-                        {t.logo_url ? <img src={t.logo_url} className='w-full h-full object-cover' /> : <Shield className='w-4 h-4 text-zinc-600' />}
-                      </div>
+                      <TeamLogo src={t.logo_url} name={t.name} size="md" />
                       <Link href={'/takim/' + t.slug} target='_blank' className='font-bold text-white hover:text-cyan-400 transition-colors'>{t.name}</Link>
                     </div>
                   </td>
@@ -811,7 +810,7 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
             <form onSubmit={handleUploadLogo} className='p-6 space-y-6'>
               <div className='flex flex-col items-center gap-4'>
                 <div className='w-24 h-24 rounded-2xl border-2 border-dashed border-white/20 bg-[#060d18] flex items-center justify-center overflow-hidden'>
-                  {logoModal.logo_url ? <img src={logoModal.logo_url} className='w-full h-full object-cover' /> : <Upload className='w-8 h-8 text-zinc-600' />}
+                  {logoModal.logo_url ? <img src={logoModal.logo_url} className='w-full h-full object-contain' /> : <Upload className='w-8 h-8 text-zinc-600' />}
                 </div>
                 <div className='w-full'>
                   <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2'>Yeni Logo (Max 5MB)</label>

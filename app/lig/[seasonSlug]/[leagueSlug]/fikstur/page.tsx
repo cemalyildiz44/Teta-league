@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { Calendar } from 'lucide-react';
+import TeamLogo from '@/components/TeamLogo';
 
 export default async function LeagueFixturesPage({
   params,
@@ -167,19 +168,7 @@ export default async function LeagueFixturesPage({
                           <span className="font-[800] text-white text-[14px] md:text-[18px] lg:text-[20px] tracking-wide text-right group-hover:text-[#00e5ff] transition-colors truncate">
                             {homeTeam?.name || 'Ev Sahibi'}
                           </span>
-                          <div className="w-8 h-8 md:w-10 md:h-10 shrink-0 rounded-full bg-[#060d18] border border-white/10 overflow-hidden flex items-center justify-center group-hover:border-[#00e5ff] transition-colors p-1 shadow-md">
-                            {homeTeam?.logo_url ? (
-                              <img
-                                src={homeTeam.logo_url}
-                                alt=""
-                                className="w-full h-full object-contain"
-                              />
-                            ) : (
-                              <span className="text-xs font-black text-[#00e5ff]">
-                                {homeTeam?.name?.charAt(0) || 'E'}
-                              </span>
-                            )}
-                          </div>
+                          <TeamLogo src={homeTeam?.logo_url} name={homeTeam?.name} size="sm" />
                         </Link>
 
                         {/* Score / Status Center Block */}
@@ -214,19 +203,7 @@ export default async function LeagueFixturesPage({
                           href={awayTeam?.slug ? `/takim/${awayTeam.slug}` : '#'}
                           className="flex-1 flex items-center justify-start gap-3 group min-w-0"
                         >
-                          <div className="w-8 h-8 md:w-10 md:h-10 shrink-0 rounded-full bg-[#060d18] border border-white/10 overflow-hidden flex items-center justify-center group-hover:border-[#00e5ff] transition-colors p-1 shadow-md">
-                            {awayTeam?.logo_url ? (
-                              <img
-                                src={awayTeam.logo_url}
-                                alt=""
-                                className="w-full h-full object-contain"
-                              />
-                            ) : (
-                              <span className="text-xs font-black text-[#00e5ff]">
-                                {awayTeam?.name?.charAt(0) || 'D'}
-                              </span>
-                            )}
-                          </div>
+                          <TeamLogo src={awayTeam?.logo_url} name={awayTeam?.name} size="sm" />
                           <span className="font-[800] text-white text-[14px] md:text-[18px] lg:text-[20px] tracking-wide text-left group-hover:text-[#00e5ff] transition-colors truncate">
                             {awayTeam?.name || 'Deplasman'}
                           </span>

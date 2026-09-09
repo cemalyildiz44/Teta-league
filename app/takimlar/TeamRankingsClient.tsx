@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import TeamLogo from '@/components/TeamLogo';
 
 export type TeamRanking = {
   id: string;
@@ -116,21 +117,7 @@ export default function TeamRankingsClient({ rankings }: { rankings: TeamRanking
                           href={`/takim/${team.slug}`}
                           className="flex items-center gap-4 group-hover:drop-shadow-[0_0_10px_rgba(0,229,255,0.3)] transition-all"
                         >
-                          <div className="w-10 h-10 shrink-0 rounded-lg bg-black border border-white/10 p-1 flex items-center justify-center overflow-hidden relative">
-                            {team.logoUrl ? (
-                              <Image 
-                                src={team.logoUrl} 
-                                alt={team.name} 
-                                width={32} 
-                                height={32} 
-                                className="w-full h-full object-contain"
-                              />
-                            ) : (
-                              <span className="text-[12px] font-bold text-gray-500">
-                                {team.name.substring(0, 2).toUpperCase()}
-                              </span>
-                            )}
-                          </div>
+                          <TeamLogo src={team.logoUrl} name={team.name} size="lg" />
                           <span className="text-[15px] font-[800] text-white group-hover:text-[#00e5ff] transition-colors min-w-0 break-words whitespace-normal leading-tight">
                             {team.name}
                           </span>

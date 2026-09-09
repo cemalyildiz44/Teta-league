@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { TransferInbox } from './TransferInbox';
 import { LeaveTeamButton } from './LeaveTeamButton';
+import TeamLogo from '@/components/TeamLogo';
 
 export default async function PlayerTransfersPage() {
   const cookieStore = await cookies();
@@ -75,13 +76,11 @@ export default async function PlayerTransfersPage() {
               <div>
                 <div className="text-[10px] font-bold text-gray-500 tracking-widest uppercase mb-1">Mevcut Takımın</div>
                 <div className="flex items-center gap-3">
-                  {(mTeam as any)?.logo_url ? (
-                    <img src={(mTeam as any).logo_url} alt="" className="w-8 h-8 rounded-full" />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-[#0a1628] border border-white/5 flex items-center justify-center text-[10px] font-bold text-[#00e5ff]">
-                      {(mTeam as any)?.name?.slice(0, 2).toUpperCase()}
-                    </div>
-                  )}
+                  <TeamLogo
+                    src={(mTeam as any)?.logo_url}
+                    name={(mTeam as any)?.name}
+                    size="sm"
+                  />
                   <span className="font-bold text-white text-lg">{(mTeam as any)?.name}</span>
                 </div>
               </div>

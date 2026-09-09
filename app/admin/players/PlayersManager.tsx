@@ -15,6 +15,7 @@ import {
   updatePlayerAccountAdminAction,
   PlayerAccountStatus
 } from './actions';
+import TeamLogo from '@/components/TeamLogo';
 
 export interface TeamOption {
   id: string;
@@ -460,9 +461,11 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
                     <td className="p-4">
                       {player.active_team ? (
                         <div className="flex items-center gap-2">
-                          {player.active_team.logo_url && (
-                            <img src={player.active_team.logo_url} alt="" className="w-5 h-5 rounded object-cover" />
-                          )}
+                          <TeamLogo
+                            src={player.active_team.logo_url}
+                            name={player.active_team.name}
+                            size="xs"
+                          />
                           <span className="text-xs font-bold text-zinc-300">{player.active_team.name}</span>
                         </div>
                       ) : (
@@ -798,13 +801,7 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
                         <div key={stat.id} className="p-4 rounded-xl bg-[#060d18] border border-white/5 hover:border-white/10 transition-all">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-lg bg-zinc-900 border border-white/10 flex items-center justify-center shrink-0 overflow-hidden">
-                                {teamLogo ? (
-                                  <img src={teamLogo} alt="" className="w-full h-full object-cover" />
-                                ) : (
-                                  <Shield className="w-5 h-5 text-zinc-500" />
-                                )}
-                              </div>
+                              <TeamLogo src={teamLogo} name={stat.team_name} size="md" />
                               <div>
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm font-black text-white">{stat.team_name}</span>

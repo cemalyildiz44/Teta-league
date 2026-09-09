@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import TeamLogo from "@/components/TeamLogo";
 
 export default async function GlobalStatsPage({ searchParams }: { searchParams: Promise<{ season?: string, league?: string }> }) {
   const resolvedParams = await searchParams;
@@ -118,13 +119,7 @@ export default async function GlobalStatsPage({ searchParams }: { searchParams: 
     if (!team) return <span className="text-gray-600 text-xs">-</span>;
     return (
       <Link href={`/takim/${team.slug}`} className="flex items-center gap-2 group">
-        <div className="w-5 h-5 rounded-full overflow-hidden bg-[#0a1628] border border-white/10 shrink-0">
-          {team.logo_url ? (
-            <img src={team.logo_url} alt={team.name} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-[8px] font-black text-[#00e5ff]">{team.name.charAt(0)}</div>
-          )}
-        </div>
+        <TeamLogo src={team.logo_url} name={team.name} size="xs" />
         <span className="text-xs font-bold text-gray-300 group-hover:text-[#00e5ff] transition-colors truncate max-w-[120px]">{team.name}</span>
       </Link>
     );

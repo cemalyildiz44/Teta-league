@@ -5,6 +5,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Calendar, ChevronRight } from 'lucide-react';
 import TeamRosterCarousel from '../TeamRosterCarousel';
+import TeamLogo from '@/components/TeamLogo';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -347,20 +348,7 @@ export default async function TeamPage({ params }: Props) {
         
         <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start gap-8">
           {/* Logo */}
-          <div className="shrink-0 relative group">
-            <div className="absolute inset-0 bg-[#00e5ff] rounded-3xl blur-[30px] opacity-20 group-hover:opacity-40 transition-opacity duration-500" />
-            {team.logo_url ? (
-              <img 
-                src={team.logo_url} 
-                alt={team.name} 
-                className="relative w-32 h-32 md:w-44 md:h-44 rounded-3xl object-contain border border-white/10 shadow-2xl"
-              />
-            ) : (
-              <div className="relative w-32 h-32 md:w-44 md:h-44 rounded-3xl bg-gradient-to-br from-[#060d18] to-black border border-white/10 shadow-2xl flex items-center justify-center text-4xl md:text-5xl font-black text-[#00e5ff]">
-                {team.name.charAt(0).toUpperCase()}
-              </div>
-            )}
-          </div>
+          <TeamLogo src={team.logo_url} name={team.name} size="hero" />
 
           {/* Info */}
           <div className="flex-1 text-center md:text-left flex flex-col justify-center pt-2">
@@ -546,15 +534,7 @@ export default async function TeamPage({ params }: Props) {
                       </div>
                       <div className="flex-1 flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 truncate">
-                          <div className="w-8 h-8 rounded flex items-center justify-center overflow-hidden shrink-0 bg-white/5 border border-white/10">
-                            {opponent?.logo_url ? (
-                              <img src={opponent.logo_url} alt="" className="w-full h-full object-contain" />
-                            ) : (
-                              <span className="text-[10px] font-bold text-[#00e5ff]">
-                                {opponent?.name?.substring(0,2) || 'R'}
-                              </span>
-                            )}
-                          </div>
+                          <TeamLogo src={opponent?.logo_url} name={opponent?.name} size="sm" />
                           <Link href={opponent?.slug ? `/takim/${opponent.slug}` : "#"} className="text-[14px] font-[800] text-gray-300 hover:text-[#00e5ff] truncate transition-colors">
                             {opponent?.name || 'Rakip Takım'}
                           </Link>
@@ -610,15 +590,7 @@ export default async function TeamPage({ params }: Props) {
                       </div>
                       <div className="flex-1 flex items-center justify-between">
                         <div className="flex items-center gap-3 truncate">
-                          <div className="w-8 h-8 rounded flex items-center justify-center overflow-hidden shrink-0 bg-white/5 border border-white/10">
-                            {opponent?.logo_url ? (
-                              <img src={opponent.logo_url} alt="" className="w-full h-full object-contain" />
-                            ) : (
-                              <span className="text-[10px] font-bold text-[#00e5ff]">
-                                {opponent?.name?.substring(0,2) || 'R'}
-                              </span>
-                            )}
-                          </div>
+                          <TeamLogo src={opponent?.logo_url} name={opponent?.name} size="sm" />
                           <span className="text-[14px] font-[800] text-gray-300 truncate group-hover:text-white transition-colors">
                             {opponent?.name || 'Rakip Takım'}
                           </span>

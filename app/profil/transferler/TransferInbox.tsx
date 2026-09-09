@@ -2,6 +2,7 @@
 
 import { useTransition, useState } from 'react';
 import { respondToTransfer } from './actions';
+import TeamLogo from '@/components/TeamLogo';
 
 export function TransferInbox({ transfers }: { transfers: any[] }) {
   const [isPending, startTransition] = useTransition();
@@ -56,13 +57,7 @@ export function TransferInbox({ transfers }: { transfers: any[] }) {
         return (
         <div key={tx.id} className="card-surface p-6 rounded-xl border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            {(txTeam as any)?.logo_url ? (
-              <img src={(txTeam as any).logo_url} alt="" className="w-16 h-16 rounded-full object-cover border border-[#00e5ff]/30" />
-            ) : (
-              <div className="w-16 h-16 rounded-full bg-[#0a1628] flex items-center justify-center text-xl font-black text-[#00e5ff]">
-                {(txTeam as any)?.name?.slice(0, 2).toUpperCase()}
-              </div>
-            )}
+            <TeamLogo src={(txTeam as any)?.logo_url} name={(txTeam as any)?.name} size="xl" className="w-16 h-16" />
             
             <div>
               <h4 className="text-xl font-black text-white">{(txTeam as any)?.name}</h4>

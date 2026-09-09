@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import TeamLogo from '@/components/TeamLogo';
 
 export function MiniStatsClient({
   topScorers,
@@ -25,9 +26,7 @@ export function MiniStatsClient({
               {idx + 1}
             </span>
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-[#0a1628] border border-white/10 overflow-hidden shrink-0 flex items-center justify-center">
-                {player.teamLogo ? <img src={player.teamLogo} alt="" className="w-full h-full object-cover" /> : <span className="text-xs font-black text-[#00e5ff]">{player.teamName.charAt(0)}</span>}
-              </div>
+              <TeamLogo src={player.teamLogo} name={player.teamName} size="sm" />
               <div>
                 <div className="text-[16px] font-[800] text-white tracking-wide">{player.playerName}</div>
                 <div className="data-label truncate max-w-[120px]">{player.teamName}</div>

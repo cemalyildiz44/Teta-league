@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { getLeagueBySlugs, compareTeamStats } from "../../utils";
 import { notFound } from "next/navigation";
+import TeamLogo from "@/components/TeamLogo";
 
 export default async function LeagueStandingsPage({
   params,
@@ -178,13 +179,7 @@ export default async function LeagueStandingsPage({
                   <td className={`p-4 text-center font-bold text-gray-400 ${tdLeftBorder}`}>{rank}</td>
                   <td className="p-4">
                     <Link href={`/takim/${team?.slug || ''}`} className="flex items-center gap-3 w-max group-hover:drop-shadow-[0_0_8px_rgba(0,229,255,0.5)] transition-all">
-                      <div className="w-8 h-8 rounded-full bg-black/50 border border-white/10 flex items-center justify-center p-1 shrink-0">
-                        {team?.logo_url ? (
-                          <img src={team.logo_url} alt={team.name} className="w-full h-full object-contain" />
-                        ) : (
-                          <span className="text-[10px] font-bold text-[#00e5ff]">{team?.name?.substring(0,2)}</span>
-                        )}
-                      </div>
+                      <TeamLogo src={team?.logo_url} name={team?.name} size="sm" />
                       <span className={`font-bold tracking-widest text-sm uppercase ${isExpelled ? 'text-red-400 line-through' : 'text-white'}`}>
                         {team?.name || 'Bilinmeyen Takım'}
                       </span>

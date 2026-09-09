@@ -11,6 +11,7 @@ import {
 import { 
   reviewMatchAction, deleteMatchAction, updateMatchScoreAction
 } from './actions';
+import TeamLogo from '@/components/TeamLogo';
 
 export function MatchesManager({ initialMatches, seasons, leagues }: any) {
   const router = useRouter();
@@ -186,9 +187,7 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                 <td className='px-4 py-3 text-xs'>{m.leagues?.name}</td>
                 <td className='px-4 py-3'>
                   <div className='flex items-center gap-2'>
-                    <div className='w-6 h-6 rounded-full border border-white/10 bg-[#060d18] overflow-hidden flex items-center justify-center'>
-                      {m.home?.logo_url ? <img src={m.home.logo_url} className='w-full h-full object-cover' /> : <Shield className='w-3 h-3 text-zinc-600' />}
-                    </div>
+                    <TeamLogo src={m.home?.logo_url} name={m.home?.name} size="sm" />
                     <span className='font-bold text-white'>{m.home?.name || 'Unknown'}</span>
                   </div>
                 </td>
@@ -204,9 +203,7 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                 <td className='px-4 py-3'>
                   <div className='flex items-center justify-end gap-2'>
                     <span className='font-bold text-white'>{m.away?.name || 'Unknown'}</span>
-                    <div className='w-6 h-6 rounded-full border border-white/10 bg-[#060d18] overflow-hidden flex items-center justify-center'>
-                      {m.away?.logo_url ? <img src={m.away.logo_url} className='w-full h-full object-cover' /> : <Shield className='w-3 h-3 text-zinc-600' />}
-                    </div>
+                    <TeamLogo src={m.away?.logo_url} name={m.away?.name} size="sm" />
                   </div>
                 </td>
                 <td className='px-4 py-3'>
@@ -248,9 +245,7 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                 
                 <div className='flex items-center gap-8'>
                   <div className='flex flex-col items-center gap-2 w-32'>
-                    <div className='w-16 h-16 rounded-full border border-white/10 bg-[#0a1628] overflow-hidden flex items-center justify-center'>
-                      {detailModal.home?.logo_url ? <img src={detailModal.home.logo_url} className='w-full h-full object-cover' /> : <Shield className='w-8 h-8 text-zinc-600' />}
-                    </div>
+                    <TeamLogo src={detailModal.home?.logo_url} name={detailModal.home?.name} size="xl" className="w-16 h-16" />
                     <span className='font-bold text-white text-center'>{detailModal.home?.name || 'Unknown'}</span>
                   </div>
                   
@@ -268,9 +263,7 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                   </div>
 
                   <div className='flex flex-col items-center gap-2 w-32'>
-                    <div className='w-16 h-16 rounded-full border border-white/10 bg-[#0a1628] overflow-hidden flex items-center justify-center'>
-                      {detailModal.away?.logo_url ? <img src={detailModal.away.logo_url} className='w-full h-full object-cover' /> : <Shield className='w-8 h-8 text-zinc-600' />}
-                    </div>
+                    <TeamLogo src={detailModal.away?.logo_url} name={detailModal.away?.name} size="xl" className="w-16 h-16" />
                     <span className='font-bold text-white text-center'>{detailModal.away?.name || 'Unknown'}</span>
                   </div>
                 </div>

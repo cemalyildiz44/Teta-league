@@ -14,6 +14,7 @@ import {
 } from './actions';
 import { LeagueRulesModal } from './LeagueRulesModal';
 import imageCompression from 'browser-image-compression';
+import TeamLogo from '@/components/TeamLogo';
 
 export function LeaguesManager({ initialLeagues, seasons, allTeams, initialLeagueTeams }: any) {
   const router = useRouter();
@@ -616,9 +617,7 @@ export function LeaguesManager({ initialLeagues, seasons, allTeams, initialLeagu
               {leagueTeams.filter((lt:any) => lt.league_id === manageTeamsModal.id).map((lt: any) => (
                 <div key={lt.team_id} className='flex items-center justify-between p-3 hover:bg-white/5 rounded-lg group'>
                   <div className='flex items-center gap-3'>
-                    <div className='w-8 h-8 bg-[#0a1628] rounded-full border border-white/10 overflow-hidden flex items-center justify-center'>
-                      {lt.teams.logo_url ? <img src={lt.teams.logo_url} className='w-full h-full object-cover' /> : <Shield className='w-4 h-4 text-zinc-500'/>}
-                    </div>
+                    <TeamLogo src={lt.teams.logo_url} name={lt.teams.name} size="sm" />
                     <span className='text-sm font-bold text-white'>{lt.teams.name}</span>
                   </div>
                   <button onClick={() => handleRemoveTeam(lt)} className='text-red-400 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/10 rounded transition-all' title='Çıkar'>

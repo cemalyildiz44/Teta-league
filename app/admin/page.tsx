@@ -7,6 +7,7 @@ import {
   CheckCircle2, XCircle, AlertCircle, Database, Lock, Check,
   Activity, ArrowRight, UserPlus, FileText, Plus
 } from 'lucide-react';
+import TeamLogo from '@/components/TeamLogo';
 
 export default async function AdminDashboard() {
   const cookieStore = await cookies();
@@ -299,9 +300,7 @@ export default async function AdminDashboard() {
                   <div className='flex items-center gap-4 flex-1 w-full'>
                     <div className='flex items-center gap-2 w-1/3 justify-end'>
                       <span className='text-sm font-bold text-white truncate'>{m.home?.name}</span>
-                      <div className='w-6 h-6 rounded-full bg-[#060d18] border border-white/10 shrink-0 overflow-hidden flex justify-center items-center'>
-                        {m.home?.logo_url ? <img src={m.home.logo_url} className='w-full h-full object-cover'/> : <Shield className='w-3 h-3 text-zinc-600'/>}
-                      </div>
+                      <TeamLogo src={m.home?.logo_url} name={m.home?.name} size="sm" />
                     </div>
                     <div className='w-16 text-center'>
                       {m.home_score !== null ? (
@@ -311,9 +310,7 @@ export default async function AdminDashboard() {
                       ) : <span className='text-zinc-600'>-</span>}
                     </div>
                     <div className='flex items-center gap-2 w-1/3'>
-                      <div className='w-6 h-6 rounded-full bg-[#060d18] border border-white/10 shrink-0 overflow-hidden flex justify-center items-center'>
-                        {m.away?.logo_url ? <img src={m.away.logo_url} className='w-full h-full object-cover'/> : <Shield className='w-3 h-3 text-zinc-600'/>}
-                      </div>
+                      <TeamLogo src={m.away?.logo_url} name={m.away?.name} size="sm" />
                       <span className='text-sm font-bold text-white truncate'>{m.away?.name}</span>
                     </div>
                   </div>
@@ -392,9 +389,7 @@ export default async function AdminDashboard() {
                 return (
                   <div key={t.id} className='p-4 flex items-center justify-between hover:bg-white/5 transition-colors'>
                     <div className='flex items-center gap-3'>
-                      <div className='w-8 h-8 rounded-lg bg-[#060d18] border border-white/10 overflow-hidden flex items-center justify-center'>
-                        {t.logo_url ? <img src={t.logo_url} className='w-full h-full object-cover'/> : <Shield className='w-4 h-4 text-zinc-600'/>}
-                      </div>
+                      <TeamLogo src={t.logo_url} name={t.name} size="md" />
                       <span className='font-bold text-white text-sm'>{t.name}</span>
                     </div>
                     <div className='text-right'>

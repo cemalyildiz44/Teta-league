@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Trophy, Medal, User, Users, Calendar, ShieldAlert, X, Loader2, Info, Image as ImageIcon } from 'lucide-react';
 import { submitNightCupApplicationAction } from './actions';
+import TeamLogo from '@/components/TeamLogo';
 
 export default function TournamentTabs({
   tournaments, winners, applications, profiles, currentUser
@@ -175,11 +176,7 @@ export default function TournamentTabs({
                             <span className='text-xs font-black text-emerald-400 uppercase tracking-widest'>NIGHT CUP ŞAMPİYONU</span>
                           </div>
                           <div className='flex items-center gap-4 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20'>
-                            {tWinners[0].tournament_applications?.logo_url ? (
-                              <img src={tWinners[0].tournament_applications.logo_url} className='w-12 h-12 rounded-lg object-cover' />
-                            ) : (
-                              <Users className='w-12 h-12 text-emerald-500 p-2 bg-black/40 rounded-lg' />
-                            )}
+                            <TeamLogo src={tWinners[0].tournament_applications?.logo_url} name={tWinners[0].tournament_applications?.team_name} size="md" className="w-12 h-12" />
                             <span className='font-black text-lg text-emerald-400 uppercase'>{tWinners[0].tournament_applications?.team_name}</span>
                           </div>
                         </div>

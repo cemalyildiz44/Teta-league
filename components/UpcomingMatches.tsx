@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
+import TeamLogo from '@/components/TeamLogo';
 
 function getShortName(name: string): string {
   return name.slice(0, 3).toUpperCase();
@@ -132,13 +133,7 @@ export default async function UpcomingMatches() {
               <div className="flex items-center justify-between">
                 {/* Home */}
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  {homeTeam?.logo_url ? (
-                    <img src={homeTeam.logo_url} alt="" className="w-10 h-10 rounded-full object-cover border border-white/5 shrink-0 group-hover:border-[#00e5ff]/30 transition-colors" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-[#0d1a2d] border border-white/5 flex items-center justify-center text-xs font-black text-gray-300 shadow-inner shrink-0 group-hover:border-[#00e5ff]/30 transition-colors">
-                      {getShortName(homeName)}
-                    </div>
-                  )}
+                  <TeamLogo src={homeTeam?.logo_url} name={homeName} size="md" />
                   <span className="text-[15px] font-[700] text-white whitespace-normal break-words min-w-0">{homeName}</span>
                 </div>
 
@@ -150,13 +145,7 @@ export default async function UpcomingMatches() {
                 {/* Away */}
                 <div className="flex items-center gap-3 flex-1 min-w-0 justify-end text-right">
                   <span className="text-[15px] font-[700] text-white whitespace-normal break-words min-w-0">{awayName}</span>
-                  {awayTeam?.logo_url ? (
-                    <img src={awayTeam.logo_url} alt="" className="w-10 h-10 rounded-full object-cover border border-white/5 shrink-0 group-hover:border-[#00e5ff]/30 transition-colors" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-[#0d1a2d] border border-white/5 flex items-center justify-center text-xs font-black text-gray-300 shadow-inner shrink-0 group-hover:border-[#00e5ff]/30 transition-colors">
-                      {getShortName(awayName)}
-                    </div>
-                  )}
+                  <TeamLogo src={awayTeam?.logo_url} name={awayName} size="md" />
                 </div>
               </div>
 

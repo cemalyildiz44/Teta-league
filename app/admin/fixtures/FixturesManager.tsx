@@ -10,6 +10,7 @@ import {
 import { 
   generateLeagueFixturesAction, updateFixtureDateAction, cancelFixtureAction, deleteFixtureAction
 } from './actions';
+import TeamLogo from '@/components/TeamLogo';
 
 export function FixturesManager({ initialFixtures, seasons, leagues, leagueTeams, teams }: any) {
   const router = useRouter();
@@ -179,9 +180,7 @@ export function FixturesManager({ initialFixtures, seasons, leagues, leagueTeams
                       <div className='flex items-center flex-1 gap-6'>
                         <div className='flex items-center gap-3 w-40 justify-end'>
                           <span className='font-bold text-white text-sm truncate'>{f.home?.name || 'BYE'}</span>
-                          <div className='w-8 h-8 rounded-full border border-white/10 bg-[#060d18] overflow-hidden flex items-center justify-center shrink-0'>
-                            {f.home?.logo_url ? <img src={f.home.logo_url} className='w-full h-full object-cover' /> : <Shield className='w-4 h-4 text-zinc-600' />}
-                          </div>
+                          <TeamLogo src={f.home?.logo_url} name={f.home?.name} size="sm" />
                         </div>
                         <div className='flex flex-col items-center justify-center w-24'>
                           <span className='text-[10px] font-mono text-zinc-500 mb-1'>{new Date(f.scheduled_at).toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'})}</span>
@@ -189,9 +188,7 @@ export function FixturesManager({ initialFixtures, seasons, leagues, leagueTeams
                           <span className='text-[10px] font-mono text-zinc-500 mt-1'>{new Date(f.scheduled_at).toLocaleDateString('tr-TR')}</span>
                         </div>
                         <div className='flex items-center gap-3 w-40'>
-                          <div className='w-8 h-8 rounded-full border border-white/10 bg-[#060d18] overflow-hidden flex items-center justify-center shrink-0'>
-                            {f.away?.logo_url ? <img src={f.away.logo_url} className='w-full h-full object-cover' /> : <Shield className='w-4 h-4 text-zinc-600' />}
-                          </div>
+                          <TeamLogo src={f.away?.logo_url} name={f.away?.name} size="sm" />
                           <span className='font-bold text-white text-sm truncate'>{f.away?.name || 'BYE'}</span>
                         </div>
                       </div>

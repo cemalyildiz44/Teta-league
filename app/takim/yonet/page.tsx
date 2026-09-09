@@ -5,6 +5,7 @@ import { PlayerSearch } from './PlayerSearch';
 import { RosterManagement } from './RosterManagement';
 import { TeamSocialsForm } from './TeamSocialsForm';
 import Link from 'next/link';
+import TeamLogo from '@/components/TeamLogo';
 
 export default async function TeamManagementPage() {
   const cookieStore = await cookies();
@@ -108,13 +109,7 @@ export default async function TeamManagementPage() {
         <div className="card-surface p-8 rounded-2xl border border-white/5 flex flex-col md:flex-row items-center gap-6 mb-8 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-[#00e5ff]/5 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/4" />
           
-          {team?.logo_url ? (
-            <img src={team.logo_url} alt="" className="w-24 h-24 rounded-full object-cover border border-[#00e5ff]/30 shadow-[0_0_20px_rgba(0,229,255,0.2)]" />
-          ) : (
-            <div className="w-24 h-24 rounded-full bg-[#0a1628] flex items-center justify-center text-3xl font-black text-[#00e5ff] shadow-[0_0_20px_rgba(0,229,255,0.2)]">
-              {team?.name.slice(0, 2).toUpperCase()}
-            </div>
-          )}
+          <TeamLogo src={team?.logo_url} name={team?.name} size="xl" />
 
           <div className="text-center md:text-left flex-1">
             <h1 className="text-3xl font-black text-white tracking-widest">{team?.name}</h1>

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Shield, ChevronRight } from "lucide-react";
+import TeamLogo from "@/components/TeamLogo";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = await params;
@@ -201,12 +202,8 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
               
               {/* HOME TEAM */}
               <Link href={`/takim/${homeTeam?.slug}`} className="flex flex-col items-center group flex-1 md:flex-none">
-                <div className="w-20 h-20 md:w-32 md:h-32 rounded-2xl bg-[#01060b] border border-white/10 flex items-center justify-center p-3 md:p-5 mb-4 md:mb-6 shadow-xl group-hover:border-[#00e5ff]/50 transition-colors">
-                  {homeTeam?.logo_url ? (
-                    <img src={homeTeam.logo_url} alt={homeTeam.name} className="w-full h-full object-contain" />
-                  ) : (
-                    <Shield className="w-10 h-10 md:w-16 md:h-16 text-gray-600" />
-                  )}
+                <div className="mb-4 md:mb-6">
+                  <TeamLogo src={homeTeam?.logo_url} name={homeTeam?.name} size="hero" className="w-24 h-24 md:w-36 md:h-36" />
                 </div>
                 <span className="text-[16px] md:text-[24px] font-[900] text-white tracking-widest uppercase text-center group-hover:text-[#00e5ff] transition-colors leading-tight">
                   {homeTeam?.name}
@@ -223,12 +220,8 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
 
               {/* AWAY TEAM */}
               <Link href={`/takim/${awayTeam?.slug}`} className="flex flex-col items-center group flex-1 md:flex-none">
-                <div className="w-20 h-20 md:w-32 md:h-32 rounded-2xl bg-[#01060b] border border-white/10 flex items-center justify-center p-3 md:p-5 mb-4 md:mb-6 shadow-xl group-hover:border-[#00e5ff]/50 transition-colors">
-                  {awayTeam?.logo_url ? (
-                    <img src={awayTeam.logo_url} alt={awayTeam.name} className="w-full h-full object-contain" />
-                  ) : (
-                    <Shield className="w-10 h-10 md:w-16 md:h-16 text-gray-600" />
-                  )}
+                <div className="mb-4 md:mb-6">
+                  <TeamLogo src={awayTeam?.logo_url} name={awayTeam?.name} size="hero" className="w-24 h-24 md:w-36 md:h-36" />
                 </div>
                 <span className="text-[16px] md:text-[24px] font-[900] text-white tracking-widest uppercase text-center group-hover:text-[#00e5ff] transition-colors leading-tight">
                   {awayTeam?.name}
@@ -274,7 +267,7 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
                 {/* EV SAHİBİ ÖZET */}
                 <div className="bg-[#03070c] border border-white/5 rounded-2xl p-6 md:p-8">
                   <h3 className="text-[14px] font-[900] text-white uppercase tracking-widest mb-6 flex items-center gap-3">
-                    {homeTeam?.logo_url && <img src={homeTeam.logo_url} className="w-6 h-6 object-contain" />}
+                    <TeamLogo src={homeTeam?.logo_url} name={homeTeam?.name} size="xs" />
                     {homeTeam?.name}
                   </h3>
                   
@@ -322,7 +315,7 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
                 {/* DEPLASMAN ÖZET */}
                 <div className="bg-[#03070c] border border-white/5 rounded-2xl p-6 md:p-8">
                   <h3 className="text-[14px] font-[900] text-white uppercase tracking-widest mb-6 flex items-center gap-3">
-                    {awayTeam?.logo_url && <img src={awayTeam.logo_url} className="w-6 h-6 object-contain" />}
+                    <TeamLogo src={awayTeam?.logo_url} name={awayTeam?.name} size="xs" />
                     {awayTeam?.name}
                   </h3>
                   
@@ -452,7 +445,7 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
               {/* HOME TABLE */}
               <div className="space-y-4">
                 <h3 className="text-[12px] font-[900] text-gray-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-3">
-                  {homeTeam?.logo_url && <img src={homeTeam.logo_url} className="w-5 h-5 object-contain" />}
+                  <TeamLogo src={homeTeam?.logo_url} name={homeTeam?.name} size="xs" />
                   {homeTeam?.name} OYUNCU İSTATİSTİKLERİ
                 </h3>
                 <div className="bg-[#03070c] border border-white/5 rounded-2xl overflow-hidden">
@@ -463,7 +456,7 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
               {/* AWAY TABLE */}
               <div className="space-y-4 pt-4">
                 <h3 className="text-[12px] font-[900] text-gray-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-3">
-                  {awayTeam?.logo_url && <img src={awayTeam.logo_url} className="w-5 h-5 object-contain" />}
+                  <TeamLogo src={awayTeam?.logo_url} name={awayTeam?.name} size="xs" />
                   {awayTeam?.name} OYUNCU İSTATİSTİKLERİ
                 </h3>
                 <div className="bg-[#03070c] border border-white/5 rounded-2xl overflow-hidden">

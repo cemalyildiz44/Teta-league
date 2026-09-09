@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import TeamLogo from '@/components/TeamLogo';
 
 export interface StandingsTeamRow {
   team_id: string;
@@ -150,15 +151,7 @@ export default function StandingsClient({ superLig, ecl }: StandingsClientProps)
                         href={row.team_slug ? `/takim/${row.team_slug}` : '#'}
                         className="flex items-center gap-2.5 sm:gap-3 min-w-0 group/team hover:drop-shadow-[0_0_8px_rgba(0,229,255,0.4)] transition-all"
                       >
-                        <div className="w-6 h-6 rounded-full bg-black/50 border border-white/10 flex items-center justify-center p-0.5 shrink-0 overflow-hidden">
-                          {row.team_logo_url ? (
-                            <img src={row.team_logo_url} alt="" className="w-full h-full object-contain" />
-                          ) : (
-                            <span className="text-[9px] font-black text-[#00e5ff]">
-                              {row.team_name?.substring(0, 2).toUpperCase() || '??'}
-                            </span>
-                          )}
-                        </div>
+                        <TeamLogo src={row.team_logo_url} name={row.team_name} size="sm" />
                         <span className="font-bold text-xs sm:text-sm truncate text-white group-hover/team:text-[#00e5ff] transition-colors uppercase tracking-wider">
                           {row.team_name}
                         </span>

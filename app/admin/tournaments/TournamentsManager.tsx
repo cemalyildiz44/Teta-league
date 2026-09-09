@@ -11,6 +11,7 @@ import {
   deleteTournamentAction, updateNightCupApplicationStatusAction, assignNightCupWinnerAction,
   updateNightCupDetailsAction
 } from './actions';
+import TeamLogo from '@/components/TeamLogo';
 
 export function TournamentsManager({ tournaments, winners, applications, seasons, profiles }: any) {
   const router = useRouter();
@@ -346,9 +347,7 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
                             <div key={app.id} className='bg-[#0a1628] border border-white/5 rounded-xl p-4'>
                               <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4'>
                                 <div className='flex items-center gap-4'>
-                                  <div className='w-12 h-12 rounded-lg bg-zinc-800 overflow-hidden flex items-center justify-center shrink-0 border border-white/10'>
-                                    {app.logo_url ? <img src={app.logo_url} alt="" className='w-full h-full object-cover'/> : <Users className='w-6 h-6 text-zinc-500'/>}
-                                  </div>
+                                  <TeamLogo src={app.logo_url} name={app.team_name} size="md" className="w-12 h-12" />
                                   <div>
                                     <h4 className='text-base font-black text-white uppercase'>{app.team_name}</h4>
                                     <span className='text-[10px] text-zinc-500 uppercase'>Başvuran Kaptan: @{app.profiles?.username}</span>

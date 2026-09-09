@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { Trophy, ShieldAlert } from "lucide-react";
 import { calculateMarketValue, formatEuro, MarketValueInput } from "@/app/utils/marketValueCalculator";
+import TeamLogo from "@/components/TeamLogo";
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }) {
   const resolvedParams = await params;
@@ -482,8 +483,8 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
           <div className="bg-[#03070c] border border-white/5 rounded-2xl p-6 lg:p-8 flex flex-col justify-center">
             {activeTeam ? (
               <div className="flex flex-col items-center text-center">
-                <div className="w-20 h-20 rounded-full bg-white/[0.02] border border-white/10 p-3 mb-4 flex items-center justify-center">
-                  {activeTeam.logo_url ? <img src={activeTeam.logo_url} alt="" className="w-full h-full object-contain" /> : <span className="text-2xl font-black text-[#00e5ff]">{activeTeam.name.substring(0, 2)}</span>}
+                <div className="mb-4">
+                  <TeamLogo src={activeTeam.logo_url} name={activeTeam.name} size="xl" />
                 </div>
                 <Link href={`/takim/${activeTeam.slug}`} className="text-[18px] md:text-[20px] font-[900] text-white hover:text-[#00e5ff] transition-colors uppercase tracking-wide">
                   {activeTeam.name}
@@ -663,9 +664,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                               <td className="px-3 py-3 text-center font-[900] text-gray-600">{m.weekNumber || "-"}</td>
                               <td className="px-3 py-3">
                                 <Link href={opp?.slug ? `/takim/${opp.slug}` : "#"} className="flex items-center gap-3 group">
-                                  <div className="w-5 h-5 rounded bg-white/5 flex items-center justify-center overflow-hidden shrink-0">
-                                    {opp?.logo_url ? <img src={opp.logo_url} alt="" className="w-full h-full object-contain" /> : <span className="text-[8px] font-bold text-gray-500">{opp?.name?.substring(0, 2)}</span>}
-                                  </div>
+                                  <TeamLogo src={opp?.logo_url} name={opp?.name} size="xs" />
                                   <span className="font-[800] text-gray-300 group-hover:text-[#00e5ff] transition-colors truncate">{opp?.name || "?"}</span>
                                 </Link>
                               </td>
@@ -754,13 +753,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                               {/* KULÜP */}
                               <td className="py-4 px-4">
                                 <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
-                                    {s.teamLogo ? (
-                                      <img src={s.teamLogo} alt={s.teamName} className="w-full h-full object-contain p-1" />
-                                    ) : (
-                                      <span className="text-[10px] font-black text-zinc-400">{s.teamName.substring(0, 2).toUpperCase()}</span>
-                                    )}
-                                  </div>
+                                  <TeamLogo src={s.teamLogo} name={s.teamName} size="lg" />
                                   {s.teamSlug ? (
                                     <Link
                                       href={`/takim/${s.teamSlug}`}
@@ -843,9 +836,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                           </div>
                           <div className="flex items-center justify-between gap-4 bg-white/[0.02] border border-white/5 rounded-xl p-4 mt-2 max-w-lg hover:bg-white/[0.04] transition-colors">
                             <div className="flex items-center gap-4 min-w-0">
-                              <div className="w-12 h-12 rounded-lg bg-black/40 border border-white/10 p-1 flex items-center justify-center shrink-0">
-                                {e.teamLogo ? <img src={e.teamLogo} alt="" className="w-full h-full object-contain" /> : <span className="text-xs font-bold text-gray-500">{e.teamName.substring(0, 2)}</span>}
-                              </div>
+                              <TeamLogo src={e.teamLogo} name={e.teamName} size="lg" />
                               <div className="flex flex-col min-w-0">
                                 {e.teamSlug ? (
                                   <Link href={`/takim/${e.teamSlug}`} className="text-[18px] font-[900] text-white hover:text-[#00e5ff] transition-colors leading-tight truncate">
