@@ -243,7 +243,10 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     TOTW: 0,
     MATCH_POTM: 0,
     MONTH_POTM: 0,
-    POTS: 0
+    POTS: 0,
+    KARMA_WINNER: 0,
+    '1V1_WINNER': 0,
+    NIGHT_CUP_WINNER: 0
   };
   
   if (playerAchievementsData) {
@@ -622,7 +625,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
             <div className="space-y-4">
               <h2 className="text-[14px] font-[900] text-gray-500 tracking-widest uppercase mb-3">KİŞİSEL BAŞARIMLAR</h2>
               <div className="bg-[#03070c] border border-white/5 rounded-2xl p-6 lg:p-10 mb-8">
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {/* TOTW */}
                   <div className={`p-5 rounded-2xl border flex flex-col items-center justify-center text-center transition-all ${achievementCounts.TOTW > 0 ? 'bg-gradient-to-br from-[#00e5ff]/10 to-transparent border-[#00e5ff]/30 shadow-[0_0_20px_rgba(0,229,255,0.1)]' : 'bg-white/[0.02] border-white/5 opacity-60'}`}>
                     <div className="w-12 h-12 mb-3 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-xl">
@@ -661,6 +664,36 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                     <div className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${achievementCounts.POTS > 0 ? 'text-white' : 'text-gray-500'}`}>SEZONUN OYUNCUSU</div>
                     <div className={`text-[20px] font-black ${achievementCounts.POTS > 0 ? 'text-yellow-400' : 'text-gray-700'}`}>
                       {achievementCounts.POTS > 0 ? `${achievementCounts.POTS}x` : 'KİLİTLİ'}
+                    </div>
+                  </div>
+                  {/* KARMA WINNER */}
+                  <div className={`p-5 rounded-2xl border flex flex-col items-center justify-center text-center transition-all ${achievementCounts.KARMA_WINNER > 0 ? 'bg-gradient-to-br from-emerald-500/10 to-transparent border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.1)]' : 'bg-white/[0.02] border-white/5 opacity-60'}`}>
+                    <div className="w-12 h-12 mb-3 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-xl">
+                      {achievementCounts.KARMA_WINNER > 0 ? '⚔️' : '🔒'}
+                    </div>
+                    <div className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${achievementCounts.KARMA_WINNER > 0 ? 'text-white' : 'text-gray-500'}`}>KARMA WINNER</div>
+                    <div className={`text-[20px] font-black ${achievementCounts.KARMA_WINNER > 0 ? 'text-emerald-400' : 'text-gray-700'}`}>
+                      {achievementCounts.KARMA_WINNER > 0 ? `${achievementCounts.KARMA_WINNER}x` : 'KİLİTLİ'}
+                    </div>
+                  </div>
+                  {/* 1V1 WINNER */}
+                  <div className={`p-5 rounded-2xl border flex flex-col items-center justify-center text-center transition-all ${achievementCounts['1V1_WINNER'] > 0 ? 'bg-gradient-to-br from-cyan-500/10 to-transparent border-cyan-500/30 shadow-[0_0_20px_rgba(6,182,212,0.1)]' : 'bg-white/[0.02] border-white/5 opacity-60'}`}>
+                    <div className="w-12 h-12 mb-3 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-xl">
+                      {achievementCounts['1V1_WINNER'] > 0 ? '🎯' : '🔒'}
+                    </div>
+                    <div className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${achievementCounts['1V1_WINNER'] > 0 ? 'text-white' : 'text-gray-500'}`}>1V1 WINNER</div>
+                    <div className={`text-[20px] font-black ${achievementCounts['1V1_WINNER'] > 0 ? 'text-cyan-400' : 'text-gray-700'}`}>
+                      {achievementCounts['1V1_WINNER'] > 0 ? `${achievementCounts['1V1_WINNER']}x` : 'KİLİTLİ'}
+                    </div>
+                  </div>
+                  {/* NIGHT CUP WINNER */}
+                  <div className={`p-5 rounded-2xl border flex flex-col items-center justify-center text-center transition-all ${achievementCounts.NIGHT_CUP_WINNER > 0 ? 'bg-gradient-to-br from-indigo-500/10 to-transparent border-indigo-500/30 shadow-[0_0_20px_rgba(99,102,241,0.1)]' : 'bg-white/[0.02] border-white/5 opacity-60'}`}>
+                    <div className="w-12 h-12 mb-3 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-xl">
+                      {achievementCounts.NIGHT_CUP_WINNER > 0 ? '🌙' : '🔒'}
+                    </div>
+                    <div className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${achievementCounts.NIGHT_CUP_WINNER > 0 ? 'text-white' : 'text-gray-500'}`}>NIGHT CUP WINNER</div>
+                    <div className={`text-[20px] font-black ${achievementCounts.NIGHT_CUP_WINNER > 0 ? 'text-indigo-400' : 'text-gray-700'}`}>
+                      {achievementCounts.NIGHT_CUP_WINNER > 0 ? `${achievementCounts.NIGHT_CUP_WINNER}x` : 'KİLİTLİ'}
                     </div>
                   </div>
                 </div>

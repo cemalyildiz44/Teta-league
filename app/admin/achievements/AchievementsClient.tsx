@@ -72,6 +72,9 @@ export default function AchievementsClient({ profiles, seasons, matches, achieve
                   <option value="MATCH_POTM">Maçın Oyuncusu (POTM)</option>
                   <option value="MONTH_POTM">Ayın Oyuncusu (POTM)</option>
                   <option value="POTS">Sezonun Oyuncusu (POTS)</option>
+                  <option value="KARMA_WINNER">KARMA WINNER</option>
+                  <option value="1V1_WINNER">1V1 WINNER</option>
+                  <option value="NIGHT_CUP_WINNER">NIGHT CUP WINNER</option>
                 </select>
               </div>
 
@@ -149,8 +152,14 @@ export default function AchievementsClient({ profiles, seasons, matches, achieve
                             ${a.achievement_type === 'MATCH_POTM' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : ''}
                             ${a.achievement_type === 'MONTH_POTM' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' : ''}
                             ${a.achievement_type === 'POTS' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' : ''}
+                            ${a.achievement_type === 'KARMA_WINNER' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : ''}
+                            ${a.achievement_type === '1V1_WINNER' ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' : ''}
+                            ${a.achievement_type === 'NIGHT_CUP_WINNER' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : ''}
                           `}>
-                            {a.achievement_type}
+                            {a.achievement_type === 'KARMA_WINNER' ? 'KARMA WINNER' :
+                             a.achievement_type === '1V1_WINNER' ? '1V1 WINNER' :
+                             a.achievement_type === 'NIGHT_CUP_WINNER' ? 'NIGHT CUP WINNER' :
+                             a.achievement_type}
                           </span>
                         </td>
                         <td className="py-4 px-4 text-xs font-medium text-gray-400">
