@@ -15,13 +15,25 @@ export async function loginAction(prevState: any, formData: FormData) {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data: authData, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
-  if (error) {
+  if (error || !authData?.user) {
     return { error: 'E-posta veya şifre hatalı.' };
+  }
+
+  // Check if player is BANNED
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('status, is_active')
+    .eq('id', authData.user.id)
+    .maybeSingle();
+
+  if (profile?.status === 'BANNED') {
+    await supabase.auth.signOut();
+    return { error: 'Hesabınız sistem kurallarını ihlal ettiği gerekçesiyle yasaklanmıştır (BANLI).' };
   }
 
   redirect('/');

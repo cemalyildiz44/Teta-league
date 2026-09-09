@@ -38,7 +38,7 @@ export default async function AdminPlayersPage() {
   ] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id, username, full_name, avatar_url, platform, primary_position, alternative_positions, is_active, beta_registered, created_at')
+      .select('*')
       .order('created_at', { ascending: false }),
     supabase
       .from('team_memberships')
@@ -121,6 +121,8 @@ export default async function AdminPlayersPage() {
     primary_position: p.primary_position || null,
     alternative_positions: p.alternative_positions || [],
     is_active: p.is_active ?? true,
+    status: (p.status as 'ACTIVE' | 'SUSPENDED' | 'BANNED') || (p.is_active !== false ? 'ACTIVE' : 'SUSPENDED'),
+    current_ea_player_id: p.current_ea_player_id || null,
     beta_registered: p.beta_registered ?? false,
     created_at: p.created_at,
     active_team: teamMap.get(p.id) || null,

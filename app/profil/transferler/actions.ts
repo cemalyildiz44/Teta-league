@@ -17,6 +17,22 @@ export async function respondToTransfer(formData: FormData) {
 
   if (!transferId) return { error: 'Missing transfer ID' };
 
+  // Profile status guard for accepting invites (SUSPENDED / BANNED)
+  if (isAccept) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('status, is_active')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profile?.status === 'BANNED') {
+      return { error: 'Hesabınız yasaklandığı için transfer teklifini kabul edemezsiniz.' };
+    }
+    if (profile?.status === 'SUSPENDED' || profile?.is_active === false) {
+      return { error: 'Hesabınız askıya alındığı için transfer teklifini kabul edemezsiniz.' };
+    }
+  }
+
   // Route to the new RPCs instead of the old respond_to_transfer
   const rpcName = isAccept ? 'accept_team_invite' : 'reject_team_invite';
   const { error } = await supabase.rpc(rpcName, {

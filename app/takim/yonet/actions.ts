@@ -18,6 +18,37 @@ export async function invitePlayer(formData: FormData) {
     return { error: 'Missing required fields' };
   }
 
+  // Caller profile status check
+  const { data: callerProfile } = await supabase
+    .from('profiles')
+    .select('status, is_active')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (callerProfile?.status === 'BANNED') {
+    return { error: 'Hesabınız yasaklandığı için transfer teklifi gönderemezsiniz.' };
+  }
+  if (callerProfile?.status === 'SUSPENDED' || callerProfile?.is_active === false) {
+    return { error: 'Hesabınız askıya alındığı için transfer teklifi gönderemezsiniz.' };
+  }
+
+  // Target player profile status check
+  const { data: targetProfile } = await supabase
+    .from('profiles')
+    .select('status, is_active, username')
+    .eq('id', playerId)
+    .maybeSingle();
+
+  if (!targetProfile) {
+    return { error: 'Oyuncu bulunamadı.' };
+  }
+  if (targetProfile.status === 'BANNED') {
+    return { error: 'Yasaklı (BANLI) bir oyuncuya transfer teklifi gönderilemez.' };
+  }
+  if (targetProfile.status === 'SUSPENDED' || targetProfile.is_active === false) {
+    return { error: 'Askıya alınmış bir oyuncuya transfer teklifi gönderilemez.' };
+  }
+
   const { error } = await supabase.rpc('send_team_invite', {
     p_player_id: playerId
   });
@@ -77,6 +108,7 @@ export async function searchPlayers(query: string, seasonId: string) {
     .from('profiles')
     .select('id, username, current_ea_player_id, primary_position, platform, avatar_url')
     .or(`username.ilike.%${query}%,current_ea_player_id.ilike.%${query}%`)
+    .eq('is_active', true)
     .limit(10);
 
   if (!profiles || profiles.length === 0) return [];

@@ -14,6 +14,20 @@ export async function createPostAction(prevState: any, formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: 'Giriş yapmalısınız.' };
 
+  // Profile status guard (SUSPENDED / BANNED)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('status, is_active')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (profile?.status === 'BANNED') {
+    return { error: 'Hesabınız yasaklandığı için gönderi paylaşamazsınız.' };
+  }
+  if (profile?.status === 'SUSPENDED' || profile?.is_active === false) {
+    return { error: 'Hesabınız askıya alındığı için gönderi paylaşamazsınız.' };
+  }
+
   const { data: insertedPost, error } = await supabase
     .from('posts')
     .insert({
@@ -120,6 +134,20 @@ export async function createCommentAction(
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: 'Giriş yapmalısınız.' };
+
+  // Profile status guard (SUSPENDED / BANNED)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('status, is_active')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (profile?.status === 'BANNED') {
+    return { error: 'Hesabınız yasaklandığı için yorum yapamazsınız.' };
+  }
+  if (profile?.status === 'SUSPENDED' || profile?.is_active === false) {
+    return { error: 'Hesabınız askıya alındığı için yorum yapamazsınız.' };
+  }
 
   const { data: insertedComment, error } = await supabase
     .from('comments')

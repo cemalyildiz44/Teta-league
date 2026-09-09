@@ -18,9 +18,9 @@ export default async function PlayersPage() {
   // 1. Fetch all profiles
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('id, username, current_ea_player_id, avatar_url, platform, primary_position, alternative_positions');
+    .select('*');
 
-  const validProfiles = profiles || [];
+  const validProfiles = (profiles || []).filter((p: any) => p.status !== 'BANNED');
   const profileIds = validProfiles.map(p => p.id);
   const eaPlayerIds = validProfiles.map(p => p.current_ea_player_id).filter(Boolean) as string[];
 

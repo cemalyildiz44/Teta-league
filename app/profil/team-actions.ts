@@ -14,6 +14,31 @@ export async function sendTeamInviteAction(playerId: string) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: 'Giriş yapmanız gerekiyor.' };
 
+    // Caller profile status check
+    const { data: callerProfile } = await supabase
+      .from('profiles')
+      .select('status, is_active')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (callerProfile?.status === 'BANNED') {
+      return { error: 'Hesabınız yasaklandığı için transfer daveti gönderemezsiniz.' };
+    }
+    if (callerProfile?.status === 'SUSPENDED' || callerProfile?.is_active === false) {
+      return { error: 'Hesabınız askıya alındığı için transfer daveti gönderemezsiniz.' };
+    }
+
+    // Target player profile status check
+    const { data: targetProfile } = await supabase
+      .from('profiles')
+      .select('status, is_active')
+      .eq('id', playerId)
+      .maybeSingle();
+
+    if (!targetProfile || targetProfile.status === 'BANNED' || targetProfile.status === 'SUSPENDED' || targetProfile.is_active === false) {
+      return { error: 'Askıya alınmış veya yasaklanmış bir oyuncuya transfer daveti gönderilemez.' };
+    }
+
     const { error: rpcError } = await supabase.rpc('send_team_invite', {
       p_player_id: playerId
     });
@@ -63,6 +88,20 @@ export async function acceptTeamInviteAction(transferId: string) {
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: 'Yetkisiz işlem.' };
+
+    // Profile status guard for accepting invites (SUSPENDED / BANNED)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('status, is_active')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profile?.status === 'BANNED') {
+      return { error: 'Hesabınız yasaklandığı için transfer teklifini kabul edemezsiniz.' };
+    }
+    if (profile?.status === 'SUSPENDED' || profile?.is_active === false) {
+      return { error: 'Hesabınız askıya alındığı için transfer teklifini kabul edemezsiniz.' };
+    }
 
     const { error: rpcError } = await supabase.rpc('accept_team_invite', {
       p_transfer_id: transferId

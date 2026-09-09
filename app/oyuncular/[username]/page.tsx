@@ -2,7 +2,7 @@ import { createClient } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { Trophy } from "lucide-react";
+import { Trophy, ShieldAlert } from "lucide-react";
 import { calculateMarketValue, formatEuro, MarketValueInput } from "@/app/utils/marketValueCalculator";
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }) {
@@ -35,6 +35,28 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   // ── 1. Profile ─────────────────────────────────────────────────────
   const { data: profile } = await supabase.from("profiles").select("*").ilike("username", paramVal).maybeSingle();
   if (!profile) notFound();
+
+  // Handle BANNED player account
+  if (profile.status === 'BANNED') {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <div className="card-surface max-w-md w-full p-8 rounded-2xl border border-red-500/30 text-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto text-red-500">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h1 className="text-xl font-black text-white tracking-wide uppercase">BU HESAP YASAKLANMIŞTIR</h1>
+          <p className="text-sm text-zinc-400 leading-relaxed">
+            <span className="font-bold text-white">@{profile.username}</span> adlı oyuncunun hesabı TETA League kuralları gereğince yasaklanmıştır (BANLI).
+          </p>
+          <div className="pt-2">
+            <Link href="/oyuncular" className="px-5 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-lg text-xs font-bold inline-flex items-center gap-2 transition-colors">
+              Oyuncu Listesine Dön
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ── 2. Parallel Fetches ────────────────────────────────────────────
   let playerStats: any[] = [];
@@ -406,6 +428,11 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                 <div className="flex flex-wrap gap-2 mb-3">
                   {profile.primary_position && <span className="px-2.5 py-0.5 rounded-md text-[10px] font-[900] tracking-widest bg-[#00e5ff]/15 text-[#00e5ff] border border-[#00e5ff]/30 uppercase">{profile.primary_position}</span>}
                   {profile.platform && <span className="px-2.5 py-0.5 rounded-md text-[10px] font-[900] tracking-widest bg-white/5 text-gray-400 border border-white/10 uppercase">{profile.platform}</span>}
+                  {(profile.status === 'SUSPENDED' || profile.is_active === false) && (
+                    <span className="px-2.5 py-0.5 rounded-md text-[10px] font-[900] tracking-widest bg-amber-500/15 text-amber-400 border border-amber-500/30 uppercase">
+                      HESAP ASKIDA
+                    </span>
+                  )}
                 </div>
                 <h1 className="text-3xl md:text-4xl lg:text-[40px] font-[900] text-white tracking-tight uppercase leading-none truncate mb-2">
                   {profile.username}

@@ -11,7 +11,9 @@ import {
   addPlayerLegacyCareerAction,
   updatePlayerLegacyCareerAction,
   deletePlayerLegacyCareerAction,
-  PlayerLegacyCareerStat
+  PlayerLegacyCareerStat,
+  updatePlayerAccountAdminAction,
+  PlayerAccountStatus
 } from './actions';
 
 export interface TeamOption {
@@ -30,6 +32,8 @@ interface PlayerRecord {
   primary_position: string | null;
   alternative_positions: string[] | null;
   is_active: boolean;
+  status: PlayerAccountStatus;
+  current_ea_player_id: string | null;
   beta_registered: boolean;
   created_at: string;
   active_team: {
@@ -70,6 +74,14 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
       }
     }
   }, [players]);
+
+  // Player Account Management State
+  const [accountUsername, setAccountUsername] = useState('');
+  const [accountEaId, setAccountEaId] = useState('');
+  const [accountStatus, setAccountStatus] = useState<PlayerAccountStatus>('ACTIVE');
+  const [accountLoading, setAccountLoading] = useState(false);
+  const [accountFeedback, setAccountFeedback] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [banConfirmOpen, setBanConfirmOpen] = useState(false);
 
   // Legacy Career Stats State
   const [legacyModalOpen, setLegacyModalOpen] = useState(false);
@@ -218,12 +230,57 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
 
   const openPlayerModal = (player: PlayerRecord) => {
     setSelectedPlayer(player);
+    setAccountUsername(player.username || '');
+    setAccountEaId(player.current_ea_player_id || '');
+    setAccountStatus(player.status || (player.is_active ? 'ACTIVE' : 'SUSPENDED'));
+    setAccountFeedback(null);
+    setBanConfirmOpen(false);
     setFeedback(null);
   };
 
   const closePlayerModal = () => {
     setSelectedPlayer(null);
     setFeedback(null);
+    setAccountFeedback(null);
+    setBanConfirmOpen(false);
+  };
+
+  const handleSaveAccount = async (e?: React.FormEvent, forceBan = false) => {
+    if (e) e.preventDefault();
+    if (!selectedPlayer) return;
+
+    // Trigger confirmation modal if changing to BANNED
+    if (accountStatus === 'BANNED' && selectedPlayer.status !== 'BANNED' && !forceBan) {
+      setBanConfirmOpen(true);
+      return;
+    }
+
+    setAccountLoading(true);
+    setAccountFeedback(null);
+
+    const formData = new FormData();
+    formData.append('player_id', selectedPlayer.id);
+    formData.append('username', accountUsername);
+    formData.append('current_ea_player_id', accountEaId);
+    formData.append('status', accountStatus);
+
+    const res = await updatePlayerAccountAdminAction(formData);
+    setAccountLoading(false);
+
+    if (res.error) {
+      setAccountFeedback({ msg: res.error, type: 'error' });
+    } else {
+      setAccountFeedback({ msg: res.success || 'Hesap bilgileri başarıyla güncellendi.', type: 'success' });
+      setBanConfirmOpen(false);
+      setSelectedPlayer({
+        ...selectedPlayer,
+        username: accountUsername,
+        current_ea_player_id: accountEaId.trim() ? accountEaId.trim() : null,
+        status: accountStatus,
+        is_active: accountStatus === 'ACTIVE'
+      });
+      router.refresh();
+    }
   };
 
   // Filtering
@@ -398,11 +455,15 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
                         <div>
                           <div className="font-bold text-white flex items-center gap-1.5">
                             @{player.username}
-                            {!player.is_active && (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 font-bold border border-red-500/20">
-                                PASİF
+                            {player.status === 'BANNED' ? (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 font-black border border-red-500/20">
+                                BANLI
                               </span>
-                            )}
+                            ) : player.status === 'SUSPENDED' || !player.is_active ? (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20">
+                                ASKIDA
+                              </span>
+                            ) : null}
                           </div>
                           {player.full_name && (
                             <div className="text-xs text-zinc-500">{player.full_name}</div>
@@ -510,6 +571,22 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
                         BETA KAYITSIZ
                       </span>
                     )}
+                    {selectedPlayer.status === 'BANNED' ? (
+                      <span className="text-[10px] font-black uppercase text-red-400 bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                        BANLI
+                      </span>
+                    ) : selectedPlayer.status === 'SUSPENDED' || !selectedPlayer.is_active ? (
+                      <span className="text-[10px] font-black uppercase text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                        ASKIDA
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-black uppercase text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        AKTİF
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -550,6 +627,140 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
                     {new Date(selectedPlayer.created_at).toLocaleDateString('tr-TR')}
                   </div>
                 </div>
+              </div>
+
+              {/* OYUNCU HESAP & ERİŞİM YÖNETİMİ */}
+              <div className="bg-[#060d18] p-5 rounded-xl border border-white/5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-black text-[#00e5ff] tracking-widest uppercase flex items-center gap-2">
+                      <ShieldAlert className="w-4 h-4" />
+                      HESAP & ERİŞİM YÖNETİMİ
+                    </h4>
+                    <p className="text-[11px] text-zinc-500 mt-0.5">
+                      Kullanıcı adı, EA ID ve hesap aktiflik/yasaklama durumunu buradan yönetebilirsiniz.
+                    </p>
+                  </div>
+                </div>
+
+                {accountFeedback && (
+                  <div className={`p-3 rounded-lg text-xs font-bold flex items-center gap-2 ${accountFeedback.type === 'error' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
+                    {accountFeedback.type === 'error' ? <ShieldAlert className="w-4 h-4 shrink-0" /> : <CheckCircle2 className="w-4 h-4 shrink-0" />}
+                    <span>{accountFeedback.msg}</span>
+                  </div>
+                )}
+
+                <form onSubmit={(e) => handleSaveAccount(e)} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Kullanıcı Adı */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+                        Kullanıcı Adı
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={accountUsername}
+                        onChange={e => setAccountUsername(e.target.value)}
+                        placeholder="kullanici_adi"
+                        className="input-field text-sm py-2 font-mono"
+                      />
+                      <p className="text-[10px] text-zinc-500 mt-1">
+                        Harf, rakam, alt çizgi, nokta ve tire içerebilir (3-30 karakter).
+                      </p>
+                    </div>
+
+                    {/* EA ID */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+                        EA ID (Pro Clubs)
+                      </label>
+                      <input
+                        type="text"
+                        value={accountEaId}
+                        onChange={e => setAccountEaId(e.target.value)}
+                        placeholder="Örn: EA_Player_99"
+                        className="input-field text-sm py-2 font-mono"
+                      />
+                      <p className="text-[10px] text-zinc-500 mt-1">
+                        EA maç istatistiklerinin oyuncuyla eşleşmesini sağlar.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Hesap Durumu */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-2">
+                      Hesap Durumu
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      {/* AKTİF */}
+                      <button
+                        type="button"
+                        onClick={() => setAccountStatus('ACTIVE')}
+                        className={`p-3 rounded-xl border text-left transition-all ${accountStatus === 'ACTIVE' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 ring-1 ring-emerald-500/50' : 'bg-black/30 border-white/5 text-zinc-400 hover:border-white/10'}`}
+                      >
+                        <div className="flex items-center gap-2 font-black text-xs">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                          AKTİF
+                        </div>
+                        <div className="text-[10px] text-zinc-500 mt-1 leading-snug">
+                          Normal erişim. Giriş yapabilir, transfer & maç aktif.
+                        </div>
+                      </button>
+
+                      {/* ASKIDA */}
+                      <button
+                        type="button"
+                        onClick={() => setAccountStatus('SUSPENDED')}
+                        className={`p-3 rounded-xl border text-left transition-all ${accountStatus === 'SUSPENDED' ? 'bg-amber-500/10 border-amber-500 text-amber-400 ring-1 ring-amber-500/50' : 'bg-black/30 border-white/5 text-zinc-400 hover:border-white/10'}`}
+                      >
+                        <div className="flex items-center gap-2 font-black text-xs">
+                          <span className="w-2 h-2 rounded-full bg-amber-400" />
+                          ASKIDA
+                        </div>
+                        <div className="text-[10px] text-zinc-500 mt-1 leading-snug">
+                          Kısıtlı hesap. Giriş yapabilir; transfer & maç engelli.
+                        </div>
+                      </button>
+
+                      {/* BANLI */}
+                      <button
+                        type="button"
+                        onClick={() => setAccountStatus('BANNED')}
+                        className={`p-3 rounded-xl border text-left transition-all ${accountStatus === 'BANNED' ? 'bg-red-500/10 border-red-500 text-red-400 ring-1 ring-red-500/50' : 'bg-black/30 border-white/5 text-zinc-400 hover:border-white/10'}`}
+                      >
+                        <div className="flex items-center gap-2 font-black text-xs">
+                          <span className="w-2 h-2 rounded-full bg-red-400" />
+                          BANLI
+                        </div>
+                        <div className="text-[10px] text-zinc-500 mt-1 leading-snug">
+                          Yasaklı hesap. Giriş engelli. Takım üyeliği korunur.
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={accountLoading}
+                      className="btn-primary px-5 py-2.5 text-xs font-black flex items-center gap-2 tracking-widest uppercase"
+                    >
+                      {accountLoading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          GÜNCELLENİYOR...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4" />
+                          HESAP BİLGİLERİNİ GÜNCELLE
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
               </div>
 
               {/* Achievements Section */}
@@ -1108,6 +1319,62 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
               >
                 {legacyLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                 EVET, ARŞİVLE
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ban Confirmation Modal */}
+      {banConfirmOpen && selectedPlayer && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+          <div className="card-surface w-full max-w-md rounded-2xl border border-red-500/40 p-6 shadow-2xl space-y-4 bg-[#060d18]">
+            <div className="flex items-center gap-3 text-red-400">
+              <div className="p-3 bg-red-500/10 rounded-xl border border-red-500/20">
+                <AlertTriangle className="w-6 h-6 text-red-400" />
+              </div>
+              <div>
+                <h4 className="text-base font-black text-white uppercase tracking-wide">OYUNCUYU BANLAMAK ÜZERESİNİZ</h4>
+                <p className="text-xs text-red-400 font-bold mt-0.5">Dikkat: Bu işlem oyuncunun erişimini kısıtlar.</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-zinc-300 leading-relaxed">
+              <span className="font-bold text-white">@{selectedPlayer.username}</span> adlı oyuncunun hesabını <span className="font-bold text-red-400">BANLI</span> durumuna getirmek istediğinizden emin misiniz?
+            </p>
+
+            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-[11px] text-red-300 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                <span>Oyuncunun sisteme girişi (Login) tamamen engellenir.</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                <span>Transfer, takım daveti ve maç işlemleri engellenir.</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                <span className="text-emerald-300">Takım üyeliği ve geçmiş kariyer kayıtları güvenle korunur.</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={accountLoading}
+                onClick={() => setBanConfirmOpen(false)}
+                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-zinc-300 font-bold text-xs rounded-lg transition-colors"
+              >
+                Vazgeç
+              </button>
+              <button
+                type="button"
+                disabled={accountLoading}
+                onClick={() => handleSaveAccount(undefined, true)}
+                className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white font-black text-xs rounded-lg transition-colors flex items-center gap-2 tracking-wider uppercase disabled:opacity-50 shadow-lg shadow-red-600/20"
+              >
+                {accountLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                EVET, OYUNCUYU BANLA
               </button>
             </div>
           </div>

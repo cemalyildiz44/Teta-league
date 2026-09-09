@@ -577,3 +577,183 @@ export async function deletePlayerLegacyCareerAction(statId: string) {
     return { error: err.message || 'Beklenmeyen bir hata oluştu.' };
   }
 }
+
+export type PlayerAccountStatus = 'ACTIVE' | 'SUSPENDED' | 'BANNED';
+
+export async function updatePlayerAccountAdminAction(formData: FormData) {
+  try {
+    const cookieStore = await cookies();
+    const supabase = createClient(cookieStore);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { error: 'Yetkisiz erişim. Lütfen giriş yapın.' };
+    }
+
+    const isAdmin = await checkAdmin(supabase, user);
+    if (!isAdmin) {
+      return { error: 'Bu işlemi yapmaya yetkiniz yok. Yalnızca yöneticiler hesap durumunu yönetebilir.' };
+    }
+
+    // Check if caller is SUPER_ADMIN
+    const { data: actorRoleData } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'SUPER_ADMIN')
+      .eq('is_active', true)
+      .maybeSingle();
+    const isActorSuperAdmin = !!actorRoleData;
+
+    const playerId = formData.get('player_id') as string;
+    if (!playerId || typeof playerId !== 'string') {
+      return { error: 'Geçerli bir oyuncu seçilmelidir.' };
+    }
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(playerId)) {
+      return { error: 'Geçersiz oyuncu kimliği (UUID).' };
+    }
+
+    // 1. Fetch target profile
+    const { data: targetProfile, error: targetProfileErr } = await supabase
+      .from('profiles')
+      .select('id, username, current_ea_player_id, is_active, status')
+      .eq('id', playerId)
+      .maybeSingle();
+
+    if (targetProfileErr || !targetProfile) {
+      return { error: 'Hedef oyuncu profili bulunamadı.' };
+    }
+
+    // 2. Form input parsing
+    const rawUsername = (formData.get('username') as string)?.trim();
+    const rawEaId = (formData.get('current_ea_player_id') as string)?.trim() || null;
+    const rawStatus = (formData.get('status') as string)?.trim()?.toUpperCase() as PlayerAccountStatus;
+
+    if (!rawUsername) {
+      return { error: 'Kullanıcı adı boş bırakılamaz.' };
+    }
+
+    // Username format check
+    const usernameRegex = /^[a-zA-Z0-9_.-]{3,30}$/;
+    if (!usernameRegex.test(rawUsername)) {
+      return { error: 'Kullanıcı adı 3-30 karakter arasında olmalı ve yalnızca harf, rakam, alt çizgi, nokta ve tire içerebilir.' };
+    }
+
+    // Status check
+    const validStatuses: PlayerAccountStatus[] = ['ACTIVE', 'SUSPENDED', 'BANNED'];
+    if (!rawStatus || !validStatuses.includes(rawStatus)) {
+      return { error: 'Geçersiz hesap durumu. Yalnızca AKTİF, ASKIDA veya BANLI seçilebilir.' };
+    }
+
+    // 3. Security Guards
+    // A) Self-action guard: Cannot suspend or ban self
+    if (user.id === playerId && rawStatus !== 'ACTIVE') {
+      return { error: 'Kendi hesabınızı askıya alamaz veya yasaklayamazsınız.' };
+    }
+
+    // B) Target user's role check
+    const { data: targetRoles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', playerId)
+      .eq('is_active', true);
+
+    const isTargetSuperAdmin = (targetRoles || []).some(r => r.role === 'SUPER_ADMIN');
+
+    // Hierarchy guard: Only a SUPER_ADMIN can modify another SUPER_ADMIN
+    if (isTargetSuperAdmin && !isActorSuperAdmin) {
+      return { error: 'Süper Yönetici hesapları yalnızca başka bir Süper Yönetici tarafından düzenlenebilir.' };
+    }
+
+    // Last Super Admin guard: Cannot suspend or ban the last active SUPER_ADMIN
+    if (isTargetSuperAdmin && rawStatus !== 'ACTIVE') {
+      const { count, error: countErr } = await supabase
+        .from('user_roles')
+        .select('*', { count: 'exact', head: true })
+        .eq('role', 'SUPER_ADMIN')
+        .eq('is_active', true)
+        .neq('user_id', playerId);
+
+      if (countErr || !count || count === 0) {
+        return { error: 'Sistemdeki son aktif Süper Yönetici hesabı askıya alınamaz veya yasaklanamaz.' };
+      }
+    }
+
+    // 4. Uniqueness Checks
+    // Username uniqueness (case-insensitive)
+    if (rawUsername.toLowerCase() !== targetProfile.username.toLowerCase()) {
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('id')
+        .ilike('username', rawUsername)
+        .neq('id', playerId)
+        .maybeSingle();
+
+      if (existingUser) {
+        return { error: 'Bu kullanıcı adı başka bir oyuncu tarafından kullanılıyor.' };
+      }
+    }
+
+    // EA ID uniqueness (case-insensitive, if provided)
+    if (rawEaId) {
+      const currentEa = targetProfile.current_ea_player_id;
+      if (!currentEa || rawEaId.toLowerCase() !== currentEa.toLowerCase()) {
+        const { data: existingEa } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('current_ea_player_id', rawEaId)
+          .neq('id', playerId)
+          .maybeSingle();
+
+        if (existingEa) {
+          return { error: 'Bu EA ID başka bir oyuncu tarafından kullanılıyor.' };
+        }
+      }
+    }
+
+    // 5. Canonical mapping
+    const is_active = rawStatus === 'ACTIVE';
+
+    // 6. DB Update
+    const updatePayload: any = {
+      username: rawUsername,
+      current_ea_player_id: rawEaId,
+      status: rawStatus,
+      is_active: is_active,
+      updated_at: new Date().toISOString()
+    };
+
+    const { error: updateErr } = await supabase
+      .from('profiles')
+      .update(updatePayload)
+      .eq('id', playerId);
+
+    if (updateErr) {
+      console.error('Update player account error:', updateErr);
+      return { error: `Hesap bilgileri güncellenemedi: ${updateErr.message}` };
+    }
+
+    // Revalidation
+    revalidatePath('/admin/players');
+    revalidatePath('/oyuncular');
+    revalidatePath(`/oyuncular/${encodeURIComponent(rawUsername)}`);
+    if (targetProfile.username && targetProfile.username !== rawUsername) {
+      revalidatePath(`/oyuncular/${encodeURIComponent(targetProfile.username)}`);
+    }
+
+    return {
+      success: 'Oyuncu hesap bilgileri başarıyla güncellendi.',
+      updatedAccount: {
+        username: rawUsername,
+        current_ea_player_id: rawEaId,
+        status: rawStatus,
+        is_active: is_active
+      }
+    };
+  } catch (err: any) {
+    console.error('Unexpected error in updatePlayerAccountAdminAction:', err);
+    return { error: err.message || 'Beklenmeyen bir hata oluştu.' };
+  }
+}

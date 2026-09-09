@@ -5,8 +5,23 @@ import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
 // Captain Security Check
-async function getCaptainContext(supabase: any, user: any) {
+async function getCaptainContext(supabase: any, user: any): Promise<{ teamId: string; seasonId: string; userId: string } | { error: string } | null> {
   if (!user) return null;
+
+  // Check captain's profile status
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('status, is_active')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (profile?.status === 'BANNED') {
+    return { error: 'Hesabınız yasaklanmıştır (BANLI). Kaptanlık işlemi yapamazsınız.' };
+  }
+  if (profile?.status === 'SUSPENDED' || profile?.is_active === false) {
+    return { error: 'Hesabınız askıya alınmıştır. Kaptanlık işlemi yapamazsınız.' };
+  }
+
   const { data: role } = await supabase
     .from('user_roles')
     .select('team_id')
@@ -34,6 +49,7 @@ export async function submitMatchAction(prevState: any, formData: FormData) {
   const ctx = await getCaptainContext(supabase, user);
 
   if (!ctx) return { error: 'Yetkisiz işlem. Kaptan yetkiniz yok.' };
+  if ('error' in ctx) return { error: ctx.error };
 
   const fixture_id = formData.get('fixture_id') as string;
   const home_score = parseInt(formData.get('home_score') as string, 10);
@@ -101,6 +117,7 @@ export async function submitPlayerStatsAction(matchId: string, statsPayload: any
   const ctx = await getCaptainContext(supabase, user);
 
   if (!ctx) return { error: 'Yetkisiz işlem. Kaptan yetkiniz yok.' };
+  if ('error' in ctx) return { error: ctx.error };
 
   // Validate match
   const { data: match } = await supabase
@@ -135,6 +152,23 @@ export async function submitPlayerStatsAction(matchId: string, statsPayload: any
 
     if (hasInvalidPlayer) {
       return { error: 'Takımınızın aktif kadrosunda yer almayan oyuncular için istatistik girilemez.' };
+    }
+
+    // Server-side check: player account status (SUSPENDED / BANNED)
+    const { data: playerProfiles } = await supabase
+      .from('profiles')
+      .select('id, username, status, is_active')
+      .in('id', submittedPlayerIds);
+
+    const invalidPlayer = (playerProfiles || []).find(
+      (p: any) => p.status === 'SUSPENDED' || p.status === 'BANNED' || p.is_active === false
+    );
+
+    if (invalidPlayer) {
+      const statusLabel = invalidPlayer.status === 'BANNED' ? 'yasaklı (BANLI)' : 'askıda';
+      return {
+        error: `@${invalidPlayer.username || 'Bilinmeyen'} adlı oyuncunun hesabı ${statusLabel} olduğu için maç istatistiği kaydedilemez.`
+      };
     }
   }
 
@@ -184,6 +218,7 @@ export async function editMatchAction(matchId: string, formData: FormData) {
 
     // A) Kaptan kontrolü
     if (!ctx) return { error: 'Yetkisiz işlem. Kaptan yetkiniz yok.' };
+    if ('error' in ctx) return { error: ctx.error };
 
     // B) matchId UUID kontrolü
     if (!matchId || typeof matchId !== 'string') {
