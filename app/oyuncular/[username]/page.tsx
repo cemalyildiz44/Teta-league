@@ -704,137 +704,118 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
               </div>
 
               {allSeasonStats.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5">
-                  {allSeasonStats.map((s, idx) => {
-                    const contribution = s.matches > 0 ? ((s.goals + s.assists) / s.matches).toFixed(2) : "0.00";
-                    const hasWDL = s.wins !== undefined && (s.draws !== undefined || s.losses !== undefined);
-                    const hasDefStats = (s.cleanSheets !== undefined && s.cleanSheets > 0) || (s.redCards !== undefined && s.redCards > 0);
+                <div className="bg-[#03070c] border border-white/10 rounded-2xl overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.4)]">
+                  <div className="overflow-x-auto custom-scrollbar">
+                    <table className="w-full text-left min-w-[760px] border-collapse">
+                      <thead className="bg-[#01060b] border-b border-white/10 text-[11px] font-[900] text-gray-400 tracking-wider uppercase">
+                        <tr>
+                          <th className="py-4 pl-6 pr-4">SEZON</th>
+                          <th className="py-4 px-4">KULÜP</th>
+                          <th className="py-4 px-4 text-center">MAÇ</th>
+                          <th className="py-4 px-4 text-center">GOL</th>
+                          <th className="py-4 px-4 text-center">ASİST</th>
+                          <th className="py-4 px-4 text-center text-[#00e5ff]">ORT. REYTING</th>
+                          <th className="py-4 pr-6 pl-4 text-center text-emerald-400">KATKI / MAÇ</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/[0.04]">
+                        {allSeasonStats.map((s, idx) => {
+                          const contribution = s.matches > 0
+                            ? ((s.goals + s.assists) / s.matches).toFixed(2)
+                            : "-";
+                          const formattedRating = s.avgRating > 0
+                            ? s.avgRating.toFixed(2)
+                            : "-";
 
-                    return (
-                      <div
-                        key={idx}
-                        className={`group relative flex flex-col justify-between bg-gradient-to-b from-[#060e1c] to-[#02060c] rounded-2xl border transition-all duration-300 hover:-translate-y-1 p-5 overflow-hidden ${
-                          s.isLegacy
-                            ? 'border-amber-500/20 hover:border-amber-500/50 hover:shadow-[0_8px_30px_rgba(245,158,11,0.08)]'
-                            : 'border-white/10 hover:border-[#00e5ff]/40 hover:shadow-[0_8px_30px_rgba(0,229,255,0.08)]'
-                        }`}
-                      >
-                        {/* Ambient ambient glow */}
-                        {s.isLegacy ? (
-                          <div className="absolute -top-10 -right-10 w-28 h-28 bg-amber-500/5 rounded-full blur-2xl pointer-events-none group-hover:bg-amber-500/10 transition-colors" />
-                        ) : (
-                          <div className="absolute -top-10 -right-10 w-28 h-28 bg-[#00e5ff]/5 rounded-full blur-2xl pointer-events-none group-hover:bg-[#00e5ff]/10 transition-colors" />
-                        )}
-
-                        {/* Top: Header & Team Badge */}
-                        <div className="relative z-10">
-                          <div className="flex items-start justify-between gap-3 mb-4">
-                            <div className="flex flex-col min-w-0">
-                              <div className="flex items-center gap-2">
-                                <h3 className="text-[15px] font-[900] text-white tracking-wide truncate">
-                                  {s.seasonName}
-                                </h3>
-                                {s.isLegacy && (
-                                  <span className="px-2 py-0.5 rounded text-[9px] font-[900] tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/30 uppercase shrink-0">
-                                    ARŞİV
+                          return (
+                            <tr
+                              key={idx}
+                              className="hover:bg-white/[0.02] transition-colors group"
+                            >
+                              {/* SEZON */}
+                              <td className="py-4 pl-6 pr-4">
+                                <div className="flex flex-col">
+                                  <span className="text-[14px] font-[900] text-white tracking-wide group-hover:text-white transition-colors">
+                                    {s.seasonName}
                                   </span>
-                                )}
-                              </div>
-                              <span className={`text-[11px] font-[800] tracking-wider uppercase truncate mt-0.5 ${s.isLegacy ? 'text-amber-400/80' : 'text-[#00e5ff]/80'}`}>
-                                {s.leagueName}
-                              </span>
-                            </div>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <span className={`text-[11px] font-[800] uppercase tracking-wider ${s.isLegacy ? 'text-amber-400/90' : 'text-gray-400'}`}>
+                                      {s.leagueName}
+                                    </span>
+                                    {s.isLegacy && (
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-[900] tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/30 uppercase">
+                                        ARŞİV
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
 
-                            {/* Team logo / badge pill */}
-                            <div className="flex items-center gap-2 px-2.5 py-1.5 bg-black/40 rounded-xl border border-white/10 shrink-0 max-w-[140px]">
-                              <div className="w-5 h-5 rounded-md bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
-                                {s.teamLogo ? (
-                                  <img src={s.teamLogo} alt={s.teamName} className="w-full h-full object-contain p-0.5" />
-                                ) : (
-                                  <span className="text-[9px] font-black text-zinc-400">{s.teamName.substring(0, 2).toUpperCase()}</span>
-                                )}
-                              </div>
-                              {s.teamSlug ? (
-                                <Link href={`/takim/${s.teamSlug}`} className="text-[11px] font-[800] text-zinc-300 hover:text-white transition-colors truncate">
-                                  {s.teamName}
-                                </Link>
-                              ) : (
-                                <span className="text-[11px] font-[800] text-zinc-300 truncate">{s.teamName}</span>
-                              )}
-                            </div>
-                          </div>
+                              {/* KULÜP */}
+                              <td className="py-4 px-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
+                                    {s.teamLogo ? (
+                                      <img src={s.teamLogo} alt={s.teamName} className="w-full h-full object-contain p-1" />
+                                    ) : (
+                                      <span className="text-[10px] font-black text-zinc-400">{s.teamName.substring(0, 2).toUpperCase()}</span>
+                                    )}
+                                  </div>
+                                  {s.teamSlug ? (
+                                    <Link
+                                      href={`/takim/${s.teamSlug}`}
+                                      className="font-[800] text-[13px] text-zinc-200 hover:text-[#00e5ff] transition-colors truncate max-w-[180px]"
+                                    >
+                                      {s.teamName}
+                                    </Link>
+                                  ) : (
+                                    <span className="font-[800] text-[13px] text-zinc-200 truncate max-w-[180px]">
+                                      {s.teamName}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
 
-                          {/* 4 Key Primary Stats Grid */}
-                          <div className="grid grid-cols-4 gap-2 my-2">
-                            <div className="bg-white/[0.02] border border-white/5 rounded-xl p-2.5 text-center flex flex-col justify-center">
-                              <span className="text-[9px] font-[900] text-zinc-500 tracking-wider uppercase mb-1">MAÇ</span>
-                              <span className="text-[18px] font-[900] text-white leading-none">{s.matches}</span>
-                            </div>
-                            <div className="bg-white/[0.02] border border-white/5 rounded-xl p-2.5 text-center flex flex-col justify-center">
-                              <span className="text-[9px] font-[900] text-zinc-500 tracking-wider uppercase mb-1">GOL</span>
-                              <span className="text-[18px] font-[900] text-white leading-none">{s.goals}</span>
-                            </div>
-                            <div className="bg-white/[0.02] border border-white/5 rounded-xl p-2.5 text-center flex flex-col justify-center">
-                              <span className="text-[9px] font-[900] text-zinc-500 tracking-wider uppercase mb-1">ASİST</span>
-                              <span className="text-[18px] font-[900] text-white leading-none">{s.assists}</span>
-                            </div>
-                            <div className="bg-[#00e5ff]/5 border border-[#00e5ff]/20 rounded-xl p-2.5 text-center flex flex-col justify-center">
-                              <span className="text-[9px] font-[900] text-[#00e5ff]/70 tracking-wider uppercase mb-1">RTG</span>
-                              <span className="text-[18px] font-[900] text-[#00e5ff] leading-none">{s.avgRating.toFixed(2)}</span>
-                            </div>
-                          </div>
-                        </div>
+                              {/* MAÇ */}
+                              <td className="py-4 px-4 text-center">
+                                <span className="text-[15px] font-[900] text-white">
+                                  {s.matches}
+                                </span>
+                              </td>
 
-                        {/* Bottom: Secondary Stats & Details */}
-                        <div className="relative z-10 mt-3 pt-3 border-t border-white/5 space-y-1.5">
-                          {/* W/D/L if available */}
-                          {hasWDL && (
-                            <div className="flex items-center justify-between text-[11px] pb-1 border-b border-white/[0.03]">
-                              <span className="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Sonuçlar</span>
-                              <div className="flex items-center gap-2 font-mono font-bold text-[11px]">
-                                <span className="text-emerald-400">{s.wins}G</span>
-                                <span className="text-amber-400">{s.draws ?? 0}B</span>
-                                <span className="text-red-400">{s.losses ?? 0}M</span>
-                              </div>
-                            </div>
-                          )}
+                              {/* GOL */}
+                              <td className="py-4 px-4 text-center">
+                                <span className="text-[15px] font-[900] text-white">
+                                  {s.goals}
+                                </span>
+                              </td>
 
-                          {/* Katkı / Maç */}
-                          <div className="flex items-center justify-between text-[11px]">
-                            <span className="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Katkı / Maç</span>
-                            <span className="font-bold text-emerald-400">{contribution}</span>
-                          </div>
+                              {/* ASİST */}
+                              <td className="py-4 px-4 text-center">
+                                <span className="text-[15px] font-[900] text-white">
+                                  {s.assists}
+                                </span>
+                              </td>
 
-                          {/* CS & Red cards if recorded */}
-                          {hasDefStats && (
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">CS • K.Kart</span>
-                              <span className="font-medium text-zinc-300">
-                                <span className="text-white font-bold">{s.cleanSheets || 0}</span> CS
-                                <span className="text-zinc-600 mx-1.5">•</span>
-                                <span className={s.redCards ? 'text-red-400 font-bold' : 'text-zinc-400'}>{s.redCards || 0} Kırmızı</span>
-                              </span>
-                            </div>
-                          )}
+                              {/* ORT. REYTING */}
+                              <td className="py-4 px-4 text-center">
+                                <span className="inline-block px-2.5 py-1 rounded-lg font-[900] text-[13px] font-mono bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/25 drop-shadow-[0_0_8px_rgba(0,229,255,0.2)]">
+                                  {formattedRating}
+                                </span>
+                              </td>
 
-                          {/* Legacy Arşiv Değeri */}
-                          {Boolean(s.marketValue && s.marketValue > 0) && (
-                            <div className="flex items-center justify-between text-[11px] pt-0.5">
-                              <span className="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Arşiv Değeri</span>
-                              <span className="font-mono font-bold text-[#00e5ff]">{formatEuro(s.marketValue!)}</span>
-                            </div>
-                          )}
-
-                          {/* Legacy Notlar */}
-                          {Boolean(s.notes) && (
-                            <p className="text-[10px] text-zinc-400 italic pt-1 border-t border-white/5 line-clamp-2">
-                              &quot;{s.notes}&quot;
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                              {/* KATKI / MAÇ */}
+                              <td className="py-4 pr-6 pl-4 text-center">
+                                <span className="font-[900] text-[14px] font-mono text-emerald-400">
+                                  {contribution}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               ) : (
                 <div className="bg-[#03070c] border border-white/5 rounded-2xl px-6 py-12 text-center text-[13px] font-[700] text-gray-600">Henüz sezon istatistiği bulunmuyor.</div>

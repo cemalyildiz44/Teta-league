@@ -141,16 +141,16 @@ export interface PlayerLegacyCareerStat {
   team_id: string | null;
   team_name: string;
   matches_played: number;
-  wins: number;
-  draws: number;
-  losses: number;
+  wins?: number | null;
+  draws?: number | null;
+  losses?: number | null;
   goals: number;
   assists: number;
   rating_avg: number;
-  clean_sheets: number;
-  red_cards: number;
-  market_value: number;
-  notes: string | null;
+  clean_sheets?: number | null;
+  red_cards?: number | null;
+  market_value?: number | null;
+  notes?: string | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;
@@ -163,16 +163,9 @@ interface LegacyCareerValidatedData {
   team_id: string | null;
   team_name: string;
   matches_played: number;
-  wins: number;
-  draws: number;
-  losses: number;
   goals: number;
   assists: number;
   rating_avg: number;
-  clean_sheets: number;
-  red_cards: number;
-  market_value: number;
-  notes: string;
 }
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -188,16 +181,9 @@ async function validateAndResolveLegacyCareerInput(
   const rawCustomTeamName = formData.get('custom_team_name');
 
   const rawMatches = formData.get('matches_played');
-  const rawWins = formData.get('wins');
-  const rawDraws = formData.get('draws');
-  const rawLosses = formData.get('losses');
   const rawGoals = formData.get('goals');
   const rawAssists = formData.get('assists');
   const rawRating = formData.get('rating_avg');
-  const rawCleanSheets = formData.get('clean_sheets');
-  const rawRedCards = formData.get('red_cards');
-  const rawMarketValue = formData.get('market_value');
-  const rawNotes = formData.get('notes');
 
   const season_name = typeof rawSeason === 'string' ? rawSeason.trim() : '';
   if (!season_name) {
@@ -227,41 +213,15 @@ async function validateAndResolveLegacyCareerInput(
   const pMatches = parsePositiveInt(rawMatches, 'Oynanan Maç');
   if (pMatches.err) return { error: pMatches.err };
 
-  const pWins = parsePositiveInt(rawWins, 'Galibiyet');
-  if (pWins.err) return { error: pWins.err };
-
-  const pDraws = parsePositiveInt(rawDraws, 'Beraberlik');
-  if (pDraws.err) return { error: pDraws.err };
-
-  const pLosses = parsePositiveInt(rawLosses, 'Mağlubiyet');
-  if (pLosses.err) return { error: pLosses.err };
-
   const pGoals = parsePositiveInt(rawGoals, 'Gol');
   if (pGoals.err) return { error: pGoals.err };
 
   const pAssists = parsePositiveInt(rawAssists, 'Asist');
   if (pAssists.err) return { error: pAssists.err };
 
-  const pCleanSheets = parsePositiveInt(rawCleanSheets, 'Gol Yememe');
-  if (pCleanSheets.err) return { error: pCleanSheets.err };
-
-  const pRedCards = parsePositiveInt(rawRedCards, 'Kırmızı Kart');
-  if (pRedCards.err) return { error: pRedCards.err };
-
-  const pMarketValue = parsePositiveInt(rawMarketValue, 'Piyasa Değeri');
-  if (pMarketValue.err) return { error: pMarketValue.err };
-
   const matches_played = pMatches.val!;
-  const wins = pWins.val!;
-  const draws = pDraws.val!;
-  const losses = pLosses.val!;
-
-  // Strict check: wins + draws + losses === matches_played
-  if (wins + draws + losses !== matches_played) {
-    return {
-      error: `Sonuçlar toplamı (G: ${wins} + B: ${draws} + M: ${losses} = ${wins + draws + losses}) oynanan maç sayısına (${matches_played}) eşit olmalıdır.`
-    };
-  }
+  const goals = pGoals.val!;
+  const assists = pAssists.val!;
 
   // Rating 0.0 - 10.0
   const ratingNum = Number(rawRating);
@@ -305,8 +265,6 @@ async function validateAndResolveLegacyCareerInput(
     team_name = customName;
   }
 
-  const notes = typeof rawNotes === 'string' ? rawNotes.slice(0, 500).trim() : '';
-
   return {
     data: {
       season_name,
@@ -314,16 +272,9 @@ async function validateAndResolveLegacyCareerInput(
       team_id,
       team_name,
       matches_played,
-      wins,
-      draws,
-      losses,
-      goals: pGoals.val!,
-      assists: pAssists.val!,
-      rating_avg,
-      clean_sheets: pCleanSheets.val!,
-      red_cards: pRedCards.val!,
-      market_value: pMarketValue.val!,
-      notes
+      goals,
+      assists,
+      rating_avg
     }
   };
 }
@@ -392,16 +343,16 @@ export async function addPlayerLegacyCareerAction(playerId: string, formData: Fo
         team_id: input.team_id,
         team_name: input.team_name,
         matches_played: input.matches_played,
-        wins: input.wins,
-        draws: input.draws,
-        losses: input.losses,
+        wins: null,
+        draws: null,
+        losses: null,
         goals: input.goals,
         assists: input.assists,
         rating_avg: input.rating_avg,
-        clean_sheets: input.clean_sheets,
-        red_cards: input.red_cards,
-        market_value: input.market_value,
-        notes: input.notes,
+        clean_sheets: 0,
+        red_cards: 0,
+        market_value: 0,
+        notes: null,
         created_by: user.id
       });
 
@@ -480,6 +431,8 @@ export async function updatePlayerLegacyCareerAction(statId: string, formData: F
       return { error: 'Bu oyuncu için belirtilen sezon ve takımda başka bir aktif legacy kaydı zaten var.' };
     }
 
+    // UPDATE: Exclude wins, draws, losses, clean_sheets, red_cards, market_value, notes
+    // to preserve whatever original values already exist on this record!
     const { error: updateErr } = await supabase
       .from('player_legacy_career_stats')
       .update({
@@ -488,16 +441,9 @@ export async function updatePlayerLegacyCareerAction(statId: string, formData: F
         team_id: input.team_id,
         team_name: input.team_name,
         matches_played: input.matches_played,
-        wins: input.wins,
-        draws: input.draws,
-        losses: input.losses,
         goals: input.goals,
         assists: input.assists,
         rating_avg: input.rating_avg,
-        clean_sheets: input.clean_sheets,
-        red_cards: input.red_cards,
-        market_value: input.market_value,
-        notes: input.notes,
         updated_at: new Date().toISOString()
       })
       .eq('id', statId);

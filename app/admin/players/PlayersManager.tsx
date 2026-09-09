@@ -97,16 +97,9 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
     team_id: teams[0]?.id || '',
     custom_team_name: '',
     matches_played: 0,
-    wins: 0,
-    draws: 0,
-    losses: 0,
     goals: 0,
     assists: 0,
-    rating_avg: 6.0,
-    clean_sheets: 0,
-    red_cards: 0,
-    market_value: 0,
-    notes: ''
+    rating_avg: 7.0
   };
 
   const [legacyForm, setLegacyForm] = useState(initialLegacyForm);
@@ -130,16 +123,9 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
       team_id: stat.team_id || (teams[0]?.id || ''),
       custom_team_name: stat.team_id ? '' : stat.team_name,
       matches_played: stat.matches_played,
-      wins: stat.wins,
-      draws: stat.draws,
-      losses: stat.losses,
       goals: stat.goals,
       assists: stat.assists,
-      rating_avg: Number(stat.rating_avg),
-      clean_sheets: stat.clean_sheets,
-      red_cards: stat.red_cards,
-      market_value: stat.market_value,
-      notes: stat.notes || ''
+      rating_avg: Number(stat.rating_avg)
     });
     setLegacyFeedback(null);
     setLegacyModalOpen(true);
@@ -155,16 +141,6 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
     e.preventDefault();
     if (!selectedPlayer) return;
 
-    // Check match math
-    const matchSum = Number(legacyForm.wins) + Number(legacyForm.draws) + Number(legacyForm.losses);
-    if (matchSum !== Number(legacyForm.matches_played)) {
-      setLegacyFeedback({
-        msg: `Galibiyet (${legacyForm.wins}) + Beraberlik (${legacyForm.draws}) + Mağlubiyet (${legacyForm.losses}) toplamı (${matchSum}), Oynanan Maç (${legacyForm.matches_played}) sayısına eşit olmalıdır.`,
-        type: 'error'
-      });
-      return;
-    }
-
     setLegacyLoading(true);
     setLegacyFeedback(null);
 
@@ -178,16 +154,9 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
       formData.append('team_name', legacyForm.custom_team_name);
     }
     formData.append('matches_played', String(legacyForm.matches_played));
-    formData.append('wins', String(legacyForm.wins));
-    formData.append('draws', String(legacyForm.draws));
-    formData.append('losses', String(legacyForm.losses));
     formData.append('goals', String(legacyForm.goals));
     formData.append('assists', String(legacyForm.assists));
     formData.append('rating_avg', String(legacyForm.rating_avg));
-    formData.append('clean_sheets', String(legacyForm.clean_sheets));
-    formData.append('red_cards', String(legacyForm.red_cards));
-    formData.append('market_value', String(legacyForm.market_value));
-    formData.append('notes', legacyForm.notes);
 
     let res;
     if (editingLegacyStat) {
@@ -877,42 +846,26 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
 
                           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-3 text-center">
                             <div className="bg-black/30 p-2 rounded-lg border border-white/5">
-                              <div className="text-[9px] font-bold text-zinc-500 uppercase">Maç / G-B-M</div>
-                              <div className="text-xs font-black text-white mt-0.5">
-                                {stat.matches_played} <span className="text-[10px] font-normal text-zinc-400">({stat.wins}G {stat.draws}B {stat.losses}M)</span>
-                              </div>
+                              <div className="text-[9px] font-bold text-zinc-500 uppercase">Maç</div>
+                              <div className="text-xs font-black text-white mt-0.5">{stat.matches_played}</div>
                             </div>
                             <div className="bg-black/30 p-2 rounded-lg border border-white/5">
-                              <div className="text-[9px] font-bold text-zinc-500 uppercase">Gol / Asist</div>
-                              <div className="text-xs font-black text-emerald-400 mt-0.5">
-                                {stat.goals} G <span className="text-zinc-500 font-normal">/</span> {stat.assists} A
-                              </div>
+                              <div className="text-[9px] font-bold text-zinc-500 uppercase">Gol</div>
+                              <div className="text-xs font-black text-white mt-0.5">{stat.goals}</div>
                             </div>
                             <div className="bg-black/30 p-2 rounded-lg border border-white/5">
-                              <div className="text-[9px] font-bold text-zinc-500 uppercase">Rating / Katkı</div>
-                              <div className="text-xs font-black text-amber-400 mt-0.5">
-                                ★ {Number(stat.rating_avg).toFixed(1)} <span className="text-[10px] font-normal text-zinc-400">({contribution}/m)</span>
-                              </div>
+                              <div className="text-[9px] font-bold text-zinc-500 uppercase">Asist</div>
+                              <div className="text-xs font-black text-white mt-0.5">{stat.assists}</div>
                             </div>
                             <div className="bg-black/30 p-2 rounded-lg border border-white/5">
-                              <div className="text-[9px] font-bold text-zinc-500 uppercase">CS / Kırmızı Kart</div>
-                              <div className="text-xs font-bold text-zinc-300 mt-0.5">
-                                {stat.clean_sheets} CS <span className="text-zinc-500 font-normal">/</span> {stat.red_cards} K.Kart
-                              </div>
+                              <div className="text-[9px] font-bold text-zinc-500 uppercase">Ort. Rating</div>
+                              <div className="text-xs font-black text-[#00e5ff] mt-0.5">★ {Number(stat.rating_avg).toFixed(2)}</div>
                             </div>
                             <div className="bg-black/30 p-2 rounded-lg border border-white/5 col-span-2 sm:col-span-1">
-                              <div className="text-[9px] font-bold text-zinc-500 uppercase">Eski Piyasa Değeri</div>
-                              <div className="text-xs font-mono font-bold text-cyan-400 mt-0.5">
-                                €{Number(stat.market_value || 0).toLocaleString('tr-TR')}
-                              </div>
+                              <div className="text-[9px] font-bold text-zinc-500 uppercase">Katkı / Maç</div>
+                              <div className="text-xs font-black text-emerald-400 mt-0.5">{contribution}</div>
                             </div>
                           </div>
-
-                          {stat.notes && (
-                            <div className="mt-2 text-[11px] text-zinc-400 italic bg-white/[0.02] p-2 rounded border border-white/5">
-                              &quot;{stat.notes}&quot;
-                            </div>
-                          )}
                         </div>
                       );
                     })}
@@ -1069,90 +1022,22 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
                 )}
               </div>
 
-              {/* Maç Sonuçları ve Matematik Doğrulaması */}
-              <div className="bg-black/30 p-4 rounded-xl border border-white/5 space-y-3">
-                <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                  Maç Sayısı ve Dağılımı (G + B + M = Toplam Maç)
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  <div>
-                    <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">
-                      Oynanan Maç
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={legacyForm.matches_played}
-                      onChange={e => setLegacyForm({ ...legacyForm, matches_played: Math.max(0, parseInt(e.target.value) || 0) })}
-                      className="input-field text-sm py-1.5"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-emerald-400 uppercase mb-1">
-                      Galibiyet (G)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={legacyForm.wins}
-                      onChange={e => setLegacyForm({ ...legacyForm, wins: Math.max(0, parseInt(e.target.value) || 0) })}
-                      className="input-field text-sm py-1.5"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-amber-400 uppercase mb-1">
-                      Beraberlik (B)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={legacyForm.draws}
-                      onChange={e => setLegacyForm({ ...legacyForm, draws: Math.max(0, parseInt(e.target.value) || 0) })}
-                      className="input-field text-sm py-1.5"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-red-400 uppercase mb-1">
-                      Mağlubiyet (M)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={legacyForm.losses}
-                      onChange={e => setLegacyForm({ ...legacyForm, losses: Math.max(0, parseInt(e.target.value) || 0) })}
-                      className="input-field text-sm py-1.5"
-                    />
-                  </div>
-                </div>
-
-                {/* Live Math Validation Warning */}
-                {(() => {
-                  const mathSum = Number(legacyForm.wins) + Number(legacyForm.draws) + Number(legacyForm.losses);
-                  const isMatch = mathSum === Number(legacyForm.matches_played);
-                  if (!isMatch) {
-                    return (
-                      <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 shrink-0" />
-                        <span>
-                          Matematiksel Uyumsuzluk: Galibiyet ({legacyForm.wins}) + Beraberlik ({legacyForm.draws}) + Mağlubiyet ({legacyForm.losses}) = {mathSum}, ancak Oynanan Maç sayısı {legacyForm.matches_played}. Kaydedebilmek için bu toplamlar eşit olmalıdır.
-                        </span>
-                      </div>
-                    );
-                  }
-                  return (
-                    <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-bold flex items-center gap-2">
-                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                      <span>Maç dağılımı matematiksel olarak doğrulandı ({legacyForm.wins}G + {legacyForm.draws}B + {legacyForm.losses}M = {legacyForm.matches_played} Maç).</span>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Bireysel Performans */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {/* Bireysel İstatistikler Grid: MAÇ, GOL, ASİST, RATING */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">
+                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+                    Oynanan Maç *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={legacyForm.matches_played}
+                    onChange={e => setLegacyForm({ ...legacyForm, matches_played: Math.max(0, parseInt(e.target.value) || 0) })}
+                    className="input-field text-sm py-2 font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">
                     Gol
                   </label>
                   <input
@@ -1160,11 +1045,11 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
                     min="0"
                     value={legacyForm.goals}
                     onChange={e => setLegacyForm({ ...legacyForm, goals: Math.max(0, parseInt(e.target.value) || 0) })}
-                    className="input-field text-sm py-1.5"
+                    className="input-field text-sm py-2 font-bold"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">
+                  <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">
                     Asist
                   </label>
                   <input
@@ -1172,79 +1057,52 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
                     min="0"
                     value={legacyForm.assists}
                     onChange={e => setLegacyForm({ ...legacyForm, assists: Math.max(0, parseInt(e.target.value) || 0) })}
-                    className="input-field text-sm py-1.5"
+                    className="input-field text-sm py-2 font-bold"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">
+                  <label className="block text-[10px] font-bold text-[#00e5ff] uppercase tracking-wider mb-1">
                     Ort. Rating (0-10)
                   </label>
                   <input
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     min="0"
                     max="10"
                     value={legacyForm.rating_avg}
                     onChange={e => setLegacyForm({ ...legacyForm, rating_avg: Math.min(10, Math.max(0, parseFloat(e.target.value) || 0)) })}
-                    className="input-field text-sm py-1.5"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">
-                    CS (Gol Yememe)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={legacyForm.clean_sheets}
-                    onChange={e => setLegacyForm({ ...legacyForm, clean_sheets: Math.max(0, parseInt(e.target.value) || 0) })}
-                    className="input-field text-sm py-1.5"
+                    className="input-field text-sm py-2 font-bold font-mono"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">
-                    Kırmızı Kart
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={legacyForm.red_cards}
-                    onChange={e => setLegacyForm({ ...legacyForm, red_cards: Math.max(0, parseInt(e.target.value) || 0) })}
-                    className="input-field text-sm py-1.5"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">
-                    Eski Piyasa Değeri (€)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="10000"
-                    value={legacyForm.market_value}
-                    onChange={e => setLegacyForm({ ...legacyForm, market_value: Math.max(0, parseInt(e.target.value) || 0) })}
-                    className="input-field text-sm py-1.5"
-                  />
-                </div>
-              </div>
+              {/* Katkı / Maç - Read-only canlı gösterim */}
+              {(() => {
+                const liveMatches = Number(legacyForm.matches_played);
+                const liveGoals = Number(legacyForm.goals);
+                const liveAssists = Number(legacyForm.assists);
+                const liveContribution = liveMatches > 0
+                  ? ((liveGoals + liveAssists) / liveMatches).toFixed(2)
+                  : '0.00';
 
-              {/* Notlar */}
-              <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">
-                  Sezon Notu / Başarı Detayı (Maksimum 500 karakter)
-                </label>
-                <input
-                  type="text"
-                  maxLength={500}
-                  placeholder="Örn: Sezon gol kralı, Play-off finalisti..."
-                  value={legacyForm.notes}
-                  onChange={e => setLegacyForm({ ...legacyForm, notes: e.target.value })}
-                  className="input-field text-sm py-1.5"
-                />
-              </div>
+                return (
+                  <div className="p-3.5 rounded-xl bg-black/40 border border-white/5 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                        Katkı / Maç (Otomatik Hesaplanır)
+                      </span>
+                      <p className="text-[11px] text-zinc-500 mt-0.5">
+                        (Toplam {liveGoals} Gol + {liveAssists} Asist) / {liveMatches} Maç
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-black font-mono text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">
+                        {liveContribution} / maç
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Footer Actions */}
               <div className="pt-3 border-t border-white/5 flex items-center justify-end gap-3">
@@ -1262,8 +1120,7 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
                     !legacyForm.season_name.trim() ||
                     !legacyForm.league_name.trim() ||
                     (legacyForm.team_mode === 'EXISTING' && !legacyForm.team_id) ||
-                    (legacyForm.team_mode === 'CUSTOM' && !legacyForm.custom_team_name.trim()) ||
-                    (Number(legacyForm.wins) + Number(legacyForm.draws) + Number(legacyForm.losses) !== Number(legacyForm.matches_played))
+                    (legacyForm.team_mode === 'CUSTOM' && !legacyForm.custom_team_name.trim())
                   }
                   className="btn-primary px-5 py-2 text-xs font-black flex items-center gap-2 tracking-widest uppercase disabled:opacity-50 disabled:cursor-not-allowed"
                 >
