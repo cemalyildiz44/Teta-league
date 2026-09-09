@@ -151,7 +151,8 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
     if (legacyForm.team_mode === 'EXISTING') {
       formData.append('team_id', legacyForm.team_id);
     } else {
-      formData.append('team_name', legacyForm.custom_team_name);
+      formData.append('custom_team_name', legacyForm.custom_team_name.trim());
+      formData.append('team_name', legacyForm.custom_team_name.trim());
     }
     formData.append('matches_played', String(legacyForm.matches_played));
     formData.append('goals', String(legacyForm.goals));
@@ -1009,6 +1010,7 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
                   <div>
                     <input
                       type="text"
+                      name="custom_team_name"
                       maxLength={80}
                       placeholder="Örn: Anatolian Lions, FC Bosphorus..."
                       value={legacyForm.custom_team_name}

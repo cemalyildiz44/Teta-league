@@ -178,7 +178,7 @@ async function validateAndResolveLegacyCareerInput(
   const rawLeague = formData.get('league_name');
   const rawTeamMode = formData.get('team_mode'); // 'EXISTING' or 'CUSTOM'
   const rawTeamId = formData.get('team_id');
-  const rawCustomTeamName = formData.get('custom_team_name');
+  const rawCustomTeamName = formData.get('custom_team_name') || formData.get('team_name');
 
   const rawMatches = formData.get('matches_played');
   const rawGoals = formData.get('goals');
