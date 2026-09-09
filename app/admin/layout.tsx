@@ -54,6 +54,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <Link href="/admin/teams" className="block px-4 py-3 rounded-lg text-sm font-bold text-gray-400 hover:text-[#00e5ff] hover:bg-[#00e5ff]/10 transition-colors">
             Takımlar
           </Link>
+          <Link href="/admin/players" className="block px-4 py-3 rounded-lg text-sm font-bold text-gray-400 hover:text-[#00e5ff] hover:bg-[#00e5ff]/10 transition-colors">
+            Oyuncular
+          </Link>
+          <Link href="/admin/penalties" className="block px-4 py-3 rounded-lg text-sm font-bold text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+            Ceza Yönetimi
+          </Link>
 
           <Link href="/admin/fixtures" className="block px-4 py-3 rounded-lg text-sm font-bold text-gray-400 hover:text-[#00e5ff] hover:bg-[#00e5ff]/10 transition-colors">
             Fikstürler

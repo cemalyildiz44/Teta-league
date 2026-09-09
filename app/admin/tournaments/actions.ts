@@ -216,3 +216,84 @@ export async function deleteTournamentAction(id: string) {
   return { success: 'Turnuva başarıyla silindi.' };
 }
 
+export async function updateNightCupDetailsAction(formData: FormData) {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!(await checkAdmin(supabase, user))) return { error: 'Yetkisiz erişim. Lütfen admin girişi yapın.' };
+
+  const tournament_id = formData.get('tournament_id') as string;
+  const name = formData.get('name') as string;
+  const description = formData.get('description') as string;
+  const max_teams = formData.get('max_teams') as string;
+  const is_registration_open = formData.get('is_registration_open') === 'true';
+  const registration_start = formData.get('registration_start') as string;
+  const registration_end = formData.get('registration_end') as string;
+  const tournament_date = formData.get('tournament_date') as string;
+
+  if (!tournament_id || typeof tournament_id !== 'string') {
+    return { error: 'Geçersiz turnuva kimliği.' };
+  }
+
+  // UUID kontrolü
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(tournament_id)) {
+    return { error: 'Geçersiz turnuva kimlik formatı.' };
+  }
+
+  if (!name || !name.trim()) {
+    return { error: 'Turnuva adı zorunludur.' };
+  }
+
+  // Kontenjan kontrolü (pozitif sayı)
+  let parsedMaxTeams: number | null = null;
+  if (max_teams && max_teams.trim()) {
+    const val = parseInt(max_teams, 10);
+    if (isNaN(val) || val <= 0) {
+      return { error: 'Kontenjan pozitif bir sayı olmalıdır.' };
+    }
+    parsedMaxTeams = val;
+  }
+
+  // Tarih sıralama kontrolü
+  if (registration_start && registration_end) {
+    const start = new Date(registration_start).getTime();
+    const end = new Date(registration_end).getTime();
+    if (!isNaN(start) && !isNaN(end) && end < start) {
+      return { error: 'Başvuru bitiş tarihi, başlangıç tarihinden önce olamaz.' };
+    }
+  }
+
+  // Turnuvayı doğrula
+  const { data: tour, error: fetchError } = await supabase
+    .from('tournaments')
+    .select('id, type')
+    .eq('id', tournament_id)
+    .maybeSingle();
+
+  if (fetchError || !tour) {
+    return { error: 'Turnuva bulunamadı.' };
+  }
+
+  const { error: updateError } = await supabase
+    .from('tournaments')
+    .update({
+      name: name.trim(),
+      description: description ? description.trim() : null,
+      max_teams: parsedMaxTeams,
+      is_registration_open,
+      registration_start: registration_start || null,
+      registration_end: registration_end || null,
+      tournament_date: tournament_date || null
+    })
+    .eq('id', tournament_id);
+
+  if (updateError) {
+    return { error: 'Turnuva güncellenemedi: ' + updateError.message };
+  }
+
+  revalidatePath('/admin/tournaments');
+  revalidatePath('/turnuvalar');
+  return { success: 'Night Cup bilgileri başarıyla güncellendi.' };
+}
+

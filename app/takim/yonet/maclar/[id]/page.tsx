@@ -3,6 +3,8 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { PlayerStatsForm } from './PlayerStatsForm';
+import { MatchEditForm } from './MatchEditForm';
+import { MatchAuditHistory } from './MatchAuditHistory';
 
 export default async function MatchDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = await params;
@@ -58,6 +60,19 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
     .eq('match_id', matchId)
     .eq('team_id', teamId);
 
+  // Fetch audit logs for this match
+  const { data: rawAuditLogs } = await supabase
+    .from('audit_logs')
+    .select('id, actor_id, action, entity_type, entity_id, old_data, new_data, created_at, profiles:actor_id(username, avatar_url)')
+    .eq('entity_type', 'matches')
+    .eq('entity_id', matchId)
+    .order('created_at', { ascending: false });
+
+  const auditLogs = (rawAuditLogs || []).map((log: any) => ({
+    ...log,
+    actor: Array.isArray(log.profiles) ? log.profiles[0] : log.profiles
+  }));
+
   return (
     <main className="min-h-screen bg-[#060d18] pt-24 pb-12">
       <div className="max-w-6xl mx-auto px-4 lg:px-6">
@@ -80,7 +95,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
               <span className="text-[10px] text-gray-500 font-black tracking-widest uppercase mb-2">Ev Sahibi</span>
               <span className="text-xl font-black text-white text-center">{homeTeam?.name}</span>
             </div>
-            
+
             <div className="flex flex-col items-center">
               <div className="flex items-center gap-4 bg-[#0a1628] px-6 py-4 rounded-xl border border-white/10">
                 <span className="text-3xl font-black text-white">{match.home_score}</span>
@@ -103,7 +118,20 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
           </div>
         </div>
 
-        {/* Notes & Screenshot */}
+        {/* 6C: Match Score and Proof Edit Form (Only for PENDING_REVIEW) */}
+        {match.status === 'PENDING_REVIEW' && (
+          <MatchEditForm
+            matchId={matchId}
+            homeTeamName={homeTeam?.name || 'Ev Sahibi'}
+            awayTeamName={awayTeam?.name || 'Deplasman'}
+            initialHomeScore={match.home_score}
+            initialAwayScore={match.away_score}
+            initialScreenshotUrl={match.screenshot_url}
+            initialNotes={match.notes}
+          />
+        )}
+
+        {/* Notes & Screenshot Display (Read-Only overview) */}
         {(match.notes || match.screenshot_url) && (
           <div className="card-surface p-6 rounded-xl border border-white/5 mb-8 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -128,12 +156,15 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
           </div>
         )}
 
-        {/* Stats Form */}
+        {/* 6C: Match Audit History */}
+        <MatchAuditHistory logs={auditLogs} />
+
+        {/* Player Stats Form */}
         {match.status === 'PENDING_REVIEW' ? (
           <PlayerStatsForm matchId={matchId} roster={roster} existingStats={existingStats || []} />
         ) : (
           <div className="card-surface p-8 text-center rounded-xl border border-white/5">
-            <span className="text-gray-500 text-sm font-medium italic">Bu maç {match.status} durumunda olduğu için istatistikler değiştirilemez.</span>
+            <span className="text-gray-500 text-sm font-medium italic">Bu maç {match.status} durumunda olduğu için skor ve istatistikler değiştirilemez.</span>
           </div>
         )}
       </div>

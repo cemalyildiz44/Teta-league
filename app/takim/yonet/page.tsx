@@ -42,10 +42,19 @@ export default async function TeamManagementPage() {
   // Active League for this team
   const { data: leagueTeam } = await supabase
     .from('league_teams')
-    .select('leagues(name)')
+    .select('league_id, leagues(name)')
     .eq('team_id', teamId)
     .eq('season_id', activeSeason.id)
     .maybeSingle();
+
+  // Fetch active penalties for this team's current season
+  const { data: teamPenalties } = await supabase
+    .from('team_penalties')
+    .select('id, penalty_type, points_deducted, violation_order, reason, issued_at, is_revoked')
+    .eq('team_id', teamId)
+    .eq('season_id', activeSeason.id)
+    .eq('is_revoked', false)
+    .order('issued_at', { ascending: false });
 
   // Team Details
   const { data: team } = await supabase
@@ -142,6 +151,65 @@ export default async function TeamManagementPage() {
             )}
           </div>
         </div>
+
+        {/* Penalty Info (Read-only) */}
+        {teamPenalties && teamPenalties.length > 0 && (
+          <div className="card-surface p-6 rounded-2xl border border-red-500/20 bg-red-500/5 mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-red-400 text-lg">⚠</span>
+              <h3 className="text-sm font-black text-red-400 tracking-widest uppercase">CEZA BİLGİSİ</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+              <div className="bg-black/30 rounded-xl p-4 border border-white/5">
+                <div className="text-[10px] font-bold text-gray-500 tracking-widest uppercase">Aktif Ceza</div>
+                <div className="text-2xl font-black text-red-400 mt-1">{teamPenalties.length}</div>
+              </div>
+              <div className="bg-black/30 rounded-xl p-4 border border-white/5">
+                <div className="text-[10px] font-bold text-gray-500 tracking-widest uppercase">Toplam Puan Kesintisi</div>
+                <div className="text-2xl font-black text-orange-400 mt-1">
+                  -{teamPenalties.reduce((sum, p) => sum + (p.points_deducted || 0), 0)}
+                </div>
+              </div>
+              <div className="bg-black/30 rounded-xl p-4 border border-white/5">
+                <div className="text-[10px] font-bold text-gray-500 tracking-widest uppercase">İhraç Durumu</div>
+                <div className="text-2xl font-black mt-1">
+                  {teamPenalties.some(p => p.penalty_type === 'EXPULSION') ? (
+                    <span className="text-red-500">İHRAÇ</span>
+                  ) : (
+                    <span className="text-green-400">—</span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {teamPenalties.slice(0, 3).map(p => {
+                const typeLabels: Record<string, string> = {
+                  WARNING: 'UYARI',
+                  POINTS_DEDUCTION: 'PUAN CEZASI',
+                  EXPULSION: 'İHRAÇ',
+                };
+                const typeColors: Record<string, string> = {
+                  WARNING: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
+                  POINTS_DEDUCTION: 'text-orange-400 bg-orange-500/10 border-orange-500/30',
+                  EXPULSION: 'text-red-400 bg-red-500/10 border-red-500/30',
+                };
+                return (
+                  <div key={p.id} className="flex items-center gap-3 p-3 bg-black/20 rounded-lg border border-white/5">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-black tracking-widest border ${typeColors[p.penalty_type] || ''}`}>
+                      {typeLabels[p.penalty_type] || p.penalty_type}
+                    </span>
+                    <span className="text-xs text-gray-500">#{p.violation_order}</span>
+                    {p.points_deducted > 0 && (
+                      <span className="text-xs text-orange-400 font-bold">-{p.points_deducted} puan</span>
+                    )}
+                    <span className="text-xs text-gray-400 flex-1 truncate">{p.reason}</span>
+                    <span className="text-[10px] text-gray-600">{new Date(p.issued_at).toLocaleDateString('tr-TR')}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column: Search & Roster & Socials */}
