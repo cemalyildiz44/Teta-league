@@ -38,7 +38,7 @@ export default async function AdminPlayersPage() {
   ] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id, username, full_name, avatar_url, platform, primary_position, alternative_positions, is_active, beta_registered, beta_old_stats, created_at')
+      .select('id, username, full_name, avatar_url, platform, primary_position, alternative_positions, is_active, beta_registered, created_at')
       .order('created_at', { ascending: false }),
     supabase
       .from('team_memberships')
@@ -122,7 +122,6 @@ export default async function AdminPlayersPage() {
     alternative_positions: p.alternative_positions || [],
     is_active: p.is_active ?? true,
     beta_registered: p.beta_registered ?? false,
-    beta_old_stats: p.beta_old_stats || null,
     created_at: p.created_at,
     active_team: teamMap.get(p.id) || null,
     achievements: achievementMap.get(p.id) || [],

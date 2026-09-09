@@ -4,12 +4,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Search, User, Trophy, ShieldAlert, CheckCircle2, X, Loader2,
-  ExternalLink, Award, FileText, Activity, Save,
+  ExternalLink, Award, FileText, Save,
   Plus, Edit2, Trash2, Calendar, Shield, AlertTriangle
 } from 'lucide-react';
 import {
-  updateBetaOldStatsAction,
-  BetaOldStatsPayload,
   addPlayerLegacyCareerAction,
   updatePlayerLegacyCareerAction,
   deletePlayerLegacyCareerAction,
@@ -33,7 +31,6 @@ interface PlayerRecord {
   alternative_positions: string[] | null;
   is_active: boolean;
   beta_registered: boolean;
-  beta_old_stats: BetaOldStatsPayload | null;
   created_at: string;
   active_team: {
     id: string;
@@ -62,7 +59,6 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
   const [teamFilter, setTeamFilter] = useState<'ALL' | 'CONTRACTED' | 'FREE'>('ALL');
 
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerRecord | null>(null);
-  const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
   // Synchronize selectedPlayer with updated players prop when router.refresh triggers
@@ -74,27 +70,6 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
       }
     }
   }, [players]);
-
-  // Form state for controlled Beta Old Stats
-  const [betaForm, setBetaForm] = useState<{
-    matches_played: number;
-    goals: number;
-    assists: number;
-    rating_avg: number;
-    clean_sheets: number;
-    red_cards: number;
-    market_value: number;
-    notes: string;
-  }>({
-    matches_played: 0,
-    goals: 0,
-    assists: 0,
-    rating_avg: 6.0,
-    clean_sheets: 0,
-    red_cards: 0,
-    market_value: 0,
-    notes: ''
-  });
 
   // Legacy Career Stats State
   const [legacyModalOpen, setLegacyModalOpen] = useState(false);
@@ -243,58 +218,12 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
 
   const openPlayerModal = (player: PlayerRecord) => {
     setSelectedPlayer(player);
-    const existing = player.beta_old_stats || {} as any;
-    setBetaForm({
-      matches_played: Number(existing.matches_played) || 0,
-      goals: Number(existing.goals) || 0,
-      assists: Number(existing.assists) || 0,
-      rating_avg: Number(existing.rating_avg) || 6.0,
-      clean_sheets: Number(existing.clean_sheets) || 0,
-      red_cards: Number(existing.red_cards) || 0,
-      market_value: Number(existing.market_value) || 0,
-      notes: typeof existing.notes === 'string' ? existing.notes : ''
-    });
     setFeedback(null);
   };
 
   const closePlayerModal = () => {
     setSelectedPlayer(null);
     setFeedback(null);
-  };
-
-  const handleSaveBetaStats = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedPlayer) return;
-
-    setLoading(true);
-    setFeedback(null);
-
-    const formData = new FormData();
-    formData.append('player_id', selectedPlayer.id);
-    formData.append('matches_played', String(betaForm.matches_played));
-    formData.append('goals', String(betaForm.goals));
-    formData.append('assists', String(betaForm.assists));
-    formData.append('rating_avg', String(betaForm.rating_avg));
-    formData.append('clean_sheets', String(betaForm.clean_sheets));
-    formData.append('red_cards', String(betaForm.red_cards));
-    formData.append('market_value', String(betaForm.market_value));
-    formData.append('notes', betaForm.notes);
-
-    const res = await updateBetaOldStatsAction(formData);
-    setLoading(false);
-
-    if (res.error) {
-      setFeedback({ msg: res.error, type: 'error' });
-    } else {
-      setFeedback({ msg: res.success || 'Başarıyla güncellendi.', type: 'success' });
-      setSelectedPlayer({
-        ...selectedPlayer,
-        beta_old_stats: {
-          ...betaForm
-        }
-      });
-      router.refresh();
-    }
   };
 
   // Filtering
@@ -780,162 +709,6 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
                 )}
               </div>
 
-              {/* BETA OLD STATS FORM (Controlled fields only) */}
-              <div className="border-t border-white/5 pt-5">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h4 className="text-sm font-black text-[#00e5ff] tracking-widest uppercase flex items-center gap-2">
-                      <Activity className="w-4 h-4" />
-                      BETA DÖNEMİ ESKİ KAYITLARI (TEKİL ÖZET ARŞİVİ)
-                    </h4>
-                    <p className="text-[11px] text-zinc-500 mt-0.5">
-                      Eski TETA Beta sitesinden aktarılacak tekil özet JSON kaydı.
-                    </p>
-                  </div>
-                </div>
-
-                <form onSubmit={handleSaveBetaStats} className="space-y-4 bg-[#060d18] p-5 rounded-xl border border-white/5">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {/* Maç Sayısı */}
-                    <div>
-                      <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                        Oynanan Maç
-                      </label>
-                      <input 
-                        type="number"
-                        min="0"
-                        value={betaForm.matches_played}
-                        onChange={e => setBetaForm({ ...betaForm, matches_played: Math.max(0, parseInt(e.target.value) || 0) })}
-                        className="input-field text-sm py-1.5"
-                      />
-                    </div>
-
-                    {/* Gol */}
-                    <div>
-                      <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                        Gol
-                      </label>
-                      <input 
-                        type="number"
-                        min="0"
-                        value={betaForm.goals}
-                        onChange={e => setBetaForm({ ...betaForm, goals: Math.max(0, parseInt(e.target.value) || 0) })}
-                        className="input-field text-sm py-1.5"
-                      />
-                    </div>
-
-                    {/* Asist */}
-                    <div>
-                      <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                        Asist
-                      </label>
-                      <input 
-                        type="number"
-                        min="0"
-                        value={betaForm.assists}
-                        onChange={e => setBetaForm({ ...betaForm, assists: Math.max(0, parseInt(e.target.value) || 0) })}
-                        className="input-field text-sm py-1.5"
-                      />
-                    </div>
-
-                    {/* Rating Ortalama */}
-                    <div>
-                      <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                        Ort. Rating (0-10)
-                      </label>
-                      <input 
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        max="10"
-                        value={betaForm.rating_avg}
-                        onChange={e => setBetaForm({ ...betaForm, rating_avg: Math.min(10, Math.max(0, parseFloat(e.target.value) || 0)) })}
-                        className="input-field text-sm py-1.5"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {/* Clean Sheet */}
-                    <div>
-                      <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                        Gol Yememe (CS)
-                      </label>
-                      <input 
-                        type="number"
-                        min="0"
-                        value={betaForm.clean_sheets}
-                        onChange={e => setBetaForm({ ...betaForm, clean_sheets: Math.max(0, parseInt(e.target.value) || 0) })}
-                        className="input-field text-sm py-1.5"
-                      />
-                    </div>
-
-                    {/* Kırmızı Kart */}
-                    <div>
-                      <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                        Kırmızı Kart
-                      </label>
-                      <input 
-                        type="number"
-                        min="0"
-                        value={betaForm.red_cards}
-                        onChange={e => setBetaForm({ ...betaForm, red_cards: Math.max(0, parseInt(e.target.value) || 0) })}
-                        className="input-field text-sm py-1.5"
-                      />
-                    </div>
-
-                    {/* Eski Piyasa Değeri */}
-                    <div>
-                      <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                        Eski Piyasa Değeri (€)
-                      </label>
-                      <input 
-                        type="number"
-                        min="0"
-                        step="10000"
-                        value={betaForm.market_value}
-                        onChange={e => setBetaForm({ ...betaForm, market_value: Math.max(0, parseInt(e.target.value) || 0) })}
-                        className="input-field text-sm py-1.5"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Notlar */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                      Beta Notu / Sezon Bilgisi (Maksimum 500 karakter)
-                    </label>
-                    <input 
-                      type="text"
-                      maxLength={500}
-                      value={betaForm.notes}
-                      onChange={e => setBetaForm({ ...betaForm, notes: e.target.value })}
-                      placeholder="Örn: Beta 1. Sezon En İyi Orta Saha Şampiyonu"
-                      className="input-field text-sm py-1.5"
-                    />
-                  </div>
-
-                  <div className="pt-2 flex justify-end">
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="btn-primary px-5 py-2.5 text-xs font-black flex items-center gap-2 tracking-widest uppercase"
-                    >
-                      {loading ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          KAYDEDİLİYOR...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-4 h-4" />
-                          BETA VERİLERİNİ KAYDET
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              </div>
             </div>
 
             {/* Modal Footer */}
