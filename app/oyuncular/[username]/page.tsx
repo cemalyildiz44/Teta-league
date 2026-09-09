@@ -52,13 +52,21 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     }
   }
 
-  const [{ data: membershipsData }, { data: allSeasonsData }, { data: allLeaguesData }, { data: playerAchievementsData }] = await Promise.all([
+  const [
+    { data: membershipsData },
+    { data: allSeasonsData },
+    { data: allLeaguesData },
+    { data: playerAchievementsData },
+    { data: legacyStatsData }
+  ] = await Promise.all([
     supabase.from("team_memberships").select("*").eq("player_id", profile.id).order("joined_at", { ascending: false }),
     supabase.from("seasons").select("id, name, slug"),
     supabase.from("leagues").select("id, name, season_id"),
-    supabase.from('player_achievements').select('achievement_type, season_id').eq('player_id', profile.id)
+    supabase.from('player_achievements').select('achievement_type, season_id').eq('player_id', profile.id),
+    supabase.from('player_legacy_career_stats').select('*').eq('player_id', profile.id).is('deleted_at', null).order('season_name', { ascending: false })
   ]);
 
+  const legacyStats = legacyStatsData || [];
   const memberships = membershipsData || [];
   const activeMembership = memberships.find((m) => !m.left_at);
   const matchMap = new Map(approvedMatches.map((m) => [m.id, m]));
@@ -69,6 +77,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   const teamIds = new Set<string>();
   approvedMatches.forEach((m) => { teamIds.add(m.home_team_id); teamIds.add(m.away_team_id); });
   memberships.forEach((m) => { if (m.team_id) teamIds.add(m.team_id); });
+  legacyStats.forEach((l: any) => { if (l.team_id) teamIds.add(l.team_id); });
   const { data: allTeamsData } = await supabase.from("teams").select("id, name, slug, logo_url, is_active").in("id", teamIds.size > 0 ? Array.from(teamIds) : ["00000000-0000-0000-0000-000000000000"]);
   const teamsMap = new Map((allTeamsData || []).map((t) => [t.id, t]));
 
@@ -152,26 +161,112 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   const r12D = recent12.filter((m) => m.result === "D").length;
   const r12L = recent12.filter((m) => m.result === "L").length;
 
-  // Season stats
-  const seasonStats = Array.from(slMap.values()).map((p) => {
-    const t = teamsMap.get(p.teamId);
-    return { ...p, teamName: t?.name || "?", teamSlug: t?.slug, teamLogo: t?.logo_url, avgRating: p.matches > 0 ? p.ratingSum / p.matches : 0 };
-  }).sort((a, b) => b.seasonName.localeCompare(a.seasonName, "tr", { numeric: true }));
+  // ── Combined Career Totals (Official + Granular Legacy Career) ────────
+  const legacyTotalMatches = legacyStats.reduce((sum: number, l: any) => sum + (l.matches_played || 0), 0);
+  const legacyTotalGoals = legacyStats.reduce((sum: number, l: any) => sum + (l.goals || 0), 0);
+  const legacyTotalAssists = legacyStats.reduce((sum: number, l: any) => sum + (l.assists || 0), 0);
+  const legacyTotalWins = legacyStats.reduce((sum: number, l: any) => sum + (l.wins || 0), 0);
+  const legacyTotalDraws = legacyStats.reduce((sum: number, l: any) => sum + (l.draws || 0), 0);
+  const legacyTotalLosses = legacyStats.reduce((sum: number, l: any) => sum + (l.losses || 0), 0);
+  const legacyTotalRedCards = legacyStats.reduce((sum: number, l: any) => sum + (l.red_cards || 0), 0);
+  const legacyTotalCleanSheets = legacyStats.reduce((sum: number, l: any) => sum + (l.clean_sheets || 0), 0);
+  const legacyRatingProductSum = legacyStats.reduce((sum: number, l: any) => sum + ((Number(l.rating_avg) || 0) * (l.matches_played || 0)), 0);
 
-  // Career timeline (consolidate consecutive memberships for the same team, league, and season)
-  interface TimelineItem {
-    teamId: string;
-    leagueId: string;
-    seasonId: string;
+  const combinedTotalMatches = tM + legacyTotalMatches;
+  const combinedTotalGoals = tG + legacyTotalGoals;
+  const combinedTotalAssists = tA + legacyTotalAssists;
+  const combinedTotalWins = tW + legacyTotalWins;
+  const combinedTotalDraws = tD + legacyTotalDraws;
+  const combinedTotalLosses = tL + legacyTotalLosses;
+  const combinedTotalRedCards = tRC + legacyTotalRedCards;
+
+  // Weighted average rating calculation
+  const combinedAvgRating = combinedTotalMatches > 0
+    ? ((tR + legacyRatingProductSum) / combinedTotalMatches).toFixed(2)
+    : "0.00";
+
+  // ── Unified Season Stats (Official + Legacy) ──────────────────────────
+  interface UnifiedSeasonStat {
+    isLegacy: boolean;
+    seasonName: string;
+    leagueName: string;
     teamName: string;
     teamSlug?: string;
     teamLogo?: string | null;
-    joinedAt: string;
-    leftAt: string | null;
+    matches: number;
+    goals: number;
+    assists: number;
+    avgRating: number;
+    wins?: number;
+    draws?: number;
+    losses?: number;
+    cleanSheets?: number;
+    redCards?: number;
+    marketValue?: number;
+    notes?: string | null;
+  }
+
+  const officialSeasonCards: UnifiedSeasonStat[] = Array.from(slMap.values()).map((p) => {
+    const t = teamsMap.get(p.teamId);
+    return {
+      isLegacy: false,
+      seasonName: p.seasonName,
+      leagueName: p.leagueName,
+      teamName: t?.name || "?",
+      teamSlug: t?.slug,
+      teamLogo: t?.logo_url,
+      matches: p.matches,
+      goals: p.goals,
+      assists: p.assists,
+      avgRating: p.matches > 0 ? p.ratingSum / p.matches : 0,
+      wins: p.wins
+    };
+  });
+
+  const legacySeasonCards: UnifiedSeasonStat[] = legacyStats.map((l: any) => {
+    const t = l.team_id ? teamsMap.get(l.team_id) : null;
+    return {
+      isLegacy: true,
+      seasonName: l.season_name,
+      leagueName: l.league_name,
+      teamName: l.team_name,
+      teamSlug: t?.slug,
+      teamLogo: t?.logo_url,
+      matches: l.matches_played,
+      goals: l.goals,
+      assists: l.assists,
+      avgRating: Number(l.rating_avg) || 0,
+      wins: l.wins,
+      draws: l.draws,
+      losses: l.losses,
+      cleanSheets: l.clean_sheets,
+      redCards: l.red_cards,
+      marketValue: l.market_value,
+      notes: l.notes
+    };
+  });
+
+  const allSeasonStats: UnifiedSeasonStat[] = [...officialSeasonCards, ...legacySeasonCards]
+    .sort((a, b) => b.seasonName.localeCompare(a.seasonName, "tr", { numeric: true }));
+
+  // Career timeline (consolidate consecutive memberships + legacy career teams)
+  interface TimelineItem {
+    teamId?: string | null;
+    leagueId?: string | null;
+    seasonId?: string | null;
+    teamName: string;
+    teamSlug?: string;
+    teamLogo?: string | null;
+    joinedAt?: string;
+    leftAt?: string | null;
     isCurrent: boolean;
     joinedFmt: string;
     leagueName: string | null;
     seasonName: string | null;
+    isLegacy?: boolean;
+    matches?: number;
+    goals?: number;
+    assists?: number;
   }
 
   const timeline: TimelineItem[] = [];
@@ -179,7 +274,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     const prev = timeline[timeline.length - 1];
     if (prev && prev.teamId === m.team_id && prev.leagueId === m.league_id && prev.seasonId === m.season_id) {
       // Merge consecutive memberships for same team, league and season
-      if (new Date(m.joined_at) < new Date(prev.joinedAt)) {
+      if (new Date(m.joined_at) < new Date(prev.joinedAt!)) {
         prev.joinedAt = m.joined_at;
         prev.joinedFmt = new Date(m.joined_at).getFullYear().toString();
       }
@@ -204,9 +299,30 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
         joinedFmt: new Date(m.joined_at).getFullYear().toString(),
         leagueName: lg?.name || null,
         seasonName: sn?.name || null,
+        isLegacy: false,
       });
     }
   }
+
+  const legacyTimelineItems: TimelineItem[] = legacyStats.map((l: any) => {
+    const t = l.team_id ? teamsMap.get(l.team_id) : null;
+    return {
+      teamId: l.team_id,
+      teamName: l.team_name,
+      teamSlug: t?.slug,
+      teamLogo: t?.logo_url,
+      isCurrent: false,
+      isLegacy: true,
+      joinedFmt: l.season_name,
+      leagueName: l.league_name,
+      seasonName: l.season_name,
+      matches: l.matches_played,
+      goals: l.goals,
+      assists: l.assists,
+    };
+  });
+
+  const fullTimeline: TimelineItem[] = [...timeline, ...legacyTimelineItems];
 
   const currentLeague = (activeTeam && activeMembership) ? leaguesMap.get(activeMembership.league_id) : null;
 
@@ -264,25 +380,6 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     { id: 'kariyer', label: 'KARİYER' },
     { id: 'basarilar', label: 'BAŞARILAR' },
   ];
-
-  // Beta Old Stats Parsing (Isolated from official statistics)
-  const betaStats = (profile.beta_old_stats && typeof profile.beta_old_stats === 'object' && !Array.isArray(profile.beta_old_stats))
-    ? profile.beta_old_stats as Record<string, any>
-    : null;
-
-  const hasBetaStats = Boolean(
-    betaStats && (
-      (typeof betaStats.matches_played === 'number' && betaStats.matches_played > 0) ||
-      (typeof betaStats.goals === 'number' && betaStats.goals > 0) ||
-      (typeof betaStats.assists === 'number' && betaStats.assists > 0) ||
-      (typeof betaStats.rating_avg === 'number' && betaStats.rating_avg > 0) ||
-      (typeof betaStats.clean_sheets === 'number' && betaStats.clean_sheets > 0) ||
-      (typeof betaStats.red_cards === 'number' && betaStats.red_cards > 0) ||
-      (typeof betaStats.market_value === 'number' && betaStats.market_value > 0) ||
-      (typeof betaStats.notes === 'string' && betaStats.notes.trim().length > 0) ||
-      (betaStats.updated_at && (betaStats.matches_played !== undefined || betaStats.goals !== undefined))
-    ) && Object.keys(betaStats).length > 0
-  );
 
   return (
     <main className="min-h-screen bg-[#01060b] pt-8 pb-20">
@@ -397,11 +494,11 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
         {/* ════════════════════════════════════════════════════════════ */}
         <section className="bg-white/[0.02] border border-white/5 rounded-2xl flex flex-wrap lg:flex-nowrap divide-x divide-y lg:divide-y-0 divide-white/5 overflow-hidden">
           {[
-            { l: "TOPLAM MAÇ", v: tM, c: "text-white" },
-            { l: "GOL", v: tG, c: "text-white" },
-            { l: "ASİST", v: tA, c: "text-white" },
-            { l: "GALİBİYET", v: tW, c: "text-emerald-400" },
-            { l: "ORT. RATING", v: avgRating, c: "text-[#00e5ff]" },
+            { l: "TOPLAM MAÇ", v: combinedTotalMatches, c: "text-white" },
+            { l: "GOL", v: combinedTotalGoals, c: "text-white" },
+            { l: "ASİST", v: combinedTotalAssists, c: "text-white" },
+            { l: "GALİBİYET", v: combinedTotalWins, c: "text-emerald-400" },
+            { l: "ORT. RATING", v: combinedAvgRating, c: "text-[#00e5ff]" },
             { l: "KAZANILAN KUPA", v: allTrophies.length, c: "text-amber-400" },
           ].map((s, i) => (
             <div key={i} className="flex-1 min-w-[120px] px-4 py-6 flex flex-col items-center justify-center hover:bg-white/[0.02] transition-colors">
@@ -490,9 +587,9 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                     { label: "MÜDAHALE", value: `${tackleAcc}%`, sub: `${tTM}/${tTA}` },
                     { label: "KURTARIŞ", value: tSv, sub: null },
                     { label: "YENEN GOL", value: tGC, sub: null, danger: true },
-                    { label: "KIRMIZI KART", value: tRC, sub: null, danger: true },
+                    { label: "KIRMIZI KART", value: combinedTotalRedCards, sub: null, danger: true },
                     { label: "MAÇIN ADAMI", value: tMOM, sub: null, accent: true },
-                    { label: "TOPLAM KATKI", value: tG + tA, sub: `${tG}G + ${tA}A` },
+                    { label: "TOPLAM KATKI", value: combinedTotalGoals + combinedTotalAssists, sub: `${combinedTotalGoals}G + ${combinedTotalAssists}A` },
                   ].map((s, i) => (
                     <div key={i} className="bg-[#03070c] border border-white/5 rounded-2xl p-5 hover:border-white/10 transition-colors text-center">
                       <div className="text-[10px] font-[900] tracking-[0.15em] text-gray-600 uppercase mb-2">{s.label}</div>
@@ -502,76 +599,6 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                   ))}
                 </div>
               </section>
-
-              {/* BETA DÖNEMİ ESKİ KAYDI */}
-              {hasBetaStats && betaStats && (
-                <section className="bg-[#03070c] border border-amber-500/20 rounded-2xl p-6 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
-
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shadow-[0_0_8px_rgba(251,191,36,0.6)]" />
-                      <h2 className="text-[14px] font-[900] text-amber-400 tracking-widest uppercase">
-                        BETA DÖNEMİ ESKİ KAYDI
-                      </h2>
-                      <span className="px-2 py-0.5 rounded text-[9px] font-[900] tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/30 uppercase">
-                        ARŞİV
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-gray-400 font-[500] leading-tight">
-                      Bu veriler Beta dönemine ait arşiv kaydıdır. Resmi TETA League istatistiklerine dahil değildir.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-                    <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 text-center">
-                      <div className="text-[9px] font-[900] tracking-[0.15em] text-gray-500 uppercase mb-1.5">Oynanan Maç</div>
-                      <div className="text-[20px] font-[900] text-white leading-none">{Number(betaStats.matches_played) || 0}</div>
-                    </div>
-                    <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 text-center">
-                      <div className="text-[9px] font-[900] tracking-[0.15em] text-gray-500 uppercase mb-1.5">Gol</div>
-                      <div className="text-[20px] font-[900] text-emerald-400 leading-none">{Number(betaStats.goals) || 0}</div>
-                    </div>
-                    <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 text-center">
-                      <div className="text-[9px] font-[900] tracking-[0.15em] text-gray-500 uppercase mb-1.5">Asist</div>
-                      <div className="text-[20px] font-[900] text-[#00e5ff] leading-none">{Number(betaStats.assists) || 0}</div>
-                    </div>
-                    <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 text-center">
-                      <div className="text-[9px] font-[900] tracking-[0.15em] text-gray-500 uppercase mb-1.5">Ort. Rating</div>
-                      <div className="text-[20px] font-[900] text-amber-400 leading-none">
-                        {betaStats.rating_avg !== undefined && betaStats.rating_avg !== null && !isNaN(Number(betaStats.rating_avg))
-                          ? Number(betaStats.rating_avg).toFixed(1)
-                          : "0.0"}
-                      </div>
-                    </div>
-                    <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 text-center">
-                      <div className="text-[9px] font-[900] tracking-[0.15em] text-gray-500 uppercase mb-1.5">Gol Yememe</div>
-                      <div className="text-[20px] font-[900] text-blue-400 leading-none">{Number(betaStats.clean_sheets) || 0}</div>
-                    </div>
-                    <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 text-center">
-                      <div className="text-[9px] font-[900] tracking-[0.15em] text-gray-500 uppercase mb-1.5">Kırmızı Kart</div>
-                      <div className="text-[20px] font-[900] text-red-400 leading-none">{Number(betaStats.red_cards) || 0}</div>
-                    </div>
-                    <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 text-center col-span-2 sm:col-span-1">
-                      <div className="text-[9px] font-[900] tracking-[0.15em] text-gray-500 uppercase mb-1.5">Eski Piyasa Değeri</div>
-                      <div className="text-[16px] font-[900] text-[#00e5ff] leading-none truncate mt-0.5">
-                        {formatEuro(Number(betaStats.market_value) || 0)}
-                      </div>
-                    </div>
-                  </div>
-
-                  {Boolean(betaStats.notes && typeof betaStats.notes === 'string' && betaStats.notes.trim().length > 0) && (
-                    <div className="mt-4 pt-3.5 border-t border-white/5 flex flex-col sm:flex-row sm:items-center gap-2">
-                      <span className="text-[10px] font-[900] text-amber-400/80 tracking-widest uppercase shrink-0">
-                        BETA NOTU / SEZON BİLGİSİ:
-                      </span>
-                      <span className="text-[12px] text-gray-300 font-[500] leading-relaxed">
-                        {betaStats.notes.trim()}
-                      </span>
-                    </div>
-                  )}
-                </section>
-              )}
             </div>
           )}
 
@@ -641,28 +668,88 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
           {activeTab === 'sezonlar' && (
             <div className="space-y-4">
               <h2 className="text-[14px] font-[900] text-gray-500 tracking-widest uppercase mb-3">SEZON PERFORMANSLARI</h2>
-              {seasonStats.length > 0 ? (
+              {allSeasonStats.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {seasonStats.map((s, idx) => (
-                    <div key={idx} className="bg-[#03070c] border border-white/5 rounded-2xl p-6 hover:border-white/10 transition-colors">
-                      <div className="flex items-start justify-between mb-5">
-                        <div className="flex flex-col">
-                          <span className="text-[16px] font-[900] text-white tracking-wide leading-tight">{s.seasonName}</span>
-                          <span className="text-[11px] font-[700] text-[#00e5ff]/70 tracking-wider uppercase mt-1">{s.leagueName}</span>
+                  {allSeasonStats.map((s, idx) => {
+                    const contribution = s.matches > 0 ? ((s.goals + s.assists) / s.matches).toFixed(2) : "0.00";
+                    return (
+                      <div key={idx} className={`bg-[#03070c] border ${s.isLegacy ? 'border-amber-500/20 hover:border-amber-500/40' : 'border-white/5 hover:border-white/10'} rounded-2xl p-6 transition-colors relative overflow-hidden`}>
+                        {s.isLegacy && (
+                          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
+                        )}
+                        <div className="flex items-start justify-between mb-5 relative z-10">
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[16px] font-[900] text-white tracking-wide leading-tight">{s.seasonName}</span>
+                              {s.isLegacy && (
+                                <span className="px-2 py-0.5 rounded text-[9px] font-[900] tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/30 uppercase">
+                                  ARŞİV
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[11px] font-[700] text-[#00e5ff]/70 tracking-wider uppercase mt-1">{s.leagueName}</span>
+                          </div>
+                          <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border border-white/5">
+                            {s.teamLogo && <img src={s.teamLogo} alt="" className="w-4 h-4 object-contain" />}
+                            {s.teamSlug ? (
+                              <Link href={`/takim/${s.teamSlug}`} className="text-[11px] font-[800] text-gray-300 hover:text-white transition-colors">
+                                {s.teamName}
+                              </Link>
+                            ) : (
+                              <span className="text-[11px] font-[800] text-gray-300">{s.teamName}</span>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border border-white/5">
-                          {s.teamLogo && <img src={s.teamLogo} alt="" className="w-4 h-4 object-contain" />}
-                          <span className="text-[11px] font-[800] text-gray-300">{s.teamName}</span>
+                        <div className="grid grid-cols-4 gap-y-4 gap-x-2 pt-4 border-t border-white/5 relative z-10">
+                          <div className="flex flex-col">
+                            <span className="text-[9px] font-[900] text-gray-500 tracking-wider">MAÇ</span>
+                            <span className="text-[18px] font-[900] text-white">{s.matches}</span>
+                            {s.isLegacy && s.wins !== undefined && (
+                              <span className="text-[9px] font-bold text-gray-500 mt-0.5">({s.wins}G {s.draws}B {s.losses}M)</span>
+                            )}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[9px] font-[900] text-gray-500 tracking-wider">GOL</span>
+                            <span className="text-[18px] font-[900] text-white">{s.goals}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[9px] font-[900] text-gray-500 tracking-wider">ASİST</span>
+                            <span className="text-[18px] font-[900] text-white">{s.assists}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[9px] font-[900] text-[#00e5ff]/50 tracking-wider">RTG</span>
+                            <span className="text-[18px] font-[900] text-[#00e5ff]">{s.avgRating.toFixed(2)}</span>
+                          </div>
                         </div>
+
+                        {s.isLegacy && (
+                          <div className="mt-4 pt-3 border-t border-white/5 space-y-2 relative z-10">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-gray-500 font-bold uppercase">Katkı / Maç</span>
+                              <span className="font-bold text-emerald-400">{contribution} / maç</span>
+                            </div>
+                            {(s.cleanSheets !== undefined || s.redCards !== undefined) && (
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-gray-500 font-bold uppercase">CS / Kırmızı Kart</span>
+                                <span className="font-medium text-gray-300">{s.cleanSheets || 0} CS • {s.redCards || 0} K.Kart</span>
+                              </div>
+                            )}
+                            {Boolean(s.marketValue && s.marketValue > 0) && (
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-gray-500 font-bold uppercase">Arşiv Değeri</span>
+                                <span className="font-mono font-bold text-[#00e5ff]">{formatEuro(s.marketValue!)}</span>
+                              </div>
+                            )}
+                            {Boolean(s.notes) && (
+                              <p className="text-[11px] text-gray-400 italic pt-1 border-t border-white/5">
+                                &quot;{s.notes}&quot;
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <div className="grid grid-cols-4 gap-y-4 gap-x-2 pt-4 border-t border-white/5">
-                        <div className="flex flex-col"><span className="text-[9px] font-[900] text-gray-500 tracking-wider">MAÇ</span><span className="text-[18px] font-[900] text-white">{s.matches}</span></div>
-                        <div className="flex flex-col"><span className="text-[9px] font-[900] text-gray-500 tracking-wider">GOL</span><span className="text-[18px] font-[900] text-white">{s.goals}</span></div>
-                        <div className="flex flex-col"><span className="text-[9px] font-[900] text-gray-500 tracking-wider">ASİST</span><span className="text-[18px] font-[900] text-white">{s.assists}</span></div>
-                        <div className="flex flex-col"><span className="text-[9px] font-[900] text-[#00e5ff]/50 tracking-wider">RTG</span><span className="text-[18px] font-[900] text-[#00e5ff]">{s.avgRating.toFixed(2)}</span></div>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="bg-[#03070c] border border-white/5 rounded-2xl px-6 py-12 text-center text-[13px] font-[700] text-gray-600">Henüz sezon istatistiği bulunmuyor.</div>
@@ -674,29 +761,44 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
           {activeTab === 'kariyer' && (
             <div className="space-y-4">
               <h2 className="text-[14px] font-[900] text-gray-500 tracking-widest uppercase mb-3">TAKIM GEÇMİŞİ</h2>
-              {timeline.length > 0 ? (
+              {fullTimeline.length > 0 ? (
                 <div className="bg-[#03070c] border border-white/5 rounded-2xl p-8 lg:p-10">
                   <div className="flex flex-col relative before:absolute before:top-2 before:bottom-2 before:left-[15px] before:w-0.5 before:bg-gradient-to-b before:from-[#00e5ff]/50 before:via-white/10 before:to-transparent">
-                    {timeline.map((e, idx) => (
+                    {fullTimeline.map((e, idx) => (
                       <div key={idx} className="relative flex gap-6 pb-10 last:pb-0 group">
-                        <div className={`w-8 h-8 rounded-full border-4 flex items-center justify-center shrink-0 z-10 ${e.isCurrent ? "border-[#00e5ff] bg-[#00e5ff]/10" : "border-[#03070c] bg-gray-800 ring-2 ring-white/10"} transition-colors`}>
-                          <div className={`w-2 h-2 rounded-full ${e.isCurrent ? "bg-[#00e5ff]" : "bg-white/30"}`} />
+                        <div className={`w-8 h-8 rounded-full border-4 flex items-center justify-center shrink-0 z-10 ${e.isCurrent ? "border-[#00e5ff] bg-[#00e5ff]/10" : e.isLegacy ? "border-amber-500/50 bg-amber-500/10 ring-2 ring-amber-500/20" : "border-[#03070c] bg-gray-800 ring-2 ring-white/10"} transition-colors`}>
+                          <div className={`w-2 h-2 rounded-full ${e.isCurrent ? "bg-[#00e5ff]" : e.isLegacy ? "bg-amber-400" : "bg-white/30"}`} />
                         </div>
                         <div className="flex flex-col min-w-0 flex-1 pt-0.5">
                           <div className="flex items-center gap-3 mb-1">
-                            <span className="text-[16px] font-[900] text-[#00e5ff]/80">{e.joinedFmt}</span>
+                            <span className={`text-[16px] font-[900] ${e.isLegacy ? "text-amber-400" : "text-[#00e5ff]/80"}`}>{e.joinedFmt}</span>
                             {e.isCurrent && <span className="text-[9px] font-[900] tracking-widest text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded uppercase">AKTİF KULÜP</span>}
+                            {e.isLegacy && <span className="text-[9px] font-[900] tracking-widest text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 uppercase">ESKİ DÖNEM</span>}
                           </div>
-                          <div className="flex items-center gap-4 bg-white/[0.02] border border-white/5 rounded-xl p-4 mt-2 max-w-lg hover:bg-white/[0.04] transition-colors">
-                            <div className="w-12 h-12 rounded-lg bg-black/40 border border-white/10 p-1 flex items-center justify-center shrink-0">
-                              {e.teamLogo ? <img src={e.teamLogo} alt="" className="w-full h-full object-contain" /> : <span className="text-xs font-bold text-gray-500">{e.teamName.substring(0, 2)}</span>}
+                          <div className="flex items-center justify-between gap-4 bg-white/[0.02] border border-white/5 rounded-xl p-4 mt-2 max-w-lg hover:bg-white/[0.04] transition-colors">
+                            <div className="flex items-center gap-4 min-w-0">
+                              <div className="w-12 h-12 rounded-lg bg-black/40 border border-white/10 p-1 flex items-center justify-center shrink-0">
+                                {e.teamLogo ? <img src={e.teamLogo} alt="" className="w-full h-full object-contain" /> : <span className="text-xs font-bold text-gray-500">{e.teamName.substring(0, 2)}</span>}
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                {e.teamSlug ? (
+                                  <Link href={`/takim/${e.teamSlug}`} className="text-[18px] font-[900] text-white hover:text-[#00e5ff] transition-colors leading-tight truncate">
+                                    {e.teamName}
+                                  </Link>
+                                ) : (
+                                  <span className="text-[18px] font-[900] text-white leading-tight truncate">
+                                    {e.teamName}
+                                  </span>
+                                )}
+                                {e.leagueName && <span className="text-[12px] font-[700] text-gray-500 mt-1 uppercase truncate">{e.leagueName}</span>}
+                              </div>
                             </div>
-                            <div className="flex flex-col">
-                              <Link href={e.teamSlug ? `/takim/${e.teamSlug}` : "#"} className="text-[18px] font-[900] text-white hover:text-[#00e5ff] transition-colors leading-tight">
-                                {e.teamName}
-                              </Link>
-                              {e.leagueName && <span className="text-[12px] font-[700] text-gray-500 mt-1 uppercase">{e.leagueName}</span>}
-                            </div>
+                            {e.isLegacy && e.matches !== undefined && (
+                              <div className="text-right shrink-0">
+                                <div className="text-[10px] font-bold text-gray-500 uppercase">{e.matches} MAÇ</div>
+                                <div className="text-xs font-black text-emerald-400">{e.goals}G <span className="text-gray-600 font-normal">/</span> {e.assists}A</div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>

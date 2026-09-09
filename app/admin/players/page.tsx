@@ -32,7 +32,9 @@ export default async function AdminPlayersPage() {
   const [
     { data: profiles, error: profilesErr },
     { data: memberships, error: membershipsErr },
-    { data: achievements, error: achievementsErr }
+    { data: achievements, error: achievementsErr },
+    { data: allTeams, error: teamsErr },
+    { data: legacyStats, error: legacyStatsErr }
   ] = await Promise.all([
     supabase
       .from('profiles')
@@ -45,11 +47,27 @@ export default async function AdminPlayersPage() {
     supabase
       .from('player_achievements')
       .select('id, player_id, achievement_type, awarded_at')
-      .order('awarded_at', { ascending: false })
+      .order('awarded_at', { ascending: false }),
+    supabase
+      .from('teams')
+      .select('id, name, logo_url, is_active')
+      .order('name', { ascending: true }),
+    supabase
+      .from('player_legacy_career_stats')
+      .select('*')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
   ]);
 
   if (profilesErr) {
     console.error('Error fetching profiles in admin:', profilesErr);
+  }
+  if (teamsErr) {
+    console.error('Error fetching teams in admin:', teamsErr);
+  }
+  if (legacyStatsErr) {
+    // Graceful fallback if table is not yet migrated
+    console.warn('Notice: player_legacy_career_stats table not yet created or error:', legacyStatsErr.message);
   }
 
   // Build lookup maps for O(1) correlation
@@ -83,6 +101,16 @@ export default async function AdminPlayersPage() {
     }
   }
 
+  const legacyStatsMap = new Map<string, any[]>();
+  if (legacyStats) {
+    for (const ls of legacyStats) {
+      if (!ls.player_id) continue;
+      const list = legacyStatsMap.get(ls.player_id) || [];
+      list.push(ls);
+      legacyStatsMap.set(ls.player_id, list);
+    }
+  }
+
   // Normalize data for PlayersManager
   const serializedPlayers = (profiles || []).map((p: any) => ({
     id: p.id,
@@ -97,8 +125,9 @@ export default async function AdminPlayersPage() {
     beta_old_stats: p.beta_old_stats || null,
     created_at: p.created_at,
     active_team: teamMap.get(p.id) || null,
-    achievements: achievementMap.get(p.id) || []
+    achievements: achievementMap.get(p.id) || [],
+    legacy_stats: legacyStatsMap.get(p.id) || []
   }));
 
-  return <PlayersManager players={serializedPlayers} />;
+  return <PlayersManager players={serializedPlayers} teams={allTeams || []} />;
 }
