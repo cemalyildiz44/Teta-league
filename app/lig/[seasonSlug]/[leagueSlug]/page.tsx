@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getLeagueBySlugs, compareTeamStats } from "../../utils";
 import { notFound } from "next/navigation";
 import TeamLogo from "@/components/TeamLogo";
+import { getStandingsZone } from "@/lib/standingsZones";
 
 export default async function LeagueStandingsPage({
   params,
@@ -17,8 +18,7 @@ export default async function LeagueStandingsPage({
     notFound();
   }
 
-  const isLevel1 = league.level === 1 || resolvedParams.leagueSlug.includes("super");
-  const isLevel2 = league.level === 2 || resolvedParams.leagueSlug.includes("ecl");
+  const isLevel1 = league.level === 1 || resolvedParams.leagueSlug.includes("super") || league.name.toLowerCase().includes("süper");
 
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
@@ -110,121 +110,194 @@ export default async function LeagueStandingsPage({
   const hasPenalties = penaltyPointsMap.size > 0 || expelledTeams.size > 0;
 
   return (
-    <div>
-      <div className="flex items-center gap-3 mb-6">
-        <h2 className="text-[28px] font-[900] tracking-tight text-white tracking-widest">PUAN <span className="text-[#00e5ff]">DURUMU</span></h2>
-        <div className="h-px flex-1 bg-gradient-to-r from-[#00e5ff]/20 to-transparent" />
+    <div className="space-y-4">
+      {/* ÜST BÖLÜM: BAŞLIK & METADATA (KUTUSUZ) */}
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 pb-2 border-b border-white/[0.08]">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-[800] tracking-wide text-white uppercase">
+            PUAN <span className="text-[#00e5ff]">DURUMU</span>
+          </h2>
+          <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
+            {league.name} — Sezonun güncel puan durumu
+          </p>
+        </div>
+
+        {/* SAĞ: SADE METADATA */}
+        <div className="text-xs text-zinc-500 font-medium font-mono self-start sm:self-auto">
+          <span>{sortedStats.length} Takım</span>
+          <span className="mx-2">•</span>
+          <span>{(league.seasons as any)?.name || 'Aktif Sezon'}</span>
+        </div>
       </div>
 
-      <div className="w-full overflow-x-auto custom-scrollbar bg-black/40 border border-white/5 rounded-2xl">
+      {/* FLAT TABLO (DIŞ PANEL / KUTU YOK, SAYFA YÜZEYİNDE DOĞRUDAN AKAR) */}
+      <div className="w-full overflow-x-auto">
         <table className="w-full min-w-[700px] text-left border-collapse">
+          {/* KOLON BAŞLIKLARI */}
           <thead>
-            <tr className="border-b border-white/10 bg-[#00e5ff]/5">
-              <th className="p-4 text-xs font-[900] text-gray-400 tracking-widest w-12 text-center">#</th>
-              <th className="p-4 text-xs font-[900] text-gray-400 tracking-widest">TAKIM</th>
-              <th className="p-4 text-xs font-[900] text-gray-400 tracking-widest text-center" title="Oynanan Maç">O</th>
-              <th className="p-4 text-xs font-[900] text-gray-400 tracking-widest text-center" title="Galibiyet">G</th>
-              <th className="p-4 text-xs font-[900] text-gray-400 tracking-widest text-center" title="Beraberlik">B</th>
-              <th className="p-4 text-xs font-[900] text-gray-400 tracking-widest text-center" title="Mağlubiyet">M</th>
-              <th className="p-4 text-xs font-[900] text-gray-400 tracking-widest text-center" title="Atılan Gol">AG</th>
-              <th className="p-4 text-xs font-[900] text-gray-400 tracking-widest text-center" title="Yenilen Gol">YG</th>
-              <th className="p-4 text-xs font-[900] text-[#00e5ff] tracking-widest text-center" title="Averaj">AV</th>
+            <tr className="border-b border-white/[0.08] text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
+              <th className="py-2.5 px-2 w-12 text-center">#</th>
+              <th className="py-2.5 px-3">TAKIM</th>
+              <th className="py-2.5 px-2.5 w-12 text-center" title="Oynanan Maç">O</th>
+              <th className="py-2.5 px-2.5 w-12 text-center" title="Galibiyet">G</th>
+              <th className="py-2.5 px-2.5 w-12 text-center" title="Beraberlik">B</th>
+              <th className="py-2.5 px-2.5 w-12 text-center" title="Mağlubiyet">M</th>
+              <th className="py-2.5 px-2.5 w-12 text-center hidden md:table-cell" title="Atılan Gol">AG</th>
+              <th className="py-2.5 px-2.5 w-12 text-center hidden md:table-cell" title="Yenilen Gol">YG</th>
+              <th className="py-2.5 px-2.5 w-12 text-center" title="Averaj">AV</th>
               {hasPenalties && (
-                <th className="p-4 text-xs font-[900] text-red-400 tracking-widest text-center" title="Ceza Puan Düşüşü">CEZA</th>
+                <th className="py-2.5 px-2.5 w-12 text-center text-rose-400" title="Ceza Puanı">CEZA</th>
               )}
-              <th className="p-4 text-xs font-[900] text-[#00e5ff] tracking-widest text-center" title="Puan">P</th>
+              <th className="py-2.5 px-3 w-14 text-center font-bold text-zinc-300" title="Puan">P</th>
             </tr>
           </thead>
-          <tbody>
+
+          {/* TAKIM SATIRLARI (56-64px, TRANSPARENT BG, INCE DIVIDER) */}
+          <tbody className="divide-y divide-white/[0.05]">
             {sortedStats.map((stat, idx) => {
               const team = teamMap.get(stat.team_id);
-              const gd = stat.goals_for - stat.goals_against;
+              const gd = (stat.goals_for || 0) - (stat.goals_against || 0);
               const isExpelled = expelledTeams.has(stat.team_id);
               const penaltyPoints = penaltyPointsMap.get(stat.team_id) || 0;
-              const effectivePoints = Math.max(0, stat.points - penaltyPoints);
+              const effectivePoints = Math.max(0, (stat.points || 0) - penaltyPoints);
+              const rank = idx + 1;
+              const zone = getStandingsZone(rank, isLevel1, isExpelled);
 
-              // Rank: expelled teams don't get a rank number
-              const rank = isExpelled ? '-' : idx + 1;
-              
-              let rowBg = "hover:bg-white/5";
-              let tdLeftBorder = "border-l-[3px] border-l-transparent";
-
-              if (isExpelled) {
-                // Expelled teams: red row
-                rowBg = "bg-red-500/5 hover:bg-red-500/10";
-                tdLeftBorder = "border-l-[3px] border-l-red-500 shadow-[-2px_0_10px_rgba(239,68,68,0.3)]";
-              } else if (isLevel1) {
-                if (rank === 1 || rank === 2) { 
-                  rowBg = "bg-[#3b82f6]/10 hover:bg-[#3b82f6]/20"; 
-                  tdLeftBorder = "border-l-[3px] border-l-[#3b82f6] shadow-[-2px_0_10px_rgba(59,130,246,0.3)]"; 
-                } else if (rank === 3 || rank === 4) { 
-                  rowBg = "bg-[#eab308]/10 hover:bg-[#eab308]/20"; 
-                  tdLeftBorder = "border-l-[3px] border-l-[#eab308] shadow-[-2px_0_10px_rgba(234,179,8,0.3)]"; 
-                } else if (rank === 11 || rank === 12) { 
-                  rowBg = "bg-[#ef4444]/10 hover:bg-[#ef4444]/20"; 
-                  tdLeftBorder = "border-l-[3px] border-l-[#ef4444] shadow-[-2px_0_10px_rgba(239,68,68,0.3)]"; 
-                }
-              } else if (isLevel2) {
-                if (rank === 1) { 
-                  rowBg = "bg-[#22c55e]/10 hover:bg-[#22c55e]/20"; 
-                  tdLeftBorder = "border-l-[3px] border-l-[#22c55e] shadow-[-2px_0_10px_rgba(34,197,94,0.3)]"; 
-                } else if (typeof rank === 'number' && rank >= 2 && rank <= 5) {
-                  rowBg = "bg-[#eab308]/10 hover:bg-[#eab308]/20"; 
-                  tdLeftBorder = "border-l-[3px] border-l-[#eab308] shadow-[-2px_0_10px_rgba(234,179,8,0.3)]"; 
-                }
-              }
-              
               return (
-                <tr key={stat.team_id} className={`border-b border-white/5 transition-colors group ${rowBg}`}>
-                  <td className={`p-4 text-center font-bold text-gray-400 ${tdLeftBorder}`}>{rank}</td>
-                  <td className="p-4">
-                    <Link href={`/takim/${team?.slug || ''}`} className="flex items-center gap-3 w-max group-hover:drop-shadow-[0_0_8px_rgba(0,229,255,0.5)] transition-all">
-                      <TeamLogo src={team?.logo_url} name={team?.name} size="sm" />
-                      <span className={`font-bold tracking-widest text-sm uppercase ${isExpelled ? 'text-red-400 line-through' : 'text-white'}`}>
-                        {team?.name || 'Bilinmeyen Takım'}
+                <tr
+                  key={stat.team_id || idx}
+                  className="h-14 sm:h-[58px] hover:bg-white/[0.02] transition-colors"
+                >
+                  {/* SIRA & SOL INCE ZONE INDICATOR */}
+                  <td className="py-3 px-2 text-center">
+                    <div className="flex items-center gap-1.5 justify-center">
+                      <span
+                        className={`w-[3px] h-5 rounded-full shrink-0 ${zone.barClass}`}
+                        title={zone.label}
+                      />
+                      <span className="w-5 text-center text-xs sm:text-sm font-bold text-zinc-400 font-mono">
+                        {isExpelled ? '—' : rank}
                       </span>
-                      {isExpelled && (
-                        <span className="px-2 py-0.5 bg-red-500/10 text-red-400 border border-red-500/30 rounded text-[9px] font-black tracking-widest animate-pulse">
-                          İHRAÇ
+                    </div>
+                  </td>
+
+                  {/* TAKIM (LOGO + AD) */}
+                  <td className="py-3 px-3">
+                    <Link
+                      href={`/takim/${team?.slug || ''}`}
+                      className="flex items-center gap-3.5 min-w-0 group/team"
+                    >
+                      <TeamLogo
+                        src={team?.logo_url}
+                        name={team?.name}
+                        size="md"
+                        className="w-9 h-9 sm:w-10 sm:h-10 shrink-0"
+                      />
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className={`font-bold text-sm sm:text-[15px] uppercase tracking-wide truncate transition-colors ${
+                            isExpelled
+                              ? 'text-rose-400 line-through'
+                              : 'text-white group-hover/team:text-[#00e5ff]'
+                          }`}
+                        >
+                          {team?.name || 'Bilinmeyen Takım'}
                         </span>
-                      )}
+                        {isExpelled && (
+                          <span className="px-1.5 py-0.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded text-[9px] font-bold uppercase tracking-wider shrink-0">
+                            İHRAÇ
+                          </span>
+                        )}
+                      </div>
                     </Link>
                   </td>
-                  <td className="p-4 text-center text-gray-300 font-bold">{stat.matches_played}</td>
-                  <td className="p-4 text-center text-emerald-400 font-bold">{stat.wins}</td>
-                  <td className="p-4 text-center text-amber-400 font-bold">{stat.draws}</td>
-                  <td className="p-4 text-center text-rose-400 font-bold">{stat.losses}</td>
-                  <td className="p-4 text-center text-gray-300 font-bold">{stat.goals_for}</td>
-                  <td className="p-4 text-center text-gray-300 font-bold">{stat.goals_against}</td>
-                  <td className="p-4 text-center text-white font-bold">{gd > 0 ? `+${gd}` : gd}</td>
+
+                  {/* O (Oynanan) */}
+                  <td className="py-3 px-2.5 text-center text-xs sm:text-sm text-zinc-400 font-medium font-mono">
+                    {stat.matches_played}
+                  </td>
+
+                  {/* G (Galibiyet) */}
+                  <td className="py-3 px-2.5 text-center text-xs sm:text-sm font-medium font-mono">
+                    <span className={stat.wins > 0 ? 'text-zinc-200' : 'text-zinc-600'}>
+                      {stat.wins}
+                    </span>
+                  </td>
+
+                  {/* B (Beraberlik) */}
+                  <td className="py-3 px-2.5 text-center text-xs sm:text-sm font-medium font-mono">
+                    <span className={stat.draws > 0 ? 'text-zinc-200' : 'text-zinc-600'}>
+                      {stat.draws}
+                    </span>
+                  </td>
+
+                  {/* M (Mağlubiyet) */}
+                  <td className="py-3 px-2.5 text-center text-xs sm:text-sm font-medium font-mono">
+                    <span className={stat.losses > 0 ? 'text-zinc-200' : 'text-zinc-600'}>
+                      {stat.losses}
+                    </span>
+                  </td>
+
+                  {/* AG (Atılan Gol - Desktop) */}
+                  <td className="py-3 px-2.5 text-center text-xs sm:text-sm font-medium hidden md:table-cell font-mono">
+                    <span className={stat.goals_for > 0 ? 'text-zinc-300' : 'text-zinc-600'}>
+                      {stat.goals_for}
+                    </span>
+                  </td>
+
+                  {/* YG (Yenilen Gol - Desktop) */}
+                  <td className="py-3 px-2.5 text-center text-xs sm:text-sm font-medium hidden md:table-cell font-mono">
+                    <span className={stat.goals_against > 0 ? 'text-zinc-300' : 'text-zinc-600'}>
+                      {stat.goals_against}
+                    </span>
+                  </td>
+
+                  {/* AV (Averaj) */}
+                  <td className="py-3 px-2.5 text-center text-xs sm:text-sm font-medium font-mono">
+                    {gd > 0 ? (
+                      <span className="text-zinc-200">+{gd}</span>
+                    ) : gd < 0 ? (
+                      <span className="text-zinc-400">{gd}</span>
+                    ) : (
+                      <span className="text-zinc-600">0</span>
+                    )}
+                  </td>
+
+                  {/* CEZA (VARSAYSA) */}
                   {hasPenalties && (
-                    <td className="p-4 text-center font-bold">
+                    <td className="py-3 px-2.5 text-center text-xs sm:text-sm font-bold font-mono">
                       {penaltyPoints > 0 ? (
-                        <span className="text-red-400">-{penaltyPoints}</span>
+                        <span className="text-rose-400">-{penaltyPoints}</span>
                       ) : (
-                        <span className="text-gray-600">—</span>
+                        <span className="text-zinc-600">—</span>
                       )}
                     </td>
                   )}
-                  <td className="p-4 text-center text-[#00e5ff] font-[900] text-lg drop-shadow-[0_0_8px_rgba(0,229,255,0.3)]">
+
+                  {/* P (Puan - TETA cyan, bold) */}
+                  <td className="py-3 px-3 text-center font-mono">
                     {isExpelled ? (
-                      <span className="text-red-400 text-base">—</span>
-                    ) : penaltyPoints > 0 ? (
-                      <span title={`Ham puan: ${stat.points}, Ceza: -${penaltyPoints}`}>
+                      <span className="text-zinc-600 font-bold text-sm">—</span>
+                    ) : (
+                      <span
+                        className="text-base sm:text-lg font-black text-[#00e5ff]"
+                        title={penaltyPoints > 0 ? `Ham Puan: ${stat.points}, Ceza: -${penaltyPoints}` : undefined}
+                      >
                         {effectivePoints}
                       </span>
-                    ) : (
-                      stat.points
                     )}
                   </td>
                 </tr>
               );
             })}
-            
+
             {sortedStats.length === 0 && (
               <tr>
-                <td colSpan={hasPenalties ? 11 : 10} className="p-12 text-center text-gray-500 font-bold tracking-widest text-sm uppercase">
-                  BU LİG İÇİN HENÜZ PUAN DURUMU BULUNMUYOR
+                <td
+                  colSpan={hasPenalties ? 11 : 10}
+                  className="py-10 text-center text-zinc-600 font-medium text-xs sm:text-sm"
+                >
+                  Bu lig için henüz puan durumu verisi bulunmuyor
                 </td>
               </tr>
             )}
@@ -232,39 +305,41 @@ export default async function LeagueStandingsPage({
         </table>
       </div>
 
-      {/* Legend */}
-      <div className="mt-6 flex flex-wrap gap-4 md:gap-6 text-[11px] md:text-[12px] font-[800] uppercase tracking-widest text-gray-400">
+      {/* ALT LEGEND (KUTUSUZ, İNCE TEK SATIR) */}
+      <div className="pt-3 pb-1 flex flex-wrap items-center gap-6 text-xs text-zinc-400 font-medium border-t border-white/[0.06]">
         {isLevel1 && (
           <>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-sm bg-[#3b82f6] shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
-              <span>Şampiyonlar Ligi</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-blue-500" />
+              <span>Şampiyonlar Ligi (1-2)</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-sm bg-[#eab308] shadow-[0_0_8px_rgba(234,179,8,0.5)]"></div>
-              <span>Avrupa Ligi</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-amber-400" />
+              <span>Avrupa Ligi (3-4)</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-sm bg-[#ef4444] shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div>
-              <span>Küme Düşme</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-rose-500" />
+              <span>Küme Düşme (11-12)</span>
             </div>
           </>
         )}
-        {isLevel2 && (
+
+        {isLevel1 === false && (
           <>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-sm bg-[#22c55e] shadow-[0_0_8px_rgba(34,197,94,0.5)]"></div>
-              <span>Lig Yükselme</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span>Lig Yükselme (1)</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-sm bg-[#eab308] shadow-[0_0_8px_rgba(234,179,8,0.5)]"></div>
-              <span>Lig Yükselme Play-Off</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-amber-400" />
+              <span>Lig Yükselme Play-Off (2-5)</span>
             </div>
           </>
         )}
+
         {expelledTeams.size > 0 && (
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-sm bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-red-600" />
             <span>İhraç Edilmiş</span>
           </div>
         )}
