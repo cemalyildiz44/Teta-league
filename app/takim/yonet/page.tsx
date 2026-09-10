@@ -74,6 +74,17 @@ export default async function TeamManagementPage() {
   const isWindowOpen = window?.is_open ?? false;
   const transferWindowId = window?.id || null;
 
+  // Transfer Slots (Option B)
+  const { data: slotRows } = await supabase.rpc('get_team_transfer_slots', {
+    p_team_id: teamId,
+    p_season_id: activeSeason.id
+  });
+  const slotData = Array.isArray(slotRows) && slotRows.length > 0 ? slotRows[0] : null;
+  const transferSlots = {
+    remaining: slotData?.remaining_slots ?? 5,
+    total: slotData?.total_slots ?? 5
+  };
+
   // Roster (team_memberships)
   const { data: memberships } = await supabase
     .from('team_memberships')
@@ -130,10 +141,18 @@ export default async function TeamManagementPage() {
           </div>
           
           <div className="flex flex-col items-center md:items-end gap-2 mt-6 md:mt-0">
-            <div className="text-right">
-              <div className="text-[10px] font-bold text-gray-500 tracking-widest uppercase">Kadro Durumu</div>
-              <div className="text-xl font-black text-white">
-                {memberships?.length || 0} <span className="text-sm text-gray-500">/ {activeSeason.roster_max}</span>
+            <div className="flex items-center gap-6">
+              <div className="text-right">
+                <div className="text-[10px] font-bold text-gray-500 tracking-widest uppercase">Kadro Durumu</div>
+                <div className="text-xl font-black text-white">
+                  {memberships?.length || 0} <span className="text-sm text-gray-500">/ {activeSeason.roster_max}</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] font-bold text-gray-500 tracking-widest uppercase">Transfer Slotu</div>
+                <div className="text-xl font-black text-white font-mono">
+                  {transferSlots.remaining} <span className="text-sm text-gray-500">/ {transferSlots.total}</span>
+                </div>
               </div>
             </div>
             <div className="text-[10px] font-medium text-gray-500">Min: {activeSeason.roster_min}</div>

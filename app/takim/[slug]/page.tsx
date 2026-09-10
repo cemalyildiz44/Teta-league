@@ -66,6 +66,17 @@ export default async function TeamPage({ params }: Props) {
   const activeLeague: any = Array.isArray(leagueTeamData?.leagues) ? leagueTeamData.leagues[0] : leagueTeamData?.leagues;
   const activeSeason: any = Array.isArray(activeLeague?.seasons) ? activeLeague.seasons[0] : activeLeague?.seasons;
 
+  // 2b. Fetch Transfer Slots (Option B)
+  const { data: slotRows } = await supabase.rpc('get_team_transfer_slots', {
+    p_team_id: team.id,
+    p_season_id: activeSeason?.id || null
+  });
+  const slotData = Array.isArray(slotRows) && slotRows.length > 0 ? slotRows[0] : null;
+  const transferSlots = {
+    remaining: slotData?.remaining_slots ?? 5,
+    total: slotData?.total_slots ?? 5
+  };
+
   // 3. Fetch Captain Role
   const { data: roles } = await supabase
     .from('user_roles')
@@ -422,6 +433,14 @@ export default async function TeamPage({ params }: Props) {
                   <span className="text-[13px] text-gray-500 font-bold uppercase tracking-widest">Kayıtlı Aktif Lig Yok</span>
                 </div>
               )}
+
+              {/* Transfer Slotu */}
+              <div className="px-5 py-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-xl flex flex-col">
+                <span className="text-[10px] text-gray-400 font-[900] uppercase tracking-[0.2em] mb-1">TRANSFER SLOTU</span>
+                <span className="text-[14px] text-white font-[800] tracking-widest uppercase font-mono">
+                  {transferSlots.remaining} / {transferSlots.total}
+                </span>
+              </div>
 
               {/* Team Market Value Badge */}
               {totalTeamValue > 0 && (

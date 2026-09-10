@@ -64,6 +64,9 @@ export async function invitePlayer(formData: FormData) {
     if (error.message.includes('No active transfer window')) {
       return { error: 'Transfer penceresi şu anda kapalı.' };
     }
+    if (error.message.includes('transfer slotu dolmuştur') || error.message.includes('Transfer kotanız dolmuştur')) {
+      return { error: 'Bu transfer dönemi için maksimum transfer kotanıza (5) ulaştınız.' };
+    }
     return { error: 'Teklif gönderilemedi: ' + error.message };
   }
 
