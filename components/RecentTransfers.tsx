@@ -4,22 +4,20 @@ import Link from 'next/link';
 import { ArrowRight, ArrowRightLeft } from 'lucide-react';
 import TeamLogo from '@/components/TeamLogo';
 
-export default async function RecentTransfers() {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+import { getActiveSeason, getAllTeams } from '@/lib/fetchers';
 
-  // 1. Get active season
-  const { data: activeSeason } = await supabase
-    .from('seasons')
-    .select('id')
-    .eq('status', 'ACTIVE')
-    .single();
+export default async function RecentTransfers() {
+  // 1. Get active season (memoized)
+  const activeSeason = await getActiveSeason();
 
   let formattedTransfers: any[] = [];
 
   if (activeSeason) {
-    // 2 & 3. Fetch approved transfers and teams concurrently (guaranteed safe, decoupled from team_memberships)
-    const [{ data: transfers }, { data: teams }] = await Promise.all([
+    const cookieStore = await cookies();
+    const supabase = createClient(cookieStore);
+
+    // 2 & 3. Fetch approved transfers and teams concurrently (teams is memoized)
+    const [{ data: transfers }, teams] = await Promise.all([
       supabase
         .from('transfers')
         .select('id, player_id, from_team_id, to_team_id, effective_at, created_at, profiles!transfers_player_id_fkey(username, avatar_url)')
@@ -27,11 +25,11 @@ export default async function RecentTransfers() {
         .eq('season_id', activeSeason.id)
         .order('effective_at', { ascending: false, nullsFirst: false })
         .limit(5),
-      supabase.from('teams').select('id, name, logo_url, slug')
+      getAllTeams()
     ]);
 
     if (transfers && transfers.length > 0) {
-      const teamMap = new Map((teams || []).map(t => [t.id, t]));
+      const teamMap = new Map((teams || []).map((t: any) => [t.id, t]));
 
       formattedTransfers = transfers.map((t: any) => {
         const fromTeam = t.from_team_id ? teamMap.get(t.from_team_id) : null;

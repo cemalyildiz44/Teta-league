@@ -1,17 +1,11 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { MiniStatsClient } from './MiniStatsClient';
+import { getActiveSeason, getAllTeams } from '@/lib/fetchers';
 
 export default async function MiniStats() {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
-
-  // Get active season
-  const { data: activeSeason } = await supabase
-    .from('seasons')
-    .select('id')
-    .eq('status', 'ACTIVE')
-    .single();
+  // Get active season (memoized)
+  const activeSeason = await getActiveSeason();
 
   let topScorers: any[] = [];
   let topAssisters: any[] = [];
@@ -19,12 +13,15 @@ export default async function MiniStats() {
   let topRatedPlayers: any[] = [];
 
   if (activeSeason) {
-    // Fetch stats and teams concurrently
-    const [ { data: stats }, { data: teams } ] = await Promise.all([
+    const cookieStore = await cookies();
+    const supabase = createClient(cookieStore);
+
+    // Fetch stats and teams concurrently (teams is memoized)
+    const [ { data: stats }, teams ] = await Promise.all([
       supabase.from('player_team_season_stats').select('goals, assists, cleansheets_gk, cleansheets_def, rating_sum, rating_count, matches_played, player_id, team_id, profiles(username)').eq('season_id', activeSeason.id),
-      supabase.from('teams').select('id, name, logo_url')
+      getAllTeams()
     ]);
-    const teamMap = new Map((teams || []).map(t => [t.id, t]));
+    const teamMap = new Map((teams || []).map((t: any) => [t.id, t]));
 
     if (stats && stats.length > 0) {
       // Format data

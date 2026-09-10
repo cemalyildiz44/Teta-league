@@ -6,13 +6,14 @@ import { RosterManagement } from './RosterManagement';
 import { TeamSocialsForm } from './TeamSocialsForm';
 import Link from 'next/link';
 import TeamLogo from '@/components/TeamLogo';
+import { getCachedUser } from '@/lib/fetchers';
 
 export default async function TeamManagementPage() {
+  const user = await getCachedUser();
+  if (!user) redirect('/giris');
+
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/giris');
 
   // Find active CAPTAIN role
   const { data: role } = await supabase

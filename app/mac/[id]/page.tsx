@@ -5,17 +5,19 @@ import Link from "next/link";
 import { Shield, ChevronRight } from "lucide-react";
 import TeamLogo from "@/components/TeamLogo";
 
+import { getMatchById, getTeamById } from "@/lib/fetchers";
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = await params;
   const matchId = resolvedParams.id;
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
 
-  const { data: match } = await supabase.from("matches").select("home_team_id, away_team_id, home_score, away_score, status").eq("id", matchId).maybeSingle();
+  const match = await getMatchById(matchId);
   if (!match || match.status !== "APPROVED") return { title: "Maç Bulunamadı | TETA League" };
 
-  const { data: ht } = await supabase.from("teams").select("name").eq("id", match.home_team_id).maybeSingle();
-  const { data: at } = await supabase.from("teams").select("name").eq("id", match.away_team_id).maybeSingle();
+  const [ht, at] = await Promise.all([
+    match.home_team_id ? getTeamById(match.home_team_id) : Promise.resolve(null),
+    match.away_team_id ? getTeamById(match.away_team_id) : Promise.resolve(null)
+  ]);
 
   return {
     title: `${ht?.name || "Ev Sahibi"} ${match.home_score} - ${match.away_score} ${at?.name || "Deplasman"} | TETA League`,
@@ -28,25 +30,22 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
   const resolvedSearchParams = await searchParams;
   const activeTab = resolvedSearchParams.tab || 'genel';
 
+  const match = await getMatchById(matchId);
+  if (!match || match.status !== "APPROVED") notFound();
+
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  const { data: match } = await supabase
-    .from("matches")
-    .select("*, fixtures(week_number)")
-    .eq("id", matchId)
-    .single();
-
-  if (!match || match.status !== "APPROVED") notFound();
-
-  // Parallel fetches for relations
-  const [{ data: leagueData }, { data: seasonData }, { data: homeTeam }, { data: awayTeam }, { data: statsData }] = await Promise.all([
-    supabase.from("leagues").select("id, name, slug").eq("id", match.league_id).maybeSingle(),
-    supabase.from("seasons").select("id, name, slug").eq("id", match.season_id).maybeSingle(),
-    supabase.from("teams").select("id, name, slug, logo_url").eq("id", match.home_team_id).single(),
-    supabase.from("teams").select("id, name, slug, logo_url").eq("id", match.away_team_id).single(),
+  // Parallel fetches for relations (homeTeam & awayTeam are memoized from generateMetadata)
+  const [{ data: leagueData }, { data: seasonData }, homeTeam, awayTeam, { data: statsData }] = await Promise.all([
+    match.league_id ? supabase.from("leagues").select("id, name, slug").eq("id", match.league_id).maybeSingle() : Promise.resolve({ data: null }),
+    match.season_id ? supabase.from("seasons").select("id, name, slug").eq("id", match.season_id).maybeSingle() : Promise.resolve({ data: null }),
+    getTeamById(match.home_team_id),
+    getTeamById(match.away_team_id),
     supabase.from("match_player_stats").select("*, profiles(username, avatar_url)").eq("match_id", matchId)
   ]);
+
+  if (!homeTeam || !awayTeam) notFound();
 
   (match as any).leagues = leagueData;
   (match as any).seasons = seasonData;

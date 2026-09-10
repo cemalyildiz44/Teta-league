@@ -3,33 +3,16 @@ import { cookies } from 'next/headers';
 import { slugify, compareTeamStats } from '@/app/lig/utils';
 import StandingsClient, { StandingsLeagueInfo, StandingsTeamRow } from './StandingsClient';
 
+import { getActiveSeason, getAllTeams } from '@/lib/fetchers';
+
 interface StandingsProps {
   compact?: boolean;
 }
 
 export default async function Standings({ compact = false }: StandingsProps) {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const currentSeason = await getActiveSeason();
 
-  // 1. Aktif sezonu bul (veya en son sezon)
-  const { data: activeSeason, error: seasonError } = await supabase
-    .from('seasons')
-    .select('id, name, slug, status')
-    .eq('status', 'ACTIVE')
-    .maybeSingle();
-
-  let season = activeSeason;
-  if (!season) {
-    const { data: latestSeason } = await supabase
-      .from('seasons')
-      .select('id, name, slug, status')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    season = latestSeason;
-  }
-
-  if (seasonError || !season) {
+  if (!currentSeason) {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
@@ -39,24 +22,25 @@ export default async function Standings({ compact = false }: StandingsProps) {
           </h2>
         </div>
         <div className="empty-state !py-8">
-          <span className="empty-state-title">
-            {seasonError ? 'Veri Alınamadı' : 'Sezon Yok'}
-          </span>
-          <span className="empty-state-desc">
-            {seasonError ? 'Puan durumu yüklenirken bir sorun oluştu.' : 'Henüz aktif sezon bulunmuyor.'}
-          </span>
+          <span className="empty-state-title">Sezon Yok</span>
+          <span className="empty-state-desc">Henüz aktif sezon bulunmuyor.</span>
         </div>
       </div>
     );
   }
 
-  const currentSeason = season;
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+
+  const seasonId = currentSeason.id;
+  const seasonSlug = currentSeason.slug || 'sezon-1';
+  const seasonName = currentSeason.name || 'Sezon 1';
 
   // 2. Aktif sezondaki ligleri çek
   const { data: leagues, error: leaguesError } = await supabase
     .from('leagues')
     .select('*')
-    .eq('season_id', currentSeason.id)
+    .eq('season_id', seasonId)
     .order('level', { ascending: true });
 
   if (leaguesError || !leagues || leagues.length === 0) {
@@ -69,12 +53,8 @@ export default async function Standings({ compact = false }: StandingsProps) {
           </h2>
         </div>
         <div className="empty-state !py-8">
-          <span className="empty-state-title">
-            {leaguesError ? 'Veri Alınamadı' : 'Lig Yok'}
-          </span>
-          <span className="empty-state-desc">
-            {leaguesError ? 'Lig bilgileri alınırken bir sorun oluştu.' : 'Henüz aktif lig bulunmuyor.'}
-          </span>
+          <span className="empty-state-title">Lig Bulunamadı</span>
+          <span className="empty-state-desc">Bu sezona ait aktif lig bulunamadı.</span>
         </div>
       </div>
     );
@@ -89,11 +69,9 @@ export default async function Standings({ compact = false }: StandingsProps) {
     (l) => l.level === 2 || l.name.toLowerCase().includes('ecl')
   ) || leagues.find((l) => l.id !== superLigLeague?.id) || null;
 
-  // 4. Takım bilgilerini toplu çek (N+1 engellemek için)
-  const { data: allTeams } = await supabase
-    .from('teams')
-    .select('id, name, slug, logo_url');
-  const teamMap = new Map((allTeams || []).map((t) => [t.id, t]));
+  // 4. Tüm takımları tek sorguda çek (memoized)
+  const allTeams = await getAllTeams();
+  const teamMap = new Map((allTeams || []).map((t: any) => [t.id, t]));
 
   // 5. Lig bazında puan durumu hesaplama yardımcısı
   async function fetchLeagueStandings(league: any): Promise<StandingsLeagueInfo> {
@@ -104,7 +82,7 @@ export default async function Standings({ compact = false }: StandingsProps) {
       .from('league_teams')
       .select('team_id')
       .eq('league_id', league.id)
-      .eq('season_id', currentSeason.id)
+      .eq('season_id', seasonId)
       .eq('is_active', true);
 
     const leagueTeams = ltData || [];
@@ -114,7 +92,7 @@ export default async function Standings({ compact = false }: StandingsProps) {
       .from('team_season_stats')
       .select('*')
       .eq('league_id', league.id)
-      .eq('season_id', currentSeason.id);
+      .eq('season_id', seasonId);
 
     const stats = statsData || [];
 
@@ -124,7 +102,7 @@ export default async function Standings({ compact = false }: StandingsProps) {
       if (existing) return existing;
       return {
         league_id: league.id,
-        season_id: currentSeason.id,
+        season_id: seasonId,
         team_id: lt.team_id,
         matches_played: 0,
         wins: 0,
@@ -162,8 +140,8 @@ export default async function Standings({ compact = false }: StandingsProps) {
       name: league.name,
       slug: leagueSlug,
       level: league.level,
-      seasonSlug: currentSeason.slug,
-      seasonName: currentSeason.name,
+      seasonSlug: seasonSlug,
+      seasonName: seasonName,
       teams: formattedTeams,
     };
   }

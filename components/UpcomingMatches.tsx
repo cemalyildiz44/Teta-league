@@ -25,17 +25,10 @@ function formatTime(dateStr: string): string {
   }).format(date);
 }
 
-export default async function UpcomingMatches() {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+import { getActiveSeason } from '@/lib/fetchers';
 
-  // 1. Aktif sezonu bul
-  const { data: activeSeason } = await supabase
-    .from('seasons')
-    .select('id, name')
-    .eq('status', 'ACTIVE')
-    .limit(1)
-    .single();
+export default async function UpcomingMatches() {
+  const activeSeason = await getActiveSeason();
 
   if (!activeSeason) {
     return (
@@ -47,6 +40,9 @@ export default async function UpcomingMatches() {
       </div>
     );
   }
+
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
 
   // 2. Aktif sezondaki ACTIVE ligleri bul (level 1 = en üst)
   const { data: activeLeague } = await supabase

@@ -2,86 +2,89 @@ import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import ClientAccount from './ClientAccount';
+import { getCachedUser, getTeamById } from '@/lib/fetchers';
 
 export const metadata = {
   title: "Hesabım | TETA League"
 };
 
 export default async function ProfilPage() {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
-
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCachedUser();
 
   if (!user) {
     redirect('/giris');
   }
 
-  // 1. Fetch user profile
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single();
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+
+  // 1. Stage 1 Parallel: Fetch profile, memberships, captain role, tournaments, and application players
+  const [
+    { data: profile },
+    { data: membershipsData },
+    { data: captainRole },
+    { data: tournamentsData },
+    { data: ncData }
+  ] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single(),
+    supabase
+      .from('team_memberships')
+      .select('*')
+      .eq('player_id', user.id)
+      .order('joined_at', { ascending: false }),
+    supabase
+      .from('user_roles')
+      .select('team_id')
+      .eq('user_id', user.id)
+      .eq('role', 'CAPTAIN')
+      .eq('is_active', true)
+      .maybeSingle(),
+    supabase
+      .from('tournament_winners')
+      .select('id, tournaments(type)')
+      .eq('profile_id', user.id),
+    supabase
+      .from('tournament_application_players')
+      .select('application_id, tournament_applications(tournament_winners(id, tournaments(type)))')
+      .eq('profile_id', user.id)
+  ]);
 
   if (!profile) {
     redirect('/giris'); // Or error page
   }
 
-  // 2. Fetch Team Memberships & League
-  const { data: membershipsData } = await supabase
-    .from('team_memberships')
-    .select('*')
-    .eq('player_id', user.id)
-    .order('joined_at', { ascending: false });
-
   const memberships = membershipsData || [];
   const activeMembership = memberships.find(m => !m.left_at);
+  const targetTeamId = activeMembership?.team_id || captainRole?.team_id || null;
+
+  // 2. Stage 2 Parallel: Fetch team and league lookups
+  const [tData, leagueRes] = await Promise.all([
+    targetTeamId ? getTeamById(targetTeamId) : Promise.resolve(null),
+    activeMembership?.league_id
+      ? supabase.from('leagues').select('name').eq('id', activeMembership.league_id).maybeSingle()
+      : Promise.resolve({ data: null })
+  ]);
 
   let team = null;
-  if (activeMembership?.team_id) {
-    const { data: tData } = await supabase.from('teams').select('id, name, slug, logo_url, is_active').eq('id', activeMembership.team_id).maybeSingle();
-    if (tData && tData.is_active !== false) {
-      team = tData;
-    }
+  if (tData && tData.is_active !== false) {
+    team = tData;
   }
 
-  // Active League
   let league = null;
-  if (team && activeMembership?.league_id) {
-    const { data: lData } = await supabase.from('leagues').select('name').eq('id', activeMembership.league_id).maybeSingle();
-    league = lData;
+  if (team && activeMembership?.league_id && leagueRes.data) {
+    league = leagueRes.data;
   }
 
-  // Captain Status (PLAYER + CAPTAIN, PLAYER + CAPTAIN + SUPER_ADMIN)
   let isCaptain = false;
-  const { data: captainRole } = await supabase
-    .from('user_roles')
-    .select('team_id')
-    .eq('user_id', user.id)
-    .eq('role', 'CAPTAIN')
-    .eq('is_active', true)
-    .maybeSingle();
-
   if (captainRole?.team_id) {
     isCaptain = true;
-    if (!team) {
-      const { data: cTeam } = await supabase.from('teams').select('id, name, slug, logo_url, is_active').eq('id', captainRole.team_id).maybeSingle();
-      if (cTeam && cTeam.is_active !== false) team = cTeam;
-    }
   }
 
-  // 3. Fetch Achievements (Summary)
-  const { data: tournamentsData } = await supabase
-    .from('tournament_winners')
-    .select('id, tournaments(type)')
-    .eq('profile_id', user.id);
-
-  const { data: ncData } = await supabase
-    .from('tournament_application_players')
-    .select('application_id, tournament_applications(tournament_winners(id, tournaments(type)))')
-    .eq('profile_id', user.id);
-
+  // 3. Achievements Summary (calculated from Stage 1 parallel fetch)
   let totalCups = 0;
   let type1V1 = 0;
   let typeKarma = 0;

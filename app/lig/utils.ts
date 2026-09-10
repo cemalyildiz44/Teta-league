@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { createClient } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
 
@@ -14,7 +15,7 @@ export function slugify(text: string) {
     .replace(/(^-|-$)+/g, '');
 }
 
-export async function getLeagueBySlugs(seasonSlug: string, leagueSlug: string) {
+export const getLeagueBySlugs = cache(async (seasonSlug: string, leagueSlug: string) => {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
@@ -37,7 +38,7 @@ export async function getLeagueBySlugs(seasonSlug: string, leagueSlug: string) {
     league.seasons = season;
   }
   return league;
-}
+});
 
 export interface TeamStatsComparable {
   points: number;
