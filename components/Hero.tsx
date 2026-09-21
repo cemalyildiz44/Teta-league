@@ -538,13 +538,14 @@ export default function Hero() {
         </div>
 
         {/* Headline */}
-        <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-[70px] font-black text-white leading-[1.08] uppercase tracking-tight mb-5 md:mb-6 max-w-4xl">
-          TÜRKİYE&apos;NİN PRO CLUBS LİGİ
+        <h1 className="text-[36px] sm:text-5xl md:text-6xl lg:text-[74px] font-black text-white leading-[1.05] uppercase tracking-tight mb-6 md:mb-8 drop-shadow-xl flex flex-col items-center">
+          <span className="block">REKABETİN MERKEZİ</span>
+          <span className="block">TETA LEAGUE.</span>
         </h1>
 
         {/* Subtitle */}
-        <p className="text-gray-400 text-base sm:text-lg lg:text-xl font-normal tracking-wide max-w-xl mb-10 md:mb-12">
-          EA FC Pro Clubs rekabetinin merkezi.
+        <p className="text-gray-400 text-base sm:text-lg lg:text-xl font-medium tracking-wide max-w-2xl mb-10 md:mb-12">
+          Takımını kur, liglere kat ve rekabetin bir parçası ol.
         </p>
 
         {/* Action Buttons */}
