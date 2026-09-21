@@ -82,6 +82,16 @@ export async function kickPlayerAction(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: 'Unauthorized' };
 
+  const { data: callerProfile } = await supabase
+    .from('profiles')
+    .select('status')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (callerProfile?.status !== 'ACTIVE') {
+    return { error: 'Hesabınız aktif olmadığı için bu işlemi yapamazsınız.' };
+  }
+
   const playerId = formData.get('playerId') as string;
   const seasonId = formData.get('seasonId') as string;
 
@@ -157,6 +167,16 @@ export async function updateTeamSocialsAction(formData: FormData) {
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: 'Oturum açmanız gerekiyor.' };
+
+  const { data: callerProfile } = await supabase
+    .from('profiles')
+    .select('status')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (callerProfile?.status !== 'ACTIVE') {
+    return { error: 'Hesabınız aktif olmadığı için bu işlemi yapamazsınız.' };
+  }
 
   const teamId = formData.get('teamId') as string;
   const streamUrl = (formData.get('stream_url') as string)?.trim() || null;

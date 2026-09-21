@@ -13,6 +13,18 @@ export const getCachedUser = cache(async () => {
   const supabase = createClient(cookieStore);
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) return null;
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('status')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (profile?.status === 'BANNED') {
+    await supabase.auth.signOut();
+    return null;
+  }
+
   return user;
 });
 
