@@ -74,13 +74,7 @@ export function PostForm({
               className="w-full bg-transparent text-[14px] md:text-[15px] text-white placeholder:text-gray-500 focus:outline-none resize-none min-h-[50px] disabled:opacity-50"
             />
             
-            <div className="mt-2 pt-3 border-t border-white/5 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-gray-500">
-                <button type="button" className="p-2 hover:bg-white/5 rounded-lg hover:text-[#00e5ff] transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path></svg>
-                </button>
-              </div>
-              
+            <div className="mt-2 pt-3 border-t border-white/5 flex items-center justify-end">
               <button
                 type="submit"
                 disabled={isPending || content.trim().length === 0}
