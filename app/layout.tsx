@@ -18,6 +18,15 @@ const exo2 = Exo_2({
 export const metadata: Metadata = {
   title: "TETA League",
   description: "TETA League - EA FC Pro Clubs rekabetinin yeni adresi. Ligler, takımlar, istatistikler ve daha fazlası.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/icon.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
