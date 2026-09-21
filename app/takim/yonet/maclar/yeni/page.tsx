@@ -59,7 +59,7 @@ export default async function NewMatchPage({ searchParams }: { searchParams: Pro
           </Link>
         </div>
 
-        <SubmitMatchForm fixture={fixture} homeTeam={homeTeam} awayTeam={awayTeam} />
+        <SubmitMatchForm fixture={fixture} homeTeam={homeTeam} awayTeam={awayTeam} teamId={role.team_id} />
       </div>
     </main>
   );

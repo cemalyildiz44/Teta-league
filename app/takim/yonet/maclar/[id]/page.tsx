@@ -122,6 +122,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
         {match.status === 'PENDING_REVIEW' && (
           <MatchEditForm
             matchId={matchId}
+            teamId={teamId}
             homeTeamName={homeTeam?.name || 'Ev Sahibi'}
             awayTeamName={awayTeam?.name || 'Deplasman'}
             initialHomeScore={match.home_score}

@@ -10,9 +10,10 @@ interface SubmitMatchFormProps {
   fixture: any;
   homeTeam: any;
   awayTeam: any;
+  teamId: string;
 }
 
-export function SubmitMatchForm({ fixture, homeTeam, awayTeam }: SubmitMatchFormProps) {
+export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitMatchFormProps) {
   const [state, formAction, isPending] = useActionState(submitMatchAction as any, { error: '', success: '', matchId: '' } as any);
   const [screenshotUrl, setScreenshotUrl] = useState('');
   const [isUploadingScreenshot, setIsUploadingScreenshot] = useState(false);
@@ -75,6 +76,7 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam }: SubmitMatchForm
             Kanıt Ekran Görüntüsü
           </label>
           <MatchScreenshotUpload
+            teamId={teamId}
             value={screenshotUrl}
             onChange={(url) => setScreenshotUrl(url)}
             onUploadingChange={(uploading) => setIsUploadingScreenshot(uploading)}

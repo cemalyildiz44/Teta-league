@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client';
 import { Upload, Image as ImageIcon, CheckCircle2, AlertCircle, Loader2, X, RefreshCw, ExternalLink } from 'lucide-react';
 
 interface MatchScreenshotUploadProps {
+  teamId: string;
   value: string;
   onChange: (url: string) => void;
   onUploadingChange?: (uploading: boolean) => void;
@@ -15,6 +16,7 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 export function MatchScreenshotUpload({
+  teamId,
   value,
   onChange,
   onUploadingChange,
@@ -58,7 +60,7 @@ export function MatchScreenshotUpload({
       const supabase = createClient();
       const ext = file.name.split('.').pop() || 'png';
       const cleanFileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${ext}`;
-      const filePath = `matches/${cleanFileName}`;
+      const filePath = `${teamId}/${cleanFileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('match-screenshots')

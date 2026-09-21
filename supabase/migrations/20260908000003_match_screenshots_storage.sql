@@ -14,70 +14,68 @@ ON CONFLICT (id) DO UPDATE SET
 
 -- Storage Policies for match-screenshots
 
--- Public read access for match screenshots
+-- 1. Public read access for match screenshots
 CREATE POLICY "Match screenshots public access"
 ON storage.objects FOR SELECT
 USING (bucket_id = 'match-screenshots');
 
--- Captain and Admin upload match screenshots
+-- 2. Captain and Admin upload match screenshots
 CREATE POLICY "Captains and Admins upload match screenshots"
 ON storage.objects FOR INSERT
 WITH CHECK (
   bucket_id = 'match-screenshots'
+  AND (SELECT status FROM public.profiles WHERE id = auth.uid()) = 'ACTIVE'
   AND (
     EXISTS (
-      SELECT 1 FROM user_roles
-      WHERE user_id = auth.uid()
-      AND role = 'CAPTAIN'
-      AND is_active = true
-    )
-    OR EXISTS (
       SELECT 1 FROM user_roles
       WHERE user_id = auth.uid()
       AND role IN ('ADMIN', 'SUPER_ADMIN')
       AND is_active = true
     )
+    OR EXISTS (
+      SELECT 1 FROM user_roles
+      WHERE user_id = auth.uid()
+      AND role = 'CAPTAIN'
+      AND is_active = true
+      AND team_id::text = (storage.foldername(name))[1]
+    )
   )
 );
 
--- Captain and Admin update match screenshots
-CREATE POLICY "Captains and Admins update match screenshots"
+-- 3. Admin update match screenshots (Captains cannot update)
+CREATE POLICY "Admins update match screenshots"
 ON storage.objects FOR UPDATE
+USING (
+  bucket_id = 'match-screenshots'
+  AND (SELECT status FROM public.profiles WHERE id = auth.uid()) = 'ACTIVE'
+  AND EXISTS (
+    SELECT 1 FROM user_roles
+    WHERE user_id = auth.uid()
+    AND role IN ('ADMIN', 'SUPER_ADMIN')
+    AND is_active = true
+  )
+)
 WITH CHECK (
   bucket_id = 'match-screenshots'
-  AND (
-    EXISTS (
-      SELECT 1 FROM user_roles
-      WHERE user_id = auth.uid()
-      AND role = 'CAPTAIN'
-      AND is_active = true
-    )
-    OR EXISTS (
-      SELECT 1 FROM user_roles
-      WHERE user_id = auth.uid()
-      AND role IN ('ADMIN', 'SUPER_ADMIN')
-      AND is_active = true
-    )
+  AND (SELECT status FROM public.profiles WHERE id = auth.uid()) = 'ACTIVE'
+  AND EXISTS (
+    SELECT 1 FROM user_roles
+    WHERE user_id = auth.uid()
+    AND role IN ('ADMIN', 'SUPER_ADMIN')
+    AND is_active = true
   )
 );
 
--- Captain and Admin delete match screenshots
-CREATE POLICY "Captains and Admins delete match screenshots"
+-- 4. Admin delete match screenshots (Captains cannot delete)
+CREATE POLICY "Admins delete match screenshots"
 ON storage.objects FOR DELETE
 USING (
   bucket_id = 'match-screenshots'
-  AND (
-    EXISTS (
-      SELECT 1 FROM user_roles
-      WHERE user_id = auth.uid()
-      AND role IN ('ADMIN', 'SUPER_ADMIN')
-      AND is_active = true
-    )
-    OR EXISTS (
-      SELECT 1 FROM user_roles
-      WHERE user_id = auth.uid()
-      AND role = 'CAPTAIN'
-      AND is_active = true
-    )
+  AND (SELECT status FROM public.profiles WHERE id = auth.uid()) = 'ACTIVE'
+  AND EXISTS (
+    SELECT 1 FROM user_roles
+    WHERE user_id = auth.uid()
+    AND role IN ('ADMIN', 'SUPER_ADMIN')
+    AND is_active = true
   )
 );

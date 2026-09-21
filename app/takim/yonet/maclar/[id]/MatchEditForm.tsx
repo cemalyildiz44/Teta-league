@@ -8,6 +8,7 @@ import { editMatchAction } from '../actions';
 
 interface MatchEditFormProps {
   matchId: string;
+  teamId: string;
   homeTeamName: string;
   awayTeamName: string;
   initialHomeScore: number | null;
@@ -18,6 +19,7 @@ interface MatchEditFormProps {
 
 export function MatchEditForm({
   matchId,
+  teamId,
   homeTeamName,
   awayTeamName,
   initialHomeScore,
@@ -137,6 +139,7 @@ export function MatchEditForm({
               Kanıt Görseli (Ekran Görüntüsü)
             </label>
             <MatchScreenshotUpload
+              teamId={teamId}
               value={screenshotUrl}
               onChange={setScreenshotUrl}
               onUploadingChange={setIsUploading}
