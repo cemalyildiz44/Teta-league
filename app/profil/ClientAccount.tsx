@@ -45,10 +45,10 @@ export default function ClientAccount({ profile, authUser, team, league, isCapta
 
       const options = {
         maxSizeMB: 1,
-        maxWidthOrHeight: 512,
+        maxWidthOrHeight: 1024,
         useWebWorker: true,
         fileType: 'image/webp',
-        initialQuality: 0.85,
+        initialQuality: 0.90,
       };
 
       let compressedFile = await imageCompression(file, options);
