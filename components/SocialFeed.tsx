@@ -44,18 +44,18 @@ export default async function SocialFeed() {
           <div key={post.id} className="group relative">
             <div className="flex items-start gap-4 p-4 rounded-xl hover:bg-[#060d18] border border-transparent hover:border-[#00e5ff]/20 transition-all">
               <div className="relative">
-                {post.author.avatar_url ? (
+                {post.author?.avatar_url ? (
                   <img src={post.author.avatar_url} alt="" className="w-12 h-12 rounded-full border border-white/10" />
                 ) : (
                   <div className="w-12 h-12 rounded-full bg-[#132338] border border-white/10 flex items-center justify-center font-bold text-[#00e5ff]">
-                    {post.author.username.charAt(0).toUpperCase()}
+                    {(post.author?.username || '?').charAt(0).toUpperCase()}
                   </div>
                 )}
               </div>
               
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="font-bold text-white text-sm truncate">{post.author.username}</span>
+                  <span className="font-bold text-white text-sm truncate">{post.author?.username || 'Anonim'}</span>
                 </div>
                 <p className="text-gray-400 text-sm line-clamp-2 mb-3">{post.content}</p>
                 <div className="flex items-center gap-4 text-[13px] font-[700] text-gray-500">
