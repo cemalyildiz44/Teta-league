@@ -81,9 +81,11 @@ export default async function TeamManagementPage() {
     p_season_id: activeSeason.id
   });
   const slotData = Array.isArray(slotRows) && slotRows.length > 0 ? slotRows[0] : null;
+  const isUnlimited = (slotData as any)?.is_unlimited ?? ((slotData?.total_slots ?? 0) >= 999);
   const transferSlots = {
     remaining: slotData?.remaining_slots ?? 5,
-    total: slotData?.total_slots ?? 5
+    total: slotData?.total_slots ?? 5,
+    isUnlimited
   };
 
   // Roster (team_memberships)
@@ -152,7 +154,13 @@ export default async function TeamManagementPage() {
               <div className="text-right">
                 <div className="text-[10px] font-bold text-gray-500 tracking-widest uppercase">Transfer Slotu</div>
                 <div className="text-xl font-black text-white font-mono">
-                  {transferSlots.remaining} <span className="text-sm text-gray-500">/ {transferSlots.total}</span>
+                  {transferSlots.isUnlimited ? (
+                    <span className="text-[#00e5ff]">SINIRSIZ</span>
+                  ) : (
+                    <>
+                      {transferSlots.remaining} <span className="text-sm text-gray-500">/ {transferSlots.total}</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

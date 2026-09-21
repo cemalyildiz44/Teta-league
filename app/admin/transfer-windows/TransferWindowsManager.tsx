@@ -20,6 +20,7 @@ export type TransferWindow = {
   start_date: string;
   end_date: string;
   is_open: boolean;
+  is_unlimited?: boolean;
   created_at: string;
   seasons?: {
     id: string;
@@ -269,7 +270,20 @@ export function TransferWindowsManager({ initialWindows, seasons }: Props) {
                           <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/10 text-cyan-400 shrink-0">
                             <Calendar className="w-4 h-4" />
                           </div>
-                          <span className="font-extrabold">{w.name}</span>
+                          <div>
+                            <span className="font-extrabold">{w.name}</span>
+                            <div className="mt-0.5">
+                              {w.is_unlimited ? (
+                                <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-black tracking-wider bg-purple-500/10 text-purple-400 border border-purple-500/30">
+                                  SINIRSIZ TRANSFER
+                                </span>
+                              ) : (
+                                <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider bg-zinc-800 text-zinc-400 border border-zinc-700">
+                                  STANDART (5 KOTA)
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </td>
                       <td className="px-3 py-4 text-gray-300 font-medium">
@@ -396,18 +410,39 @@ export function TransferWindowsManager({ initialWindows, seasons }: Props) {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 pt-2">
-                <input
-                  type="checkbox"
-                  id="is_open_create"
-                  name="is_open"
-                  value="true"
-                  defaultChecked={true}
-                  className="w-4 h-4 rounded bg-[#03070c] border-white/20 text-[#00e5ff] focus:ring-0"
-                />
-                <label htmlFor="is_open_create" className="text-sm font-bold text-gray-300">
-                  Pencereyi doğrudan AÇIK olarak başlat
-                </label>
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="is_open_create"
+                    name="is_open"
+                    value="true"
+                    defaultChecked={true}
+                    className="w-4 h-4 rounded bg-[#03070c] border-white/20 text-[#00e5ff] focus:ring-0"
+                  />
+                  <label htmlFor="is_open_create" className="text-sm font-bold text-gray-300 cursor-pointer">
+                    Pencereyi doğrudan AÇIK olarak başlat
+                  </label>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 bg-purple-500/5 border border-purple-500/20 rounded-xl">
+                  <input
+                    type="checkbox"
+                    id="is_unlimited_create"
+                    name="is_unlimited"
+                    value="true"
+                    defaultChecked={false}
+                    className="w-4 h-4 rounded bg-[#03070c] border-purple-500/40 text-purple-500 focus:ring-0 mt-0.5"
+                  />
+                  <div>
+                    <label htmlFor="is_unlimited_create" className="text-sm font-bold text-purple-300 block cursor-pointer">
+                      Sınırsız Transfer Dönemi (Off-Season / Sezon Öncesi)
+                    </label>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      İşaretlenirse takımlar 5 slot sınırına takılmadan sınırsız oyuncu transfer edebilir.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/5">
@@ -496,18 +531,39 @@ export function TransferWindowsManager({ initialWindows, seasons }: Props) {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 pt-2">
-                <input
-                  type="checkbox"
-                  id="is_open_edit"
-                  name="is_open"
-                  value="true"
-                  defaultChecked={editWindow.is_open}
-                  className="w-4 h-4 rounded bg-[#03070c] border-white/20 text-[#00e5ff] focus:ring-0"
-                />
-                <label htmlFor="is_open_edit" className="text-sm font-bold text-gray-300">
-                  Transfer Penceresi Açık (Aktif)
-                </label>
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="is_open_edit"
+                    name="is_open"
+                    value="true"
+                    defaultChecked={editWindow.is_open}
+                    className="w-4 h-4 rounded bg-[#03070c] border-white/20 text-[#00e5ff] focus:ring-0"
+                  />
+                  <label htmlFor="is_open_edit" className="text-sm font-bold text-gray-300 cursor-pointer">
+                    Transfer Penceresi Açık (Aktif)
+                  </label>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 bg-purple-500/5 border border-purple-500/20 rounded-xl">
+                  <input
+                    type="checkbox"
+                    id="is_unlimited_edit"
+                    name="is_unlimited"
+                    value="true"
+                    defaultChecked={editWindow.is_unlimited ?? false}
+                    className="w-4 h-4 rounded bg-[#03070c] border-purple-500/40 text-purple-500 focus:ring-0 mt-0.5"
+                  />
+                  <div>
+                    <label htmlFor="is_unlimited_edit" className="text-sm font-bold text-purple-300 block cursor-pointer">
+                      Sınırsız Transfer Dönemi (Off-Season / Sezon Öncesi)
+                    </label>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      İşaretlenirse takımlar 5 slot sınırına takılmadan sınırsız oyuncu transfer edebilir.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/5">

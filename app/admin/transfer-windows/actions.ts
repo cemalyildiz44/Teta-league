@@ -27,6 +27,7 @@ export async function createTransferWindow(formData: FormData) {
   const start_date_raw = formData.get('start_date') as string;
   const end_date_raw = formData.get('end_date') as string;
   const is_open = formData.get('is_open') === 'true' || formData.get('is_open') === 'on';
+  const is_unlimited = formData.get('is_unlimited') === 'true' || formData.get('is_unlimited') === 'on';
 
   if (!name) return { error: 'Pencere adı boş olamaz.' };
   if (!season_id) return { error: 'Sezon seçilmelidir.' };
@@ -53,6 +54,7 @@ export async function createTransferWindow(formData: FormData) {
     start_date: startDate.toISOString(),
     end_date: endDate.toISOString(),
     is_open,
+    is_unlimited,
     created_by: user.id
   });
 
@@ -79,6 +81,7 @@ export async function updateTransferWindow(formData: FormData) {
   const start_date_raw = formData.get('start_date') as string;
   const end_date_raw = formData.get('end_date') as string;
   const is_open = formData.get('is_open') === 'true' || formData.get('is_open') === 'on';
+  const is_unlimited = formData.get('is_unlimited') === 'true' || formData.get('is_unlimited') === 'on';
 
   if (!id) return { error: 'Pencere ID eksik.' };
   if (!name) return { error: 'Pencere adı boş olamaz.' };
@@ -102,6 +105,7 @@ export async function updateTransferWindow(formData: FormData) {
     start_date: startDate.toISOString(),
     end_date: endDate.toISOString(),
     is_open,
+    is_unlimited,
     updated_at: new Date().toISOString()
   }).eq('id', id);
 

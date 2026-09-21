@@ -235,9 +235,11 @@ export default async function TeamPage({ params }: Props) {
   }
 
   const slotData = Array.isArray(slotRows) && slotRows.length > 0 ? slotRows[0] : null;
+  const isUnlimited = (slotData as any)?.is_unlimited ?? ((slotData?.total_slots ?? 0) >= 999);
   const transferSlots = {
     remaining: slotData?.remaining_slots ?? 5,
-    total: slotData?.total_slots ?? 5
+    total: slotData?.total_slots ?? 5,
+    isUnlimited
   };
 
   // 4. Stage 4 Parallel: Roster Stats & Market Value Bulk Fetch
@@ -440,7 +442,11 @@ export default async function TeamPage({ params }: Props) {
               <div className="px-5 py-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-xl flex flex-col">
                 <span className="text-[10px] text-gray-400 font-[900] uppercase tracking-[0.2em] mb-1">TRANSFER SLOTU</span>
                 <span className="text-[14px] text-white font-[800] tracking-widest uppercase font-mono">
-                  {transferSlots.remaining} / {transferSlots.total}
+                  {transferSlots.isUnlimited ? (
+                    <span className="text-[#00e5ff]">SINIRSIZ</span>
+                  ) : (
+                    `${transferSlots.remaining} / ${transferSlots.total}`
+                  )}
                 </span>
               </div>
 
