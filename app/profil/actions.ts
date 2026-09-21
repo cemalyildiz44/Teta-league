@@ -73,12 +73,16 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
       }
     }
 
-    // Fetch existing profile to handle avatar cleanup and preserve existing social links
+    // Fetch existing profile to handle avatar cleanup, BANNED check, and preserve existing social links
     const { data: currentProfile } = await supabase
       .from('profiles')
-      .select('avatar_url, social_links')
+      .select('username, status, avatar_url, social_links')
       .eq('id', user.id)
       .single();
+
+    if (currentProfile?.status === 'BANNED') {
+      return { error: 'Yasaklı hesaplar profil bilgilerini güncelleyemez.' };
+    }
 
     const existingSocials = currentProfile?.social_links || {};
 
@@ -145,6 +149,9 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
     revalidatePath('/');
     revalidatePath('/oyuncular');
     revalidatePath(`/oyuncular/${username}`);
+    if (currentProfile?.username && currentProfile.username !== username) {
+      revalidatePath(`/oyuncular/${currentProfile.username}`);
+    }
     revalidatePath('/istatistikler');
     
     return { success: 'Profil başarıyla kaydedildi.' };

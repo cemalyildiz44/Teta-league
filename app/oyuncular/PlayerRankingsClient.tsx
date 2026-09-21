@@ -42,6 +42,8 @@ export type PlayerRanking = {
   position: string;
   alternativePositions?: string[] | null;
   status: string;
+  teamName?: string | null;
+  isSuspended?: boolean;
   marketValue: number;
   wins?: number;
   draws?: number;
@@ -338,13 +340,24 @@ export default function PlayerRankingsClient({ rankings }: { rankings: PlayerRan
                             )}
                           </div>
                           <div className="flex flex-col min-w-0">
-                            <span className="text-[15px] font-[800] text-white group-hover:text-[#00e5ff] transition-colors min-w-0 break-words whitespace-normal leading-tight">
-                              {player.username}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[15px] font-[800] text-white group-hover:text-[#00e5ff] transition-colors min-w-0 break-words whitespace-normal leading-tight">
+                                {player.username}
+                              </span>
+                              {player.isSuspended && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-[900] tracking-widest bg-amber-500/15 text-amber-400 border border-amber-500/30 uppercase shrink-0">
+                                  ASKIDA
+                                </span>
+                              )}
+                            </div>
                             <div className="flex items-center gap-2 mt-1">
                               <span className="data-label !text-[9px] !px-1.5">{formatPosition(player.position)}</span>
                               <span className="text-[10px] text-gray-500 font-medium">{formatPlatform(player.platform)}</span>
-                              <span className="text-[10px] text-gray-600 font-medium">{player.status === 'CONTRACTED' ? 'SÖZLEŞMELİ' : 'SERBEST'}</span>
+                              <span className="text-[10px] text-gray-600 font-medium">
+                                {player.status === 'CONTRACTED'
+                                  ? `SÖZLEŞMELİ${player.teamName ? ` • ${player.teamName}` : ''}`
+                                  : 'SERBEST'}
+                              </span>
                             </div>
                           </div>
                         </Link>

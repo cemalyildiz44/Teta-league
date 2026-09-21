@@ -42,16 +42,17 @@ export default async function PlayersPage() {
           .select('player_id, achievement_type, season_id')
           .in('player_id', profileIds)
       : Promise.resolve({ data: [] }),
-    supabase.from('teams').select('id').eq('is_active', true)
+    supabase.from('teams').select('id, name').eq('is_active', true)
   ]);
 
   const memberships = memData || [];
-  const activeTeamIdSet = new Set((activeTeamsData || []).map(t => t.id));
-  const contractedPlayerIds = new Set(
-    memberships
-      .filter(m => activeTeamIdSet.has(m.team_id))
-      .map(m => m.player_id)
-  );
+  const activeTeamsMap = new Map((activeTeamsData || []).map(t => [t.id, t.name]));
+  const activeMembershipByPlayer = new Map<string, string>(); // player_id -> team_id
+  memberships.forEach(m => {
+    if (activeTeamsMap.has(m.team_id)) {
+      activeMembershipByPlayer.set(m.player_id, m.team_id);
+    }
+  });
 
   // Index achievements by profile id
   const achByProfile = new Map<string, any[]>();
@@ -127,6 +128,9 @@ export default async function PlayersPage() {
 
     const mvResult = calculateMarketValue(mvInput);
 
+    const playerTeamId = activeMembershipByPlayer.get(p.id);
+    const playerTeamName = playerTeamId ? activeTeamsMap.get(playerTeamId) : null;
+
     return {
       id: p.id,
       username: p.username,
@@ -134,7 +138,9 @@ export default async function PlayersPage() {
       platform: p.platform || 'Bilinmiyor',
       position: p.primary_position || 'Bilinmiyor',
       alternativePositions: p.alternative_positions || [],
-      status: contractedPlayerIds.has(p.id) ? 'CONTRACTED' : 'FREE',
+      status: playerTeamId ? 'CONTRACTED' : 'FREE',
+      teamName: playerTeamName,
+      isSuspended: p.status === 'SUSPENDED',
       marketValue: mvResult.totalValue,
       wins: tW,
       draws: tD,
