@@ -160,7 +160,7 @@ export default async function LiglerPage() {
                 <div className="flex flex-wrap justify-center items-center gap-3 w-full">
                   <div className="flex-1 min-w-[100px] px-3 py-3 bg-white/5 rounded-xl border border-white/5 flex flex-col items-center">
                     <span className="text-gray-500 text-[10px] font-black tracking-widest uppercase mb-1">SEZON</span>
-                    <span className="text-white text-[13px] font-bold tracking-wider truncate max-w-[100px]">{league.seasonName}</span>
+                    <span className="text-white text-[13px] font-bold tracking-wider truncate max-w-full text-center" title={league.seasonName}>{league.seasonName}</span>
                   </div>
                   <div className="flex-1 min-w-[100px] px-3 py-3 bg-white/5 rounded-xl border border-white/5 flex flex-col items-center">
                     <span className="text-gray-500 text-[10px] font-black tracking-widest uppercase mb-1">TAKIM</span>
