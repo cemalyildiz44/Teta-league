@@ -80,6 +80,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               Başarı Yönetimi
             </Link>
           </div>
+
+          {adminRole.role === 'SUPER_ADMIN' && (
+            <div className="pt-4 mt-4 border-t border-white/5">
+              <h3 className="px-4 text-[10px] font-black tracking-widest text-amber-400 mb-2 uppercase">Süper Admin</h3>
+              <Link href="/admin/yoneticiler" className="block px-4 py-3 rounded-lg text-sm font-bold text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors">
+                Yönetici Yönetimi
+              </Link>
+            </div>
+          )}
         </nav>
       </aside>
 
