@@ -85,9 +85,15 @@ export default async function LeagueStandingsPage({
   const { data: teams } = await supabase.from("teams").select("id, name, slug, logo_url");
   const teamMap = new Map((teams || []).map(t => [t.id, t]));
 
+  // Attach team_name for alphabetical tiebreaker in compareTeamStats
+  const combinedStatsWithNames = combinedStats.map((s) => ({
+    ...s,
+    team_name: teamMap.get(s.team_id)?.name || '',
+  }));
+
   // 6. Split into normal teams and expelled teams, then sort separately
-  const normalStats = combinedStats.filter(s => !expelledTeams.has(s.team_id));
-  const expelledStats = combinedStats.filter(s => expelledTeams.has(s.team_id));
+  const normalStats = combinedStatsWithNames.filter(s => !expelledTeams.has(s.team_id));
+  const expelledStats = combinedStatsWithNames.filter(s => expelledTeams.has(s.team_id));
 
   // Sort normal teams by effective points (DB points - penalty deduction)
   const sortedNormal = [...normalStats].sort((a, b) => {

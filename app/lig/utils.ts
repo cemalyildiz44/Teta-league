@@ -45,6 +45,7 @@ export interface TeamStatsComparable {
   goals_for: number;
   goals_against: number;
   wins: number;
+  team_name?: string;
 }
 
 /**
@@ -53,6 +54,7 @@ export interface TeamStatsComparable {
  * 2. Goal Difference (descending)
  * 3. Goals Scored (descending)
  * 4. Wins (descending)
+ * 5. Team Name (alphabetical ascending, Turkish locale)
  */
 export function compareTeamStats(a: TeamStatsComparable, b: TeamStatsComparable): number {
   // 1. Puan
@@ -68,6 +70,11 @@ export function compareTeamStats(a: TeamStatsComparable, b: TeamStatsComparable)
 
   // 4. Galibiyet
   if (b.wins !== a.wins) return (b.wins || 0) - (a.wins || 0);
+
+  // 5. Takım Adı (Alfabetik fallback, Türkçe)
+  if (a.team_name || b.team_name) {
+    return (a.team_name || '').localeCompare(b.team_name || '', 'tr', { sensitivity: 'base' });
+  }
 
   return 0;
 }

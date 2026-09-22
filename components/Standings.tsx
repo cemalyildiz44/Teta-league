@@ -98,12 +98,15 @@ export default async function Standings({ compact = false }: StandingsProps) {
 
     // league_teams'teki ancak henüz istatistiği oluşmamış takımlar için 0 varsayılanı
     const combinedStats = leagueTeams.map((lt) => {
+      const team = teamMap.get(lt.team_id);
+      const teamName = team?.name || '';
       const existing = stats.find((s) => s.team_id === lt.team_id);
-      if (existing) return existing;
+      if (existing) return { ...existing, team_name: teamName };
       return {
         league_id: league.id,
         season_id: seasonId,
         team_id: lt.team_id,
+        team_name: teamName,
         matches_played: 0,
         wins: 0,
         draws: 0,
