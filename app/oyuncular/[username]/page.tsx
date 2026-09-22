@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { Trophy, ShieldAlert } from "lucide-react";
 import { calculateMarketValue, formatEuro, MarketValueInput } from "@/app/utils/marketValueCalculator";
+import { getPositionLabel } from "@/app/utils/positions";
 import TeamLogo from "@/components/TeamLogo";
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }) {
@@ -426,8 +427,26 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                 )}
               </div>
               <div className="flex flex-col flex-1 min-w-0">
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {profile.primary_position && <span className="px-2.5 py-0.5 rounded-md text-[10px] font-[900] tracking-widest bg-[#00e5ff]/15 text-[#00e5ff] border border-[#00e5ff]/30 uppercase">{profile.primary_position}</span>}
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  {profile.primary_position && (
+                    <span className="px-2.5 py-0.5 rounded-md text-[10px] font-[900] tracking-widest bg-[#00e5ff]/15 text-[#00e5ff] border border-[#00e5ff]/30 uppercase" title="Ana Pozisyon">
+                      {getPositionLabel(profile.primary_position)}
+                    </span>
+                  )}
+                  {profile.alternative_positions && profile.alternative_positions.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] font-[700] text-gray-500 uppercase tracking-wider ml-1">YAN:</span>
+                      {profile.alternative_positions.map((pos: string) => (
+                        <span
+                          key={pos}
+                          className="px-2.5 py-0.5 rounded-md text-[10px] font-[700] tracking-wide bg-white/5 text-gray-300 border border-white/10 uppercase"
+                          title={`Yan Pozisyon: ${getPositionLabel(pos)}`}
+                        >
+                          {getPositionLabel(pos)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {profile.platform && <span className="px-2.5 py-0.5 rounded-md text-[10px] font-[900] tracking-widest bg-white/5 text-gray-400 border border-white/10 uppercase">{profile.platform}</span>}
                   {(profile.status === 'SUSPENDED' || profile.is_active === false) && (
                     <span className="px-2.5 py-0.5 rounded-md text-[10px] font-[900] tracking-widest bg-amber-500/15 text-amber-400 border border-amber-500/30 uppercase">

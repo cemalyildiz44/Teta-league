@@ -1,33 +1,32 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { formatEuro } from '@/app/utils/marketValueCalculator';
+import {
+  PLATFORM_OPTIONS,
+  POSITION_FILTER_OPTIONS,
+  POSITION_OPTIONS,
+  POSITION_ALIASES,
+  getPositionLabel,
+  matchesPositionSingle,
+  matchesSecondaryPosition,
+  formatPosition,
+  formatPlatform
+} from '@/app/utils/positions';
 
-export const PLATFORM_OPTIONS = [
-  'PS5',
-  'Xbox Series X',
-  'Xbox Series S',
-  'PC'
-];
-
-export const POSITION_FILTER_OPTIONS = [
-  { value: 'KL', label: 'KL (Kaleci)' },
-  { value: 'STP', label: 'STP (Stoper)' },
-  { value: 'SĞB', label: 'SĞB (Sağ Bek)' },
-  { value: 'SLB', label: 'SLB (Sol Bek)' },
-  { value: 'MDO', label: 'MDO (Defansif Orta Saha)' },
-  { value: 'MO', label: 'MO (Merkez Orta Saha)' },
-  { value: 'SĞO', label: 'SĞO (Sağ Orta Saha)' },
-  { value: 'SLO', label: 'SLO (Sol Orta Saha)' },
-  { value: 'OOS', label: 'OOS (Ofansif Orta Saha)' },
-  { value: 'SĞK', label: 'SĞK (Sağ Kanat)' },
-  { value: 'SLK', label: 'SLK (Sol Kanat)' },
-  { value: 'ST', label: 'ST (Santrfor)' },
-];
-
-export const POSITION_OPTIONS = POSITION_FILTER_OPTIONS.map(p => p.value);
+export {
+  PLATFORM_OPTIONS,
+  POSITION_FILTER_OPTIONS,
+  POSITION_OPTIONS,
+  POSITION_ALIASES,
+  getPositionLabel,
+  matchesPositionSingle,
+  matchesSecondaryPosition,
+  formatPosition,
+  formatPlatform
+};
 
 export const STATUS_OPTIONS = [
   { value: 'FREE', label: 'SERBEST' },
@@ -51,56 +50,6 @@ export type PlayerRanking = {
   played?: number;
 };
 
-// Pozisyon alias haritası: Hem Türkçe hem İngilizce kayıtları doğru Türkçe karşılığıyla eşleştirir
-const POSITION_ALIASES: Record<string, string[]> = {
-  KL: ['KL', 'GK', 'KALECİ', 'KALECI'],
-  STP: ['STP', 'CB', 'STOPER'],
-  SĞB: ['SĞB', 'SGB', 'RB'],
-  SLB: ['SLB', 'LB'],
-  MDO: ['MDO', 'CDM', 'DM'],
-  MO: ['MO', 'CM'],
-  SĞO: ['SĞO', 'SGO', 'RM'],
-  SLO: ['SLO', 'LM'],
-  OOS: ['OOS', 'CAM', 'AM'],
-  SĞK: ['SĞK', 'SGK', 'RW'],
-  SLK: ['SLK', 'LW'],
-  ST: ['ST', 'CF', 'SANTRFOR', 'FORVET'],
-};
-
-function matchesPositionSingle(posValue: string | null | undefined, filterValue: string): boolean {
-  if (!posValue) return false;
-  const p = posValue.trim().toUpperCase();
-  const f = filterValue.trim().toUpperCase();
-
-  if (p === f) return true;
-
-  const aliases = POSITION_ALIASES[f];
-  if (aliases && aliases.includes(p)) {
-    return true;
-  }
-
-  for (const [key, aliasList] of Object.entries(POSITION_ALIASES)) {
-    if (aliasList.includes(f) && (key === p || aliasList.includes(p))) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-function matchesPosition(
-  primaryPosition: string | null | undefined,
-  alternativePositions: string[] | null | undefined,
-  filterValue: string
-): boolean {
-  if (!filterValue || filterValue === 'TÜMÜ') return true;
-  if (matchesPositionSingle(primaryPosition, filterValue)) return true;
-  if (Array.isArray(alternativePositions) && alternativePositions.length > 0) {
-    return alternativePositions.some(alt => matchesPositionSingle(alt, filterValue));
-  }
-  return false;
-}
-
 function matchesPlatform(playerPlatform: string | null | undefined, filterValue: string): boolean {
   if (!filterValue || filterValue === 'TÜMÜ') return true;
   if (!playerPlatform) return false;
@@ -117,28 +66,25 @@ function matchesPlatform(playerPlatform: string | null | undefined, filterValue:
   return p === f;
 }
 
-export function formatPosition(pos: string | null | undefined): string {
-  if (!pos || pos === 'Bilinmiyor') return 'BİLİNMİYOR';
-  const normalized = pos.trim().toUpperCase();
-  if (POSITION_ALIASES[normalized]) return normalized;
-  for (const [trKey, aliasList] of Object.entries(POSITION_ALIASES)) {
-    if (aliasList.includes(normalized)) return trKey;
-  }
-  return normalized;
-}
-
-export function formatPlatform(platform: string | null | undefined): string {
-  if (!platform || platform === 'Bilinmiyor' || platform === 'common-gen5' || platform === 'common_gen5') {
-    return 'Belirtilmedi';
-  }
-  return platform;
-}
-
 export default function PlayerRankingsClient({ rankings }: { rankings: PlayerRanking[] }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [platformFilter, setPlatformFilter] = useState('TÜMÜ');
   const [positionFilter, setPositionFilter] = useState('TÜMÜ');
+  const [secondaryPositionFilters, setSecondaryPositionFilters] = useState<string[]>([]);
+  const [isSecondaryDropdownOpen, setIsSecondaryDropdownOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState('ALL');
+
+  const secondaryDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (secondaryDropdownRef.current && !secondaryDropdownRef.current.contains(event.target as Node)) {
+        setIsSecondaryDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const filteredRankings = useMemo(() => {
     return rankings.filter(player => {
@@ -149,10 +95,13 @@ export default function PlayerRankingsClient({ rankings }: { rankings: PlayerRan
       // 2. Platform filter
       if (platformFilter !== 'TÜMÜ' && !matchesPlatform(player.platform, platformFilter)) return false;
 
-      // 3. Position filter
-      if (positionFilter !== 'TÜMÜ' && !matchesPosition(player.position, player.alternativePositions, positionFilter)) return false;
+      // 3. Primary Position filter
+      if (positionFilter !== 'TÜMÜ' && !matchesPositionSingle(player.position, positionFilter)) return false;
 
-      // 4. Status filter
+      // 4. Secondary Position filter (Multi-select OR logic)
+      if (secondaryPositionFilters.length > 0 && !matchesSecondaryPosition(player.alternativePositions, secondaryPositionFilters)) return false;
+
+      // 5. Status filter
       if (statusFilter !== 'ALL' && player.status !== statusFilter) return false;
 
       return true;
@@ -162,7 +111,7 @@ export default function PlayerRankingsClient({ rankings }: { rankings: PlayerRan
       }
       return a.username.localeCompare(b.username, 'tr', { sensitivity: 'base' });
     });
-  }, [rankings, searchTerm, platformFilter, positionFilter, statusFilter]);
+  }, [rankings, searchTerm, platformFilter, positionFilter, secondaryPositionFilters, statusFilter]);
 
   
 
@@ -170,10 +119,10 @@ export default function PlayerRankingsClient({ rankings }: { rankings: PlayerRan
     <div className="w-full">
       {/* Search & Filters */}
       <div className="mb-10 bg-black/40 border border-white/5 p-6 rounded-2xl client-glass shadow-[0_0_20px_rgba(0,0,0,0.5)] relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-5">
           
           {/* Search */}
-          <div className="relative md:col-span-1 flex flex-col gap-1.5 group">
+          <div className="relative sm:col-span-2 lg:col-span-1 flex flex-col gap-1.5 group">
             <label className="text-[10px] font-[900] tracking-widest text-gray-500 uppercase ml-1">OYUNCU</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -214,9 +163,9 @@ export default function PlayerRankingsClient({ rankings }: { rankings: PlayerRan
             </div>
           </div>
 
-          {/* Position Filter */}
+          {/* Position (Primary) Filter */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-[900] tracking-widest text-gray-500 uppercase ml-1">POZİSYON</label>
+            <label className="text-[10px] font-[900] tracking-widest text-gray-500 uppercase ml-1">ANA POZİSYON</label>
             <div className="relative">
               <select
                 value={positionFilter}
@@ -234,6 +183,113 @@ export default function PlayerRankingsClient({ rankings }: { rankings: PlayerRan
                 </svg>
               </div>
             </div>
+          </div>
+
+          {/* Secondary Position Multi-Select Filter */}
+          <div className="flex flex-col gap-1.5 relative" ref={secondaryDropdownRef}>
+            <div className="flex items-center justify-between ml-1">
+              <label className="text-[10px] font-[900] tracking-widest text-gray-500 uppercase">
+                YAN POZİSYON {secondaryPositionFilters.length > 0 && `(${secondaryPositionFilters.length})`}
+              </label>
+              {secondaryPositionFilters.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSecondaryPositionFilters([])}
+                  className="text-[10px] font-[700] text-gray-500 hover:text-white transition-colors uppercase tracking-wider"
+                >
+                  Temizle
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsSecondaryDropdownOpen(prev => !prev)}
+              className="w-full bg-[#03070c] border border-white/10 rounded-xl px-4 py-3 text-[14px] font-[500] text-left text-white focus:outline-none focus:border-[#00e5ff]/50 transition-all flex items-center justify-between cursor-pointer"
+            >
+              <span className={secondaryPositionFilters.length === 0 ? "text-gray-400" : "text-white font-[600] truncate mr-2"}>
+                {secondaryPositionFilters.length === 0 ? "TÜMÜ" : secondaryPositionFilters.join(', ')}
+              </span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`text-gray-400 transition-transform shrink-0 ${isSecondaryDropdownOpen ? 'rotate-180' : ''}`}
+              >
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+
+            {/* Dropdown Menu */}
+            {isSecondaryDropdownOpen && (
+              <div className="absolute top-[calc(100%+4px)] left-0 right-0 bg-[#03070c] border border-white/10 rounded-xl shadow-2xl p-2 z-50 max-h-60 overflow-y-auto backdrop-blur-md">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSecondaryPositionFilters([]);
+                    setIsSecondaryDropdownOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-[12px] font-[700] rounded-lg transition-colors text-left cursor-pointer ${
+                    secondaryPositionFilters.length === 0 ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <span>TÜMÜ (Temizle)</span>
+                  {secondaryPositionFilters.length === 0 && <span>✓</span>}
+                </button>
+                <div className="h-[1px] bg-white/5 my-1.5" />
+                {POSITION_FILTER_OPTIONS.map(p => {
+                  const isChecked = secondaryPositionFilters.includes(p.value);
+                  return (
+                    <button
+                      key={p.value}
+                      type="button"
+                      onClick={() => {
+                        setSecondaryPositionFilters(prev =>
+                          isChecked ? prev.filter(v => v !== p.value) : [...prev, p.value]
+                        );
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] rounded-lg hover:bg-white/5 transition-colors text-left cursor-pointer"
+                    >
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                        isChecked ? 'bg-white/20 border-white/60 text-white font-black text-[10px]' : 'border-white/20 bg-black/40'
+                      }`}>
+                        {isChecked ? '✓' : ''}
+                      </div>
+                      <span className={`text-[12px] ${isChecked ? 'text-white font-[700]' : 'text-gray-400 font-medium'}`}>
+                        {p.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Selected Chips */}
+            {secondaryPositionFilters.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {secondaryPositionFilters.map(pos => (
+                  <span
+                    key={pos}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/5 border border-white/10 text-gray-300 rounded text-[10px] font-bold"
+                  >
+                    <span>{pos}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSecondaryPositionFilters(prev => prev.filter(v => v !== pos))}
+                      className="text-gray-400 hover:text-white transition-colors leading-none"
+                    >
+                      &times;
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Status Filter */}
@@ -350,8 +406,16 @@ export default function PlayerRankingsClient({ rankings }: { rankings: PlayerRan
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 mt-1">
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
                               <span className="data-label !text-[9px] !px-1.5">{formatPosition(player.position)}</span>
+                              {player.alternativePositions && player.alternativePositions.length > 0 && (
+                                <span
+                                  className="text-[9px] font-semibold text-gray-400 bg-white/5 px-1.5 py-0.5 rounded border border-white/10"
+                                  title={`Yan Pozisyonlar: ${player.alternativePositions.map(p => getPositionLabel(p)).join(', ')}`}
+                                >
+                                  YAN: {player.alternativePositions.join(', ')}
+                                </span>
+                              )}
                               <span className="text-[10px] text-gray-500 font-medium">{formatPlatform(player.platform)}</span>
                               <span className="text-[10px] text-gray-600 font-medium">
                                 {player.status === 'CONTRACTED'

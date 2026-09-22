@@ -5,6 +5,7 @@ import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
 import { isValidHttpUrl } from '@/app/utils/urlValidator';
+import { POSITION_OPTIONS } from '@/app/utils/positions';
 
 export async function updateProfileAction(prevState: any, formData: FormData) {
   try {
@@ -26,17 +27,28 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
     const platform = (formData.get('platform') as string)?.trim() || null;
     let current_ea_player_id = (formData.get('current_ea_player_id') as string)?.trim();
     
-    // Alternative positions (JSON parsed)
+    // Alternative positions (JSON parsed or secondary_position fallback)
     let alternative_positions: string[] = [];
     try {
-      const altPosStr = formData.get('alternative_positions') as string;
+      const altPosStr = (formData.get('alternative_positions') as string)?.trim();
+      const secPos = (formData.get('secondary_position') as string)?.trim();
+
       if (altPosStr) {
-        alternative_positions = JSON.parse(altPosStr);
+        if (altPosStr.startsWith('[') && altPosStr.endsWith(']')) {
+          const parsed = JSON.parse(altPosStr);
+          if (Array.isArray(parsed)) {
+            alternative_positions = parsed.filter(Boolean).map((p: unknown) => String(p).trim());
+          }
+        } else if (altPosStr !== 'Belirtilmedi' && altPosStr !== '') {
+          alternative_positions = [altPosStr];
+        }
+      } else if (secPos && secPos !== 'Belirtilmedi' && secPos !== '') {
+        alternative_positions = [secPos];
       }
     } catch(e) {
       console.error('Failed to parse alternative_positions', e);
     }
-    
+
     const twitter = (formData.get('twitter') as string)?.trim();
     const twitch = (formData.get('twitch') as string)?.trim();
     const discord = (formData.get('discord') as string)?.trim();
@@ -46,6 +58,29 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
     if (!username) {
       return { error: 'Kullanıcı adı boş bırakılamaz.' };
     }
+
+    // Deduplicate alternative positions
+    const uniqueAltPositions = Array.from(new Set(alternative_positions));
+
+    if (uniqueAltPositions.length !== alternative_positions.length) {
+      return { error: 'Aynı yan pozisyon birden fazla kez seçilemez.' };
+    }
+
+    if (uniqueAltPositions.length > 4) {
+      return { error: 'En fazla 4 adet yan pozisyon seçebilirsiniz.' };
+    }
+
+    if (primary_position && uniqueAltPositions.includes(primary_position)) {
+      return { error: 'Yan pozisyonlar arasında ana pozisyon bulunamaz.' };
+    }
+
+    for (const pos of uniqueAltPositions) {
+      if (!POSITION_OPTIONS.includes(pos)) {
+        return { error: `Geçersiz yan pozisyon: ${pos}` };
+      }
+    }
+
+    alternative_positions = uniqueAltPositions;
     if (bio && bio.length > 300) {
       return { error: 'Biyografi en fazla 300 karakter olabilir.' };
     }
