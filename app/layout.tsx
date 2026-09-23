@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Exo_2 } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -9,10 +9,11 @@ import { cookies } from "next/headers";
 
 import { getCachedUser, getTeamById } from "@/lib/fetchers";
 
-const exo2 = Exo_2({
+const exo2 = localFont({
+  src: "./fonts/Exo2-VariableFont_wght.ttf",
   variable: "--font-sans",
-  subsets: ["latin", "latin-ext"],
-  weight: ["300", "400", "500", "600", "700", "800", "900"],
+  display: "swap",
+  weight: "300 900",
 });
 
 export const metadata: Metadata = {

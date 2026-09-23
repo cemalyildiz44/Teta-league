@@ -2,7 +2,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { 
   Search, Plus, Filter, MoreVertical, 
   Edit2, CheckCircle2, Archive, Trash2, 
@@ -270,9 +269,14 @@ export function SeasonsManager({ initialSeasons }: { initialSeasons: Season[] })
             {filteredSeasons.map(s => (
               <tr key={s.id} className='hover:bg-white/5 transition-colors group'>
                 <td className='px-4 py-4'>
-                  <Link href={'/admin/seasons/' + s.id} className='font-bold text-white hover:text-cyan-400 transition-colors'>
+                  <button
+                    type='button'
+                    onClick={() => setEditSeasonData(s)}
+                    className='font-bold text-white hover:text-cyan-400 transition-colors text-left cursor-pointer'
+                    title='Sezonu Düzenle'
+                  >
                     {s.name}
-                  </Link>
+                  </button>
                 </td>
                 <td className='px-4 py-4 font-mono text-xs'>{s.slug}</td>
                 <td className='px-4 py-4'><StatusBadge status={s.status} /></td>

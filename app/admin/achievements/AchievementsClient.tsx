@@ -2,12 +2,14 @@
 
 import { useActionState, useState } from 'react';
 import { addAchievementAction, deleteAchievementAction } from './actions';
-import { Trophy, Trash2, Shield, Calendar, Hash, Star } from 'lucide-react';
+import { Trophy, Trash2, Shield, Calendar, Hash, Star, Search } from 'lucide-react';
 
 export default function AchievementsClient({ profiles, seasons, matches, achievements }: any) {
   const [state, formAction, pending] = useActionState(addAchievementAction, null);
   const [selectedType, setSelectedType] = useState('TOTW');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [formPlayerSearch, setFormPlayerSearch] = useState('');
+  const [tableSearch, setTableSearch] = useState('');
 
   const handleDelete = async (id: string) => {
     if (!confirm('Bu başarımı silmek istediğinize emin misiniz?')) return;
@@ -16,6 +18,16 @@ export default function AchievementsClient({ profiles, seasons, matches, achieve
     setIsDeleting(null);
     if (res.error) alert(res.error);
   };
+
+  const filteredAchievements = achievements.filter((a: any) => {
+    if (!tableSearch.trim()) return true;
+    const q = tableSearch.toLowerCase().trim();
+    const username = a.profile?.username?.toLowerCase() || '';
+    const fullName = a.profile?.full_name?.toLowerCase() || '';
+    const type = a.achievement_type?.toLowerCase() || '';
+    const season = a.season?.name?.toLowerCase() || '';
+    return username.includes(q) || fullName.includes(q) || type.includes(q) || season.includes(q);
+  });
 
   return (
     <div className="space-y-6">
@@ -51,11 +63,24 @@ export default function AchievementsClient({ profiles, seasons, matches, achieve
             <form action={formAction} className="space-y-4">
               <div>
                 <label className="block text-[10px] font-[900] text-gray-500 tracking-widest uppercase mb-2">OYUNCU</label>
+                <input
+                  type="text"
+                  placeholder="Oyuncu veya isim ara..."
+                  value={formPlayerSearch}
+                  onChange={(e) => setFormPlayerSearch(e.target.value)}
+                  className="w-full mb-2 bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#00e5ff]/50 transition-colors"
+                />
                 <select name="player_id" required className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[14px] font-[700] text-white focus:outline-none focus:border-[#00e5ff]/50 transition-colors">
                   <option value="">Oyuncu Seçin...</option>
-                  {profiles.map((p: any) => (
-                    <option key={p.id} value={p.id}>{p.username}</option>
-                  ))}
+                  {profiles
+                    .filter((p: any) => {
+                      if (!formPlayerSearch.trim()) return true;
+                      const q = formPlayerSearch.toLowerCase().trim();
+                      return p.username?.toLowerCase().includes(q) || p.full_name?.toLowerCase().includes(q);
+                    })
+                    .map((p: any) => (
+                      <option key={p.id} value={p.id}>{p.username}{p.full_name ? ` (${p.full_name})` : ''}</option>
+                    ))}
                 </select>
               </div>
 
@@ -122,11 +147,23 @@ export default function AchievementsClient({ profiles, seasons, matches, achieve
 
         <div className="lg:col-span-2">
           <div className="bg-[#03070c] border border-white/5 rounded-2xl p-6">
-            <h2 className="text-[12px] font-[900] text-gray-500 tracking-[0.2em] uppercase mb-6 flex items-center gap-2">
-              <Shield className="w-4 h-4" /> VERİLEN BAŞARIMLAR (SON 100)
-            </h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <h2 className="text-[12px] font-[900] text-gray-500 tracking-[0.2em] uppercase flex items-center gap-2">
+                <Shield className="w-4 h-4" /> VERİLEN BAŞARIMLAR ({filteredAchievements.length})
+              </h2>
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+                <input
+                  type="text"
+                  placeholder="Oyuncu veya başarım ara..."
+                  value={tableSearch}
+                  onChange={(e) => setTableSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#00e5ff]/50 transition-colors"
+                />
+              </div>
+            </div>
             
-            {achievements.length > 0 ? (
+            {filteredAchievements.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
@@ -138,10 +175,13 @@ export default function AchievementsClient({ profiles, seasons, matches, achieve
                     </tr>
                   </thead>
                   <tbody>
-                    {achievements.map((a: any) => (
+                    {filteredAchievements.map((a: any) => (
                       <tr key={a.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
                         <td className="py-4 px-4">
-                          <span className="text-[14px] font-[700] text-white">{a.profile?.username}</span>
+                          <span className="text-[14px] font-[700] text-white">@{a.profile?.username}</span>
+                          {a.profile?.full_name && (
+                            <span className="block text-xs text-zinc-400 font-normal">{a.profile.full_name}</span>
+                          )}
                         </td>
                         <td className="py-4 px-4">
                           <span className={`inline-flex px-2 py-1 rounded text-[10px] font-[900] tracking-wider uppercase border 

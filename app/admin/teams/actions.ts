@@ -16,6 +16,19 @@ async function checkAdmin(supabase: any, user: any) {
   return !!data;
 }
 
+async function checkSuperAdmin(supabase: any, user: any) {
+  if (!user) return false;
+  const { data } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id)
+    .eq('role', 'SUPER_ADMIN')
+    .eq('is_active', true)
+    .is('revoked_at', null)
+    .maybeSingle();
+  return !!data;
+}
+
 export async function createTeam(formData: FormData) {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
@@ -451,6 +464,98 @@ export async function deleteTeamAction(teamId: string) {
 
   for (const uname of affectedUsernames) {
     revalidatePath(`/oyuncular/${uname}`);
+  }
+
+  return { success: successMsg };
+}
+
+/**
+ * SUPER_ADMIN only action to permanently force-delete an inactive test team
+ * that has zero matches, fixtures, match player stats, or season standings history.
+ * Executes atomically via the public.force_delete_test_team PostgreSQL RPC.
+ */
+export async function forceDeleteTestTeamAction(teamId: string) {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+
+  // 1. Auth & SUPER_ADMIN check
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'Yetkisiz erişim. Lütfen giriş yapın.' };
+
+  const isSuperAdmin = await checkSuperAdmin(supabase, user);
+  if (!isSuperAdmin) {
+    return { error: 'Yetkisiz erişim. Bu işlem yalnızca SUPER_ADMIN tarafından gerçekleştirilebilir.' };
+  }
+
+  // 2. Validate input and strict test team allowlist
+  if (!teamId || typeof teamId !== 'string' || teamId.trim() === '') {
+    return { error: 'Geçersiz takım ID.' };
+  }
+
+  const ALLOWED_TEST_TEAM_IDS = [
+    'e9415213-c11c-497e-836f-f6354539ad4a', // Teta FC
+    'd0f69110-5fff-4e83-bfdb-c0fbe0f5ae9f', // Teta Test FC
+  ];
+
+  if (!ALLOWED_TEST_TEAM_IDS.includes(teamId)) {
+    return { error: 'Bu işlem yalnızca onaylanmış TETA test takımları için kullanılabilir.' };
+  }
+
+  // Collect member usernames prior to atomic deletion for selective cache invalidation
+  // Note: player profiles (profiles) are NEVER modified or deleted
+  const { data: memberProfiles } = await supabase
+    .from('team_memberships')
+    .select('player_id, profiles!team_memberships_player_id_fkey(username)')
+    .eq('team_id', teamId);
+
+  const affectedUsernames = (memberProfiles || [])
+    .map((m: any) => m.profiles?.username)
+    .filter(Boolean);
+
+  // 3. Execute atomic PostgreSQL RPC (All guards + cascade deletions run in a single transaction)
+  const { data: rpcResult, error: rpcError } = await supabase.rpc('force_delete_test_team', {
+    p_team_id: teamId,
+  });
+
+  if (rpcError) {
+    return { error: rpcError.message || 'Test takımı silinirken veritabanı hatası oluştu.' };
+  }
+
+  // 4. Logo cleanup in storage (ONLY after database transaction has successfully committed)
+  let logoWarning: string | null = null;
+  const logoUrl = rpcResult?.logo_url;
+  if (logoUrl) {
+    try {
+      const parts = logoUrl.split('/public/team-logos/');
+      if (parts.length === 2) {
+        const { error: storageErr } = await supabase.storage.from('team-logos').remove([parts[1]]);
+        if (storageErr) {
+          logoWarning = `Takım silindi ancak logosu depolamadan kaldırılamadı: ${storageErr.message}`;
+        }
+      }
+    } catch (cleanupErr: any) {
+      logoWarning = `Takım silindi ancak logosu depolamadan kaldırılamadı: ${cleanupErr?.message || cleanupErr}`;
+    }
+  }
+
+  // 5. Invalidate relevant cache paths
+  revalidatePath('/admin/teams');
+  revalidatePath('/admin/takimlar');
+  revalidatePath('/admin');
+  revalidatePath('/takimlar');
+  revalidatePath('/oyuncular');
+  revalidatePath('/profil');
+  revalidatePath('/', 'layout');
+
+  for (const uname of affectedUsernames) {
+    revalidatePath(`/oyuncular/${uname}`);
+  }
+
+  const teamName = rpcResult?.team_name || 'Test';
+  const successMsg = `"${teamName}" test takımı ve tüm test kayıtları tek bir atomik işlemle veritabanından kalıcı olarak silindi.`;
+
+  if (logoWarning) {
+    return { success: successMsg, warning: logoWarning };
   }
 
   return { success: successMsg };

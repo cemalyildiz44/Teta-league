@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Trophy, Plus, Trash2, ShieldAlert, X, Loader2, Users, CheckCircle2,
-  XCircle, User, Edit3, Calendar, Clock
+  XCircle, User, Edit3, Calendar, Clock, Search
 } from 'lucide-react';
 import {
   create1V1WinnerAction, createKarmaWinnerAction, createNightCupAction,
@@ -19,6 +19,10 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
   const [tab, setTab] = useState<'1V1' | 'KARMA' | 'NIGHT_CUP'>('1V1');
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
+
+  const [search, setSearch] = useState('');
+  const [winner1V1PlayerSearch, setWinner1V1PlayerSearch] = useState('');
+  const [karmaPlayerSearch, setKarmaPlayerSearch] = useState('');
 
   const [create1V1Modal, setCreate1V1Modal] = useState(false);
   const [createKarmaModal, setCreateKarmaModal] = useState(false);
@@ -120,7 +124,42 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
     }
   };
 
-  const filteredTournaments = tournaments.filter((t: any) => t.type === tab);
+  const filteredTournaments = tournaments.filter((t: any) => {
+    if (t.type !== tab) return false;
+    if (!search.trim()) return true;
+    const q = search.toLowerCase().trim();
+
+    // Tournament name & description match
+    if (t.name?.toLowerCase().includes(q)) return true;
+    if (t.description?.toLowerCase().includes(q)) return true;
+
+    // Winner players match (username, full_name, team name)
+    const tourWinners = winners.filter((w: any) => w.tournament_id === t.id);
+    const winnerMatch = tourWinners.some((w: any) => {
+      const u = w.profiles?.username?.toLowerCase() || '';
+      const fn = w.profiles?.full_name?.toLowerCase() || '';
+      const team = w.tournament_applications?.team_name?.toLowerCase() || '';
+      return u.includes(q) || fn.includes(q) || team.includes(q);
+    });
+    if (winnerMatch) return true;
+
+    // Application players & teams match
+    const tourApps = applications.filter((a: any) => a.tournament_id === t.id);
+    const appMatch = tourApps.some((a: any) => {
+      const captainU = a.profiles?.username?.toLowerCase() || '';
+      const captainFn = a.profiles?.full_name?.toLowerCase() || '';
+      const team = a.team_name?.toLowerCase() || '';
+      const playerMatch = a.tournament_application_players?.some((p: any) => {
+        const pu = p.profiles?.username?.toLowerCase() || '';
+        const pfn = p.profiles?.full_name?.toLowerCase() || '';
+        return pu.includes(q) || pfn.includes(q);
+      });
+      return captainU.includes(q) || captainFn.includes(q) || team.includes(q) || playerMatch;
+    });
+    if (appMatch) return true;
+
+    return false;
+  });
 
   return (
     <div className='space-y-6'>
@@ -144,25 +183,37 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
 
       {/* Action Bar */}
       <div className='space-y-4'>
-        <div className='flex justify-between items-center'>
-          <div className='text-xs font-bold text-zinc-500 uppercase tracking-wider'>
-            {filteredTournaments.length} {tab.replace('_', ' ')} Turnuvası Listeleniyor
+        <div className='flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center'>
+          <div className='relative w-full sm:w-80'>
+            <Search className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500' />
+            <input
+              type='text'
+              placeholder='Turnuva veya Oyuncu Ara...'
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className='w-full pl-9 pr-4 py-2 bg-[#060d18] border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/50'
+            />
           </div>
-          {tab === '1V1' && (
-            <button onClick={() => setCreate1V1Modal(true)} className='btn-primary px-4 py-2 text-sm flex items-center gap-2'>
-              <Plus className='w-4 h-4'/> YENİ 1V1 ŞAMPİYONU
-            </button>
-          )}
-          {tab === 'KARMA' && (
-            <button onClick={() => setCreateKarmaModal(true)} className='btn-primary px-4 py-2 text-sm flex items-center gap-2'>
-              <Plus className='w-4 h-4'/> YENİ KARMA ŞAMPİYONU
-            </button>
-          )}
-          {tab === 'NIGHT_CUP' && (
-            <button onClick={() => setCreateNightCupModal(true)} className='btn-primary px-4 py-2 text-sm flex items-center gap-2'>
-              <Plus className='w-4 h-4'/> YENİ NIGHT CUP
-            </button>
-          )}
+          <div className='flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end'>
+            <div className='text-xs font-bold text-zinc-500 uppercase tracking-wider'>
+              {filteredTournaments.length} {tab.replace('_', ' ')} Turnuvası
+            </div>
+            {tab === '1V1' && (
+              <button onClick={() => setCreate1V1Modal(true)} className='btn-primary px-4 py-2 text-sm flex items-center gap-2'>
+                <Plus className='w-4 h-4'/> YENİ 1V1 ŞAMPİYONU
+              </button>
+            )}
+            {tab === 'KARMA' && (
+              <button onClick={() => setCreateKarmaModal(true)} className='btn-primary px-4 py-2 text-sm flex items-center gap-2'>
+                <Plus className='w-4 h-4'/> YENİ KARMA ŞAMPİYONU
+              </button>
+            )}
+            {tab === 'NIGHT_CUP' && (
+              <button onClick={() => setCreateNightCupModal(true)} className='btn-primary px-4 py-2 text-sm flex items-center gap-2'>
+                <Plus className='w-4 h-4'/> YENİ NIGHT CUP
+              </button>
+            )}
+          </div>
         </div>
 
         {filteredTournaments.length === 0 ? (
@@ -413,9 +464,24 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
               </div>
               <div>
                 <label className='block text-xs font-bold text-zinc-400 mb-1'>ŞAMPİYON OYUNCU</label>
+                <input
+                  type='text'
+                  placeholder='Oyuncu veya isim ara...'
+                  value={winner1V1PlayerSearch}
+                  onChange={e => setWinner1V1PlayerSearch(e.target.value)}
+                  className='w-full mb-2 bg-[#060d18] border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs placeholder:text-zinc-500 focus:outline-none focus:border-cyan-500/50'
+                />
                 <select required name='profile_id' className='input-field'>
                   <option value=''>Seçiniz</option>
-                  {profiles.map((p: any) => <option key={p.id} value={p.id}>@{p.username}</option>)}
+                  {profiles
+                    .filter((p: any) => {
+                      if (!winner1V1PlayerSearch.trim()) return true;
+                      const q = winner1V1PlayerSearch.toLowerCase().trim();
+                      return p.username?.toLowerCase().includes(q) || p.full_name?.toLowerCase().includes(q);
+                    })
+                    .map((p: any) => (
+                      <option key={p.id} value={p.id}>@{p.username}{p.full_name ? ` (${p.full_name})` : ''}</option>
+                    ))}
                 </select>
               </div>
               <div><label className='block text-xs font-bold text-zinc-400 mb-1'>AÇIKLAMA</label><input name='description' type='text' className='input-field'/></div>
@@ -432,7 +498,7 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
           <div className='card-surface w-full max-w-2xl rounded-2xl border border-white/10 overflow-hidden shadow-2xl flex flex-col max-h-[90vh]'>
             <div className='p-6 border-b border-white/5 flex justify-between items-center shrink-0'>
               <h3 className='text-lg font-black text-white uppercase tracking-widest'>YENİ KARMA ŞAMPİYONU</h3>
-              <button onClick={() => setCreateKarmaModal(false)} className='text-zinc-500 hover:text-white'><X className='w-5 h-5'/></button>
+              <button onClick={() => { setCreateKarmaModal(false); setKarmaPlayerSearch(''); }} className='text-zinc-500 hover:text-white'><X className='w-5 h-5'/></button>
             </div>
             <form onSubmit={handleCreateKarma} className='flex-1 overflow-y-auto p-6 space-y-4'>
               <div className='grid grid-cols-2 gap-4'>
@@ -447,18 +513,38 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
               </div>
 
               <div>
-                <label className='block text-xs font-bold text-zinc-400 mb-2'>KAZANAN KADRO (11 KİŞİ SEÇİN: {karmaProfiles.length}/11)</label>
+                <div className='flex items-center justify-between mb-1'>
+                  <label className='block text-xs font-bold text-zinc-400'>
+                    KAZANAN KADRO (11 KİŞİ SEÇİN: {karmaProfiles.length}/11)
+                  </label>
+                </div>
+                <input
+                  type='text'
+                  placeholder='Oyuncu veya isim ara...'
+                  value={karmaPlayerSearch}
+                  onChange={e => setKarmaPlayerSearch(e.target.value)}
+                  className='w-full mb-2 bg-[#060d18] border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs placeholder:text-zinc-500 focus:outline-none focus:border-cyan-500/50'
+                />
                 <div className='grid grid-cols-2 md:grid-cols-3 gap-2 max-h-64 overflow-y-auto p-2 bg-black/20 rounded-xl border border-white/5'>
-                  {profiles.map((p: any) => (
-                    <div
-                      key={p.id}
-                      onClick={() => toggleKarmaProfile(p.id)}
-                      className={`p-2 rounded-lg border text-sm cursor-pointer flex items-center gap-2 transition-all ${karmaProfiles.includes(p.id) ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400 font-bold' : 'bg-[#060d18] border-white/5 text-zinc-400 hover:bg-white/5'}`}
-                    >
-                      {p.avatar_url ? <img src={p.avatar_url} alt="" className='w-5 h-5 rounded-full object-cover'/> : <User className='w-4 h-4'/>}
-                      <span className='truncate'>@{p.username}</span>
-                    </div>
-                  ))}
+                  {profiles
+                    .filter((p: any) => {
+                      if (!karmaPlayerSearch.trim()) return true;
+                      const q = karmaPlayerSearch.toLowerCase().trim();
+                      return p.username?.toLowerCase().includes(q) || p.full_name?.toLowerCase().includes(q);
+                    })
+                    .map((p: any) => (
+                      <div
+                        key={p.id}
+                        onClick={() => toggleKarmaProfile(p.id)}
+                        className={`p-2 rounded-lg border text-sm cursor-pointer flex items-center gap-2 transition-all ${karmaProfiles.includes(p.id) ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400 font-bold' : 'bg-[#060d18] border-white/5 text-zinc-400 hover:bg-white/5'}`}
+                      >
+                        {p.avatar_url ? <img src={p.avatar_url} alt="" className='w-5 h-5 rounded-full object-cover'/> : <User className='w-4 h-4'/>}
+                        <div className='truncate'>
+                          <span className='block truncate'>@{p.username}</span>
+                          {p.full_name && <span className='block text-[10px] text-zinc-500 truncate'>{p.full_name}</span>}
+                        </div>
+                      </div>
+                    ))}
                 </div>
               </div>
 

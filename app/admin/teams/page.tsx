@@ -13,14 +13,14 @@ export default async function AdminTeamsPage() {
   // Fetch active captains
   const { data: captains } = await supabase
     .from('user_roles')
-    .select('team_id, user_id, profiles!user_roles_user_id_fkey(username)')
+    .select('team_id, user_id, profiles!user_roles_user_id_fkey(username, full_name)')
     .eq('role', 'CAPTAIN')
     .eq('is_active', true);
 
   // Fetch team memberships
   const { data: memberships } = await supabase
     .from('team_memberships')
-    .select('id, team_id, player_id, league_id, season_id, joined_at, left_at, profiles!team_memberships_player_id_fkey(username), league_teams(leagues(name, seasons(name)))')
+    .select('id, team_id, player_id, league_id, season_id, joined_at, left_at, profiles!team_memberships_player_id_fkey(username, full_name), league_teams(leagues(name, seasons(name)))')
     .order('joined_at', { ascending: false });
 
   // Fetch league_teams for assignments
@@ -32,7 +32,7 @@ export default async function AdminTeamsPage() {
   // Fetch all profiles for assigning players/captains
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('id, username')
+    .select('id, username, full_name')
     .order('username');
 
   return (

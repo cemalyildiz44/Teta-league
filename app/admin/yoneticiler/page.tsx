@@ -40,7 +40,7 @@ export default async function AdminYoneticilerPage() {
   // 3. Fetch all active ADMIN and SUPER_ADMIN users
   const { data: adminRoleRows } = await supabase
     .from('user_roles')
-    .select('user_id, role, created_at, is_active')
+    .select('user_id, role, granted_at, is_active')
     .in('role', ['ADMIN', 'SUPER_ADMIN'])
     .eq('is_active', true)
     .is('revoked_at', null);

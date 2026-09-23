@@ -26,7 +26,7 @@ export default async function AchievementsPage() {
   // Tüm oyuncuları getir
   const { data: profilesData } = await supabase
     .from('profiles')
-    .select('id, username')
+    .select('id, username, full_name')
     .order('username', { ascending: true });
 
   // Sezonları getir
@@ -45,7 +45,7 @@ export default async function AchievementsPage() {
   // Verilen başarıları listele
   const { data: achievementsData } = await supabase
     .from('player_achievements')
-    .select('id, achievement_type, week_number, month_number, awarded_at, profile:player_id(username), season:season_id(name), match:match_id(played_at, home_team:home_team_id(name), away_team:away_team_id(name))')
+    .select('id, achievement_type, week_number, month_number, awarded_at, profile:player_id(username, full_name), season:season_id(name), match:match_id(played_at, home_team:home_team_id(name), away_team:away_team_id(name))')
     .order('awarded_at', { ascending: false })
     .limit(100);
 
