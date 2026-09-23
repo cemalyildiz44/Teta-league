@@ -7,12 +7,12 @@ export function RosterManagement({
   memberships, 
   seasonId, 
   isWindowOpen,
-  captainId
+  captainIds = []
 }: { 
   memberships: any[], 
   seasonId: string, 
   isWindowOpen: boolean,
-  captainId: string
+  captainIds?: string[]
 }) {
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState('');
@@ -47,7 +47,7 @@ export function RosterManagement({
       <div className="space-y-2">
         {memberships.map((mem) => {
           const profile = mem.profiles;
-          const isCaptain = profile.id === captainId;
+          const isCaptain = (captainIds || []).includes(profile.id);
           // In a real app we'd also check if they are another captain, but for now we rely on DB throwing if we kick a captain.
           
           return (

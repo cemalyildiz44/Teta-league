@@ -220,34 +220,69 @@ export async function updateTeamStatus(id: string, is_active: boolean) {
   return { success: 'Takım durumu güncellendi.' };
 }
 
-export async function assignCaptain(team_id: string, user_id: string) {
+export async function assignTeamCaptainAction(teamId: string, userId: string) {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
   const { data: { user } } = await supabase.auth.getUser();
   if (!(await checkAdmin(supabase, user)) || !user) return { error: 'Yetkisiz erişim.' };
 
-  if (!team_id || !user_id) return { error: 'Takım ve Kullanıcı seçilmelidir.' };
+  if (!teamId || !userId) return { error: 'Takım ve Kullanıcı seçilmelidir.' };
 
-  // Deactivate old captains
-  await supabase.from('user_roles')
-    .update({ is_active: false, revoked_at: new Date().toISOString() })
-    .eq('team_id', team_id)
-    .eq('role', 'CAPTAIN');
-
-  // Insert new captain
-  const { error } = await supabase.from('user_roles').insert({
-    user_id,
-    role: 'CAPTAIN',
-    team_id,
-    is_active: true,
-    granted_by: user.id
+  const { error } = await supabase.rpc('admin_assign_team_captain', {
+    p_team_id: teamId,
+    p_user_id: userId
   });
 
-  if (error) return { error: 'Kaptan atanamadı: ' + error.message };
+  if (error) return { error: error.message };
+
+  const { data: team } = await supabase
+    .from('teams')
+    .select('slug')
+    .eq('id', teamId)
+    .maybeSingle();
 
   revalidatePath('/admin/teams');
-  return { success: 'Kaptan başarıyla değiştirildi.' };
+  revalidatePath('/takimlar');
+  if (team?.slug) {
+    revalidatePath(`/takim/${team.slug}`);
+  }
+  return { success: 'Kaptan başarıyla atandı.' };
 }
+
+export async function removeTeamCaptainAction(teamId: string, userId: string) {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!(await checkAdmin(supabase, user)) || !user) return { error: 'Yetkisiz erişim.' };
+
+  if (!teamId || !userId) return { error: 'Takım ve Kullanıcı seçilmelidir.' };
+
+  const { error } = await supabase.rpc('admin_remove_team_captain', {
+    p_team_id: teamId,
+    p_user_id: userId
+  });
+
+  if (error) return { error: error.message };
+
+  const { data: team } = await supabase
+    .from('teams')
+    .select('slug')
+    .eq('id', teamId)
+    .maybeSingle();
+
+  revalidatePath('/admin/teams');
+  revalidatePath('/takimlar');
+  if (team?.slug) {
+    revalidatePath(`/takim/${team.slug}`);
+  }
+  return { success: 'Kaptanlık yetkisi başarıyla kaldırıldı.' };
+}
+
+// Geriye dönük uyumluluk için alias
+export async function assignCaptain(team_id: string, user_id: string) {
+  return assignTeamCaptainAction(team_id, user_id);
+}
+
 
 export async function addPlayerToTeam(team_id: string, player_id: string, league_id: string, season_id: string) {
   const cookieStore = await cookies();

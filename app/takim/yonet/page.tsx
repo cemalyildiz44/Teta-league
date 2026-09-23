@@ -97,6 +97,16 @@ export default async function TeamManagementPage() {
     .is('left_at', null)
     .order('joined_at', { ascending: true });
 
+  // Fetch all active captains for this team
+  const { data: teamCaptains } = await supabase
+    .from('user_roles')
+    .select('user_id')
+    .eq('team_id', teamId)
+    .eq('role', 'CAPTAIN')
+    .eq('is_active', true);
+
+  const captainIds = (teamCaptains || []).map((c: any) => c.user_id);
+
   // Pending Transfers (Outgoing)
   const { data: pendingTransfers } = await supabase
     .from('transfers')
@@ -254,7 +264,7 @@ export default async function TeamManagementPage() {
               memberships={memberships || []} 
               seasonId={activeSeason.id} 
               isWindowOpen={isWindowOpen}
-              captainId={user.id}
+              captainIds={captainIds}
             />
           </div>
 

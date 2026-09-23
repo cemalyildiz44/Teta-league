@@ -63,9 +63,7 @@ export default async function TeamPage({ params }: Props) {
       .select('user_id, role, profiles ( id, username, avatar_url, current_ea_player_id )')
       .eq('team_id', team.id)
       .eq('role', 'CAPTAIN')
-      .eq('is_active', true)
-      .limit(1)
-      .single(),
+      .eq('is_active', true),
     supabase
       .from('matches')
       .select('id, home_team_id, away_team_id, home_score, away_score')
@@ -76,7 +74,10 @@ export default async function TeamPage({ params }: Props) {
 
   const activeLeague: any = Array.isArray(leagueTeamData?.leagues) ? leagueTeamData.leagues[0] : leagueTeamData?.leagues;
   const activeSeason: any = Array.isArray(activeLeague?.seasons) ? activeLeague.seasons[0] : activeLeague?.seasons;
-  const captain: any = Array.isArray(roles?.profiles) ? roles.profiles[0] : roles?.profiles;
+  const captainRolesList = Array.isArray(roles) ? roles : roles ? [roles] : [];
+  const captainIds = new Set(captainRolesList.map((r: any) => r.user_id));
+  const captains = captainRolesList.map((r: any) => Array.isArray(r.profiles) ? r.profiles[0] : r.profiles).filter(Boolean);
+  const captain: any = captains[0] || null;
   const teamMap = new Map((allTeamsData || []).map((t: any) => [t.id, t]));
 
   // 2. All-Time match record calculation
@@ -172,7 +173,7 @@ export default async function TeamPage({ params }: Props) {
       roster = memberships.map((m: any) => ({
         joined_at: m.joined_at,
         ...m.profiles,
-        role: captain?.id === m.profiles.id ? 'CAPTAIN' : 'PLAYER',
+        role: captainIds.has(m.profiles?.id || m.player_id) ? 'CAPTAIN' : 'PLAYER',
         stats: { matches: 0, goals: 0, assists: 0, avgRating: "0.00" }
       }));
     }

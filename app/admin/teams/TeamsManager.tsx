@@ -10,7 +10,8 @@ import {
 } from 'lucide-react';
 import { 
   createTeam, editTeam, updateTeamStatus,
-  assignCaptain, addPlayerToTeam, removePlayerFromTeam, uploadTeamLogoAction,
+  assignCaptain, assignTeamCaptainAction, removeTeamCaptainAction,
+  addPlayerToTeam, removePlayerFromTeam, uploadTeamLogoAction,
   deleteTeamAction, forceDeleteTestTeamAction
 } from './actions';
 
@@ -61,11 +62,13 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
     // Team name & slug match
     const teamNameMatch = t.name.toLowerCase().includes(q) || (t.slug && t.slug.toLowerCase().includes(q));
 
-    // Captain match (username or full name)
-    const captain = initialCaptains.find((c: any) => c.team_id === t.id);
-    const captainUsername = captain?.profiles?.username?.toLowerCase() || '';
-    const captainFullName = captain?.profiles?.full_name?.toLowerCase() || '';
-    const captainMatch = captainUsername.includes(q) || captainFullName.includes(q);
+    // Captain match (any active captain username or full name)
+    const teamCaptains = initialCaptains.filter((c: any) => c.team_id === t.id);
+    const captainMatch = teamCaptains.some((c: any) => {
+      const u = c.profiles?.username?.toLowerCase() || '';
+      const fn = c.profiles?.full_name?.toLowerCase() || '';
+      return u.includes(q) || fn.includes(q);
+    });
 
     // Player match (username or full name across team members)
     const teamMembers = initialMemberships.filter((m: any) => m.team_id === t.id);
@@ -80,13 +83,13 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
     let f = true;
     if (filter === 'ACTIVE') f = t.is_active === true;
     if (filter === 'INACTIVE') f = t.is_active === false;
-    if (filter === 'NO_CAPTAIN') f = !captain;
+    if (filter === 'NO_CAPTAIN') f = teamCaptains.length === 0;
     return s && f;
   });
 
   const totalTeams = teams.length;
   const activeTeams = teams.filter((t: any) => t.is_active).length;
-  const withCaptain = initialCaptains.length;
+  const withCaptain = new Set(initialCaptains.map((c: any) => c.team_id)).size;
   const withoutCaptain = totalTeams - withCaptain;
 
   const showFeedback = (msg: string, type: 'success' | 'error') => {
@@ -220,10 +223,34 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
 
   const handleAssignCaptain = async (e: any) => {
     e.preventDefault();
+    if (!captainModal) return;
+    const userId = new FormData(e.currentTarget).get('user_id') as string;
+    if (!userId) {
+      showFeedback('Lütfen kullanıcı seçiniz.', 'error');
+      return;
+    }
     setLoading(true);
-    const res = await assignCaptain(captainModal.id, new FormData(e.currentTarget).get('user_id') as string);
-    if (res.error) showFeedback(res.error, 'error');
-    else { showFeedback(res.success || '', 'success'); setCaptainModal(null); router.refresh(); }
+    const res = await assignTeamCaptainAction(captainModal.id, userId);
+    if (res.error) {
+      showFeedback(res.error, 'error');
+    } else {
+      showFeedback(res.success || 'Kaptan başarıyla atandı.', 'success');
+      setCaptainUserSearch('');
+      router.refresh();
+    }
+    setLoading(false);
+  };
+
+  const handleRemoveCaptain = async (userId: string) => {
+    if (!captainModal) return;
+    setLoading(true);
+    const res = await removeTeamCaptainAction(captainModal.id, userId);
+    if (res.error) {
+      showFeedback(res.error, 'error');
+    } else {
+      showFeedback(res.success || 'Kaptanlık kaldırıldı.', 'success');
+      router.refresh();
+    }
     setLoading(false);
   };
 
@@ -422,7 +449,7 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
           </thead>
           <tbody className='divide-y divide-white/5'>
             {filtered.map((t: any) => {
-              const cap = initialCaptains.find((c:any) => c.team_id === t.id);
+              const teamCaps = initialCaptains.filter((c:any) => c.team_id === t.id);
               const mems = initialMemberships.filter((m:any) => m.team_id === t.id && !m.left_at);
               const lts = initialLeagueTeams.filter((l:any) => l.team_id === t.id);
 
@@ -435,11 +462,18 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
                     </div>
                   </td>
                   <td className='px-4 py-4'>
-                    {cap ? (
-                      <span className='inline-flex items-center gap-1.5 px-2 py-1 bg-amber-500/10 text-amber-400 rounded-md text-[10px] font-bold'>
-                        <Crown className='w-3 h-3' /> {cap.profiles?.username}
-                      </span>
-                    ) : <span className='text-[10px] font-bold text-zinc-600 uppercase'>Yok</span>}
+                    {teamCaps.length > 0 ? (
+                      <div className='flex flex-wrap items-center gap-1.5'>
+                        <span className='text-[10px] font-mono font-bold text-zinc-400 mr-0.5'>
+                          {teamCaps.length}/3
+                        </span>
+                        {teamCaps.map((c: any) => (
+                          <span key={c.user_id} className='inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded text-[10px] font-bold'>
+                            <Crown className='w-3 h-3 text-amber-400 shrink-0' /> {c.profiles?.username}
+                          </span>
+                        ))}
+                      </div>
+                    ) : <span className='text-[10px] font-bold text-zinc-600 uppercase'>Yok (0/3)</span>}
                   </td>
                   <td className='px-4 py-4'>
                     {lts.length > 0 ? (
@@ -472,7 +506,7 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
                         <button onClick={() => setLogoModal(t)} className='p-1.5 bg-pink-500/10 hover:bg-pink-500/20 rounded-md text-pink-400' title='Logo Yükle'>
                           <Upload className='w-4 h-4' />
                         </button>
-                        <button onClick={() => setCaptainModal(t)} className='p-1.5 bg-amber-500/10 hover:bg-amber-500/20 rounded-md text-amber-400' title='Kaptan Ata'>
+                        <button onClick={() => setCaptainModal(t)} className='p-1.5 bg-amber-500/10 hover:bg-amber-500/20 rounded-md text-amber-400' title='Kaptan Yönetimi'>
                           <Crown className='w-4 h-4' />
                         </button>
                         <button onClick={() => setRosterModal(t)} className='p-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 rounded-md text-indigo-400' title='Kadro Yönetimi'>
@@ -723,53 +757,135 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
         </div>
       )}
 
-      {/* Captain Modal */}
-      {captainModal && (
-        <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm'>
-          <div className='card-surface w-full max-w-sm rounded-2xl border border-white/10 overflow-hidden flex flex-col'>
-            <div className='flex justify-between items-center p-4 border-b border-white/5 bg-[#0a1628]'>
-              <div>
-                <h2 className='text-sm font-black text-white tracking-widest'>KAPTAN ATA</h2>
-                <p className='text-xs text-cyan-400'>{captainModal.name}</p>
+      {/* Captain Management Modal */}
+      {captainModal && (() => {
+        const currentTeamCaptains = initialCaptains.filter((c: any) => c.team_id === captainModal.id);
+        const currentCaptainUserIds = new Set(currentTeamCaptains.map((c: any) => c.user_id));
+        const isMaxCaptains = currentTeamCaptains.length >= 3;
+
+        return (
+          <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm'>
+            <div className='card-surface w-full max-w-md rounded-2xl border border-white/10 overflow-hidden flex flex-col shadow-2xl'>
+              <div className='flex justify-between items-center p-4 border-b border-white/5 bg-[#0a1628]'>
+                <div>
+                  <div className='flex items-center gap-2'>
+                    <h2 className='text-sm font-black text-white tracking-widest'>KAPTAN YÖNETİMİ</h2>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                      isMaxCaptains ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                    }`}>
+                      {currentTeamCaptains.length}/3 Kaptan
+                    </span>
+                  </div>
+                  <p className='text-xs text-cyan-400 mt-0.5'>{captainModal.name}</p>
+                </div>
+                <button onClick={() => { setCaptainModal(null); setCaptainUserSearch(''); }} className='text-zinc-400 hover:text-white transition-colors'><X className='w-5 h-5'/></button>
               </div>
-              <button onClick={() => { setCaptainModal(null); setCaptainUserSearch(''); }} className='text-zinc-400 hover:text-white'><X className='w-5 h-5'/></button>
+
+              <div className='p-6 space-y-6'>
+                {/* 1. Mevcut Aktif Kaptanlar Listesi */}
+                <div>
+                  <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2.5'>
+                    Aktif Kaptanlar ({currentTeamCaptains.length}/3)
+                  </label>
+                  {currentTeamCaptains.length === 0 ? (
+                    <div className='p-3 bg-white/5 rounded-lg border border-white/5 text-xs text-zinc-500 italic text-center'>
+                      Bu takıma henüz atanmış aktif bir kaptan bulunmuyor.
+                    </div>
+                  ) : (
+                    <div className='space-y-2'>
+                      {currentTeamCaptains.map((c: any) => (
+                        <div key={c.user_id} className='flex items-center justify-between p-2.5 bg-[#060d18] border border-white/5 rounded-lg group/cap'>
+                          <div className='flex items-center gap-2.5'>
+                            <div className='w-7 h-7 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0'>
+                              <Crown className='w-3.5 h-3.5 text-amber-400' />
+                            </div>
+                            <div>
+                              <div className='text-xs font-bold text-white'>{c.profiles?.username}</div>
+                              {c.profiles?.full_name && (
+                                <div className='text-[10px] text-zinc-400'>{c.profiles.full_name}</div>
+                              )}
+                            </div>
+                          </div>
+                          <button
+                            type='button'
+                            disabled={loading}
+                            onClick={() => handleRemoveCaptain(c.user_id)}
+                            className='px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded text-[10px] font-bold tracking-wider flex items-center gap-1 transition-colors disabled:opacity-50'
+                            title='Kaptanlık Yetkisini Kaldır'
+                          >
+                            <Trash2 className='w-3 h-3' />
+                            <span>Kaldır</span>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Yeni Kaptan Ekleme Bölümü */}
+                <div className='pt-2 border-t border-white/5'>
+                  {isMaxCaptains ? (
+                    <div className='p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-400 font-medium flex items-start gap-2'>
+                      <AlertTriangle className='w-4 h-4 shrink-0 mt-0.5' />
+                      <span>Bu takım maksimum kaptan sınırına (3/3) ulaşmıştır. Yeni bir kaptan atamak için lütfen önce mevcut kaptanlardan birini kaldırınız.</span>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleAssignCaptain} className='space-y-3'>
+                      <div>
+                        <div className='flex items-center justify-between mb-1'>
+                          <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest'>
+                            Yeni Kaptan Ata ({3 - currentTeamCaptains.length} slot boş)
+                          </label>
+                        </div>
+                        <input
+                          type='text'
+                          placeholder='Kullanıcı veya isim ara...'
+                          value={captainUserSearch}
+                          onChange={e => setCaptainUserSearch(e.target.value)}
+                          className='w-full mb-2 bg-[#060d18] border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs placeholder:text-zinc-500 focus:outline-none focus:border-cyan-500/50'
+                        />
+                        <select name='user_id' required className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm custom-scrollbar'>
+                          <option value=''>Kullanıcı seçiniz...</option>
+                          {allProfiles
+                            .filter((p: any) => !currentCaptainUserIds.has(p.id))
+                            .filter((p: any) => {
+                              if (!captainUserSearch.trim()) return true;
+                              const q = captainUserSearch.toLowerCase().trim();
+                              return p.username?.toLowerCase().includes(q) || p.full_name?.toLowerCase().includes(q);
+                            })
+                            .map((p: any) => (
+                              <option key={p.id} value={p.id}>
+                                {p.username}{p.full_name ? ` (${p.full_name})` : ''}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+
+                      <button
+                        type='submit'
+                        disabled={loading}
+                        className='w-full py-2.5 bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg text-xs font-black flex justify-center items-center gap-2 transition-colors disabled:opacity-50 shadow-lg shadow-cyan-950/20'
+                      >
+                        {loading && <Loader2 className='w-4 h-4 animate-spin' />} KAPTAN ATA
+                      </button>
+                    </form>
+                  )}
+                </div>
+
+                <div className='pt-2'>
+                  <button
+                    type='button'
+                    onClick={() => { setCaptainModal(null); setCaptainUserSearch(''); }}
+                    className='w-full py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-xs font-bold transition-colors'
+                  >
+                    KAPAT
+                  </button>
+                </div>
+              </div>
             </div>
-            <form onSubmit={handleAssignCaptain} className='p-6 space-y-4'>
-              <p className='text-xs text-amber-500'>Mevcut kaptanlık yetkisi alınacak ve seçtiğiniz kullanıcıya verilecektir.</p>
-              <div>
-                <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>Kullanıcı Seçin</label>
-                <input
-                  type='text'
-                  placeholder='Kullanıcı veya isim ara...'
-                  value={captainUserSearch}
-                  onChange={e => setCaptainUserSearch(e.target.value)}
-                  className='w-full mb-2 bg-[#060d18] border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs placeholder:text-zinc-500 focus:outline-none focus:border-cyan-500/50'
-                />
-                <select name='user_id' required className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm custom-scrollbar'>
-                  <option value=''>Seçiniz...</option>
-                  {allProfiles
-                    .filter((p: any) => {
-                      if (!captainUserSearch.trim()) return true;
-                      const q = captainUserSearch.toLowerCase().trim();
-                      return p.username?.toLowerCase().includes(q) || p.full_name?.toLowerCase().includes(q);
-                    })
-                    .map((p: any) => (
-                      <option key={p.id} value={p.id}>
-                        {p.username}{p.full_name ? ` (${p.full_name})` : ''}
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <div className='pt-4 flex gap-2'>
-                <button type='button' onClick={() => { setCaptainModal(null); setCaptainUserSearch(''); }} className='flex-1 py-2 bg-white/5 text-white rounded-lg text-xs font-bold'>İPTAL</button>
-                <button type='submit' disabled={loading} className='flex-1 py-2 bg-cyan-500 text-black rounded-lg text-xs font-black flex justify-center items-center gap-2'>
-                  {loading && <Loader2 className='w-4 h-4 animate-spin' />} KAPTAN ATA
-                </button>
-              </div>
-            </form>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Add Player Modal (Opens over Roster Modal) */}
       {addPlayerModal && (
