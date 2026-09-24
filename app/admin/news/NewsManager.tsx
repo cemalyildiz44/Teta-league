@@ -207,9 +207,12 @@ export function NewsManager({ initialNews }: NewsManagerProps) {
                   <tr key={item.id} className="hover:bg-white/[0.02] transition-colors">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-14 h-10 rounded-lg overflow-hidden bg-black/40 shrink-0 border border-white/5 relative">
+                        <div className="w-14 h-10 rounded-lg overflow-hidden bg-[#02060b] shrink-0 border border-white/5 relative flex items-center justify-center">
                           {item.image_url ? (
-                            <img src={item.image_url} alt={item.title} className="w-full h-full object-cover" />
+                            <>
+                              <img src={item.image_url} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover blur-sm opacity-30 select-none pointer-events-none" />
+                              <img src={item.image_url} alt={item.title} className="relative z-10 w-full h-full object-contain select-none" />
+                            </>
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-gray-600">
                               <ImageIcon className="w-4 h-4" />
@@ -544,7 +547,10 @@ export function NewsManager({ initialNews }: NewsManagerProps) {
 
               {editingNews.image_url && (
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-black/40 border border-white/5">
-                  <img src={editingNews.image_url} alt="Mevcut görsel" className="w-16 h-12 object-cover rounded-lg" />
+                  <div className="w-16 h-12 rounded-lg overflow-hidden bg-[#02060b] shrink-0 border border-white/10 relative flex items-center justify-center">
+                    <img src={editingNews.image_url} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover blur-sm opacity-30 select-none pointer-events-none" />
+                    <img src={editingNews.image_url} alt="Mevcut görsel" className="relative z-10 w-full h-full object-contain select-none" />
+                  </div>
                   <div className="text-xs text-gray-400 truncate">
                     Mevcut Görsel: <span className="text-white truncate">{editingNews.image_url}</span>
                   </div>

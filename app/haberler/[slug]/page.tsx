@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Calendar, User, Newspaper, Clock, Share2 } from 'lucide-react';
 import type { Metadata } from 'next';
+import NewsImage from '@/components/NewsImage';
 
 interface NewsDetailPageProps {
   params: Promise<{ slug: string }>;
@@ -137,14 +138,11 @@ export default async function NewsDetailPage({ params }: NewsDetailPageProps) {
 
         {/* Cover Image */}
         {news.image_url && (
-          <div className="relative w-full rounded-2xl overflow-hidden bg-black/60 border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.8)] aspect-video max-h-[500px]">
-            <img
-              src={news.image_url}
-              alt={news.title}
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#03070C]/60 via-transparent to-transparent pointer-events-none" />
-          </div>
+          <NewsImage
+            src={news.image_url}
+            alt={news.title}
+            variant="detail"
+          />
         )}
 
         {/* Article Body */}
@@ -168,11 +166,12 @@ export default async function NewsDetailPage({ params }: NewsDetailPageProps) {
                   className="group block p-4 rounded-xl bg-[#0a1628] border border-white/5 hover:border-[#00e5ff]/40 transition-all"
                 >
                   {item.image_url && (
-                    <div className="w-full h-28 rounded-lg overflow-hidden mb-3 bg-black/50">
-                      <img
+                    <div className="mb-3">
+                      <NewsImage
                         src={item.image_url}
                         alt={item.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        variant="thumb"
+                        className="rounded-lg"
                       />
                     </div>
                   )}

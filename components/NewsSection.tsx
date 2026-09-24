@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { Newspaper } from 'lucide-react';
+import NewsImage from '@/components/NewsImage';
 
 export default async function NewsSection() {
   const cookieStore = await cookies();
@@ -46,25 +47,12 @@ export default async function NewsSection() {
                 href={`/haberler/${item.slug}`}
                 className="client-glass-interactive group overflow-hidden flex flex-col h-full border border-white/5 hover:border-[#00E5FF]/40 transition-all rounded-xl cursor-pointer"
               >
-                <div className="relative h-36 sm:h-40 w-full overflow-hidden bg-black/50">
-                  {item.image_url ? (
-                    <img
-                      src={item.image_url}
-                      alt={item.title}
-                      className="w-full h-full object-cover opacity-60 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#0a1628] to-[#020508]">
-                      <Newspaper className="w-10 h-10 text-[#00e5ff]/30" />
-                    </div>
-                  )}
-                  <div className="absolute top-3 left-3">
-                    <span className="badge-cyan bg-[#00E5FF]/20 text-[#00E5FF] border-[#00E5FF]/30 backdrop-blur-md font-black tracking-widest text-[9px] sm:text-[10px] px-2.5 py-1 uppercase shadow-[0_0_10px_rgba(0,229,255,0.2)]">
-                      {item.category}
-                    </span>
-                  </div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#050a0f] via-transparent to-transparent opacity-90" />
-                </div>
+                <NewsImage
+                  src={item.image_url}
+                  alt={item.title}
+                  category={item.category}
+                  variant="card"
+                />
 
                 <div className="p-4 sm:p-5 flex flex-col flex-1 bg-gradient-to-b from-[#050a0f] to-[#01060b]">
                   <span className="data-label mb-1.5 block !text-[10px]">{formattedDate}</span>

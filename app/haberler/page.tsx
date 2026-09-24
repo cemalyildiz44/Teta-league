@@ -1,9 +1,9 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
-import Image from 'next/image';
-import { Newspaper, Calendar, ArrowRight, Tag } from 'lucide-react';
+import { Newspaper, Calendar, ArrowRight } from 'lucide-react';
 import { NewsArticle } from '@/types/news';
+import NewsImage from '@/components/NewsImage';
 
 export const metadata = {
   title: 'Haberler & Duyurular | TETA League',
@@ -116,25 +116,12 @@ export default async function HaberlerPage({
                 className="group flex flex-col overflow-hidden rounded-2xl bg-gradient-to-b from-[#0a1628] to-[#040a14] border border-white/5 hover:border-[#00e5ff]/40 transition-all duration-300 hover:shadow-[0_0_30px_rgba(0,229,255,0.15)] hover:-translate-y-1"
               >
                 {/* Image */}
-                <div className="relative h-48 w-full overflow-hidden bg-black/60">
-                  {item.image_url ? (
-                    <img
-                      src={item.image_url}
-                      alt={item.title}
-                      className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#0a1628] to-black">
-                      <Newspaper className="w-12 h-12 text-[#00e5ff]/30" />
-                    </div>
-                  )}
-                  <div className="absolute top-3 left-3">
-                    <span className="badge-cyan bg-[#00E5FF]/20 text-[#00E5FF] border-[#00E5FF]/30 backdrop-blur-md font-black tracking-widest text-[10px] px-2.5 py-1 uppercase shadow-[0_0_10px_rgba(0,229,255,0.2)]">
-                      {item.category}
-                    </span>
-                  </div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#0a1628] via-transparent to-transparent opacity-90" />
-                </div>
+                <NewsImage
+                  src={item.image_url}
+                  alt={item.title}
+                  category={item.category}
+                  variant="card"
+                />
 
                 {/* Content */}
                 <div className="p-6 flex flex-col flex-1 space-y-3">
