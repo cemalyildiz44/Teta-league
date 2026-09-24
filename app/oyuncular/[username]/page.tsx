@@ -380,6 +380,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   const allTrophies = [...directTournaments, ...ncWins];
   
   const achievementCounts = {
+    BALLON_DOR: 0,
     TOTW: 0,
     MATCH_POTM: 0,
     MONTH_POTM: 0,
@@ -406,6 +407,132 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
         seasonName: sName,
       };
     });
+
+  const potsWins = (playerAchievementsData || [])
+    .filter((a: any) => a.achievement_type === 'POTS')
+    .map((a: any) => a.seasons?.name || (a.season_id ? seasonsMap.get(a.season_id)?.name : null) || 'Sezon');
+
+  // Transfermarkt Stili Oyuncu Adı Altı Gerçek Kazanılan Kupalar / Başarılar
+  interface PlayerTrophyBadge {
+    id: string;
+    label: string;
+    icon: string;
+    count: number;
+    highlight?: 'gold' | 'cyan' | 'purple' | 'emerald';
+  }
+
+  const earnedTrophies: PlayerTrophyBadge[] = [];
+
+  // 1. Ballon d'Or
+  if (ballonDorWins.length > 0) {
+    earnedTrophies.push({
+      id: 'ballon_dor',
+      label: "Ballon d'Or",
+      icon: '🏆',
+      count: ballonDorWins.length,
+      highlight: 'gold',
+    });
+  }
+
+  // 2. Sezonun Oyuncusu (POTS)
+  if (achievementCounts.POTS > 0) {
+    earnedTrophies.push({
+      id: 'pots',
+      label: 'Sezonun Oyuncusu',
+      icon: '👑',
+      count: achievementCounts.POTS,
+      highlight: 'gold',
+    });
+  }
+
+  // 3. Turnuva Şampiyonlukları (tournament_winners / allTrophies)
+  if (allTrophies.length > 0) {
+    const tourCounts: Record<string, { label: string; icon: string; count: number }> = {};
+    for (const t of allTrophies) {
+      const type = t.tournaments?.type || 'TURNUVA';
+      const key = `tour_${type}`;
+      if (!tourCounts[key]) {
+        const label = type === 'KARMA' ? 'Karma Şampiyonluğu' :
+                      type === '1V1' ? '1v1 Şampiyonluğu' :
+                      type === 'NIGHT_CUP' ? 'Night Cup Şampiyonluğu' :
+                      `${t.tournaments?.name || 'Turnuva'} Şampiyonluğu`;
+        const icon = type === '1V1' ? '🎯' : type === 'NIGHT_CUP' ? '🌙' : '🏆';
+        tourCounts[key] = { label, icon, count: 0 };
+      }
+      tourCounts[key].count++;
+    }
+    for (const [key, val] of Object.entries(tourCounts)) {
+      earnedTrophies.push({
+        id: key,
+        label: val.label,
+        icon: val.icon,
+        count: val.count,
+        highlight: 'gold',
+      });
+    }
+  }
+
+  // 4. Turnuva Başarımları (player_achievements tablosundan)
+  if (achievementCounts.KARMA_WINNER > 0) {
+    earnedTrophies.push({
+      id: 'karma_winner',
+      label: 'Karma Şampiyonu',
+      icon: '⚔️',
+      count: achievementCounts.KARMA_WINNER,
+      highlight: 'emerald',
+    });
+  }
+  if (achievementCounts['1V1_WINNER'] > 0) {
+    earnedTrophies.push({
+      id: '1v1_winner',
+      label: '1v1 Şampiyonu',
+      icon: '🎯',
+      count: achievementCounts['1V1_WINNER'],
+      highlight: 'cyan',
+    });
+  }
+  if (achievementCounts.NIGHT_CUP_WINNER > 0) {
+    earnedTrophies.push({
+      id: 'night_cup_winner',
+      label: 'Night Cup Şampiyonu',
+      icon: '🌙',
+      count: achievementCounts.NIGHT_CUP_WINNER,
+      highlight: 'purple',
+    });
+  }
+
+  // 5. Ayın Oyuncusu (MONTH_POTM)
+  if (achievementCounts.MONTH_POTM > 0) {
+    earnedTrophies.push({
+      id: 'month_potm',
+      label: 'Ayın Oyuncusu',
+      icon: '⚡',
+      count: achievementCounts.MONTH_POTM,
+      highlight: 'purple',
+    });
+  }
+
+  // 6. Haftanın Takımı (TOTW)
+  if (achievementCounts.TOTW > 0) {
+    earnedTrophies.push({
+      id: 'totw',
+      label: 'Haftanın Takımı',
+      icon: '🌟',
+      count: achievementCounts.TOTW,
+      highlight: 'cyan',
+    });
+  }
+
+  // 7. Maçın Oyuncusu (MATCH_POTM)
+  if (achievementCounts.MATCH_POTM > 0) {
+    earnedTrophies.push({
+      id: 'match_potm',
+      label: 'Maçın Oyuncusu',
+      icon: '🔥',
+      count: achievementCounts.MATCH_POTM,
+      highlight: 'cyan',
+    });
+  }
 
   const tabs = [
     { id: 'genel', label: 'GENEL' },
@@ -469,6 +596,36 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                 </h1>
                 {profile.full_name && <p className="text-[#00e5ff] text-[14px] font-[700] tracking-wide mb-1.5">{profile.full_name}</p>}
                 {profile.current_ea_player_id && <p className="text-[12px] text-gray-500 font-mono">EA ID: <span className="text-gray-400 font-[600]">{profile.current_ea_player_id}</span></p>}
+                {earnedTrophies.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-2.5 border-t border-white/5">
+                    {earnedTrophies.map((tr) => (
+                      <div
+                        key={tr.id}
+                        title={`${tr.count}x ${tr.label}`}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-black transition-all cursor-default select-none ${
+                          tr.highlight === 'gold'
+                            ? 'bg-gradient-to-r from-amber-500/20 via-yellow-500/15 to-amber-500/10 border-amber-400/40 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
+                            : tr.highlight === 'emerald'
+                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                            : tr.highlight === 'purple'
+                            ? 'bg-purple-500/10 border-purple-500/30 text-purple-400'
+                            : 'bg-white/5 border-white/10 text-gray-300 hover:border-white/20'
+                        }`}
+                      >
+                        <span className="text-base leading-none drop-shadow-sm">{tr.icon}</span>
+                        <span
+                          className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black leading-none ${
+                            tr.highlight === 'gold'
+                              ? 'bg-amber-400 text-black shadow-sm font-black'
+                              : 'bg-white/15 text-white'
+                          }`}
+                        >
+                          {tr.count}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             {profile.bio && (
@@ -900,116 +1057,301 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
           {/* BASARILAR TAB */}
           {activeTab === 'basarilar' && (
             <div className="space-y-4">
-              {/* BALLON D'OR SHOWCASE (Sadece kazanan oyuncularda gösterilir) */}
-              {ballonDorWins.length > 0 && (
-                <div className="relative overflow-hidden rounded-2xl border border-amber-400/40 bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-amber-500/20 p-6 lg:p-8 shadow-[0_0_35px_rgba(245,158,11,0.2)] mb-8">
-                  <div className="absolute -right-8 -top-8 w-40 h-40 bg-yellow-400/10 rounded-full blur-3xl pointer-events-none" />
-                  <div className="relative flex flex-col sm:flex-row items-center justify-between gap-6">
-                    <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left">
-                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-amber-400/30 to-yellow-600/20 border border-amber-400/50 flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(251,191,36,0.3)]">
-                        <span className="text-3xl sm:text-4xl drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]">👑</span>
-                      </div>
-                      <div>
-                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1.5">
-                          <span className="text-[10px] font-black tracking-widest text-amber-400 bg-amber-400/10 px-2.5 py-0.5 rounded-full border border-amber-400/30 uppercase">
-                            TETA LEAGUE PRESTİJ ÖDÜLÜ
-                          </span>
-                        </div>
-                        <h2 className="text-2xl sm:text-3xl font-[900] text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-400 tracking-wider uppercase">
-                          BALLON D'OR{ballonDorWins.length > 1 ? ` ×${ballonDorWins.length}` : ''}
-                        </h2>
-                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2.5">
+              <h2 className="text-[14px] font-[900] text-gray-500 tracking-widest uppercase mb-3">KİŞİSEL BAŞARILAR</h2>
+              <div className="bg-[#03070c] border border-white/5 rounded-2xl p-6 lg:p-10 mb-8">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {/* BALLON D'OR */}
+                  <div
+                    className={`p-5 rounded-2xl border flex flex-col items-center justify-between text-center transition-all ${
+                      achievementCounts.BALLON_DOR > 0
+                        ? 'bg-gradient-to-b from-amber-500/20 via-amber-950/20 to-[#03070c] border-amber-400/50 shadow-[0_0_25px_rgba(245,158,11,0.2)] hover:border-amber-400'
+                        : 'bg-white/[0.02] border-white/5 opacity-60'
+                    }`}
+                  >
+                    <div
+                      className={`w-14 h-14 mb-2 rounded-2xl flex items-center justify-center text-3xl transition-all ${
+                        achievementCounts.BALLON_DOR > 0
+                          ? 'bg-gradient-to-br from-amber-400/30 to-yellow-600/20 border border-amber-400/60 shadow-[0_0_15px_rgba(251,191,36,0.3)]'
+                          : 'bg-black/40 border border-white/10 text-xl text-gray-500'
+                      }`}
+                    >
+                      {achievementCounts.BALLON_DOR > 0 ? '🏆' : '🔒'}
+                    </div>
+                    <div
+                      className={`text-[12px] font-[900] tracking-wider uppercase mb-1 ${
+                        achievementCounts.BALLON_DOR > 0
+                          ? 'text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-400'
+                          : 'text-gray-500'
+                      }`}
+                    >
+                      BALLON D'OR
+                    </div>
+                    {achievementCounts.BALLON_DOR > 0 ? (
+                      <>
+                        <div className="flex flex-wrap items-center justify-center gap-1 my-1.5 min-h-[22px]">
                           {ballonDorWins.map((w: any, idx: number) => (
                             <span
                               key={idx}
-                              className="px-2.5 py-1 rounded-lg bg-black/60 border border-amber-400/30 text-[11px] font-black text-amber-300 tracking-wider uppercase"
+                              className="px-2 py-0.5 rounded bg-black/70 border border-amber-400/40 text-[10px] font-black text-amber-300 uppercase tracking-wider"
                             >
                               {w.seasonName}
                             </span>
                           ))}
                         </div>
+                        <div className="text-[14px] font-black text-amber-400 font-mono tracking-tight mt-1">
+                          {ballonDorWins.length} ÖDÜL
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-[14px] font-black text-gray-700 tracking-wider mt-2">
+                        KİLİTLİ
                       </div>
-                    </div>
-                    <div className="text-center sm:text-right shrink-0">
-                      <div className="text-[10px] font-black text-zinc-400 tracking-widest uppercase mb-1">DÜNYANIN EN İYİSİ</div>
-                      <div className="text-2xl font-[900] text-amber-400 font-mono tracking-tight">
-                        {ballonDorWins.length} ÖDÜL
-                      </div>
-                    </div>
+                    )}
                   </div>
-                </div>
-              )}
 
-              <h2 className="text-[14px] font-[900] text-gray-500 tracking-widest uppercase mb-3">KİŞİSEL BAŞARIMLAR</h2>
-              <div className="bg-[#03070c] border border-white/5 rounded-2xl p-6 lg:p-10 mb-8">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {/* TOTW */}
-                  <div className={`p-5 rounded-2xl border flex flex-col items-center justify-center text-center transition-all ${achievementCounts.TOTW > 0 ? 'bg-gradient-to-br from-[#00e5ff]/10 to-transparent border-[#00e5ff]/30 shadow-[0_0_20px_rgba(0,229,255,0.1)]' : 'bg-white/[0.02] border-white/5 opacity-60'}`}>
-                    <div className="w-12 h-12 mb-3 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-xl">
-                      {achievementCounts.TOTW > 0 ? '🌟' : '🔒'}
+                  {/* SEZONUN OYUNCUSU (POTS) */}
+                  <div
+                    className={`p-5 rounded-2xl border flex flex-col items-center justify-between text-center transition-all ${
+                      achievementCounts.POTS > 0
+                        ? 'bg-gradient-to-br from-yellow-500/15 via-yellow-950/20 to-[#03070c] border-yellow-500/40 shadow-[0_0_20px_rgba(234,179,8,0.15)] hover:border-yellow-500/60'
+                        : 'bg-white/[0.02] border-white/5 opacity-60'
+                    }`}
+                  >
+                    <div
+                      className={`w-12 h-12 mb-2 rounded-full flex items-center justify-center text-xl ${
+                        achievementCounts.POTS > 0
+                          ? 'bg-yellow-500/20 border border-yellow-500/40 shadow-[0_0_10px_rgba(234,179,8,0.2)]'
+                          : 'bg-black/40 border border-white/10 text-gray-500'
+                      }`}
+                    >
+                      {achievementCounts.POTS > 0 ? '👑' : '🔒'}
                     </div>
-                    <div className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${achievementCounts.TOTW > 0 ? 'text-white' : 'text-gray-500'}`}>HAFTANIN TAKIMI</div>
-                    <div className={`text-[20px] font-black ${achievementCounts.TOTW > 0 ? 'text-[#00e5ff]' : 'text-gray-700'}`}>
-                      {achievementCounts.TOTW > 0 ? `${achievementCounts.TOTW}x` : 'KİLİTLİ'}
+                    <div
+                      className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${
+                        achievementCounts.POTS > 0 ? 'text-white' : 'text-gray-500'
+                      }`}
+                    >
+                      SEZONUN OYUNCUSU
                     </div>
+                    {achievementCounts.POTS > 0 ? (
+                      <>
+                        {potsWins.length > 0 && (
+                          <div className="flex flex-wrap items-center justify-center gap-1 my-1">
+                            {potsWins.map((sn: string, idx: number) => (
+                              <span
+                                key={idx}
+                                className="px-2 py-0.5 rounded bg-black/70 border border-yellow-500/30 text-[10px] font-black text-yellow-300 uppercase tracking-wider"
+                              >
+                                {sn}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="text-[14px] font-black text-yellow-400 font-mono tracking-tight mt-1">
+                          {achievementCounts.POTS}x
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-[14px] font-black text-gray-700 tracking-wider mt-2">
+                        KİLİTLİ
+                      </div>
+                    )}
                   </div>
-                  {/* MATCH_POTM */}
-                  <div className={`p-5 rounded-2xl border flex flex-col items-center justify-center text-center transition-all ${achievementCounts.MATCH_POTM > 0 ? 'bg-gradient-to-br from-[#00e5ff]/10 to-transparent border-[#00e5ff]/30 shadow-[0_0_20px_rgba(0,229,255,0.1)]' : 'bg-white/[0.02] border-white/5 opacity-60'}`}>
-                    <div className="w-12 h-12 mb-3 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-xl">
-                      {achievementCounts.MATCH_POTM > 0 ? '🔥' : '🔒'}
-                    </div>
-                    <div className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${achievementCounts.MATCH_POTM > 0 ? 'text-white' : 'text-gray-500'}`}>MAÇIN OYUNCUSU</div>
-                    <div className={`text-[20px] font-black ${achievementCounts.MATCH_POTM > 0 ? 'text-[#00e5ff]' : 'text-gray-700'}`}>
-                      {achievementCounts.MATCH_POTM > 0 ? `${achievementCounts.MATCH_POTM}x` : 'KİLİTLİ'}
-                    </div>
-                  </div>
-                  {/* MONTH_POTM */}
-                  <div className={`p-5 rounded-2xl border flex flex-col items-center justify-center text-center transition-all ${achievementCounts.MONTH_POTM > 0 ? 'bg-gradient-to-br from-purple-500/10 to-transparent border-purple-500/30 shadow-[0_0_20px_rgba(168,85,247,0.1)]' : 'bg-white/[0.02] border-white/5 opacity-60'}`}>
-                    <div className="w-12 h-12 mb-3 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-xl">
+
+                  {/* AYIN OYUNCUSU (MONTH_POTM) */}
+                  <div
+                    className={`p-5 rounded-2xl border flex flex-col items-center justify-between text-center transition-all ${
+                      achievementCounts.MONTH_POTM > 0
+                        ? 'bg-gradient-to-br from-purple-500/15 via-purple-950/20 to-[#03070c] border-purple-500/40 shadow-[0_0_20px_rgba(168,85,247,0.15)] hover:border-purple-500/60'
+                        : 'bg-white/[0.02] border-white/5 opacity-60'
+                    }`}
+                  >
+                    <div
+                      className={`w-12 h-12 mb-2 rounded-full flex items-center justify-center text-xl ${
+                        achievementCounts.MONTH_POTM > 0
+                          ? 'bg-purple-500/20 border border-purple-500/40 shadow-[0_0_10px_rgba(168,85,247,0.2)]'
+                          : 'bg-black/40 border border-white/10 text-gray-500'
+                      }`}
+                    >
                       {achievementCounts.MONTH_POTM > 0 ? '⚡' : '🔒'}
                     </div>
-                    <div className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${achievementCounts.MONTH_POTM > 0 ? 'text-white' : 'text-gray-500'}`}>AYIN OYUNCUSU</div>
-                    <div className={`text-[20px] font-black ${achievementCounts.MONTH_POTM > 0 ? 'text-purple-400' : 'text-gray-700'}`}>
+                    <div
+                      className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${
+                        achievementCounts.MONTH_POTM > 0 ? 'text-white' : 'text-gray-500'
+                      }`}
+                    >
+                      AYIN OYUNCUSU
+                    </div>
+                    <div
+                      className={`text-[20px] font-black mt-1 ${
+                        achievementCounts.MONTH_POTM > 0 ? 'text-purple-400' : 'text-gray-700'
+                      }`}
+                    >
                       {achievementCounts.MONTH_POTM > 0 ? `${achievementCounts.MONTH_POTM}x` : 'KİLİTLİ'}
                     </div>
                   </div>
-                  {/* POTS */}
-                  <div className={`p-5 rounded-2xl border flex flex-col items-center justify-center text-center transition-all ${achievementCounts.POTS > 0 ? 'bg-gradient-to-br from-yellow-500/10 to-transparent border-yellow-500/30 shadow-[0_0_20px_rgba(234,179,8,0.1)]' : 'bg-white/[0.02] border-white/5 opacity-60'}`}>
-                    <div className="w-12 h-12 mb-3 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-xl">
-                      {achievementCounts.POTS > 0 ? '👑' : '🔒'}
+
+                  {/* HAFTANIN TAKIMI (TOTW) */}
+                  <div
+                    className={`p-5 rounded-2xl border flex flex-col items-center justify-between text-center transition-all ${
+                      achievementCounts.TOTW > 0
+                        ? 'bg-gradient-to-br from-[#00e5ff]/15 via-[#00e5ff]/5 to-[#03070c] border-[#00e5ff]/40 shadow-[0_0_20px_rgba(0,229,255,0.15)] hover:border-[#00e5ff]/60'
+                        : 'bg-white/[0.02] border-white/5 opacity-60'
+                    }`}
+                  >
+                    <div
+                      className={`w-12 h-12 mb-2 rounded-full flex items-center justify-center text-xl ${
+                        achievementCounts.TOTW > 0
+                          ? 'bg-[#00e5ff]/20 border border-[#00e5ff]/40 shadow-[0_0_10px_rgba(0,229,255,0.2)]'
+                          : 'bg-black/40 border border-white/10 text-gray-500'
+                      }`}
+                    >
+                      {achievementCounts.TOTW > 0 ? '🌟' : '🔒'}
                     </div>
-                    <div className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${achievementCounts.POTS > 0 ? 'text-white' : 'text-gray-500'}`}>SEZONUN OYUNCUSU</div>
-                    <div className={`text-[20px] font-black ${achievementCounts.POTS > 0 ? 'text-yellow-400' : 'text-gray-700'}`}>
-                      {achievementCounts.POTS > 0 ? `${achievementCounts.POTS}x` : 'KİLİTLİ'}
+                    <div
+                      className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${
+                        achievementCounts.TOTW > 0 ? 'text-white' : 'text-gray-500'
+                      }`}
+                    >
+                      HAFTANIN TAKIMI
+                    </div>
+                    <div
+                      className={`text-[20px] font-black mt-1 ${
+                        achievementCounts.TOTW > 0 ? 'text-[#00e5ff]' : 'text-gray-700'
+                      }`}
+                    >
+                      {achievementCounts.TOTW > 0 ? `${achievementCounts.TOTW}x` : 'KİLİTLİ'}
                     </div>
                   </div>
+
+                  {/* MAÇIN OYUNCUSU (MATCH_POTM) */}
+                  <div
+                    className={`p-5 rounded-2xl border flex flex-col items-center justify-between text-center transition-all ${
+                      achievementCounts.MATCH_POTM > 0
+                        ? 'bg-gradient-to-br from-cyan-500/15 via-orange-950/20 to-[#03070c] border-cyan-500/40 shadow-[0_0_20px_rgba(6,182,212,0.15)] hover:border-cyan-500/60'
+                        : 'bg-white/[0.02] border-white/5 opacity-60'
+                    }`}
+                  >
+                    <div
+                      className={`w-12 h-12 mb-2 rounded-full flex items-center justify-center text-xl ${
+                        achievementCounts.MATCH_POTM > 0
+                          ? 'bg-orange-500/20 border border-orange-500/40 shadow-[0_0_10px_rgba(249,115,22,0.2)]'
+                          : 'bg-black/40 border border-white/10 text-gray-500'
+                      }`}
+                    >
+                      {achievementCounts.MATCH_POTM > 0 ? '🔥' : '🔒'}
+                    </div>
+                    <div
+                      className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${
+                        achievementCounts.MATCH_POTM > 0 ? 'text-white' : 'text-gray-500'
+                      }`}
+                    >
+                      MAÇIN OYUNCUSU
+                    </div>
+                    <div
+                      className={`text-[20px] font-black mt-1 ${
+                        achievementCounts.MATCH_POTM > 0 ? 'text-[#00e5ff]' : 'text-gray-700'
+                      }`}
+                    >
+                      {achievementCounts.MATCH_POTM > 0 ? `${achievementCounts.MATCH_POTM}x` : 'KİLİTLİ'}
+                    </div>
+                  </div>
+
                   {/* KARMA WINNER */}
-                  <div className={`p-5 rounded-2xl border flex flex-col items-center justify-center text-center transition-all ${achievementCounts.KARMA_WINNER > 0 ? 'bg-gradient-to-br from-emerald-500/10 to-transparent border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.1)]' : 'bg-white/[0.02] border-white/5 opacity-60'}`}>
-                    <div className="w-12 h-12 mb-3 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-xl">
+                  <div
+                    className={`p-5 rounded-2xl border flex flex-col items-center justify-between text-center transition-all ${
+                      achievementCounts.KARMA_WINNER > 0
+                        ? 'bg-gradient-to-br from-emerald-500/15 via-emerald-950/20 to-[#03070c] border-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.15)] hover:border-emerald-500/60'
+                        : 'bg-white/[0.02] border-white/5 opacity-60'
+                    }`}
+                  >
+                    <div
+                      className={`w-12 h-12 mb-2 rounded-full flex items-center justify-center text-xl ${
+                        achievementCounts.KARMA_WINNER > 0
+                          ? 'bg-emerald-500/20 border border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
+                          : 'bg-black/40 border border-white/10 text-gray-500'
+                      }`}
+                    >
                       {achievementCounts.KARMA_WINNER > 0 ? '⚔️' : '🔒'}
                     </div>
-                    <div className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${achievementCounts.KARMA_WINNER > 0 ? 'text-white' : 'text-gray-500'}`}>KARMA WINNER</div>
-                    <div className={`text-[20px] font-black ${achievementCounts.KARMA_WINNER > 0 ? 'text-emerald-400' : 'text-gray-700'}`}>
+                    <div
+                      className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${
+                        achievementCounts.KARMA_WINNER > 0 ? 'text-white' : 'text-gray-500'
+                      }`}
+                    >
+                      KARMA ŞAMPİYONU
+                    </div>
+                    <div
+                      className={`text-[20px] font-black mt-1 ${
+                        achievementCounts.KARMA_WINNER > 0 ? 'text-emerald-400' : 'text-gray-700'
+                      }`}
+                    >
                       {achievementCounts.KARMA_WINNER > 0 ? `${achievementCounts.KARMA_WINNER}x` : 'KİLİTLİ'}
                     </div>
                   </div>
+
                   {/* 1V1 WINNER */}
-                  <div className={`p-5 rounded-2xl border flex flex-col items-center justify-center text-center transition-all ${achievementCounts['1V1_WINNER'] > 0 ? 'bg-gradient-to-br from-cyan-500/10 to-transparent border-cyan-500/30 shadow-[0_0_20px_rgba(6,182,212,0.1)]' : 'bg-white/[0.02] border-white/5 opacity-60'}`}>
-                    <div className="w-12 h-12 mb-3 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-xl">
+                  <div
+                    className={`p-5 rounded-2xl border flex flex-col items-center justify-between text-center transition-all ${
+                      achievementCounts['1V1_WINNER'] > 0
+                        ? 'bg-gradient-to-br from-cyan-500/15 via-cyan-950/20 to-[#03070c] border-cyan-500/40 shadow-[0_0_20px_rgba(6,182,212,0.15)] hover:border-cyan-500/60'
+                        : 'bg-white/[0.02] border-white/5 opacity-60'
+                    }`}
+                  >
+                    <div
+                      className={`w-12 h-12 mb-2 rounded-full flex items-center justify-center text-xl ${
+                        achievementCounts['1V1_WINNER'] > 0
+                          ? 'bg-cyan-500/20 border border-cyan-500/40 shadow-[0_0_10px_rgba(6,182,212,0.2)]'
+                          : 'bg-black/40 border border-white/10 text-gray-500'
+                      }`}
+                    >
                       {achievementCounts['1V1_WINNER'] > 0 ? '🎯' : '🔒'}
                     </div>
-                    <div className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${achievementCounts['1V1_WINNER'] > 0 ? 'text-white' : 'text-gray-500'}`}>1V1 WINNER</div>
-                    <div className={`text-[20px] font-black ${achievementCounts['1V1_WINNER'] > 0 ? 'text-cyan-400' : 'text-gray-700'}`}>
+                    <div
+                      className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${
+                        achievementCounts['1V1_WINNER'] > 0 ? 'text-white' : 'text-gray-500'
+                      }`}
+                    >
+                      1V1 ŞAMPİYONU
+                    </div>
+                    <div
+                      className={`text-[20px] font-black mt-1 ${
+                        achievementCounts['1V1_WINNER'] > 0 ? 'text-cyan-400' : 'text-gray-700'
+                      }`}
+                    >
                       {achievementCounts['1V1_WINNER'] > 0 ? `${achievementCounts['1V1_WINNER']}x` : 'KİLİTLİ'}
                     </div>
                   </div>
+
                   {/* NIGHT CUP WINNER */}
-                  <div className={`p-5 rounded-2xl border flex flex-col items-center justify-center text-center transition-all ${achievementCounts.NIGHT_CUP_WINNER > 0 ? 'bg-gradient-to-br from-indigo-500/10 to-transparent border-indigo-500/30 shadow-[0_0_20px_rgba(99,102,241,0.1)]' : 'bg-white/[0.02] border-white/5 opacity-60'}`}>
-                    <div className="w-12 h-12 mb-3 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-xl">
+                  <div
+                    className={`p-5 rounded-2xl border flex flex-col items-center justify-between text-center transition-all ${
+                      achievementCounts.NIGHT_CUP_WINNER > 0
+                        ? 'bg-gradient-to-br from-indigo-500/15 via-indigo-950/20 to-[#03070c] border-indigo-500/40 shadow-[0_0_20px_rgba(99,102,241,0.15)] hover:border-indigo-500/60'
+                        : 'bg-white/[0.02] border-white/5 opacity-60'
+                    }`}
+                  >
+                    <div
+                      className={`w-12 h-12 mb-2 rounded-full flex items-center justify-center text-xl ${
+                        achievementCounts.NIGHT_CUP_WINNER > 0
+                          ? 'bg-indigo-500/20 border border-indigo-500/40 shadow-[0_0_10px_rgba(99,102,241,0.2)]'
+                          : 'bg-black/40 border border-white/10 text-gray-500'
+                      }`}
+                    >
                       {achievementCounts.NIGHT_CUP_WINNER > 0 ? '🌙' : '🔒'}
                     </div>
-                    <div className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${achievementCounts.NIGHT_CUP_WINNER > 0 ? 'text-white' : 'text-gray-500'}`}>NIGHT CUP WINNER</div>
-                    <div className={`text-[20px] font-black ${achievementCounts.NIGHT_CUP_WINNER > 0 ? 'text-indigo-400' : 'text-gray-700'}`}>
+                    <div
+                      className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${
+                        achievementCounts.NIGHT_CUP_WINNER > 0 ? 'text-white' : 'text-gray-500'
+                      }`}
+                    >
+                      NIGHT CUP ŞAMPİYONU
+                    </div>
+                    <div
+                      className={`text-[20px] font-black mt-1 ${
+                        achievementCounts.NIGHT_CUP_WINNER > 0 ? 'text-indigo-400' : 'text-gray-700'
+                      }`}
+                    >
                       {achievementCounts.NIGHT_CUP_WINNER > 0 ? `${achievementCounts.NIGHT_CUP_WINNER}x` : 'KİLİTLİ'}
                     </div>
                   </div>
