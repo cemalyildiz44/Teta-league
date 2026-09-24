@@ -417,6 +417,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     id: string;
     label: string;
     icon: string;
+    imageUrl?: string;
     count: number;
     highlight?: 'gold' | 'cyan' | 'purple' | 'emerald';
   }
@@ -429,6 +430,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
       id: 'ballon_dor',
       label: "Ballon d'Or",
       icon: '🏆',
+      imageUrl: '/assets/achievements/ballon-dor.png',
       count: ballonDorWins.length,
       highlight: 'gold',
     });
@@ -612,7 +614,15 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                             : 'bg-white/5 border-white/10 text-gray-300 hover:border-white/20'
                         }`}
                       >
-                        <span className="text-base leading-none drop-shadow-sm">{tr.icon}</span>
+                        {tr.imageUrl ? (
+                          <img
+                            src={tr.imageUrl}
+                            alt={tr.label}
+                            className="h-5 w-auto object-contain drop-shadow-[0_0_6px_rgba(245,158,11,0.5)]"
+                          />
+                        ) : (
+                          <span className="text-base leading-none drop-shadow-sm">{tr.icon}</span>
+                        )}
                         <span
                           className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black leading-none ${
                             tr.highlight === 'gold'
@@ -1068,15 +1078,20 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                         : 'bg-white/[0.02] border-white/5 opacity-60'
                     }`}
                   >
-                    <div
-                      className={`w-14 h-14 mb-2 rounded-2xl flex items-center justify-center text-3xl transition-all ${
-                        achievementCounts.BALLON_DOR > 0
-                          ? 'bg-gradient-to-br from-amber-400/30 to-yellow-600/20 border border-amber-400/60 shadow-[0_0_15px_rgba(251,191,36,0.3)]'
-                          : 'bg-black/40 border border-white/10 text-xl text-gray-500'
-                      }`}
-                    >
-                      {achievementCounts.BALLON_DOR > 0 ? '🏆' : '🔒'}
-                    </div>
+                    {achievementCounts.BALLON_DOR > 0 ? (
+                      <div className="relative my-1 flex items-center justify-center">
+                        <div className="absolute inset-0 bg-amber-400/15 rounded-full blur-xl pointer-events-none scale-90" />
+                        <img
+                          src="/assets/achievements/ballon-dor.png"
+                          alt="Ballon d'Or TETA League"
+                          className="relative h-[75px] md:h-[95px] w-auto object-contain drop-shadow-[0_6px_12px_rgba(0,0,0,0.6)] drop-shadow-[0_0_20px_rgba(245,158,11,0.35)] transition-transform duration-300 hover:scale-105"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-14 h-14 mb-2 rounded-2xl flex items-center justify-center bg-black/40 border border-white/10 text-xl text-gray-500">
+                        🔒
+                      </div>
+                    )}
                     <div
                       className={`text-[12px] font-[900] tracking-wider uppercase mb-1 ${
                         achievementCounts.BALLON_DOR > 0
