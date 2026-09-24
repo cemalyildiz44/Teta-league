@@ -556,12 +556,12 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
           {/* SOL: Oyuncu Bilgileri */}
           <div className="bg-[#03070c] border border-white/5 rounded-2xl p-6 lg:p-8 flex flex-col justify-center">
             <div className="flex gap-4 md:gap-6 items-start">
-              <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl bg-[#0a1628] border border-white/10 overflow-hidden shrink-0 shadow-lg">
+              <div className="w-24 h-24 md:w-28 md:h-28 rounded-2xl bg-[#0a1628] border border-white/10 overflow-hidden shrink-0 shadow-lg">
                 {profile.avatar_url ? (
                   <img src={profile.avatar_url} alt={profile.username} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#00e5ff]/10 to-transparent">
-                    <span className="text-3xl font-[900] text-[#00e5ff]/40">{profile.username.charAt(0).toUpperCase()}</span>
+                    <span className="text-3xl md:text-4xl font-[900] text-[#00e5ff]/40">{profile.username.charAt(0).toUpperCase()}</span>
                   </div>
                 )}
               </div>
@@ -604,7 +604,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                       <div
                         key={tr.id}
                         title={`${tr.count}x ${tr.label}`}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-black transition-all cursor-default select-none ${
+                        className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-lg border text-xs font-black transition-all cursor-default select-none ${
                           tr.highlight === 'gold'
                             ? 'bg-gradient-to-r from-amber-500/20 via-yellow-500/15 to-amber-500/10 border-amber-400/40 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
                             : tr.highlight === 'emerald'
@@ -618,7 +618,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                           <img
                             src={tr.imageUrl}
                             alt={tr.label}
-                            className="h-5 w-auto object-contain drop-shadow-[0_0_6px_rgba(245,158,11,0.5)]"
+                            className="h-7 w-auto object-contain shrink-0"
                           />
                         ) : (
                           <span className="text-base leading-none drop-shadow-sm">{tr.icon}</span>
@@ -1078,22 +1078,8 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                         : 'bg-white/[0.02] border-white/5 opacity-60'
                     }`}
                   >
-                    {achievementCounts.BALLON_DOR > 0 ? (
-                      <div className="relative my-1 flex items-center justify-center">
-                        <div className="absolute inset-0 bg-amber-400/15 rounded-full blur-xl pointer-events-none scale-90" />
-                        <img
-                          src="/assets/achievements/ballon-dor.png"
-                          alt="Ballon d'Or TETA League"
-                          className="relative h-[75px] md:h-[95px] w-auto object-contain drop-shadow-[0_6px_12px_rgba(0,0,0,0.6)] drop-shadow-[0_0_20px_rgba(245,158,11,0.35)] transition-transform duration-300 hover:scale-105"
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-14 h-14 mb-2 rounded-2xl flex items-center justify-center bg-black/40 border border-white/10 text-xl text-gray-500">
-                        🔒
-                      </div>
-                    )}
                     <div
-                      className={`text-[12px] font-[900] tracking-wider uppercase mb-1 ${
+                      className={`text-[12px] font-[900] tracking-wider uppercase mb-1.5 ${
                         achievementCounts.BALLON_DOR > 0
                           ? 'text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-400'
                           : 'text-gray-500'
@@ -1101,9 +1087,24 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                     >
                       BALLON D'OR
                     </div>
+
                     {achievementCounts.BALLON_DOR > 0 ? (
-                      <>
-                        <div className="flex flex-wrap items-center justify-center gap-1 my-1.5 min-h-[22px]">
+                      <div className="my-1.5 flex items-center justify-center">
+                        <img
+                          src="/assets/achievements/ballon-dor.png"
+                          alt="Ballon d'Or TETA League"
+                          className="h-[88px] md:h-[112px] w-auto object-contain transition-transform duration-300 hover:scale-105 select-none"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-14 h-14 my-3 rounded-2xl flex items-center justify-center bg-black/40 border border-white/10 text-xl text-gray-500">
+                        🔒
+                      </div>
+                    )}
+
+                    {achievementCounts.BALLON_DOR > 0 ? (
+                      <div className="flex flex-col items-center">
+                        <div className="flex flex-wrap items-center justify-center gap-1 my-1 min-h-[22px]">
                           {ballonDorWins.map((w: any, idx: number) => (
                             <span
                               key={idx}
@@ -1116,7 +1117,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                         <div className="text-[14px] font-black text-amber-400 font-mono tracking-tight mt-1">
                           {ballonDorWins.length} ÖDÜL
                         </div>
-                      </>
+                      </div>
                     ) : (
                       <div className="text-[14px] font-black text-gray-700 tracking-wider mt-2">
                         KİLİTLİ
