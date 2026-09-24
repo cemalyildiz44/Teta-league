@@ -40,6 +40,10 @@ export async function addAchievementAction(prevState: any, formData: FormData) {
       return { error: 'Oyuncu ve başarı türü zorunludur.' };
     }
 
+    if (achievement_type === 'BALLON_DOR' && !season_id) {
+      return { error: 'Ballon d\'Or için sezon seçimi zorunludur.' };
+    }
+
     const insertData: any = {
       player_id,
       achievement_type,
@@ -55,6 +59,9 @@ export async function addAchievementAction(prevState: any, formData: FormData) {
 
     if (error) {
       if (error.code === '23505') {
+        if (achievement_type === 'BALLON_DOR') {
+          return { error: 'Bu oyuncuya seçilen sezon için zaten Ballon d\'Or verilmiş (Mükerrer Kayıt).' };
+        }
         return { error: 'Bu oyuncu için belirtilen olayda (ör: aynı maç veya aynı hafta) bu başarı zaten daha önce verilmiş (Mükerrer Kayıt).' };
       }
       return { error: 'Başarı eklenirken hata oluştu: ' + error.message };

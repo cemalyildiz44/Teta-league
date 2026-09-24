@@ -86,7 +86,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     supabase.from("team_memberships").select("*").eq("player_id", profile.id).order("joined_at", { ascending: false }),
     supabase.from("seasons").select("id, name, slug"),
     supabase.from("leagues").select("id, name, season_id"),
-    supabase.from('player_achievements').select('achievement_type, season_id').eq('player_id', profile.id),
+    supabase.from('player_achievements').select('achievement_type, season_id, seasons(name, slug)').eq('player_id', profile.id),
     supabase.from('player_legacy_career_stats').select('*').eq('player_id', profile.id).is('deleted_at', null).order('season_name', { ascending: false })
   ]);
 
@@ -396,6 +396,16 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
       }
     });
   }
+
+  const ballonDorWins = (playerAchievementsData || [])
+    .filter((a: any) => a.achievement_type === 'BALLON_DOR')
+    .map((a: any) => {
+      const sName = a.seasons?.name || (a.season_id ? seasonsMap.get(a.season_id)?.name : null) || 'Sezon';
+      return {
+        seasonId: a.season_id,
+        seasonName: sName,
+      };
+    });
 
   const tabs = [
     { id: 'genel', label: 'GENEL' },
@@ -890,6 +900,46 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
           {/* BASARILAR TAB */}
           {activeTab === 'basarilar' && (
             <div className="space-y-4">
+              {/* BALLON D'OR SHOWCASE (Sadece kazanan oyuncularda gösterilir) */}
+              {ballonDorWins.length > 0 && (
+                <div className="relative overflow-hidden rounded-2xl border border-amber-400/40 bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-amber-500/20 p-6 lg:p-8 shadow-[0_0_35px_rgba(245,158,11,0.2)] mb-8">
+                  <div className="absolute -right-8 -top-8 w-40 h-40 bg-yellow-400/10 rounded-full blur-3xl pointer-events-none" />
+                  <div className="relative flex flex-col sm:flex-row items-center justify-between gap-6">
+                    <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-amber-400/30 to-yellow-600/20 border border-amber-400/50 flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(251,191,36,0.3)]">
+                        <span className="text-3xl sm:text-4xl drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]">👑</span>
+                      </div>
+                      <div>
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1.5">
+                          <span className="text-[10px] font-black tracking-widest text-amber-400 bg-amber-400/10 px-2.5 py-0.5 rounded-full border border-amber-400/30 uppercase">
+                            TETA LEAGUE PRESTİJ ÖDÜLÜ
+                          </span>
+                        </div>
+                        <h2 className="text-2xl sm:text-3xl font-[900] text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-400 tracking-wider uppercase">
+                          BALLON D'OR{ballonDorWins.length > 1 ? ` ×${ballonDorWins.length}` : ''}
+                        </h2>
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2.5">
+                          {ballonDorWins.map((w: any, idx: number) => (
+                            <span
+                              key={idx}
+                              className="px-2.5 py-1 rounded-lg bg-black/60 border border-amber-400/30 text-[11px] font-black text-amber-300 tracking-wider uppercase"
+                            >
+                              {w.seasonName}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-center sm:text-right shrink-0">
+                      <div className="text-[10px] font-black text-zinc-400 tracking-widest uppercase mb-1">DÜNYANIN EN İYİSİ</div>
+                      <div className="text-2xl font-[900] text-amber-400 font-mono tracking-tight">
+                        {ballonDorWins.length} ÖDÜL
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <h2 className="text-[14px] font-[900] text-gray-500 tracking-widest uppercase mb-3">KİŞİSEL BAŞARIMLAR</h2>
               <div className="bg-[#03070c] border border-white/5 rounded-2xl p-6 lg:p-10 mb-8">
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">

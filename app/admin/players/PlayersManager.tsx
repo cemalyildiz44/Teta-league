@@ -284,6 +284,7 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
       case 'MATCH_POTM': return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20';
       case 'MONTH_POTM': return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
       case 'POTS': return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40';
+      case 'BALLON_DOR': return 'bg-amber-400/20 text-amber-300 border-amber-400/40 shadow-[0_0_10px_rgba(251,191,36,0.2)]';
       case 'KARMA_WINNER': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
       case '1V1_WINNER': return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
       case 'NIGHT_CUP_WINNER': return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20';
@@ -755,7 +756,7 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
                         key={ach.id}
                         className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border ${getAchievementBadgeColor(ach.achievement_type)}`}
                       >
-                        {ach.achievement_type.replace('_', ' ')}
+                        {ach.achievement_type === 'BALLON_DOR' ? "Ballon d'Or" : ach.achievement_type.replace('_', ' ')}
                       </span>
                     ))}
                   </div>
