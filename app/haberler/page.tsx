@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { Newspaper, Calendar, ArrowRight } from 'lucide-react';
 import { NewsArticle } from '@/types/news';
 import NewsImage from '@/components/NewsImage';
+import NewsContent from '@/components/NewsContent';
+import { extractMentionCandidates, getValidMentionUsernames } from '@/utils/mentions';
 
 export const metadata = {
   title: 'Haberler & Duyurular | TETA League',
@@ -34,6 +36,11 @@ export default async function HaberlerPage({
 
   const { data: newsList } = await query;
   const articles: NewsArticle[] = (newsList as any) || [];
+
+  // Batch fetch valid mention usernames across all articles on the page in 1 single query
+  const allTexts = articles.map((a) => `${a.title || ''} ${a.summary || ''}`);
+  const mentionCandidates = extractMentionCandidates(allTexts);
+  const validUsernames = await getValidMentionUsernames(mentionCandidates, supabase);
 
   const categories = [
     { label: 'TÜMÜ', value: 'ALL' },
@@ -110,18 +117,19 @@ export default async function HaberlerPage({
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {articles.map((item) => (
-              <Link
+              <div
                 key={item.id}
-                href={`/haberler/${item.slug}`}
                 className="group flex flex-col overflow-hidden rounded-2xl bg-gradient-to-b from-[#0a1628] to-[#040a14] border border-white/5 hover:border-[#00e5ff]/40 transition-all duration-300 hover:shadow-[0_0_30px_rgba(0,229,255,0.15)] hover:-translate-y-1"
               >
                 {/* Image */}
-                <NewsImage
-                  src={item.image_url}
-                  alt={item.title}
-                  category={item.category}
-                  variant="card"
-                />
+                <Link href={`/haberler/${item.slug}`} className="block">
+                  <NewsImage
+                    src={item.image_url}
+                    alt={item.title}
+                    category={item.category}
+                    variant="card"
+                  />
+                </Link>
 
                 {/* Content */}
                 <div className="p-6 flex flex-col flex-1 space-y-3">
@@ -136,22 +144,32 @@ export default async function HaberlerPage({
                     </span>
                   </div>
 
-                  <h2 className="text-lg font-bold text-white group-hover:text-[#00e5ff] transition-colors line-clamp-2 leading-snug">
-                    {item.title}
+                  <h2 className="text-lg font-bold text-white leading-snug">
+                    <Link
+                      href={`/haberler/${item.slug}`}
+                      className="hover:text-[#00e5ff] transition-colors line-clamp-2"
+                    >
+                      {item.title}
+                    </Link>
                   </h2>
 
                   {item.summary && (
                     <p className="text-gray-400 text-xs sm:text-sm font-medium line-clamp-3 leading-relaxed flex-1">
-                      {item.summary}
+                      <NewsContent content={item.summary} validUsernames={validUsernames} />
                     </p>
                   )}
 
-                  <div className="pt-3 mt-auto border-t border-white/5 flex items-center justify-between text-xs font-bold text-[#00e5ff] group-hover:translate-x-1 transition-transform">
-                    <span>Devamını Oku</span>
-                    <ArrowRight className="w-4 h-4" />
+                  <div className="pt-3 mt-auto border-t border-white/5 flex items-center justify-between text-xs font-bold text-[#00e5ff]">
+                    <Link
+                      href={`/haberler/${item.slug}`}
+                      className="inline-flex items-center gap-1.5 hover:underline group-hover:translate-x-1 transition-transform"
+                    >
+                      <span>Devamını Oku</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </Link>
                   </div>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}

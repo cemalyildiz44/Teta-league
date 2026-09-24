@@ -14,6 +14,7 @@ import {
   togglePublishNewsAction 
 } from './actions';
 import { NewsArticle } from '@/types/news';
+import MentionTextarea from '@/components/MentionTextarea';
 
 interface NewsManagerProps {
   initialNews: NewsArticle[];
@@ -373,26 +374,32 @@ export function NewsManager({ initialNews }: NewsManagerProps) {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-1.5">
-                  Özet (Kısa Açıklama)
-                </label>
-                <textarea
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider">
+                    Özet (Kısa Açıklama)
+                  </label>
+                  <span className="text-[10px] text-[#00e5ff]/70 font-semibold">@ ile oyuncu etiketleyebilirsiniz</span>
+                </div>
+                <MentionTextarea
                   name="summary"
                   rows={2}
-                  placeholder="Ana sayfa ve kartlarda gösterilecek kısa özet..."
+                  placeholder="Ana sayfa ve kartlarda gösterilecek kısa özet... (Örn: Tebrikler @kullanici)"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/10 text-white text-sm focus:outline-none focus:border-[#00e5ff]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-1.5">
-                  Haber İçeriği *
-                </label>
-                <textarea
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider">
+                    Haber İçeriği *
+                  </label>
+                  <span className="text-[10px] text-[#00e5ff]/70 font-semibold">@ ile oyuncu etiketleyebilirsiniz</span>
+                </div>
+                <MentionTextarea
                   name="content"
                   rows={8}
                   required
-                  placeholder="Haberin tam detayları..."
+                  placeholder="Haberin tam detayları... (Örn: Sezon 5 şampiyonu @kullanici)"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/10 text-white text-sm focus:outline-none focus:border-[#00e5ff]"
                 />
               </div>
@@ -521,10 +528,13 @@ export function NewsManager({ initialNews }: NewsManagerProps) {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-1.5">
-                  Özet (Kısa Açıklama)
-                </label>
-                <textarea
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider">
+                    Özet (Kısa Açıklama)
+                  </label>
+                  <span className="text-[10px] text-[#00e5ff]/70 font-semibold">@ ile oyuncu etiketleyebilirsiniz</span>
+                </div>
+                <MentionTextarea
                   name="summary"
                   rows={2}
                   defaultValue={editingNews.summary || ''}
@@ -533,10 +543,13 @@ export function NewsManager({ initialNews }: NewsManagerProps) {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-1.5">
-                  Haber İçeriği *
-                </label>
-                <textarea
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider">
+                    Haber İçeriği *
+                  </label>
+                  <span className="text-[10px] text-[#00e5ff]/70 font-semibold">@ ile oyuncu etiketleyebilirsiniz</span>
+                </div>
+                <MentionTextarea
                   name="content"
                   rows={8}
                   defaultValue={editingNews.content}

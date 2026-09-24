@@ -3,6 +3,8 @@ import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { Newspaper } from 'lucide-react';
 import NewsImage from '@/components/NewsImage';
+import NewsContent from '@/components/NewsContent';
+import { extractMentionCandidates, getValidMentionUsernames } from '@/utils/mentions';
 
 export default async function NewsSection() {
   const cookieStore = await cookies();
@@ -16,6 +18,11 @@ export default async function NewsSection() {
     .limit(2);
 
   const news = newsList || [];
+
+  // Batch fetch valid mention usernames across all home page news items (1 query, no N+1)
+  const allTexts = news.map((item) => `${item.title || ''} ${item.summary || ''}`);
+  const mentionCandidates = extractMentionCandidates(allTexts);
+  const validUsernames = await getValidMentionUsernames(mentionCandidates, supabase);
 
   return (
     <div className="space-y-4 sm:space-y-5">
@@ -42,30 +49,33 @@ export default async function NewsSection() {
             });
 
             return (
-              <Link
+              <div
                 key={item.id}
-                href={`/haberler/${item.slug}`}
-                className="client-glass-interactive group overflow-hidden flex flex-col h-full border border-white/5 hover:border-[#00E5FF]/40 transition-all rounded-xl cursor-pointer"
+                className="client-glass-interactive group overflow-hidden flex flex-col h-full border border-white/5 hover:border-[#00E5FF]/40 transition-all rounded-xl"
               >
-                <NewsImage
-                  src={item.image_url}
-                  alt={item.title}
-                  category={item.category}
-                  variant="card"
-                />
+                <Link href={`/haberler/${item.slug}`} className="block">
+                  <NewsImage
+                    src={item.image_url}
+                    alt={item.title}
+                    category={item.category}
+                    variant="card"
+                  />
+                </Link>
 
                 <div className="p-4 sm:p-5 flex flex-col flex-1 bg-gradient-to-b from-[#050a0f] to-[#01060b]">
                   <span className="data-label mb-1.5 block !text-[10px]">{formattedDate}</span>
-                  <h3 className="text-[17px] sm:text-[18px] md:text-[19px] font-[800] text-white leading-snug mb-2 group-hover:text-[#00E5FF] transition-colors line-clamp-2 drop-shadow-md">
-                    {item.title}
+                  <h3 className="text-[17px] sm:text-[18px] md:text-[19px] font-[800] text-white leading-snug mb-2 drop-shadow-md">
+                    <Link href={`/haberler/${item.slug}`} className="hover:text-[#00E5FF] transition-colors line-clamp-2">
+                      {item.title}
+                    </Link>
                   </h3>
                   {item.summary && (
                     <p className="text-gray-400 text-xs sm:text-[13px] font-medium line-clamp-2 mt-auto leading-relaxed">
-                      {item.summary}
+                      <NewsContent content={item.summary} validUsernames={validUsernames} />
                     </p>
                   )}
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>

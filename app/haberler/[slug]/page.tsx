@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { ArrowLeft, Calendar, User, Newspaper, Clock, Share2 } from 'lucide-react';
 import type { Metadata } from 'next';
 import NewsImage from '@/components/NewsImage';
+import NewsContent from '@/components/NewsContent';
+import { extractMentionCandidates, getValidMentionUsernames } from '@/utils/mentions';
 
 interface NewsDetailPageProps {
   params: Promise<{ slug: string }>;
@@ -86,6 +88,10 @@ export default async function NewsDetailPage({ params }: NewsDetailPageProps) {
     year: 'numeric',
   });
 
+  // Batch fetch valid mention usernames across article (single query, no N+1)
+  const mentionCandidates = extractMentionCandidates([news.title, news.summary, news.content]);
+  const validUsernames = await getValidMentionUsernames(mentionCandidates, supabase);
+
   return (
     <div className="min-h-screen bg-[#03070C] text-white py-10 px-4 lg:px-6">
       <article className="max-w-[1000px] mx-auto space-y-8">
@@ -131,7 +137,7 @@ export default async function NewsDetailPage({ params }: NewsDetailPageProps) {
 
           {news.summary && (
             <p className="text-gray-300 text-base sm:text-lg font-medium leading-relaxed border-l-2 border-[#00e5ff] pl-4 py-1 bg-[#00e5ff]/5 rounded-r-xl">
-              {news.summary}
+              <NewsContent content={news.summary} validUsernames={validUsernames} />
             </p>
           )}
         </div>
@@ -148,7 +154,7 @@ export default async function NewsDetailPage({ params }: NewsDetailPageProps) {
         {/* Article Body */}
         <div className="bg-[#060d18] border border-white/5 rounded-3xl p-6 sm:p-10 text-gray-300 leading-relaxed space-y-6 text-base sm:text-lg">
           <div className="whitespace-pre-line font-normal text-gray-200">
-            {news.content}
+            <NewsContent content={news.content} validUsernames={validUsernames} />
           </div>
         </div>
 

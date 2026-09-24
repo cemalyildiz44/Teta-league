@@ -259,3 +259,34 @@ export async function togglePublishNewsAction(id: string, newPublishedState: boo
 
   return { success: newPublishedState ? 'Haber yayınlandı.' : 'Haber yayından kaldırıldı.' };
 }
+
+export async function searchPlayersForMentionAction(query: string) {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!(await checkAdmin(supabase, user))) {
+    return { error: 'Yetkisiz erişim.', data: [] };
+  }
+
+  const cleanQuery = (query || '').trim().replace(/^@/, '');
+
+  let dbQuery = supabase
+    .from('profiles')
+    .select('id, username, full_name, avatar_url')
+    .not('username', 'is', null);
+
+  if (cleanQuery) {
+    dbQuery = dbQuery.ilike('username', `%${cleanQuery}%`);
+  }
+
+  const { data, error } = await dbQuery
+    .order('username', { ascending: true })
+    .limit(8);
+
+  if (error) {
+    return { error: error.message, data: [] };
+  }
+
+  return { data: (data || []) as Array<{ id: string; username: string; full_name: string | null; avatar_url: string | null }> };
+}
