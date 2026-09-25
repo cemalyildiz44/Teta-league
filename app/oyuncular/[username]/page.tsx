@@ -381,10 +381,11 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   
   const achievementCounts = {
     BALLON_DOR: 0,
+    POTS: 0,
+    TOTS: 0,
     TOTW: 0,
     MATCH_POTM: 0,
     MONTH_POTM: 0,
-    POTS: 0,
     KARMA_WINNER: 0,
     '1V1_WINNER': 0,
     NIGHT_CUP_WINNER: 0
@@ -411,6 +412,16 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   const potsWins = (playerAchievementsData || [])
     .filter((a: any) => a.achievement_type === 'POTS')
     .map((a: any) => a.seasons?.name || (a.season_id ? seasonsMap.get(a.season_id)?.name : null) || 'Sezon');
+
+  const totsWins = (playerAchievementsData || [])
+    .filter((a: any) => a.achievement_type === 'TOTS')
+    .map((a: any) => {
+      const sName = a.seasons?.name || (a.season_id ? seasonsMap.get(a.season_id)?.name : null) || 'Sezon';
+      return {
+        seasonId: a.season_id,
+        seasonName: sName,
+      };
+    });
 
   // Transfermarkt Stili Oyuncu Adı Altı Gerçek Kazanılan Kupalar / Başarılar
   interface PlayerTrophyBadge {
@@ -444,6 +455,17 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
       icon: '👑',
       count: achievementCounts.POTS,
       highlight: 'gold',
+    });
+  }
+
+  // 3. Sezonun Takımı (TOTS)
+  if (achievementCounts.TOTS > 0) {
+    earnedTrophies.push({
+      id: 'tots',
+      label: 'TOTS — Team of the Season',
+      icon: '🛡️',
+      count: achievementCounts.TOTS,
+      highlight: 'cyan',
     });
   }
 
@@ -603,10 +625,12 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                     {earnedTrophies.map((tr) => (
                       <div
                         key={tr.id}
-                        title={`${tr.count}x ${tr.label}`}
+                        title={tr.id === 'tots' ? (tr.count > 1 ? `${tr.count}x TOTS — Team of the Season` : 'TOTS — Team of the Season') : `${tr.count}x ${tr.label}`}
                         className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-lg border text-xs font-black transition-all cursor-default select-none ${
                           tr.highlight === 'gold'
                             ? 'bg-gradient-to-r from-amber-500/20 via-yellow-500/15 to-amber-500/10 border-amber-400/40 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
+                            : tr.highlight === 'cyan'
+                            ? 'bg-cyan-500/10 border-cyan-400/30 text-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.2)]'
                             : tr.highlight === 'emerald'
                             ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
                             : tr.highlight === 'purple'
@@ -627,6 +651,8 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                           className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black leading-none ${
                             tr.highlight === 'gold'
                               ? 'bg-amber-400 text-black shadow-sm font-black'
+                              : tr.highlight === 'cyan'
+                              ? 'bg-cyan-400 text-black shadow-sm font-black'
                               : 'bg-white/15 text-white'
                           }`}
                         >
@@ -1165,6 +1191,56 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                         )}
                         <div className="text-[14px] font-black text-yellow-400 font-mono tracking-tight mt-1">
                           {achievementCounts.POTS}x
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-[14px] font-black text-gray-700 tracking-wider mt-2">
+                        KİLİTLİ
+                      </div>
+                    )}
+                  </div>
+
+                  {/* SEZONUN TAKIMI (TOTS) */}
+                  <div
+                    className={`p-5 rounded-2xl border flex flex-col items-center justify-between text-center transition-all ${
+                      achievementCounts.TOTS > 0
+                        ? 'bg-gradient-to-br from-cyan-500/15 via-sky-950/20 to-[#03070c] border-cyan-400/40 shadow-[0_0_20px_rgba(6,182,212,0.18)] hover:border-cyan-400/70'
+                        : 'bg-white/[0.02] border-white/5 opacity-60'
+                    }`}
+                  >
+                    <div
+                      className={`w-12 h-12 mb-2 rounded-full flex items-center justify-center text-xl ${
+                        achievementCounts.TOTS > 0
+                          ? 'bg-cyan-500/20 border border-cyan-400/40 shadow-[0_0_10px_rgba(6,182,212,0.25)]'
+                          : 'bg-black/40 border border-white/10 text-gray-500'
+                      }`}
+                    >
+                      {/* Gelecekte gerçek TOTS asset'i eklendiğinde img olarak kullanılabilir */}
+                      {achievementCounts.TOTS > 0 ? '🛡️' : '🔒'}
+                    </div>
+                    <div
+                      className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${
+                        achievementCounts.TOTS > 0 ? 'text-white' : 'text-gray-500'
+                      }`}
+                    >
+                      TOTS
+                    </div>
+                    {achievementCounts.TOTS > 0 ? (
+                      <>
+                        {totsWins.length > 0 && (
+                          <div className="flex flex-wrap items-center justify-center gap-1 my-1">
+                            {totsWins.map((w: any, idx: number) => (
+                              <span
+                                key={idx}
+                                className="px-2 py-0.5 rounded bg-black/70 border border-cyan-400/30 text-[10px] font-black text-cyan-300 uppercase tracking-wider"
+                              >
+                                {w.seasonName}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="text-[14px] font-black text-cyan-400 font-mono tracking-tight mt-1">
+                          {achievementCounts.TOTS}x
                         </div>
                       </>
                     ) : (

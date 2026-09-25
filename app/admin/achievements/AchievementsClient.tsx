@@ -97,20 +97,21 @@ export default function AchievementsClient({ profiles, seasons, matches, achieve
                   <option value="MATCH_POTM">Maçın Oyuncusu (POTM)</option>
                   <option value="MONTH_POTM">Ayın Oyuncusu (POTM)</option>
                   <option value="POTS">Sezonun Oyuncusu (POTS)</option>
+                  <option value="TOTS">TOTS — Team of the Season</option>
                   <option value="BALLON_DOR">Ballon d'Or</option>
                 </select>
               </div>
 
               <div>
                 <label className="block text-[10px] font-[900] text-gray-500 tracking-widest uppercase mb-2">
-                  SEZON {selectedType === 'BALLON_DOR' ? '(ZORUNLU)' : '(OPSİYONEL/ÖNERİLEN)'}
+                  SEZON {(selectedType === 'BALLON_DOR' || selectedType === 'TOTS') ? '(ZORUNLU)' : '(OPSİYONEL/ÖNERİLEN)'}
                 </label>
                 <select
                   name="season_id"
-                  required={selectedType === 'BALLON_DOR'}
+                  required={selectedType === 'BALLON_DOR' || selectedType === 'TOTS'}
                   className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[14px] font-[700] text-white focus:outline-none focus:border-[#00e5ff]/50 transition-colors"
                 >
-                  <option value="">{selectedType === 'BALLON_DOR' ? 'Sezon Seçin (Zorunlu)...' : 'Sezon Seçin (Zorunlu Değil)...'}</option>
+                  <option value="">{(selectedType === 'BALLON_DOR' || selectedType === 'TOTS') ? 'Sezon Seçin (Zorunlu)...' : 'Sezon Seçin (Zorunlu Değil)...'}</option>
                   {seasons.map((s: any) => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
@@ -196,9 +197,10 @@ export default function AchievementsClient({ profiles, seasons, matches, achieve
                             ${a.achievement_type === 'MATCH_POTM' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : ''}
                             ${a.achievement_type === 'MONTH_POTM' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' : ''}
                             ${a.achievement_type === 'POTS' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' : ''}
+                            ${a.achievement_type === 'TOTS' ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40 shadow-[0_0_12px_rgba(6,182,212,0.25)]' : ''}
                             ${a.achievement_type === 'BALLON_DOR' ? 'bg-amber-400/20 text-amber-300 border-amber-400/40 shadow-[0_0_12px_rgba(251,191,36,0.25)]' : ''}
                           `}>
-                            {a.achievement_type === 'BALLON_DOR' ? "Ballon d'Or" : a.achievement_type}
+                            {a.achievement_type === 'BALLON_DOR' ? "Ballon d'Or" : a.achievement_type === 'TOTS' ? 'TOTS' : a.achievement_type}
                           </span>
                         </td>
                         <td className="py-4 px-4 text-xs font-medium text-gray-400">
