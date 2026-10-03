@@ -86,7 +86,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     supabase.from("team_memberships").select("*").eq("player_id", profile.id).order("joined_at", { ascending: false }),
     supabase.from("seasons").select("id, name, slug"),
     supabase.from("leagues").select("id, name, season_id"),
-    supabase.from('player_achievements').select('achievement_type, season_id, seasons(name, slug)').eq('player_id', profile.id),
+    supabase.from('player_achievements').select('achievement_type, season_id, season_name, seasons(name, slug)').eq('player_id', profile.id),
     supabase.from('player_legacy_career_stats').select('*').eq('player_id', profile.id).is('deleted_at', null).order('season_name', { ascending: false })
   ]);
 
@@ -402,7 +402,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   const ballonDorWins = (playerAchievementsData || [])
     .filter((a: any) => a.achievement_type === 'BALLON_DOR')
     .map((a: any) => {
-      const sName = a.seasons?.name || (a.season_id ? seasonsMap.get(a.season_id)?.name : null) || 'Sezon';
+      const sName = a.season_name || a.seasons?.name || (a.season_id ? seasonsMap.get(a.season_id)?.name : null) || 'Sezon';
       return {
         seasonId: a.season_id,
         seasonName: sName,
@@ -411,12 +411,12 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
 
   const potsWins = (playerAchievementsData || [])
     .filter((a: any) => a.achievement_type === 'POTS')
-    .map((a: any) => a.seasons?.name || (a.season_id ? seasonsMap.get(a.season_id)?.name : null) || 'Sezon');
+    .map((a: any) => a.season_name || a.seasons?.name || (a.season_id ? seasonsMap.get(a.season_id)?.name : null) || 'Sezon');
 
   const totsWins = (playerAchievementsData || [])
     .filter((a: any) => a.achievement_type === 'TOTS')
     .map((a: any) => {
-      const sName = a.seasons?.name || (a.season_id ? seasonsMap.get(a.season_id)?.name : null) || 'Sezon';
+      const sName = a.season_name || a.seasons?.name || (a.season_id ? seasonsMap.get(a.season_id)?.name : null) || 'Sezon';
       return {
         seasonId: a.season_id,
         seasonName: sName,

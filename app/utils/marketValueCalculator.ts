@@ -23,6 +23,7 @@ export interface MarketValueInput {
   achievements: {
     achievement_type: string;
     season_id?: string | null;
+    season_name?: string | null;
   }[];
 }
 
@@ -108,7 +109,7 @@ export function calculateMarketValue(input: MarketValueInput): MarketValueResult
   const countedPOTS = new Set<string>(); // Keep track of season_id to avoid duplicates if any
   for (const ach of input.achievements) {
     if (ach.achievement_type === 'POTS') {
-      const key = ach.season_id || 'unknown';
+      const key = ach.season_id || ach.season_name || 'unknown';
       if (!countedPOTS.has(key)) {
         countedPOTS.add(key);
         totalAchievementsBonus += 1_000_000;

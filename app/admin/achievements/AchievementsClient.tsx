@@ -25,7 +25,7 @@ export default function AchievementsClient({ profiles, seasons, matches, achieve
     const username = a.profile?.username?.toLowerCase() || '';
     const fullName = a.profile?.full_name?.toLowerCase() || '';
     const type = a.achievement_type?.toLowerCase() || '';
-    const season = a.season?.name?.toLowerCase() || '';
+    const season = (a.season_name || a.season?.name || '').toLowerCase();
     return username.includes(q) || fullName.includes(q) || type.includes(q) || season.includes(q);
   });
 
@@ -204,7 +204,7 @@ export default function AchievementsClient({ profiles, seasons, matches, achieve
                           </span>
                         </td>
                         <td className="py-4 px-4 text-xs font-medium text-gray-400">
-                          {a.season?.name && <span className="block">{a.season.name}</span>}
+                          {(a.season_name || a.season?.name) && <span className="block">{a.season_name || a.season.name}</span>}
                           {a.week_number && <span>Hafta {a.week_number} </span>}
                           {a.month_number && <span>Ay {a.month_number} </span>}
                           {a.match && <span className="block mt-1 truncate max-w-[200px]">{a.match.home_team?.name} vs {a.match.away_team?.name}</span>}

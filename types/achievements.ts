@@ -14,6 +14,7 @@ export interface PlayerAchievementRecord {
   player_id: string;
   achievement_type: AchievementType;
   season_id?: string | null;
+  season_name?: string | null;
   match_id?: string | null;
   week_number?: number | null;
   month_number?: number | null;

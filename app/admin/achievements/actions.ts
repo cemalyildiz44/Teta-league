@@ -29,8 +29,24 @@ export async function addAchievementAction(prevState: any, formData: FormData) {
 
     const player_id = formData.get('player_id') as string;
     const achievement_type = formData.get('achievement_type') as string;
-    const season_id = formData.get('season_id') as string;
+    const raw_season_value = (formData.get('season_id') as string) || '';
     
+    // Historical vs Real DB Season separation
+    let final_season_id: string | null = null;
+    let final_season_name: string | null = null;
+
+    if (raw_season_value) {
+      if (raw_season_value.startsWith('HISTORICAL:')) {
+        // Tarihsel sezon (Season 1–4): seasons tablosuna kayıt oluşturulmaz, etiket metni kaydedilir
+        final_season_id = null;
+        final_season_name = raw_season_value.replace('HISTORICAL:', '').trim();
+      } else {
+        // Gerçek DB sezonu (Season 5, 6 vb.): mevcut UUID sistemi aynen korunur
+        final_season_id = raw_season_value.trim();
+        final_season_name = null;
+      }
+    }
+
     // Opsiyonel alanlar
     const match_id = formData.get('match_id') as string;
     const week_number = formData.get('week_number') ? parseInt(formData.get('week_number') as string, 10) : null;
@@ -40,11 +56,13 @@ export async function addAchievementAction(prevState: any, formData: FormData) {
       return { error: 'Oyuncu ve başarı türü zorunludur.' };
     }
 
-    if (achievement_type === 'BALLON_DOR' && !season_id) {
+    const has_season = Boolean(final_season_id || final_season_name);
+
+    if (achievement_type === 'BALLON_DOR' && !has_season) {
       return { error: 'Ballon d\'Or için sezon seçimi zorunludur.' };
     }
 
-    if (achievement_type === 'TOTS' && !season_id) {
+    if (achievement_type === 'TOTS' && !has_season) {
       return { error: 'TOTS için sezon seçimi zorunludur.' };
     }
 
@@ -54,7 +72,8 @@ export async function addAchievementAction(prevState: any, formData: FormData) {
       awarded_by: user.id
     };
 
-    if (season_id) insertData.season_id = season_id;
+    if (final_season_id) insertData.season_id = final_season_id;
+    if (final_season_name) insertData.season_name = final_season_name;
     if (match_id) insertData.match_id = match_id;
     if (week_number) insertData.week_number = week_number;
     if (month_number) insertData.month_number = month_number;
