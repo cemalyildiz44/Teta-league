@@ -4,6 +4,8 @@ import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
+import { logAdminAudit } from '@/lib/audit';
+
 async function checkAdmin(supabase: any, user: any) {
   const { data: roleData } = await supabase
     .from('user_roles')
@@ -93,6 +95,18 @@ export async function addAchievementAction(prevState: any, formData: FormData) {
       return { error: 'Başarı eklenirken hata oluştu: ' + error.message };
     }
 
+    // Audit log
+    const { data: targetProf } = await supabase.from('profiles').select('username').eq('id', player_id).maybeSingle();
+    const targetLabel = targetProf?.username ? `@${targetProf.username}` : player_id;
+    await logAdminAudit({
+      action: 'ACHIEVEMENT_AWARD',
+      entity_type: 'player_achievements',
+      entity_label: targetLabel,
+      description: `${achievement_type} başarısı verildi (${final_season_name || raw_season_value || 'Genel'})`,
+      new_data: insertData,
+      actor_id: user.id,
+    });
+
     revalidatePath('/admin/achievements');
     revalidatePath('/oyuncular');
     return { success: 'Başarım başarıyla eklendi.' };
@@ -113,11 +127,29 @@ export async function deleteAchievementAction(id: string) {
       return { error: 'Bu işlemi yapmaya yetkiniz yok.' };
     }
 
+    const { data: targetAch } = await supabase
+      .from('player_achievements')
+      .select('id, achievement_type, season_name, profile:player_id(username)')
+      .eq('id', id)
+      .maybeSingle();
+    const targetLabel = (targetAch?.profile as any)?.username ? `@${(targetAch?.profile as any).username}` : id;
+
     const { error } = await supabase.from('player_achievements').delete().eq('id', id);
 
     if (error) {
       return { error: 'Silinirken hata oluştu: ' + error.message };
     }
+
+    // Audit log
+    await logAdminAudit({
+      action: 'ACHIEVEMENT_DELETE',
+      entity_type: 'player_achievements',
+      entity_id: id,
+      entity_label: targetLabel,
+      description: `${targetAch?.achievement_type || 'Başarım'} silindi`,
+      old_data: targetAch,
+      actor_id: user.id,
+    });
 
     revalidatePath('/admin/achievements');
     revalidatePath('/oyuncular');

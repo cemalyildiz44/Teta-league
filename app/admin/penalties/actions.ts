@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { logAdminAudit } from '@/lib/audit';
 
 // ──────────────────────────────────────────────────
 // Auth helper — same pattern used across admin actions
@@ -106,7 +107,7 @@ export async function issuePenaltyAction(formData: FormData) {
     // 5. Verify team is registered in this league+season
     const { data: leagueTeam, error: ltErr } = await supabase
       .from('league_teams')
-      .select('id, team_id, league_id, season_id')
+      .select('id, team_id, league_id, season_id, teams(name)')
       .eq('league_id', leagueId)
       .eq('season_id', seasonId)
       .eq('team_id', teamId)
@@ -221,6 +222,24 @@ export async function issuePenaltyAction(formData: FormData) {
       EXPULSION: 'İHRAÇ',
     };
 
+    const teamName = (leagueTeam.teams as any)?.name || 'Takım';
+    await logAdminAudit({
+      action: 'ISSUE_PENALTY',
+      entity_type: 'team_penalties',
+      entity_id: teamId,
+      entity_label: `${teamName} (İhlal #${escalation.violation_order})`,
+      new_data: {
+        penalty_type: escalation.penalty_type,
+        points_deducted: escalation.points_deducted,
+        violation_order: escalation.violation_order,
+        reason,
+        match_id: matchId,
+        target_user_id: targetUserId,
+      },
+      description: `${teamName} takımına ${typeLabels[escalation.penalty_type]} cezası verildi (Gerekçe: ${reason.slice(0, 80)})`,
+      actor_id: user.id
+    });
+
     return {
       success: `Ceza başarıyla verildi: ${typeLabels[escalation.penalty_type]} — İhlal #${escalation.violation_order}`,
     };
@@ -263,7 +282,7 @@ export async function revokePenaltyAction(formData: FormData) {
     // 4. Fetch penalty
     const { data: penalty, error: fetchErr } = await supabase
       .from('team_penalties')
-      .select('id, is_revoked')
+      .select('id, team_id, season_id, penalty_type, points_deducted, violation_order, is_revoked, teams(name)')
       .eq('id', penaltyId)
       .maybeSingle();
 
@@ -291,6 +310,18 @@ export async function revokePenaltyAction(formData: FormData) {
       console.error('revokePenaltyAction update error:', updateErr);
       return { error: `Ceza iptal edilemedi: ${updateErr.message}` };
     }
+
+    const teamName = (penalty.teams as any)?.name || 'Takım';
+    await logAdminAudit({
+      action: 'REVOKE_PENALTY',
+      entity_type: 'team_penalties',
+      entity_id: penaltyId,
+      entity_label: `${teamName} (İhlal #${penalty.violation_order})`,
+      old_data: { is_revoked: false },
+      new_data: { is_revoked: true, revocation_reason: revocationReason },
+      description: `${teamName} takımının cezası iptal edildi (Gerekçe: ${revocationReason.slice(0, 80)})`,
+      actor_id: user.id
+    });
 
     // 7. Revalidate
     revalidatePath('/admin/penalties');

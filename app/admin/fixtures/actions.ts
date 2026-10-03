@@ -4,6 +4,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { logAdminAudit } from '@/lib/audit';
 
 export interface TeamRef {
   id: string;
@@ -141,6 +142,25 @@ export async function generateLeagueFixturesAction(seasonId: string, leagueId: s
     return { error: 'Fikstür kaydedilirken bir hata oluştu: ' + insertError.message };
   }
 
+  const { data: leagueData } = await supabase.from('leagues').select('name').eq('id', leagueId).maybeSingle();
+  const leagueName = leagueData?.name || leagueId;
+
+  await logAdminAudit({
+    action: 'GENERATE_LEAGUE_FIXTURES',
+    entity_type: 'fixtures',
+    entity_id: leagueId,
+    entity_label: `${leagueName} (${rowsToInsert.length} Maç)`,
+    new_data: {
+      season_id: seasonId,
+      league_id: leagueId,
+      match_count: rowsToInsert.length,
+      double_round: doubleRound,
+      start_date: startDateStr,
+    },
+    description: `"${leagueName}" ligi için ${rowsToInsert.length} maçlık fikstür oluşturuldu.`,
+    actor_id: user.id
+  });
+
   revalidatePath('/admin/fixtures');
   return { success: 'Fikstür başarıyla oluşturuldu.', totalMatches: rowsToInsert.length };
 }
@@ -151,8 +171,26 @@ export async function updateFixtureDateAction(fixtureId: string, newDateStr: str
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: 'Giriş yapmalısınız.' };
 
-  const { error } = await supabase.from('fixtures').update({ scheduled_at: new Date(newDateStr).toISOString(), updated_at: new Date().toISOString() }).eq('id', fixtureId);
+  const { data: currentFixture } = await supabase
+    .from('fixtures')
+    .select('id, scheduled_at, week_number')
+    .eq('id', fixtureId)
+    .maybeSingle();
+
+  const newIsoDate = new Date(newDateStr).toISOString();
+  const { error } = await supabase.from('fixtures').update({ scheduled_at: newIsoDate, updated_at: new Date().toISOString() }).eq('id', fixtureId);
   if (error) return { error: 'Tarih güncellenemedi: ' + error.message };
+
+  await logAdminAudit({
+    action: 'UPDATE_FIXTURE_DATE',
+    entity_type: 'fixtures',
+    entity_id: fixtureId,
+    entity_label: `Hafta ${currentFixture?.week_number || ''} Fikstürü`,
+    old_data: { scheduled_at: currentFixture?.scheduled_at },
+    new_data: { scheduled_at: newIsoDate },
+    description: `Fikstür tarihi güncellendi: ${newDateStr}`,
+    actor_id: user.id
+  });
 
   revalidatePath('/admin/fixtures');
   return { success: 'Fikstür tarihi başarıyla güncellendi.' };
@@ -164,8 +202,25 @@ export async function cancelFixtureAction(fixtureId: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: 'Giriş yapmalısınız.' };
 
+  const { data: currentFixture } = await supabase
+    .from('fixtures')
+    .select('id, status, week_number')
+    .eq('id', fixtureId)
+    .maybeSingle();
+
   const { error } = await supabase.from('fixtures').update({ status: 'CANCELLED', updated_at: new Date().toISOString() }).eq('id', fixtureId);
   if (error) return { error: 'Fikstür iptal edilemedi: ' + error.message };
+
+  await logAdminAudit({
+    action: 'CANCEL_FIXTURE',
+    entity_type: 'fixtures',
+    entity_id: fixtureId,
+    entity_label: `Hafta ${currentFixture?.week_number || ''} Fikstürü`,
+    old_data: { status: currentFixture?.status },
+    new_data: { status: 'CANCELLED' },
+    description: `Fikstür iptal edildi.`,
+    actor_id: user.id
+  });
 
   revalidatePath('/admin/fixtures');
   return { success: 'Fikstür iptal edildi.' };
@@ -177,11 +232,27 @@ export async function deleteFixtureAction(fixtureId: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: 'Giriş yapmalısınız.' };
 
+  const { data: currentFixture } = await supabase
+    .from('fixtures')
+    .select('id, week_number, scheduled_at, league_id')
+    .eq('id', fixtureId)
+    .maybeSingle();
+
   const { error } = await supabase.from('fixtures').delete().eq('id', fixtureId);
   if (error) {
     if (error.code === '23503') return { error: 'Bu fikstüre bağlı maç/veri bulunduğu için silinemez.' };
     return { error: 'Fikstür silinemedi: ' + error.message };
   }
+
+  await logAdminAudit({
+    action: 'DELETE_FIXTURE',
+    entity_type: 'fixtures',
+    entity_id: fixtureId,
+    entity_label: `Hafta ${currentFixture?.week_number || ''} Fikstürü`,
+    old_data: currentFixture,
+    description: `Fikstür kaydı silindi.`,
+    actor_id: user.id
+  });
 
   revalidatePath('/admin/fixtures');
   return { success: 'Fikstür başarıyla silindi.' };

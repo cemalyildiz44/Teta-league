@@ -4,6 +4,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { logAdminAudit } from '@/lib/audit';
 
 async function checkAdmin(supabase: any, user: any) {
   if (!user) return false;
@@ -62,6 +63,16 @@ export async function create1V1WinnerAction(formData: FormData) {
 
   if (winError) return { error: 'Kazanan eklenemedi: ' + winError.message };
 
+  await logAdminAudit({
+    action: 'CREATE_TOURNAMENT_1V1',
+    entity_type: 'tournaments',
+    entity_id: tourData.id,
+    entity_label: name,
+    new_data: { name, season_id, profile_id, type: '1V1' },
+    description: `"${name}" 1V1 turnuvası ve kazananı eklendi.`,
+    actor_id: user?.id
+  });
+
   revalidatePath('/admin/tournaments');
   revalidatePath('/turnuvalar');
   revalidatePath('/oyuncular/[username]', 'page');
@@ -109,6 +120,16 @@ export async function createKarmaWinnerAction(formData: FormData) {
   const { error: winError } = await supabase.from('tournament_winners').insert(winnersToInsert);
 
   if (winError) return { error: 'Kazananlar eklenemedi: ' + winError.message };
+
+  await logAdminAudit({
+    action: 'CREATE_TOURNAMENT_KARMA',
+    entity_type: 'tournaments',
+    entity_id: tourData.id,
+    entity_label: name,
+    new_data: { name, season_id, type: 'KARMA', winners_count: 11 },
+    description: `"${name}" Karma turnuvası ve 11 kişilik kadrosu eklendi.`,
+    actor_id: user?.id
+  });
 
   revalidatePath('/admin/tournaments');
   revalidatePath('/turnuvalar');
@@ -160,6 +181,15 @@ export async function createNightCupAction(formData: FormData) {
 
   if (error) return { error: 'Night Cup oluşturulamadı: ' + error.message };
 
+  await logAdminAudit({
+    action: 'CREATE_TOURNAMENT_NIGHT_CUP',
+    entity_type: 'tournaments',
+    entity_label: name,
+    new_data: { name, season_id, type: 'NIGHT_CUP', max_teams },
+    description: `"${name}" Night Cup turnuvası oluşturuldu.`,
+    actor_id: user?.id
+  });
+
   revalidatePath('/admin/tournaments');
   revalidatePath('/turnuvalar');
   return { success: 'Night Cup başarıyla oluşturuldu.' };
@@ -175,6 +205,16 @@ export async function updateNightCupApplicationStatusAction(application_id: stri
   
   if (error) return { error: 'Başvuru durumu güncellenemedi.' };
   
+  await logAdminAudit({
+    action: 'UPDATE_TOURNAMENT_APPLICATION',
+    entity_type: 'tournament_applications',
+    entity_id: application_id,
+    entity_label: `Başvuru #${application_id.substring(0, 8)}`,
+    new_data: { status },
+    description: `Night Cup başvurusu (#${application_id.substring(0, 8)}) durumu "${status}" yapıldı.`,
+    actor_id: user?.id
+  });
+
   revalidatePath('/admin/tournaments');
   return { success: 'Başvuru başarıyla güncellendi.' };
 }
@@ -197,6 +237,16 @@ export async function assignNightCupWinnerAction(tournament_id: string, applicat
 
   if (error) return { error: 'Kazanan eklenemedi: ' + error.message };
 
+  await logAdminAudit({
+    action: 'ASSIGN_TOURNAMENT_WINNER',
+    entity_type: 'tournaments',
+    entity_id: tournament_id,
+    entity_label: `Turnuva #${tournament_id.substring(0, 8)}`,
+    new_data: { tournament_id, application_id },
+    description: `Night Cup (#${tournament_id.substring(0, 8)}) kazananı belirlendi.`,
+    actor_id: user?.id
+  });
+
   revalidatePath('/admin/tournaments');
   revalidatePath('/turnuvalar');
   return { success: 'Night Cup kazananı kaydedildi.' };
@@ -208,8 +258,19 @@ export async function deleteTournamentAction(id: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!(await checkAdmin(supabase, user))) return { error: 'Yetkisiz erişim.' };
 
+  const { data: tour } = await supabase.from('tournaments').select('name').eq('id', id).maybeSingle();
+
   const { error } = await supabase.from('tournaments').delete().eq('id', id);
   if (error) return { error: 'Turnuva silinemedi: ' + error.message };
+
+  await logAdminAudit({
+    action: 'DELETE_TOURNAMENT',
+    entity_type: 'tournaments',
+    entity_id: id,
+    entity_label: tour?.name || 'Turnuva',
+    description: `"${tour?.name || 'Turnuva'}" silindi.`,
+    actor_id: user?.id
+  });
 
   revalidatePath('/admin/tournaments');
   revalidatePath('/turnuvalar');
@@ -291,6 +352,16 @@ export async function updateNightCupDetailsAction(formData: FormData) {
   if (updateError) {
     return { error: 'Turnuva güncellenemedi: ' + updateError.message };
   }
+
+  await logAdminAudit({
+    action: 'UPDATE_TOURNAMENT_DETAILS',
+    entity_type: 'tournaments',
+    entity_id: tournament_id,
+    entity_label: name.trim(),
+    new_data: { name: name.trim(), max_teams: parsedMaxTeams, is_registration_open },
+    description: `"${name.trim()}" Night Cup detayları güncellendi.`,
+    actor_id: user?.id
+  });
 
   revalidatePath('/admin/tournaments');
   revalidatePath('/turnuvalar');

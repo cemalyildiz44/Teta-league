@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { logAdminAudit } from '@/lib/audit';
 
 async function checkAdmin(supabase: any, user: any) {
   if (!user) return false;
@@ -63,6 +64,16 @@ export async function createTransferWindow(formData: FormData) {
     return { error: 'Transfer penceresi oluşturulamadı: ' + error.message };
   }
 
+  await logAdminAudit({
+    action: 'CREATE_TRANSFER_WINDOW',
+    entity_type: 'transfer_windows',
+    entity_id: season_id,
+    entity_label: name,
+    new_data: { season_id, name, start_date: startDate.toISOString(), end_date: endDate.toISOString(), is_open, is_unlimited },
+    description: `"${name}" transfer penceresi oluşturuldu.`,
+    actor_id: user.id
+  });
+
   revalidatePath('/admin/transfer-windows');
   revalidatePath('/takim/yonet');
   revalidatePath('/profil/transferler');
@@ -114,6 +125,16 @@ export async function updateTransferWindow(formData: FormData) {
     return { error: 'Transfer penceresi güncellenemedi: ' + error.message };
   }
 
+  await logAdminAudit({
+    action: 'UPDATE_TRANSFER_WINDOW',
+    entity_type: 'transfer_windows',
+    entity_id: id,
+    entity_label: name,
+    new_data: { season_id, name, start_date: startDate.toISOString(), end_date: endDate.toISOString(), is_open, is_unlimited },
+    description: `"${name}" transfer penceresi güncellendi.`,
+    actor_id: user?.id
+  });
+
   revalidatePath('/admin/transfer-windows');
   revalidatePath('/takim/yonet');
   revalidatePath('/profil/transferler');
@@ -128,6 +149,8 @@ export async function toggleTransferWindow(id: string, newIsOpen: boolean) {
 
   if (!id) return { error: 'Pencere ID eksik.' };
 
+  const { data: win } = await supabase.from('transfer_windows').select('name').eq('id', id).maybeSingle();
+
   const { error } = await supabase.from('transfer_windows').update({
     is_open: newIsOpen,
     updated_at: new Date().toISOString()
@@ -137,6 +160,16 @@ export async function toggleTransferWindow(id: string, newIsOpen: boolean) {
     console.error('toggleTransferWindow error:', error);
     return { error: 'Durum değiştirilemedi: ' + error.message };
   }
+
+  await logAdminAudit({
+    action: newIsOpen ? 'OPEN_TRANSFER_WINDOW' : 'CLOSE_TRANSFER_WINDOW',
+    entity_type: 'transfer_windows',
+    entity_id: id,
+    entity_label: win?.name || 'Transfer Penceresi',
+    new_data: { is_open: newIsOpen },
+    description: `"${win?.name || 'Transfer Penceresi'}" ${newIsOpen ? 'açıldı' : 'kapatıldı'}.`,
+    actor_id: user?.id
+  });
 
   revalidatePath('/admin/transfer-windows');
   revalidatePath('/takim/yonet');
@@ -168,6 +201,8 @@ export async function deleteTransferWindow(id: string) {
     };
   }
 
+  const { data: win } = await supabase.from('transfer_windows').select('name').eq('id', id).maybeSingle();
+
   const { error } = await supabase.from('transfer_windows').delete().eq('id', id);
 
   if (error) {
@@ -176,6 +211,15 @@ export async function deleteTransferWindow(id: string) {
     }
     return { error: 'Transfer penceresi silinemedi: ' + error.message };
   }
+
+  await logAdminAudit({
+    action: 'DELETE_TRANSFER_WINDOW',
+    entity_type: 'transfer_windows',
+    entity_id: id,
+    entity_label: win?.name || 'Transfer Penceresi',
+    description: `"${win?.name || 'Transfer Penceresi'}" silindi.`,
+    actor_id: user?.id
+  });
 
   revalidatePath('/admin/transfer-windows');
   revalidatePath('/takim/yonet');

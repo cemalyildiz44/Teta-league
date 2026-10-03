@@ -4,6 +4,8 @@ import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
+import { logAdminAudit } from '@/lib/audit';
+
 function slugify(text: string): string {
   const trMap: Record<string, string> = {
     'ç': 'c', 'Ç': 'c',
@@ -91,7 +93,7 @@ export async function createNewsAction(formData: FormData) {
     final_image_url = urlData.publicUrl;
   }
 
-  const { error: insertError } = await supabase.from('news').insert({
+  const { data: insertedNews, error: insertError } = await supabase.from('news').insert({
     title,
     slug,
     category,
@@ -101,7 +103,7 @@ export async function createNewsAction(formData: FormData) {
     is_published,
     published_at: new Date().toISOString(),
     author_id: user?.id || null,
-  });
+  }).select('id').single();
 
   if (insertError) {
     if (insertError.code === '23505') {
@@ -109,6 +111,16 @@ export async function createNewsAction(formData: FormData) {
     }
     return { error: 'Haber oluşturulamadı: ' + insertError.message };
   }
+
+  await logAdminAudit({
+    action: 'NEWS_CREATE',
+    entity_type: 'news',
+    entity_id: insertedNews?.id || null,
+    entity_label: title,
+    description: `Yeni haber oluşturuldu: '${title}'`,
+    new_data: { title, slug, category, is_published },
+    actor_id: user?.id,
+  });
 
   revalidatePath('/');
   revalidatePath('/haberler');
@@ -192,6 +204,16 @@ export async function updateNewsAction(formData: FormData) {
     return { error: 'Haber güncellenemedi: ' + updateError.message };
   }
 
+  await logAdminAudit({
+    action: 'NEWS_UPDATE',
+    entity_type: 'news',
+    entity_id: id,
+    entity_label: title,
+    description: `Haber güncellendi: '${title}'`,
+    new_data: { title, slug, category, is_published },
+    actor_id: user?.id,
+  });
+
   revalidatePath('/');
   revalidatePath('/haberler');
   revalidatePath(`/haberler/${slug}`);
@@ -211,11 +233,23 @@ export async function deleteNewsAction(id: string) {
 
   if (!id) return { error: 'Haber ID bulunamadı.' };
 
+  const { data: oldNews } = await supabase.from('news').select('title').eq('id', id).maybeSingle();
+
   const { error } = await supabase.from('news').delete().eq('id', id);
 
   if (error) {
     return { error: 'Haber silinemedi: ' + error.message };
   }
+
+  await logAdminAudit({
+    action: 'NEWS_DELETE',
+    entity_type: 'news',
+    entity_id: id,
+    entity_label: oldNews?.title || id,
+    description: `Haber silindi: '${oldNews?.title || id}'`,
+    old_data: oldNews,
+    actor_id: user?.id,
+  });
 
   revalidatePath('/');
   revalidatePath('/haberler');
@@ -252,6 +286,18 @@ export async function togglePublishNewsAction(id: string, newPublishedState: boo
   if (error) {
     return { error: 'Durum güncellenemedi: ' + error.message };
   }
+
+  const { data: currentNews } = await supabase.from('news').select('title').eq('id', id).maybeSingle();
+
+  await logAdminAudit({
+    action: 'NEWS_TOGGLE_PUBLISH',
+    entity_type: 'news',
+    entity_id: id,
+    entity_label: currentNews?.title || id,
+    description: newPublishedState ? `Haber yayınlandı: '${currentNews?.title || id}'` : `Haber yayından kaldırıldı: '${currentNews?.title || id}'`,
+    new_data: { is_published: newPublishedState },
+    actor_id: user?.id,
+  });
 
   revalidatePath('/');
   revalidatePath('/haberler');

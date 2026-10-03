@@ -4,6 +4,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { logAdminAudit } from '@/lib/audit';
 
 async function checkAdmin(supabase: any, user: any) {
   if (!user) return false;
@@ -73,7 +74,7 @@ export async function createLeague(formData: FormData) {
     insertPayload.image_url = image_url;
   }
 
-  let { error } = await supabase.from('leagues').insert(insertPayload);
+  let { data: insertedLeague, error } = await supabase.from('leagues').insert(insertPayload).select('id').maybeSingle();
 
   if (error) {
     // Clean up uploaded image if DB insert failed
@@ -83,6 +84,16 @@ export async function createLeague(formData: FormData) {
     if (error.code === '23505') return { error: 'Bu sezonda aynı isimde veya seviyede lig zaten var.' };
     return { error: 'Lig oluşturulamadı: ' + error.message };
   }
+
+  await logAdminAudit({
+    action: 'CREATE_LEAGUE',
+    entity_type: 'leagues',
+    entity_id: insertedLeague?.id || null,
+    entity_label: name,
+    new_data: { name, season_id, level, max_teams, status: status || 'UPCOMING' },
+    description: `"${name}" adlı lig oluşturuldu.`,
+    actor_id: user?.id
+  });
 
   revalidatePath('/admin/leagues');
   revalidatePath('/ligler');
@@ -178,6 +189,17 @@ export async function editLeague(formData: FormData) {
     }
   }
 
+  await logAdminAudit({
+    action: 'UPDATE_LEAGUE',
+    entity_type: 'leagues',
+    entity_id: id,
+    entity_label: name,
+    old_data: currentLeague ? { image_url: oldImageUrl } : undefined,
+    new_data: updatePayload,
+    description: `"${name}" adlı lig güncellendi.`,
+    actor_id: user?.id
+  });
+
   revalidatePath('/admin/leagues');
   revalidatePath('/ligler');
   revalidatePath('/', 'layout');
@@ -190,8 +212,21 @@ export async function updateLeagueStatus(id: string, newStatus: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!(await checkAdmin(supabase, user))) return { error: 'Yetkisiz erişim.' };
 
+  const { data: currentLeague } = await supabase.from('leagues').select('name, status').eq('id', id).maybeSingle();
+
   const { error } = await supabase.from('leagues').update({ status: newStatus }).eq('id', id);
   if (error) return { error: 'Durum güncellenemedi.' };
+
+  await logAdminAudit({
+    action: newStatus === 'ACTIVE' ? 'ACTIVATE_LEAGUE' : (newStatus === 'COMPLETED' ? 'DEACTIVATE_LEAGUE' : 'UPDATE_LEAGUE_STATUS'),
+    entity_type: 'leagues',
+    entity_id: id,
+    entity_label: currentLeague?.name || id,
+    old_data: { status: currentLeague?.status },
+    new_data: { status: newStatus },
+    description: `"${currentLeague?.name || id}" liginin durumu ${newStatus} olarak güncellendi.`,
+    actor_id: user?.id
+  });
 
   revalidatePath('/admin/leagues');
   return { success: 'Lig durumu başarıyla güncellendi.' };
@@ -204,6 +239,14 @@ export async function assignTeamToLeague(league_id: string, season_id: string, t
   if (!(await checkAdmin(supabase, user))) return { error: 'Yetkisiz erişim.' };
 
   if (!season_id || !league_id || !team_id) return { error: 'Tüm alanlar zorunludur.' };
+
+  // Fetch league and team names for readable audit logs
+  const [{ data: leagueData }, { data: teamData }] = await Promise.all([
+    supabase.from('leagues').select('name').eq('id', league_id).maybeSingle(),
+    supabase.from('teams').select('name').eq('id', team_id).maybeSingle()
+  ]);
+  const leagueName = leagueData?.name || league_id;
+  const teamName = teamData?.name || team_id;
 
   // Check if league_teams entry already exists (e.g. inactive)
   const { data: existingLT } = await supabase
@@ -226,6 +269,16 @@ export async function assignTeamToLeague(league_id: string, season_id: string, t
 
     if (reactivateError) return { error: 'Takım tekrar lige eklenemedi: ' + reactivateError.message };
 
+    await logAdminAudit({
+      action: 'ASSIGN_TEAM_TO_LEAGUE',
+      entity_type: 'league_teams',
+      entity_id: existingLT.id,
+      entity_label: `${teamName} -> ${leagueName}`,
+      new_data: { league_id, season_id, team_id, league_name: leagueName, team_name: teamName, reactivated: true },
+      description: `"${teamName}" takımı "${leagueName}" ligine eklendi (yeniden aktifleştirildi).`,
+      actor_id: user?.id
+    });
+
     revalidatePath('/admin/leagues');
     revalidatePath('/admin/teams');
     revalidatePath('/admin/fixtures');
@@ -247,6 +300,16 @@ export async function assignTeamToLeague(league_id: string, season_id: string, t
     return { error: 'Takım eklenemedi: ' + error.message };
   }
 
+  await logAdminAudit({
+    action: 'ASSIGN_TEAM_TO_LEAGUE',
+    entity_type: 'league_teams',
+    entity_id: `${league_id}_${team_id}`,
+    entity_label: `${teamName} -> ${leagueName}`,
+    new_data: { league_id, season_id, team_id, league_name: leagueName, team_name: teamName },
+    description: `"${teamName}" takımı "${leagueName}" ligine atandı.`,
+    actor_id: user?.id
+  });
+
   revalidatePath('/admin/leagues');
   revalidatePath('/admin/teams');
   revalidatePath('/admin/fixtures');
@@ -262,6 +325,14 @@ export async function removeTeamFromLeague(league_id: string, team_id: string) {
   if (!(await checkAdmin(supabase, user))) return { error: 'Yetkisiz erişim.' };
 
   if (!league_id || !team_id) return { error: 'Lig ve Takım bilgisi zorunludur.' };
+
+  // Fetch league and team names for readable audit logs
+  const [{ data: leagueData }, { data: teamData }] = await Promise.all([
+    supabase.from('leagues').select('name').eq('id', league_id).maybeSingle(),
+    supabase.from('teams').select('name').eq('id', team_id).maybeSingle()
+  ]);
+  const leagueName = leagueData?.name || league_id;
+  const teamName = teamData?.name || team_id;
 
   // 1. Check if the team has matches in this league
   const { count: matchCount } = await supabase
@@ -307,6 +378,16 @@ export async function removeTeamFromLeague(league_id: string, team_id: string) {
     }
   }
 
+  await logAdminAudit({
+    action: 'REMOVE_TEAM_FROM_LEAGUE',
+    entity_type: 'league_teams',
+    entity_id: `${league_id}_${team_id}`,
+    entity_label: `${teamName} - ${leagueName}`,
+    old_data: { league_id, team_id, league_name: leagueName, team_name: teamName },
+    description: `"${teamName}" takımı "${leagueName}" liginden çıkarıldı.`,
+    actor_id: user?.id
+  });
+
   revalidatePath('/admin/leagues');
   revalidatePath('/admin/teams');
   revalidatePath('/admin/fixtures');
@@ -325,6 +406,15 @@ export async function saveLeagueRulesAction(league_id: string, rules: any) {
 
   const { error } = await supabase.from('leagues').update({ rules }).eq('id', league_id);
   if (error) return { error: 'Kurallar kaydedilemedi: ' + error.message };
+
+  await logAdminAudit({
+    action: 'UPDATE_LEAGUE_RULES',
+    entity_type: 'leagues',
+    entity_id: league_id,
+    new_data: { rules },
+    description: `Lig kuralları güncellendi.`,
+    actor_id: user?.id
+  });
 
   revalidatePath('/admin/leagues');
   revalidatePath('/ligler');

@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { slugify } from '@/app/lig/utils';
+import { logAdminAudit } from '@/lib/audit';
 
 async function checkAdmin(supabase: any, user: any) {
   if (!user) return false;
@@ -42,6 +43,17 @@ export async function reviewMatchAction(matchId: string, status: 'APPROVED' | 'R
 
   if (error) return { error: error.message };
 
+  await logAdminAudit({
+    action: status === 'APPROVED' ? 'APPROVE_MATCH' : `REVIEW_MATCH_${status}`,
+    entity_type: 'matches',
+    entity_id: matchId,
+    entity_label: `Maç #${matchId.substring(0, 8)}`,
+    old_data: { status: existingMatch.status },
+    new_data: { status },
+    description: `Maç (#${matchId.substring(0, 8)}) durumu "${existingMatch.status}" -> "${status}" olarak güncellendi.`,
+    actor_id: user.id
+  });
+
   // 3. Cache Invalidation: Revalidate necessary public paths and admin paths
   revalidatePath('/admin/matches');
 
@@ -78,6 +90,15 @@ export async function deleteMatchAction(matchId: string) {
   const { error } = await supabase.from('matches').delete().eq('id', matchId);
   if (error) return { error: 'Maç silinemedi: ' + error.message };
 
+  await logAdminAudit({
+    action: 'DELETE_MATCH',
+    entity_type: 'matches',
+    entity_id: matchId,
+    entity_label: `Maç #${matchId.substring(0, 8)}`,
+    description: `Maç (#${matchId.substring(0, 8)}) ve ilişkili istatistikleri silindi.`,
+    actor_id: user.id
+  });
+
   revalidatePath('/admin/matches');
   return { success: 'Maç başarıyla silindi.' };
 }
@@ -97,6 +118,17 @@ export async function updateMatchScoreAction(matchId: string, home_score: number
   }).eq('id', matchId);
 
   if (error) return { error: 'Skor güncellenemedi: ' + error.message };
+
+  await logAdminAudit({
+    action: 'UPDATE_MATCH_SCORE',
+    entity_type: 'matches',
+    entity_id: matchId,
+    entity_label: `Maç #${matchId.substring(0, 8)}`,
+    new_data: { home_score, away_score },
+    description: `Maç (#${matchId.substring(0, 8)}) skoru ${home_score} - ${away_score} olarak güncellendi.`,
+    actor_id: user.id
+  });
+
   revalidatePath('/admin/matches');
   return { success: 'Skor başarıyla güncellendi.' };
 }

@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { logAdminAudit } from '@/lib/audit';
 
 async function checkAdmin(supabase: any, user: any) {
   if (!user) return false;
@@ -97,6 +98,16 @@ export async function createTeam(formData: FormData) {
     if (error.code === '23505') return { error: 'Bu isimde veya slug ile bir takım zaten var.' };
     return { error: 'Takım oluşturulamadı: ' + error.message };
   }
+
+  await logAdminAudit({
+    action: 'CREATE_TEAM',
+    entity_type: 'teams',
+    entity_label: name,
+    new_data: { name, slug, ea_club_id, ea_club_name },
+    description: `"${name}" takımı oluşturuldu.`,
+    actor_id: user?.id
+  });
+
   revalidatePath('/admin/teams');
   revalidatePath('/takimlar');
   revalidatePath('/', 'layout');
@@ -201,6 +212,16 @@ export async function editTeam(formData: FormData) {
     }
   }
 
+  await logAdminAudit({
+    action: 'UPDATE_TEAM',
+    entity_type: 'teams',
+    entity_id: id,
+    entity_label: name,
+    new_data: updatePayload,
+    description: `"${name}" takımı güncellendi.`,
+    actor_id: user?.id
+  });
+
   revalidatePath('/admin/teams');
   revalidatePath('/takimlar');
   revalidatePath('/', 'layout');
@@ -213,8 +234,20 @@ export async function updateTeamStatus(id: string, is_active: boolean) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!(await checkAdmin(supabase, user))) return { error: 'Yetkisiz erişim.' };
 
+  const { data: team } = await supabase.from('teams').select('name').eq('id', id).maybeSingle();
+
   const { error } = await supabase.from('teams').update({ is_active }).eq('id', id);
   if (error) return { error: 'Durum güncellenemedi.' };
+
+  await logAdminAudit({
+    action: is_active ? 'ACTIVATE_TEAM' : 'DEACTIVATE_TEAM',
+    entity_type: 'teams',
+    entity_id: id,
+    entity_label: team?.name || 'Takım',
+    new_data: { is_active },
+    description: `"${team?.name || 'Takım'}" ${is_active ? 'aktif edildi' : 'pasif edildi'}.`,
+    actor_id: user?.id
+  });
 
   revalidatePath('/admin/teams');
   return { success: 'Takım durumu güncellendi.' };
@@ -237,9 +270,19 @@ export async function assignTeamCaptainAction(teamId: string, userId: string) {
 
   const { data: team } = await supabase
     .from('teams')
-    .select('slug')
+    .select('name, slug')
     .eq('id', teamId)
     .maybeSingle();
+
+  await logAdminAudit({
+    action: 'ASSIGN_CAPTAIN',
+    entity_type: 'teams',
+    entity_id: teamId,
+    entity_label: team?.name || team?.slug || 'Takım',
+    new_data: { teamId, userId },
+    description: `"${team?.name || 'Takım'}" takımına kaptan atandı.`,
+    actor_id: user.id
+  });
 
   revalidatePath('/admin/teams');
   revalidatePath('/takimlar');
@@ -266,9 +309,19 @@ export async function removeTeamCaptainAction(teamId: string, userId: string) {
 
   const { data: team } = await supabase
     .from('teams')
-    .select('slug')
+    .select('name, slug')
     .eq('id', teamId)
     .maybeSingle();
+
+  await logAdminAudit({
+    action: 'REMOVE_CAPTAIN',
+    entity_type: 'teams',
+    entity_id: teamId,
+    entity_label: team?.name || team?.slug || 'Takım',
+    new_data: { teamId, userId },
+    description: `"${team?.name || 'Takım'}" takımından kaptanlık yetkisi kaldırıldı.`,
+    actor_id: user.id
+  });
 
   revalidatePath('/admin/teams');
   revalidatePath('/takimlar');
@@ -490,6 +543,15 @@ export async function deleteTeamAction(teamId: string) {
     successMsg = `"${team.name}" takımı başarıyla tamamen silindi.`;
   }
 
+  await logAdminAudit({
+    action: 'DELETE_TEAM',
+    entity_type: 'teams',
+    entity_id: teamId,
+    entity_label: team.name,
+    description: successMsg,
+    actor_id: user?.id
+  });
+
   // 6. Comprehensive cache invalidation
   revalidatePath('/admin/teams');
   revalidatePath('/takimlar');
@@ -588,6 +650,16 @@ export async function forceDeleteTestTeamAction(teamId: string) {
 
   const teamName = rpcResult?.team_name || 'Test';
   const successMsg = `"${teamName}" test takımı ve tüm test kayıtları tek bir atomik işlemle veritabanından kalıcı olarak silindi.`;
+
+  await logAdminAudit({
+    action: 'FORCE_DELETE_TEST_TEAM',
+    entity_type: 'teams',
+    entity_id: teamId,
+    entity_label: teamName,
+    old_data: rpcResult,
+    description: successMsg,
+    actor_id: user?.id
+  });
 
   if (logoWarning) {
     return { success: successMsg, warning: logoWarning };

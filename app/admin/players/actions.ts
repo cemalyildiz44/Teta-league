@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { logAdminAudit } from '@/lib/audit';
 
 async function checkAdmin(supabase: any, user: any) {
   const { data: roleData } = await supabase
@@ -94,7 +95,7 @@ export async function updateBetaOldStatsAction(formData: FormData) {
     // Oyuncunun mevcut kaydını kontrol et
     const { data: existingProfile, error: profileErr } = await supabase
       .from('profiles')
-      .select('id, username')
+      .select('id, username, beta_old_stats')
       .eq('id', playerId)
       .maybeSingle();
 
@@ -115,6 +116,17 @@ export async function updateBetaOldStatsAction(formData: FormData) {
       console.error('Beta old stats update error:', updateErr);
       return { error: `Güncelleme başarısız: ${updateErr.message}` };
     }
+
+    await logAdminAudit({
+      action: 'UPDATE_BETA_STATS',
+      entity_type: 'profiles',
+      entity_id: playerId,
+      entity_label: `@${existingProfile.username}`,
+      old_data: existingProfile.beta_old_stats || null,
+      new_data: payload,
+      description: `@${existingProfile.username} oyuncusunun Beta Dönemi Eski Kayıtları güncellendi.`,
+      actor_id: user.id
+    });
 
     revalidatePath('/admin/players');
     revalidatePath('/oyuncular');
@@ -361,6 +373,16 @@ export async function addPlayerLegacyCareerAction(playerId: string, formData: Fo
       return { error: `Kayıt eklenemedi: ${insertErr.message}` };
     }
 
+    await logAdminAudit({
+      action: 'CREATE_LEGACY_CAREER',
+      entity_type: 'player_legacy_career_stats',
+      entity_id: playerId,
+      entity_label: `@${profile.username} (${input.season_name})`,
+      new_data: input,
+      description: `@${profile.username} oyuncusuna ${input.season_name} (${input.team_name}) kariyer kaydı eklendi.`,
+      actor_id: user.id
+    });
+
     revalidatePath('/admin/players');
     revalidatePath('/oyuncular');
     if (profile.username) {
@@ -395,7 +417,7 @@ export async function updatePlayerLegacyCareerAction(statId: string, formData: F
 
     const { data: existingStat, error: statErr } = await supabase
       .from('player_legacy_career_stats')
-      .select('id, player_id, profiles(username)')
+      .select('id, player_id, season_name, league_name, team_name, team_id, matches_played, goals, assists, rating_avg, profiles(username)')
       .eq('id', statId)
       .is('deleted_at', null)
       .maybeSingle();
@@ -453,9 +475,21 @@ export async function updatePlayerLegacyCareerAction(statId: string, formData: F
       return { error: `Güncelleme başarısız: ${updateErr.message}` };
     }
 
+    const profileObj = existingStat.profiles as any;
+
+    await logAdminAudit({
+      action: 'UPDATE_LEGACY_CAREER',
+      entity_type: 'player_legacy_career_stats',
+      entity_id: statId,
+      entity_label: `@${profileObj?.username || 'Oyuncu'} (${input.season_name})`,
+      old_data: existingStat,
+      new_data: input,
+      description: `@${profileObj?.username || 'Oyuncu'} oyuncusunun ${input.season_name} kariyer kaydı güncellendi.`,
+      actor_id: user.id
+    });
+
     revalidatePath('/admin/players');
     revalidatePath('/oyuncular');
-    const profileObj = existingStat.profiles as any;
     if (profileObj?.username) {
       revalidatePath(`/oyuncular/${profileObj.username}`);
     }
@@ -488,7 +522,7 @@ export async function deletePlayerLegacyCareerAction(statId: string) {
 
     const { data: existingStat, error: statErr } = await supabase
       .from('player_legacy_career_stats')
-      .select('id, player_id, profiles(username)')
+      .select('id, player_id, season_name, league_name, team_name, profiles(username)')
       .eq('id', statId)
       .is('deleted_at', null)
       .maybeSingle();
@@ -510,9 +544,20 @@ export async function deletePlayerLegacyCareerAction(statId: string) {
       return { error: `Silme işlemi başarısız: ${delErr.message}` };
     }
 
+    const profileObj = existingStat.profiles as any;
+
+    await logAdminAudit({
+      action: 'DELETE_LEGACY_CAREER',
+      entity_type: 'player_legacy_career_stats',
+      entity_id: statId,
+      entity_label: `@${profileObj?.username || 'Oyuncu'} (${existingStat.season_name || ''})`,
+      old_data: existingStat,
+      description: `@${profileObj?.username || 'Oyuncu'} oyuncusunun ${existingStat.season_name || ''} kariyer kaydı arşive alındı.`,
+      actor_id: user.id
+    });
+
     revalidatePath('/admin/players');
     revalidatePath('/oyuncular');
-    const profileObj = existingStat.profiles as any;
     if (profileObj?.username) {
       revalidatePath(`/oyuncular/${profileObj.username}`);
     }
@@ -680,6 +725,22 @@ export async function updatePlayerAccountAdminAction(formData: FormData) {
       console.error('Update player account error:', updateErr);
       return { error: `Hesap bilgileri güncellenemedi: ${updateErr.message}` };
     }
+
+    await logAdminAudit({
+      action: 'UPDATE_ACCOUNT_STATUS',
+      entity_type: 'profiles',
+      entity_id: playerId,
+      entity_label: `@${rawUsername}`,
+      old_data: {
+        username: targetProfile.username,
+        current_ea_player_id: targetProfile.current_ea_player_id,
+        status: targetProfile.status,
+        is_active: targetProfile.is_active
+      },
+      new_data: updatePayload,
+      description: `@${targetProfile.username} oyuncu hesabı güncellendi (Durum: ${rawStatus}, EA ID: ${rawEaId || '-'})`,
+      actor_id: user.id
+    });
 
     // Revalidation
     revalidatePath('/admin/players');

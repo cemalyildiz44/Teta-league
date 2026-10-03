@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { logAdminAudit } from '@/lib/audit';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -124,6 +125,16 @@ export async function grantAdminRoleAction(targetUserId: string) {
       }
     }
 
+    await logAdminAudit({
+      action: 'ADMIN_ROLE_GRANT',
+      entity_type: 'user_roles',
+      entity_id: targetUserId,
+      entity_label: `@${targetProfile.username || targetUserId}`,
+      description: `@${targetProfile.username || targetUserId} kullanıcısına ADMIN rolü verildi`,
+      new_data: { role: 'ADMIN', target_username: targetProfile.username },
+      actor_id: caller.id,
+    });
+
     revalidatePath('/admin/yoneticiler');
     revalidatePath('/admin');
     return { success: true, message: `${targetProfile.username || 'Kullanıcıya'} ADMIN rolü başarıyla verildi.` };
@@ -206,6 +217,16 @@ export async function revokeAdminRoleAction(targetUserId: string) {
       console.error('Error revoking admin role:', revokeErr);
       return { success: false, error: `Rol kaldırılamadı: ${revokeErr.message}` };
     }
+
+    await logAdminAudit({
+      action: 'ADMIN_ROLE_REVOKE',
+      entity_type: 'user_roles',
+      entity_id: targetUserId,
+      entity_label: `@${targetProfile.username || targetUserId}`,
+      description: `@${targetProfile.username || targetUserId} kullanıcısının ADMIN rolü kaldırıldı`,
+      old_data: { role: 'ADMIN', target_username: targetProfile.username },
+      actor_id: caller.id,
+    });
 
     revalidatePath('/admin/yoneticiler');
     revalidatePath('/admin');
