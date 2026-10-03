@@ -62,25 +62,27 @@ export default async function AdminAuditLogsPage({ searchParams }: PageProps) {
 
     if (actionFilter) {
       const upper = actionFilter.toUpperCase();
-      if (upper === 'CREATE') {
-        q = q.or('action.ilike.%CREATE%,action.ilike.%ADD%,action.ilike.%GRANT%');
+      if (upper === 'ACHIEVEMENT') {
+        q = q.or('action.ilike.%ACHIEVEMENT%,entity_type.ilike.%player_achievements%');
+      } else if (upper === 'CREATE') {
+        q = q.or('action.ilike.%CREATE%,action.ilike.%ADD%,action.ilike.%AWARD%,action.ilike.%GENERATE%');
       } else if (upper === 'UPDATE') {
-        q = q.or('action.ilike.%UPDATE%,action.ilike.%REVIEW%,action.ilike.%EDIT%');
+        q = q.or('action.ilike.%UPDATE%,action.ilike.%REVIEW%,action.ilike.%EDIT%,action.ilike.%TOGGLE%');
       } else if (upper === 'DELETE') {
-        q = q.or('action.ilike.%DELETE%,action.ilike.%REVOKE%');
+        q = q.or('action.ilike.%DELETE%,action.ilike.%REVOKE%,action.ilike.%CANCEL%');
       } else if (upper === 'APPROVE') {
         q = q.or('action.ilike.%APPROVE%,action.ilike.%REVIEW%');
       } else if (upper === 'PENALTY') {
         q = q.or('action.ilike.%PENALTY%,action.ilike.%WARN%');
       } else if (upper === 'ROLE') {
-        q = q.or('action.ilike.%ROLE%,action.ilike.%GRANT%,action.ilike.%REVOKE%');
+        q = q.or('action.ilike.%ROLE%,action.ilike.%GRANT%,action.ilike.%REVOKE%,action.ilike.%CAPTAIN%');
       } else {
         q = q.ilike('action', `%${actionFilter}%`);
       }
     }
 
     if (searchQuery) {
-      q = q.or(`description.ilike.%${searchQuery}%,action.ilike.%${searchQuery}%,entity_type.ilike.%${searchQuery}%`);
+      q = q.or(`description.ilike.%${searchQuery}%,action.ilike.%${searchQuery}%,entity_type.ilike.%${searchQuery}%,entity_label.ilike.%${searchQuery}%`);
     }
 
     return q;

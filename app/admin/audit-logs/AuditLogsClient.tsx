@@ -5,24 +5,18 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import {
   Shield,
   Search,
-  Filter,
   RefreshCw,
   Clock,
   User,
-  Globe,
   Database,
   ArrowRight,
   Eye,
   X,
-  FileCode,
   Layers,
   Activity,
   CheckCircle2,
-  AlertTriangle,
   ChevronLeft,
   ChevronRight,
-  Copy,
-  Check
 } from 'lucide-react';
 import { AuditLogItem } from '@/types/audit';
 
@@ -43,47 +37,188 @@ interface AuditLogsClientProps {
   };
 }
 
+export const ACTION_TITLE_MAP: Record<string, string> = {
+  ACHIEVEMENT_AWARD: 'Başarı Verdi',
+  ACHIEVEMENT_DELETE: 'Başarıyı Sildi',
+  CREATE_TEAM: 'Takım Oluşturdu',
+  UPDATE_TEAM: 'Takımı Güncelledi',
+  DELETE_TEAM: 'Takımı Sildi',
+  ACTIVATE_TEAM: 'Takımı Aktifleştirdi',
+  DEACTIVATE_TEAM: 'Takımı Pasife Aldı',
+  FORCE_DELETE_TEST_TEAM: 'Test Takımını Sildi',
+  ASSIGN_CAPTAIN: 'Kaptan Atadı',
+  REMOVE_CAPTAIN: 'Kaptanlığı Kaldırdı',
+  ASSIGN_TEAM_TO_LEAGUE: 'Takımı Lige Ekledi',
+  REMOVE_TEAM_FROM_LEAGUE: 'Takımı Ligden Çıkardı',
+  CREATE_LEAGUE: 'Lig Oluşturdu',
+  UPDATE_LEAGUE: 'Ligi Güncelledi',
+  UPDATE_LEAGUE_RULES: 'Lig Kurallarını Güncelledi',
+  ACTIVATE_LEAGUE: 'Ligi Aktifleştirdi',
+  DEACTIVATE_LEAGUE: 'Ligi Tamamladı',
+  UPDATE_LEAGUE_STATUS: 'Lig Durumunu Güncelledi',
+  CREATE_SEASON: 'Sezon Oluşturdu',
+  UPDATE_SEASON: 'Sezonu Güncelledi',
+  DELETE_SEASON: 'Sezonu Sildi',
+  ACTIVATE_SEASON: 'Sezonu Aktifleştirdi',
+  DEACTIVATE_SEASON: 'Sezonu Tamamladı',
+  UPDATE_SEASON_STATUS: 'Sezon Durumunu Güncelledi',
+  FORCE_UPDATE_SEASON_STATUS: 'Sezonu Zorla Güncelledi',
+  GENERATE_LEAGUE_FIXTURES: 'Lig Fikstürü Oluşturdu',
+  UPDATE_FIXTURE_DATE: 'Fikstür Tarihini Güncelledi',
+  CANCEL_FIXTURE: 'Fikstürü İptal Etti',
+  DELETE_FIXTURE: 'Fikstürü Sildi',
+  UPDATE_MATCH_SCORE: 'Maç Skorunu Güncelledi',
+  DELETE_MATCH: 'Maçı Sildi',
+  APPROVE_MATCH: 'Maçı Onayladı',
+  REVIEW_MATCH_REJECTED: 'Maçı Reddetti',
+  REVIEW_MATCH_PENDING: 'Maçı İncelemeye Aldı',
+  NEWS_CREATE: 'Haber Oluşturdu',
+  NEWS_UPDATE: 'Haberi Güncelledi',
+  NEWS_DELETE: 'Haberi Sildi',
+  NEWS_TOGGLE_PUBLISH: 'Haber Yayınını Değiştirdi',
+  ISSUE_PENALTY: 'Ceza Verdi',
+  REVOKE_PENALTY: 'Cezayı Kaldırdı',
+  ADMIN_ROLE_GRANT: 'Yönetici Rolü Verdi',
+  ADMIN_ROLE_REVOKE: 'Yönetici Rolünü Kaldırdı',
+  UPDATE_ACCOUNT_STATUS: 'Oyuncu Hesabını Güncelledi',
+  UPDATE_BETA_STATS: 'Beta İstatistiklerini Güncelledi',
+  CREATE_LEGACY_CAREER: 'Kariyer Kaydı Ekledi',
+  UPDATE_LEGACY_CAREER: 'Kariyer Kaydını Güncelledi',
+  DELETE_LEGACY_CAREER: 'Kariyer Kaydını Sildi',
+  CREATE_TOURNAMENT_1V1: '1v1 Turnuva Kazananı Ekledi',
+  CREATE_TOURNAMENT_KARMA: 'Karma Turnuva Kazananı Ekledi',
+  CREATE_TOURNAMENT_NIGHT_CUP: 'Gece Kupası Oluşturdu',
+  UPDATE_TOURNAMENT_APPLICATION: 'Turnuva Başvurusunu Güncelledi',
+  ASSIGN_TOURNAMENT_WINNER: 'Turnuva Kazananını Belirledi',
+  UPDATE_TOURNAMENT_DETAILS: 'Turnuva Detayını Güncelledi',
+  DELETE_TOURNAMENT: 'Turnuvayı Sildi',
+  CREATE_TRANSFER_WINDOW: 'Transfer Penceresi Oluşturdu',
+  UPDATE_TRANSFER_WINDOW: 'Transfer Penceresini Güncelledi',
+  DELETE_TRANSFER_WINDOW: 'Transfer Penceresini Sildi',
+  OPEN_TRANSFER_WINDOW: 'Transfer Penceresini Açtı',
+  CLOSE_TRANSFER_WINDOW: 'Transfer Penceresini Kapattı',
+  DELETE_POST: 'Sosyal Gönderiyi Sildi',
+  RESTORE_POST: 'Sosyal Gönderiyi Geri Yükledi',
+  DELETE_COMMENT: 'Yorumu Sildi',
+  RESTORE_COMMENT: 'Yorumu Geri Yükledi',
+};
+
+export function formatActionTitle(action: string): string {
+  if (ACTION_TITLE_MAP[action]) return ACTION_TITLE_MAP[action];
+  return action
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/(^\w|\s\w)/g, (m) => m.toUpperCase());
+}
+
+export const ENTITY_TITLE_MAP: Record<string, string> = {
+  player_achievements: 'Başarım',
+  teams: 'Takım',
+  matches: 'Maç',
+  news: 'Haber',
+  leagues: 'Lig',
+  seasons: 'Sezon',
+  fixtures: 'Fikstür',
+  team_penalties: 'Ceza',
+  profiles: 'Oyuncu Hesabı',
+  user_roles: 'Yönetici Rolü',
+  transfer_windows: 'Transfer Dönemi',
+  tournaments: 'Turnuva',
+  posts: 'Sosyal Gönderi',
+  comments: 'Sosyal Yorum',
+  league_teams: 'Lig Takımı',
+};
+
 const ENTITY_OPTIONS = [
-  { value: '', label: 'Tüm Varlıklar' },
-  { value: 'player_achievements', label: 'Başarılar (player_achievements)' },
-  { value: 'news', label: 'Haberler (news)' },
-  { value: 'user_roles', label: 'Yönetici Rolleri (user_roles)' },
-  { value: 'profiles', label: 'Oyuncu Profilleri (profiles)' },
-  { value: 'matches', label: 'Maçlar (matches)' },
-  { value: 'teams', label: 'Takımlar (teams)' },
-  { value: 'league_teams', label: 'Lig Takımları (league_teams)' },
-  { value: 'leagues', label: 'Ligler (leagues)' },
-  { value: 'seasons', label: 'Sezonlar (seasons)' },
-  { value: 'fixtures', label: 'Fikstürler (fixtures)' },
-  { value: 'team_penalties', label: 'Cezalar (team_penalties)' },
-  { value: 'transfer_windows', label: 'Transfer Pencereleri' },
-  { value: 'tournaments', label: 'Turnuvalar (tournaments)' },
-  { value: 'posts', label: 'Sosyal Gönderiler (posts)' },
-  { value: 'comments', label: 'Sosyal Yorumlar (comments)' },
+  { value: '', label: 'Tüm Hedef Varlıklar' },
+  { value: 'player_achievements', label: 'Oyuncu Başarımları' },
+  { value: 'teams', label: 'Takımlar' },
+  { value: 'matches', label: 'Maçlar & Skorlar' },
+  { value: 'news', label: 'Haberler' },
+  { value: 'leagues', label: 'Ligler' },
+  { value: 'seasons', label: 'Sezonlar' },
+  { value: 'fixtures', label: 'Fikstürler' },
+  { value: 'team_penalties', label: 'Cezalar' },
+  { value: 'profiles', label: 'Oyuncu Profilleri' },
+  { value: 'user_roles', label: 'Yönetici Rolleri' },
+  { value: 'transfer_windows', label: 'Transfer Dönemleri' },
+  { value: 'tournaments', label: 'Turnuvalar' },
+  { value: 'posts', label: 'Sosyal Gönderiler' },
+  { value: 'comments', label: 'Sosyal Yorumlar' },
+  { value: 'league_teams', label: 'Lig Takımları' },
 ];
 
 const ACTION_OPTIONS = [
-  { value: '', label: 'Tüm Eylemler' },
-  { value: 'CREATE', label: 'Oluşturma (CREATE / ADD)' },
-  { value: 'UPDATE', label: 'Güncelleme (UPDATE / EDIT)' },
-  { value: 'DELETE', label: 'Silme / Arşivleme (DELETE)' },
-  { value: 'APPROVE', label: 'Onaylama (APPROVE)' },
-  { value: 'PENALTY', label: 'Ceza İşlemleri (PENALTY)' },
-  { value: 'ROLE', label: 'Yetkilendirme (ROLE / GRANT)' },
+  { value: '', label: 'Tüm İşlemler' },
+  { value: 'ACHIEVEMENT', label: 'Başarı İşlemleri' },
+  { value: 'CREATE', label: 'Oluşturma & Ekleme İşlemleri' },
+  { value: 'UPDATE', label: 'Güncelleme & Düzenleme İşlemleri' },
+  { value: 'DELETE', label: 'Silme & İptal İşlemleri' },
+  { value: 'APPROVE', label: 'Maç Onay İşlemleri' },
+  { value: 'PENALTY', label: 'Ceza İşlemleri' },
+  { value: 'ROLE', label: 'Yönetici & Kaptanlık Rol İşlemleri' },
 ];
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(val?: string | null): boolean {
+  if (!val) return false;
+  return UUID_REGEX.test(val.trim());
+}
+
+export function resolveTarget(log: AuditLogItem): { label: string; typeLabel: string } {
+  const typeLabel = ENTITY_TITLE_MAP[log.entity_type] || 'Varlık';
+
+  // 1. If entity_label exists and is NOT a UUID, use it
+  if (log.entity_label && !isUuid(log.entity_label)) {
+    return { label: log.entity_label, typeLabel };
+  }
+
+  // 2. Check new_data or old_data
+  const data = log.new_data || log.old_data || {};
+  if (data.username) return { label: `@${data.username}`, typeLabel };
+  if (data.name) return { label: data.name, typeLabel };
+  if (data.title) return { label: data.title, typeLabel };
+  if (data.team_name && data.league_name) return { label: `${data.team_name} → ${data.league_name}`, typeLabel };
+  if (data.achievement_type) return { label: `${data.achievement_type.replace(/_/g, ' ')} Başarısı`, typeLabel };
+  if (data.home_team && data.away_team) return { label: `${data.home_team} vs ${data.away_team}`, typeLabel };
+
+  // 3. From description if available (e.g. mentions @username or quotes)
+  if (log.description) {
+    const usernameMatch = log.description.match(/@([a-zA-Z0-9_-]+)/);
+    if (usernameMatch) return { label: usernameMatch[0], typeLabel };
+    const quotedMatch = log.description.match(/"([^"]+)"/);
+    if (quotedMatch) return { label: quotedMatch[1], typeLabel };
+  }
+
+  // 4. Safe human fallback, never a raw hex UUID
+  return { label: typeLabel, typeLabel };
+}
+
+export function resolveDescription(log: AuditLogItem, actorName: string, targetLabel: string): string {
+  if (!log.description) {
+    return `${actorName}, ${targetLabel} üzerinde ${formatActionTitle(log.action).toLowerCase()} işlemini tamamladı.`;
+  }
+
+  let desc = log.description;
+  // Strip any raw UUID patterns from descriptions and replace with human target
+  desc = desc.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, targetLabel);
+
+  return desc;
+}
 
 function getActionBadgeStyle(action: string) {
   const upper = action.toUpperCase();
-  if (upper.includes('CREATE') || upper.includes('ADD') || upper.includes('GRANT') || upper.includes('APPROVE')) {
+  if (upper.includes('CREATE') || upper.includes('ADD') || upper.includes('GRANT') || upper.includes('AWARD') || upper.includes('APPROVE') || upper.includes('RESTORE')) {
     return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
   }
-  if (upper.includes('DELETE') || upper.includes('REVOKE') || upper.includes('EXPULSION') || upper.includes('BAN')) {
+  if (upper.includes('DELETE') || upper.includes('REVOKE') || upper.includes('CANCEL') || upper.includes('DEACTIVATE') || upper.includes('CLOSE')) {
     return 'bg-rose-500/10 text-rose-400 border-rose-500/30';
   }
-  if (upper.includes('UPDATE') || upper.includes('REVIEW') || upper.includes('EDIT')) {
+  if (upper.includes('UPDATE') || upper.includes('EDIT') || upper.includes('SCORE') || upper.includes('DATE') || upper.includes('STATUS')) {
     return 'bg-sky-500/10 text-sky-400 border-sky-500/30';
   }
-  if (upper.includes('PENALTY') || upper.includes('WARN')) {
+  if (upper.includes('PENALTY') || upper.includes('WARN') || upper.includes('REJECT')) {
     return 'bg-amber-500/10 text-amber-400 border-amber-500/30';
   }
   return 'bg-purple-500/10 text-purple-400 border-purple-500/30';
@@ -99,11 +234,71 @@ function formatDateTR(dateString: string) {
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit',
     }).format(d);
   } catch {
     return dateString;
   }
+}
+
+
+const FIELD_LABEL_MAP: Record<string, string> = {
+  home_score: 'Ev Sahibi Skor',
+  away_score: 'Deplasman Skor',
+  status: 'Durum',
+  is_active: 'Aktiflik Durumu',
+  is_published: 'Yayın Durumu',
+  name: 'İsim / Ad',
+  slug: 'URL Bağlantısı (Slug)',
+  level: 'Lig Seviyesi',
+  max_teams: 'Maksimum Takım Kapasitesi',
+  roster_min: 'Minimum Kadro Sayısı',
+  roster_max: 'Maksimum Kadro Sayısı',
+  scheduled_at: 'Planlanan Tarih',
+  week_number: 'Hafta Numarası',
+  month_number: 'Ay Numarası',
+  achievement_type: 'Başarı Türü',
+  season_name: 'Sezon Adı',
+  match_count: 'Ceza Maç Sayısı',
+  reason: 'Gerekçe / Sebep',
+  role: 'Atanan Rol',
+  team_name: 'Takım Adı',
+  league_name: 'Lig Adı',
+  platform: 'Platform',
+  primary_position: 'Mevki',
+  bio: 'Biyografi',
+  content: 'İçerik',
+  title: 'Haber Başlığı',
+};
+
+const IGNORED_RAW_FIELDS = new Set([
+  'id',
+  '_meta',
+  'created_at',
+  'updated_at',
+  'deleted_at',
+  'actor_id',
+  'awarded_by',
+  'player_id',
+  'entity_id',
+  'user_id',
+  'team_id',
+  'league_id',
+  'season_id',
+  'match_id',
+  'home_team_id',
+  'away_team_id',
+  'post_id',
+  'comment_id',
+  'image_url',
+  'logo_url',
+  'avatar_url',
+]);
+
+function formatFieldValue(val: any): string {
+  if (val === undefined || val === null) return 'Boş';
+  if (typeof val === 'boolean') return val ? 'Aktif / Evet' : 'Pasif / Hayır';
+  if (typeof val === 'object') return JSON.stringify(val);
+  return String(val);
 }
 
 export default function AuditLogsClient({
@@ -119,8 +314,6 @@ export default function AuditLogsClient({
   const searchParams = useSearchParams();
 
   const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
-  const [modalTab, setModalTab] = useState<'diff' | 'raw'>('diff');
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState(currentFilters.search || '');
 
   const totalPages = Math.ceil(totalCount / pageSize) || 1;
@@ -155,15 +348,9 @@ export default function AuditLogsClient({
     router.push(pathname);
   };
 
-  const copyToClipboard = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2000);
-  };
-
   return (
     <div className="space-y-6">
-      {/* Page Title & Breadcrumb Header */}
+      {/* Page Title & Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-6">
         <div>
           <div className="flex items-center gap-2 mb-1.5">
@@ -171,30 +358,30 @@ export default function AuditLogsClient({
               <Shield className="w-5 h-5" />
             </span>
             <h1 className="text-xl md:text-2xl font-black text-white tracking-wide uppercase">
-              Denetim Kayıtları (Audit Log)
+              Yönetici İşlem Geçmişi (Denetim Kayıtları)
             </h1>
           </div>
           <p className="text-sm text-gray-400">
-            Yönetici eylemleri, kritik veritabanı değişiklikleri ve sistem aktivitelerinin değişmez (immutable) kayıtları.
+            TETA League yönetim panelinde yetkili yöneticiler tarafından gerçekleştirilen tüm işlemlerin şeffaf geçmişi.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
             <CheckCircle2 className="w-4 h-4" />
-            <span>Kayıtlar Değiştirilemez (Append-Only)</span>
+            <span>Yalnızca Yönetici İşlemleri</span>
           </div>
         </div>
       </div>
 
-      {/* KPI Overview Cards */}
+      {/* Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-[#0a1628] border border-white/5 rounded-xl p-4 flex items-center gap-4">
           <div className="w-12 h-12 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-[#00e5ff]">
             <Database className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Toplam Denetim Kaydı</div>
+            <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Toplam Yönetici Eylemi</div>
             <div className="text-2xl font-black text-white mt-0.5">{stats.totalLogs.toLocaleString('tr-TR')}</div>
           </div>
         </div>
@@ -204,7 +391,7 @@ export default function AuditLogsClient({
             <Activity className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Son 24 Saat Eylemleri</div>
+            <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Son 24 Saatteki Eylemler</div>
             <div className="text-2xl font-black text-white mt-0.5">{stats.last24hCount.toLocaleString('tr-TR')}</div>
           </div>
         </div>
@@ -214,8 +401,8 @@ export default function AuditLogsClient({
             <Layers className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">İzlenen Varlık Türü</div>
-            <div className="text-2xl font-black text-white mt-0.5">{stats.distinctEntitiesCount} Kategori</div>
+            <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Aktif Modül Kategorisi</div>
+            <div className="text-2xl font-black text-white mt-0.5">{stats.distinctEntitiesCount} Modül</div>
           </div>
         </div>
       </div>
@@ -228,7 +415,7 @@ export default function AuditLogsClient({
             <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Açıklama veya hedef varlıkta ara..."
+              placeholder="Yönetici, işlem veya hedef varlık ara..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               className="w-full bg-[#060d18] border border-white/10 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#00e5ff] transition-colors"
@@ -240,7 +427,7 @@ export default function AuditLogsClient({
             <select
               value={currentFilters.entityType || ''}
               onChange={handleEntityChange}
-              className="w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-gray-200 focus:outline-none focus:border-[#00e5ff] transition-colors"
+              className="w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-gray-200 focus:outline-none focus:border-[#00e5ff] transition-colors cursor-pointer"
             >
               {ENTITY_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value} className="bg-[#0a1628] text-white">
@@ -255,7 +442,7 @@ export default function AuditLogsClient({
             <select
               value={currentFilters.action || ''}
               onChange={handleActionChange}
-              className="w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-gray-200 focus:outline-none focus:border-[#00e5ff] transition-colors"
+              className="w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-gray-200 focus:outline-none focus:border-[#00e5ff] transition-colors cursor-pointer"
             >
               {ACTION_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value} className="bg-[#0a1628] text-white">
@@ -279,47 +466,43 @@ export default function AuditLogsClient({
         </div>
       </div>
 
-      {/* Main Table */}
+      {/* Main Activity Table */}
       <div className="bg-[#0a1628] border border-white/5 rounded-xl overflow-hidden shadow-2xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-white/5 bg-white/[0.02] text-[11px] font-black uppercase tracking-wider text-gray-400">
                 <th className="py-3.5 px-4">Tarih / Saat</th>
-                <th className="py-3.5 px-4">Yönetici (Aktör)</th>
-                <th className="py-3.5 px-4">Eylem</th>
-                <th className="py-3.5 px-4">Hedef Varlık</th>
+                <th className="py-3.5 px-4">Yönetici</th>
+                <th className="py-3.5 px-4">İşlem</th>
+                <th className="py-3.5 px-4">Hedef</th>
                 <th className="py-3.5 px-4">Açıklama</th>
-                <th className="py-3.5 px-4">IP Adresi</th>
-                <th className="py-3.5 px-4 text-right">İşlem</th>
+                <th className="py-3.5 px-4 text-right">Detay</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 text-sm text-gray-300">
               {logs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-gray-500 font-medium">
-                    <Database className="w-10 h-10 mx-auto mb-2 text-gray-600" />
-                    Kriterlere uygun herhangi bir denetim kaydı bulunamadı.
+                  <td colSpan={6} className="py-14 text-center text-gray-500 font-medium">
+                    <Database className="w-10 h-10 mx-auto mb-2 text-gray-600 opacity-60" />
+                    Kriterlere uygun yönetici işlemi bulunamadı.
                   </td>
                 </tr>
               ) : (
                 logs.map((log) => {
-                  const actorName = log.actor?.username
-                    ? `@${log.actor.username}`
-                    : log.actor?.full_name || (log.actor_id ? 'Yönetici' : 'Admin');
-
-                  const targetLabel = log.entity_label || log.new_data?._meta?.entity_label || (log.entity_id ? `#${log.entity_id.substring(0, 8)}` : '-');
+                  const actorFullName = log.actor?.full_name || 'Yönetici';
+                  const actorUsername = log.actor?.username ? `@${log.actor.username}` : '@admin';
+                  const target = resolveTarget(log);
+                  const readableDesc = resolveDescription(log, actorFullName, target.label);
+                  const actionTitle = formatActionTitle(log.action);
 
                   return (
                     <tr
                       key={log.id}
                       className="hover:bg-white/[0.03] transition-colors cursor-pointer group"
-                      onClick={() => {
-                        setSelectedLog(log);
-                        setModalTab('diff');
-                      }}
+                      onClick={() => setSelectedLog(log)}
                     >
-                      {/* Timestamp */}
+                      {/* Tarih / Saat */}
                       <td className="py-3.5 px-4 whitespace-nowrap text-xs text-gray-400 font-mono">
                         <div className="flex items-center gap-1.5">
                           <Clock className="w-3.5 h-3.5 text-gray-500" />
@@ -327,68 +510,64 @@ export default function AuditLogsClient({
                         </div>
                       </td>
 
-                      {/* Actor */}
+                      {/* Yönetici */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-xs font-bold text-[#00e5ff]">
-                            {log.actor?.username ? log.actor.username[0].toUpperCase() : <User className="w-3.5 h-3.5" />}
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-xs font-bold text-[#00e5ff] overflow-hidden">
+                            {log.actor?.avatar_url ? (
+                              <img src={log.actor.avatar_url} alt={actorFullName} className="w-full h-full object-cover" />
+                            ) : log.actor?.username ? (
+                              log.actor.username[0].toUpperCase()
+                            ) : (
+                              <User className="w-3.5 h-3.5" />
+                            )}
                           </div>
                           <div>
                             <div className="text-xs font-bold text-white group-hover:text-[#00e5ff] transition-colors">
-                              {actorName}
+                              {actorFullName}
                             </div>
-                            {log.actor?.full_name && (
-                              <div className="text-[10px] text-gray-500">{log.actor.full_name}</div>
-                            )}
+                            <div className="text-[11px] text-gray-500 font-mono">{actorUsername}</div>
                           </div>
                         </div>
                       </td>
 
-                      {/* Action */}
+                      {/* İşlem Rozeti */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span
                           className={`inline-block px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider border ${getActionBadgeStyle(
                             log.action
                           )}`}
                         >
-                          {log.action}
+                          {actionTitle}
                         </span>
                       </td>
 
-                      {/* Entity / Target */}
+                      {/* Hedef Varlık */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <div className="flex flex-col">
-                          <span className="text-xs font-semibold text-gray-200">{targetLabel}</span>
-                          <span className="text-[10px] text-gray-500 font-mono uppercase">{log.entity_type}</span>
+                          <span className="text-xs font-bold text-gray-200 group-hover:text-white transition-colors">
+                            {target.label}
+                          </span>
+                          <span className="text-[10px] text-gray-500 font-medium">
+                            {target.typeLabel}
+                          </span>
                         </div>
                       </td>
 
-                      {/* Description */}
-                      <td className="py-3.5 px-4 max-w-xs truncate text-xs text-gray-300">
-                        {log.description || '-'}
+                      {/* Açıklama */}
+                      <td className="py-3.5 px-4 max-w-md truncate text-xs text-gray-300">
+                        {readableDesc}
                       </td>
 
-                      {/* IP Address */}
-                      <td className="py-3.5 px-4 whitespace-nowrap text-xs font-mono text-gray-400">
-                        {log.ip_address ? (
-                          <span className="px-2 py-0.5 rounded bg-black/40 border border-white/5 text-[11px]">
-                            {log.ip_address}
-                          </span>
-                        ) : (
-                          <span className="text-gray-600">-</span>
-                        )}
-                      </td>
-
-                      {/* Detail CTA */}
+                      {/* Detay Butonu */}
                       <td className="py-3.5 px-4 whitespace-nowrap text-right">
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedLog(log);
-                            setModalTab('diff');
                           }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-[#00e5ff]/10 text-gray-300 hover:text-[#00e5ff] border border-white/10 hover:border-[#00e5ff]/30 text-xs font-semibold transition-colors"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-[#00e5ff]/10 text-gray-300 hover:text-[#00e5ff] border border-white/10 hover:border-[#00e5ff]/30 text-xs font-semibold transition-colors"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           <span>İncele</span>
@@ -440,356 +619,174 @@ export default function AuditLogsClient({
         </div>
       </div>
 
-      {/* DETAIL MODAL */}
-      {selectedLog && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0a1628] border border-[#00e5ff]/30 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in duration-150">
-            {/* Modal Header */}
-            <div className="p-6 border-b border-white/10 flex items-start justify-between gap-4 bg-white/[0.02]">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <span
-                    className={`px-3 py-1 rounded-md text-xs font-black uppercase tracking-wider border ${getActionBadgeStyle(
-                      selectedLog.action
-                    )}`}
-                  >
-                    {selectedLog.action}
-                  </span>
-                  <span className="text-xs font-mono text-gray-400 bg-black/40 px-2 py-0.5 rounded border border-white/5">
-                    {selectedLog.entity_type}
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    {formatDateTR(selectedLog.created_at)}
-                  </span>
+      {/* EXECUTIVE DETAIL MODAL */}
+      {selectedLog && (() => {
+        const target = resolveTarget(selectedLog);
+        const actorFullName = selectedLog.actor?.full_name || 'Yönetici';
+        const actorUsername = selectedLog.actor?.username ? `@${selectedLog.actor.username}` : '@admin';
+        const actionTitle = formatActionTitle(selectedLog.action);
+        const fullDesc = resolveDescription(selectedLog, actorFullName, target.label);
+
+        // Compute semantic changes excluding database internals
+        const rawOld = selectedLog.old_data || {};
+        const rawNew = selectedLog.new_data || {};
+        const changedFields: Array<{ label: string; oldVal: string; newVal: string }> = [];
+
+        const allKeys = Array.from(new Set([...Object.keys(rawOld), ...Object.keys(rawNew)]));
+        allKeys.forEach((key) => {
+          if (IGNORED_RAW_FIELDS.has(key)) return;
+          const oldV = rawOld[key];
+          const newV = rawNew[key];
+          if (oldV !== newV && (oldV !== undefined || newV !== undefined)) {
+            changedFields.push({
+              label: FIELD_LABEL_MAP[key] || key,
+              oldVal: formatFieldValue(oldV),
+              newVal: formatFieldValue(newV),
+            });
+          }
+        });
+
+        return (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-[#0a1628] border border-[#00e5ff]/30 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in duration-150">
+              {/* Modal Header */}
+              <div className="p-6 border-b border-white/10 flex items-start justify-between gap-4 bg-white/[0.02]">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span
+                      className={`px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-wider border ${getActionBadgeStyle(
+                        selectedLog.action
+                      )}`}
+                    >
+                      {actionTitle}
+                    </span>
+                    <span className="text-xs font-bold text-gray-300 bg-white/5 px-2.5 py-1 rounded-md border border-white/10">
+                      {target.label}
+                    </span>
+                    <span className="text-xs text-gray-400 font-mono bg-black/40 px-2 py-0.5 rounded border border-white/5">
+                      {formatDateTR(selectedLog.created_at)}
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-bold text-white mt-1">
+                    {actorFullName} — {actionTitle}
+                  </h3>
+                  <p className="text-xs text-gray-300">
+                    {fullDesc}
+                  </p>
                 </div>
-                <h3 className="text-lg font-bold text-white mt-1">
-                  {selectedLog.entity_label || selectedLog.new_data?._meta?.entity_label || 'Denetim Kaydı Detayı'}
-                </h3>
-                {selectedLog.description && (
-                  <p className="text-xs text-gray-300">{selectedLog.description}</p>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedLog(null)}
+                  className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 overflow-y-auto space-y-6 flex-1">
+                {/* 4 Executive Meta Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="p-3.5 rounded-xl bg-[#060d18] border border-white/5">
+                    <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider">İşlemi Yapan</span>
+                    <span className="font-bold text-white text-sm mt-1 block truncate">
+                      {actorFullName}
+                    </span>
+                    <span className="text-[11px] text-[#00e5ff] font-mono block truncate">
+                      {actorUsername}
+                    </span>
+                    <span className="text-[10px] text-gray-500 block mt-0.5 font-medium">
+                      Admin
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-[#060d18] border border-white/5">
+                    <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider">Hedef Varlık</span>
+                    <span className="font-bold text-white text-sm mt-1 block truncate">
+                      {target.label}
+                    </span>
+                    <span className="text-[11px] text-gray-400 block truncate font-medium">
+                      {target.typeLabel}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-[#060d18] border border-white/5">
+                    <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider">İşlem</span>
+                    <span className="font-bold text-[#00e5ff] text-xs mt-1 block uppercase tracking-wide">
+                      {actionTitle}
+                    </span>
+                    <span className="text-[10px] text-gray-500 block mt-0.5">
+                      Yönetici Aksiyonu
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-[#060d18] border border-white/5">
+                    <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider">Tarih</span>
+                    <span className="font-bold text-white text-xs mt-1 block font-mono">
+                      {formatDateTR(selectedLog.created_at)}
+                    </span>
+                    <span className="text-[10px] text-gray-500 block mt-0.5">
+                      Yerel Saat
+                    </span>
+                  </div>
+                </div>
+
+                {/* Description Card */}
+                <div className="p-4 rounded-xl bg-cyan-500/5 border border-cyan-500/20">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[#00e5ff] mb-1">
+                    Açıklama
+                  </div>
+                  <div className="text-sm text-gray-100 font-medium">
+                    {fullDesc}
+                  </div>
+                </div>
+
+                {/* Semantic Field Changes (if any) */}
+                {changedFields.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="text-xs font-bold uppercase tracking-wider text-white">
+                      Değiştirilen Alanlar ({changedFields.length})
+                    </div>
+                    <div className="space-y-2">
+                      {changedFields.map((field, idx) => (
+                        <div
+                          key={idx}
+                          className="p-3 rounded-xl bg-[#060d18] border border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-2.5 text-xs"
+                        >
+                          <div className="font-semibold text-gray-300 md:w-1/3">
+                            {field.label}
+                          </div>
+                          <div className="flex-1 flex items-center gap-2 text-xs font-medium">
+                            <span className="px-2 py-1 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20 line-through">
+                              {field.oldVal}
+                            </span>
+                            <ArrowRight className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                            <span className="px-2 py-1 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                              {field.newVal}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => setSelectedLog(null)}
-                className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Executive Info Meta */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-5 bg-[#060d18] border-b border-white/5 text-xs">
-              <div>
-                <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider">İşlemi Yapan</span>
-                <span className="font-semibold text-white mt-0.5 block truncate">
-                  {selectedLog.actor?.username ? `@${selectedLog.actor.username}` : (selectedLog.actor_id ? 'Yönetici' : 'Admin')}
-                </span>
-                {selectedLog.actor_id && (
-                  <span className="text-[10px] text-gray-500 font-mono truncate block">{selectedLog.actor_id}</span>
-                )}
+              {/* Modal Footer */}
+              <div className="p-4 border-t border-white/10 flex justify-end bg-white/[0.02]">
+                <button
+                  type="button"
+                  onClick={() => setSelectedLog(null)}
+                  className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors"
+                >
+                  Kapat
+                </button>
               </div>
-
-              <div>
-                <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider">Hedef Varlık ID</span>
-                <span className="font-mono text-gray-300 mt-0.5 block truncate">
-                  {selectedLog.entity_id || 'Belirtilmedi'}
-                </span>
-              </div>
-
-              <div>
-                <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider">IP Adresi</span>
-                <span className="font-mono text-gray-300 mt-0.5 block truncate">
-                  {selectedLog.ip_address || '-'}
-                </span>
-              </div>
-
-              <div>
-                <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider">Kayıt Kimliği (UUID)</span>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="font-mono text-[10px] text-gray-400 truncate block">{selectedLog.id}</span>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(selectedLog.id, 'log-id')}
-                    title="Kopyala"
-                    className="text-gray-500 hover:text-[#00e5ff]"
-                  >
-                    {copiedKey === 'log-id' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Tabs */}
-            <div className="flex items-center border-b border-white/10 px-6 bg-[#0a1628]">
-              <button
-                type="button"
-                onClick={() => setModalTab('diff')}
-                className={`py-3 px-4 text-xs font-bold border-b-2 flex items-center gap-2 transition-colors ${
-                  modalTab === 'diff'
-                    ? 'border-[#00e5ff] text-[#00e5ff]'
-                    : 'border-transparent text-gray-400 hover:text-white'
-                }`}
-              >
-                <Layers className="w-4 h-4" />
-                <span>Değişiklik Detayı (Diff Karşılaştırma)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setModalTab('raw')}
-                className={`py-3 px-4 text-xs font-bold border-b-2 flex items-center gap-2 transition-colors ${
-                  modalTab === 'raw'
-                    ? 'border-[#00e5ff] text-[#00e5ff]'
-                    : 'border-transparent text-gray-400 hover:text-white'
-                }`}
-              >
-                <FileCode className="w-4 h-4" />
-                <span>Ham JSON Yükü (Raw Payload)</span>
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6 overflow-y-auto space-y-6 flex-1">
-              {modalTab === 'diff' ? (
-                <DiffViewer oldData={selectedLog.old_data} newData={selectedLog.new_data} />
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Old Data JSON */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs text-rose-400 font-bold uppercase tracking-wider">
-                      <span>Önceki Durum (old_data)</span>
-                      {selectedLog.old_data && (
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(JSON.stringify(selectedLog.old_data, null, 2), 'old_data')}
-                          className="text-[11px] text-gray-500 hover:text-white flex items-center gap-1"
-                        >
-                          {copiedKey === 'old_data' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                          Kopyala
-                        </button>
-                      )}
-                    </div>
-                    <pre className="p-4 rounded-xl bg-black/60 border border-rose-500/20 text-xs font-mono text-gray-300 max-h-96 overflow-y-auto whitespace-pre-wrap">
-                      {selectedLog.old_data
-                        ? JSON.stringify(selectedLog.old_data, null, 2)
-                        : '// Eski kayıt mevcut değil (Yeni Ekleme)'}
-                    </pre>
-                  </div>
-
-                  {/* New Data JSON */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs text-emerald-400 font-bold uppercase tracking-wider">
-                      <span>Yeni Durum (new_data)</span>
-                      {selectedLog.new_data && (
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(JSON.stringify(selectedLog.new_data, null, 2), 'new_data')}
-                          className="text-[11px] text-gray-500 hover:text-white flex items-center gap-1"
-                        >
-                          {copiedKey === 'new_data' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                          Kopyala
-                        </button>
-                      )}
-                    </div>
-                    <pre className="p-4 rounded-xl bg-black/60 border border-emerald-500/20 text-xs font-mono text-gray-300 max-h-96 overflow-y-auto whitespace-pre-wrap">
-                      {selectedLog.new_data
-                        ? JSON.stringify(selectedLog.new_data, null, 2)
-                        : '// Yeni veri mevcut değil (Silme İşlemi)'}
-                    </pre>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 border-t border-white/10 bg-white/[0.02] flex items-center justify-between">
-              <span className="text-[11px] text-gray-500 font-mono">
-                PostgreSQL RLS Korumalı Denetim Kaydı
-              </span>
-              <button
-                type="button"
-                onClick={() => setSelectedLog(null)}
-                className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition-colors"
-              >
-                Kapat
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
-}
-
-/**
- * Intelligent Diff Viewer Component
- * Compares old_data and new_data field-by-field with visual cues
- */
-function DiffViewer({ oldData, newData }: { oldData?: Record<string, any> | null; newData?: Record<string, any> | null }) {
-  const cleanOld = oldData && typeof oldData === 'object' ? { ...oldData } : null;
-  const cleanNew = newData && typeof newData === 'object' ? { ...newData } : null;
-
-  // Filter out internal metadata keys from diff table
-  if (cleanNew && cleanNew._meta) delete cleanNew._meta;
-
-  if (!cleanOld && !cleanNew) {
-    return (
-      <div className="py-8 text-center text-gray-500 text-sm">
-        Bu işlem için karşılaştırılabilir veri yükü bulunmuyor.
-      </div>
-    );
-  }
-
-  // Pure INSERT / CREATE case
-  if (!cleanOld && cleanNew) {
-    return (
-      <div className="space-y-4">
-        <div className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
-          <CheckCircle2 className="w-4 h-4" />
-          <span>Yeni Varlık Oluşturuldu — Eklenen Alanlar</span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {Object.entries(cleanNew).map(([key, val]) => (
-            <div key={key} className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
-              <div className="text-[10px] font-mono text-gray-400 uppercase tracking-wider">{key}</div>
-              <div className="text-xs font-semibold text-white mt-1 break-words font-mono">
-                {formatDiffValue(val)}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // Pure DELETE case
-  if (cleanOld && !cleanNew) {
-    return (
-      <div className="space-y-4">
-        <div className="text-xs font-semibold text-rose-400 flex items-center gap-1.5">
-          <AlertTriangle className="w-4 h-4" />
-          <span>Varlık Silindi / Arşive Alındı — Kaldırılan Veriler</span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {Object.entries(cleanOld).map(([key, val]) => (
-            <div key={key} className="p-3 rounded-lg bg-rose-500/5 border border-rose-500/20">
-              <div className="text-[10px] font-mono text-gray-400 uppercase tracking-wider">{key}</div>
-              <div className="text-xs font-semibold text-gray-300 mt-1 break-words font-mono line-through decoration-rose-500">
-                {formatDiffValue(val)}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // UPDATE case: field-by-field diff
-  const allKeys = Array.from(new Set([...Object.keys(cleanOld || {}), ...Object.keys(cleanNew || {})]));
-  const changedEntries: Array<{ key: string; oldVal: any; newVal: any; status: 'modified' | 'added' | 'removed' }> = [];
-  const unchangedEntries: Array<{ key: string; val: any }> = [];
-
-  allKeys.forEach((key) => {
-    const oldVal = cleanOld ? cleanOld[key] : undefined;
-    const newVal = cleanNew ? cleanNew[key] : undefined;
-
-    const oldStr = JSON.stringify(oldVal);
-    const newStr = JSON.stringify(newVal);
-
-    if (oldVal === undefined && newVal !== undefined) {
-      changedEntries.push({ key, oldVal, newVal, status: 'added' });
-    } else if (oldVal !== undefined && newVal === undefined) {
-      changedEntries.push({ key, oldVal, newVal, status: 'removed' });
-    } else if (oldStr !== newStr) {
-      changedEntries.push({ key, oldVal, newVal, status: 'modified' });
-    } else {
-      unchangedEntries.push({ key, val: newVal });
-    }
-  });
-
-  return (
-    <div className="space-y-6">
-      {/* Changed Fields Table */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-white">
-          <span>Değişen Alanlar ({changedEntries.length})</span>
-          <span className="text-[11px] text-gray-400 font-normal">Kırmızı: Önceki • Yeşil: Yeni</span>
-        </div>
-
-        {changedEntries.length === 0 ? (
-          <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 text-xs text-gray-400 text-center">
-            Alan düzeyinde doğrudan fark tespit edilmedi (Aynı değerler veya ilişkisel kayıt güncellendi).
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {changedEntries.map(({ key, oldVal, newVal, status }) => (
-              <div
-                key={key}
-                className="p-3 rounded-xl bg-[#060d18] border border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
-              >
-                <div className="font-mono font-bold text-gray-300 md:w-1/4">
-                  {key}
-                  <span
-                    className={`ml-2 px-1.5 py-0.2 rounded text-[9px] uppercase font-bold ${
-                      status === 'added'
-                        ? 'bg-emerald-500/20 text-emerald-400'
-                        : status === 'removed'
-                        ? 'bg-rose-500/20 text-rose-400'
-                        : 'bg-sky-500/20 text-sky-400'
-                    }`}
-                  >
-                    {status === 'added' ? 'YENİ ALAN' : status === 'removed' ? 'KALDIRILDI' : 'GÜNCELLENDİ'}
-                  </span>
-                </div>
-
-                <div className="flex-1 flex flex-col md:flex-row md:items-center gap-2 font-mono">
-                  {/* Old Value */}
-                  <div className="flex-1 p-2 rounded bg-rose-500/5 border border-rose-500/20 text-rose-300 break-words">
-                    <span className="text-[10px] text-rose-400/60 block uppercase font-bold">Önceki</span>
-                    {formatDiffValue(oldVal)}
-                  </div>
-
-                  <ArrowRight className="hidden md:block w-4 h-4 text-gray-500 shrink-0" />
-
-                  {/* New Value */}
-                  <div className="flex-1 p-2 rounded bg-emerald-500/5 border border-emerald-500/20 text-emerald-300 break-words">
-                    <span className="text-[10px] text-emerald-400/60 block uppercase font-bold">Yeni</span>
-                    {formatDiffValue(newVal)}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Unchanged Fields Accordion (collapsed by default if many) */}
-      {unchangedEntries.length > 0 && (
-        <details className="group border border-white/5 rounded-xl bg-white/[0.01] p-3 text-xs">
-          <summary className="cursor-pointer font-bold text-gray-400 hover:text-white flex items-center justify-between select-none">
-            <span>Değişmeyen Diğer Alanlar ({unchangedEntries.length})</span>
-            <span className="text-[10px] text-gray-500 group-open:rotate-180 transition-transform">▼</span>
-          </summary>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3 pt-3 border-t border-white/5 font-mono">
-            {unchangedEntries.map(({ key, val }) => (
-              <div key={key} className="p-2 rounded bg-black/40 border border-white/5">
-                <span className="text-[10px] text-gray-500 block truncate">{key}</span>
-                <span className="text-gray-300 text-xs block truncate">{formatDiffValue(val)}</span>
-              </div>
-            ))}
-          </div>
-        </details>
-      )}
-    </div>
-  );
-}
-
-function formatDiffValue(val: any): string {
-  if (val === undefined) return '(Yok)';
-  if (val === null) return 'null';
-  if (typeof val === 'boolean') return val ? 'true (Evet)' : 'false (Hayır)';
-  if (typeof val === 'object') return JSON.stringify(val);
-  return String(val);
 }

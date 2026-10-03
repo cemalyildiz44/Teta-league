@@ -97,12 +97,12 @@ export async function addAchievementAction(prevState: any, formData: FormData) {
 
     // Audit log
     const { data: targetProf } = await supabase.from('profiles').select('username').eq('id', player_id).maybeSingle();
-    const targetLabel = targetProf?.username ? `@${targetProf.username}` : player_id;
+    const targetLabel = targetProf?.username ? `@${targetProf.username}` : 'Oyuncu';
     await logAdminAudit({
       action: 'ACHIEVEMENT_AWARD',
       entity_type: 'player_achievements',
       entity_label: targetLabel,
-      description: `${achievement_type} başarısı verildi (${final_season_name || raw_season_value || 'Genel'})`,
+      description: `${targetLabel} kullanıcısına ${achievement_type.replace(/_/g, ' ')} başarısı verildi (${final_season_name || raw_season_value || 'Genel'})`,
       new_data: insertData,
       actor_id: user.id,
     });
@@ -132,7 +132,7 @@ export async function deleteAchievementAction(id: string) {
       .select('id, achievement_type, season_name, profile:player_id(username)')
       .eq('id', id)
       .maybeSingle();
-    const targetLabel = (targetAch?.profile as any)?.username ? `@${(targetAch?.profile as any).username}` : id;
+    const targetLabel = (targetAch?.profile as any)?.username ? `@${(targetAch?.profile as any).username}` : 'Oyuncu';
 
     const { error } = await supabase.from('player_achievements').delete().eq('id', id);
 
@@ -146,7 +146,7 @@ export async function deleteAchievementAction(id: string) {
       entity_type: 'player_achievements',
       entity_id: id,
       entity_label: targetLabel,
-      description: `${targetAch?.achievement_type || 'Başarım'} silindi`,
+      description: `${targetLabel} kullanıcısının ${targetAch?.achievement_type?.replace(/_/g, ' ') || 'başarısı'} silindi`,
       old_data: targetAch,
       actor_id: user.id,
     });
