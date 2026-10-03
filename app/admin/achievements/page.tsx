@@ -66,24 +66,67 @@ export default async function AchievementsPage() {
   // Maçları getir (opsiyonel, maçın oyuncusu için) - Sadece son 50 maçı alalım performans için
   const { data: matchesData } = await supabase
     .from('matches')
-    .select('id, played_at, home_team:home_team_id(name), away_team:away_team_id(name)')
+    .select(`
+      id,
+      played_at,
+      home_team:league_teams!matches_league_id_season_id_home_team_id_fkey(teams(name)),
+      away_team:league_teams!matches_league_id_season_id_away_team_id_fkey(teams(name))
+    `)
     .order('played_at', { ascending: false })
     .limit(50);
 
   // Verilen başarıları listele (season_name dahil)
   const { data: achievementsData } = await supabase
     .from('player_achievements')
-    .select('id, achievement_type, week_number, month_number, awarded_at, season_name, profile:player_id(username, full_name), season:season_id(name), match:match_id(played_at, home_team:home_team_id(name), away_team:away_team_id(name))')
+    .select(`
+      id,
+      achievement_type,
+      week_number,
+      month_number,
+      awarded_at,
+      season_name,
+      profile:player_id(username, full_name),
+      season:season_id(name),
+      match:match_id(
+        id,
+        played_at,
+        home_team:league_teams!matches_league_id_season_id_home_team_id_fkey(teams(name)),
+        away_team:league_teams!matches_league_id_season_id_away_team_id_fkey(teams(name))
+      )
+    `)
     .order('awarded_at', { ascending: false })
     .limit(100);
+
+  const formatTeam = (leagueTeam: any) => {
+    if (!leagueTeam) return null;
+    const teamObj = Array.isArray(leagueTeam.teams) ? leagueTeam.teams[0] : leagueTeam.teams;
+    return { name: teamObj?.name || leagueTeam.name || '' };
+  };
+
+  const formattedMatches = (matchesData || []).map((m: any) => ({
+    ...m,
+    home_team: formatTeam(m.home_team),
+    away_team: formatTeam(m.away_team),
+  }));
+
+  const formattedAchievements = (achievementsData || []).map((a: any) => ({
+    ...a,
+    match: a.match
+      ? {
+          ...a.match,
+          home_team: formatTeam(a.match.home_team),
+          away_team: formatTeam(a.match.away_team),
+        }
+      : null,
+  }));
 
   return (
     <div>
       <AchievementsClient 
         profiles={profilesData || []} 
         seasons={sortedSeasons} 
-        matches={matchesData || []} 
-        achievements={achievementsData || []} 
+        matches={formattedMatches} 
+        achievements={formattedAchievements} 
       />
     </div>
   );
