@@ -52,129 +52,131 @@ export default async function HaberlerPage({
   ];
 
   return (
-    <div className="min-h-screen bg-[#03070C] text-white py-12 px-4 lg:px-6">
-      <div className="max-w-[1400px] mx-auto space-y-10">
-        
-        {/* Header Banner */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#060d18] via-[#0a1628] to-[#040a14] border border-[#00e5ff]/20 p-8 sm:p-12 shadow-[0_0_50px_rgba(0,229,255,0.08)]">
-          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-80 h-80 bg-[#00e5ff]/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="relative z-10 max-w-2xl space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00e5ff]/10 border border-[#00e5ff]/20 text-[#00e5ff] text-xs font-black tracking-widest uppercase">
-              <Newspaper className="w-3.5 h-3.5" />
-              RESMİ BÜLTEN
-            </div>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black uppercase tracking-tight text-white">
-              HABERLER & <span className="text-[#00e5ff] drop-shadow-[0_0_20px_rgba(0,229,255,0.6)]">DUYURULAR</span>
-            </h1>
-            <p className="text-gray-400 text-sm sm:text-base leading-relaxed font-medium">
-              TETA League arenasındaki en güncel lig haberleri, transfer gelişmeleri, haftalık maç analizleri ve turnuva duyuruları.
-            </p>
+    <div className="mx-auto max-w-[1400px] px-4 lg:px-6 py-12 md:py-16">
+      
+      {/* PAGE HEADER */}
+      <div className="mb-10 md:mb-14 text-center fade-in-up flex flex-col items-center">
+        <span className="text-[#00e5ff] text-[11px] font-[900] tracking-[0.3em] uppercase bg-[#00e5ff]/10 px-4 py-1.5 rounded-full border border-[#00e5ff]/30 mb-5 glow-cyan-strong shadow-[0_0_20px_rgba(0,229,255,0.2)]">
+          RESMİ BÜLTEN
+        </span>
+        <h1 className="text-[38px] sm:text-[46px] md:text-[60px] font-[900] text-white tracking-widest uppercase mb-4 drop-shadow-[0_0_15px_rgba(0,229,255,0.4)] leading-tight">
+          HABERLER & <span className="text-[#00e5ff]">DUYURULAR</span>
+        </h1>
+        <p className="text-[#a0b0c0] font-medium max-w-2xl mx-auto text-[15px] md:text-[16px] leading-relaxed">
+          TETA League ekosistemindeki en güncel lig haberleri, transfer gelişmeleri ve resmi duyurular.
+        </p>
+      </div>
+
+      {/* CATEGORY TABS */}
+      <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-2.5 mb-10 md:mb-12 fade-in-up" style={{ animationDelay: '0.1s' }}>
+        {categories.map((cat) => {
+          const isActive = currentCategory === cat.value;
+          const href = cat.value === 'ALL' ? '/haberler' : `/haberler?category=${encodeURIComponent(cat.value)}`;
+          return (
+            <Link
+              key={cat.value}
+              href={href}
+              className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-[11px] sm:text-xs font-[800] uppercase tracking-wider whitespace-nowrap transition-all duration-200 border ${
+                isActive
+                  ? 'bg-[#00e5ff]/15 text-[#00e5ff] border-[#00e5ff]/40 shadow-[0_0_15px_rgba(0,229,255,0.2)] glow-cyan-sm'
+                  : 'bg-[#060d18] text-gray-400 border-white/5 hover:border-[#00e5ff]/30 hover:text-white hover:bg-white/[0.02]'
+              }`}
+            >
+              {cat.label}
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* ARTICLES LIST / GRID */}
+      {articles.length === 0 ? (
+        <div className="client-glass max-w-xl mx-auto rounded-3xl p-12 border border-white/5 text-center shadow-[0_0_30px_rgba(0,229,255,0.03)] relative overflow-hidden group my-8 fade-in-up" style={{ animationDelay: '0.2s' }}>
+          <div className="w-16 h-16 rounded-2xl bg-[#00e5ff]/10 text-[#00e5ff] flex items-center justify-center mx-auto border border-[#00e5ff]/20 mb-4 shadow-[0_0_20px_rgba(0,229,255,0.15)]">
+            <Newspaper className="w-8 h-8" />
           </div>
+          <h3 className="text-xl font-bold text-white uppercase tracking-wide mb-2">Henüz Haber Bulunmuyor</h3>
+          <p className="text-sm text-gray-400 leading-relaxed mb-6">
+            {currentCategory !== 'ALL'
+              ? 'Bu kategoride henüz yayınlanmış bir haber bulunmuyor. Diğer kategorileri inceleyebilirsiniz.'
+              : 'Lig duyuruları ve haber bültenleri yayınlandığında burada görüntülenecektir.'}
+          </p>
+          {currentCategory !== 'ALL' && (
+            <Link
+              href="/haberler"
+              className="inline-block px-5 py-2.5 rounded-xl bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/30 text-xs font-bold uppercase tracking-wider hover:bg-[#00e5ff]/20 transition-all glow-cyan-sm"
+            >
+              Tüm Haberleri Göster
+            </Link>
+          )}
         </div>
-
-        {/* Category Filters */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-          {categories.map((cat) => {
-            const isActive = currentCategory === cat.value;
-            const href = cat.value === 'ALL' ? '/haberler' : `/haberler?category=${encodeURIComponent(cat.value)}`;
-            return (
-              <Link
-                key={cat.value}
-                href={href}
-                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-all border ${
-                  isActive
-                    ? 'bg-[#00e5ff] text-black border-[#00e5ff] shadow-[0_0_15px_rgba(0,229,255,0.4)]'
-                    : 'bg-[#060d18] text-gray-400 border-white/5 hover:border-[#00e5ff]/30 hover:text-white'
-                }`}
-              >
-                {cat.label}
+      ) : (
+        <div
+          className={`fade-in-up ${
+            articles.length === 1
+              ? 'max-w-2xl mx-auto'
+              : articles.length === 2
+              ? 'grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-w-5xl mx-auto'
+              : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8'
+          }`}
+          style={{ animationDelay: '0.2s' }}
+        >
+          {articles.map((item) => (
+            <article
+              key={item.id}
+              className="group flex flex-col overflow-hidden rounded-2xl bg-[#060d18] border border-white/5 hover:border-[#00e5ff]/40 transition-all duration-300 hover:shadow-[0_0_30px_rgba(0,229,255,0.12)] hover:-translate-y-1"
+            >
+              {/* Image */}
+              <Link href={`/haberler/${item.slug}`} className="block relative overflow-hidden">
+                <NewsImage
+                  src={item.image_url}
+                  alt={item.title}
+                  category={item.category}
+                  variant="card"
+                />
               </Link>
-            );
-          })}
-        </div>
 
-        {/* Articles List / Grid */}
-        {articles.length === 0 ? (
-          <div className="p-16 rounded-3xl bg-[#060d18] border border-white/5 text-center max-w-xl mx-auto space-y-4">
-            <div className="w-16 h-16 rounded-2xl bg-[#00e5ff]/10 text-[#00e5ff] flex items-center justify-center mx-auto border border-[#00e5ff]/20">
-              <Newspaper className="w-8 h-8" />
-            </div>
-            <h3 className="text-xl font-bold text-white uppercase tracking-wide">Henüz Haber Bulunmuyor</h3>
-            <p className="text-sm text-gray-400 leading-relaxed">
-              {currentCategory !== 'ALL'
-                ? 'Bu kategoride henüz yayınlanmış bir haber bulunmuyor. Diğer kategorileri inceleyebilirsiniz.'
-                : 'Lig duyuruları ve haber bültenleri yayınlandığında burada görüntülenecektir.'}
-            </p>
-            {currentCategory !== 'ALL' && (
-              <Link
-                href="/haberler"
-                className="inline-block mt-2 px-5 py-2 rounded-xl bg-white/5 text-[#00e5ff] text-xs font-bold uppercase tracking-wider hover:bg-white/10 transition-colors"
-              >
-                Tüm Haberleri Göster
-              </Link>
-            )}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {articles.map((item) => (
-              <div
-                key={item.id}
-                className="group flex flex-col overflow-hidden rounded-2xl bg-gradient-to-b from-[#0a1628] to-[#040a14] border border-white/5 hover:border-[#00e5ff]/40 transition-all duration-300 hover:shadow-[0_0_30px_rgba(0,229,255,0.15)] hover:-translate-y-1"
-              >
-                {/* Image */}
-                <Link href={`/haberler/${item.slug}`} className="block">
-                  <NewsImage
-                    src={item.image_url}
-                    alt={item.title}
-                    category={item.category}
-                    variant="card"
-                  />
-                </Link>
+              {/* Content */}
+              <div className="p-6 flex flex-col flex-1">
+                <div className="flex items-center gap-2 text-gray-500 text-xs font-semibold mb-3">
+                  <Calendar className="w-3.5 h-3.5 text-[#00e5ff]" />
+                  <span>
+                    {new Date(item.published_at || item.created_at).toLocaleDateString('tr-TR', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })}
+                  </span>
+                </div>
 
-                {/* Content */}
-                <div className="p-6 flex flex-col flex-1 space-y-3">
-                  <div className="flex items-center gap-2 text-gray-500 text-xs font-semibold">
-                    <Calendar className="w-3.5 h-3.5 text-[#00e5ff]" />
-                    <span>
-                      {new Date(item.published_at || item.created_at).toLocaleDateString('tr-TR', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric',
-                      })}
-                    </span>
+                <h2 className="text-[17px] sm:text-[18px] font-bold text-white leading-snug mb-3">
+                  <Link
+                    href={`/haberler/${item.slug}`}
+                    className="hover:text-[#00e5ff] transition-colors line-clamp-2"
+                  >
+                    {item.title}
+                  </Link>
+                </h2>
+
+                {item.summary && (
+                  <div className="text-gray-400 text-xs sm:text-sm font-medium line-clamp-3 leading-relaxed mb-5 flex-1">
+                    <NewsContent content={item.summary} validUsernames={validUsernames} />
                   </div>
+                )}
 
-                  <h2 className="text-lg font-bold text-white leading-snug">
-                    <Link
-                      href={`/haberler/${item.slug}`}
-                      className="hover:text-[#00e5ff] transition-colors line-clamp-2"
-                    >
-                      {item.title}
-                    </Link>
-                  </h2>
-
-                  {item.summary && (
-                    <p className="text-gray-400 text-xs sm:text-sm font-medium line-clamp-3 leading-relaxed flex-1">
-                      <NewsContent content={item.summary} validUsernames={validUsernames} />
-                    </p>
-                  )}
-
-                  <div className="pt-3 mt-auto border-t border-white/5 flex items-center justify-between text-xs font-bold text-[#00e5ff]">
-                    <Link
-                      href={`/haberler/${item.slug}`}
-                      className="inline-flex items-center gap-1.5 hover:underline group-hover:translate-x-1 transition-transform"
-                    >
-                      <span>Devamını Oku</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </Link>
-                  </div>
+                <div className="pt-4 mt-auto border-t border-white/5 flex items-center justify-between text-xs font-bold text-[#00e5ff]">
+                  <Link
+                    href={`/haberler/${item.slug}`}
+                    className="inline-flex items-center gap-1.5 hover:underline group-hover:translate-x-1 transition-transform"
+                  >
+                    <span>Devamını Oku</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-
-      </div>
+            </article>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
