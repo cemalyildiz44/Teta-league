@@ -306,7 +306,7 @@ export default function AuditLogsClient({
                 logs.map((log) => {
                   const actorName = log.actor?.username
                     ? `@${log.actor.username}`
-                    : log.actor?.full_name || (log.actor_id ? 'Yönetici' : 'Sistem / DB Trigger');
+                    : log.actor?.full_name || (log.actor_id ? 'Yönetici' : 'Admin');
 
                   const targetLabel = log.entity_label || log.new_data?._meta?.entity_label || (log.entity_id ? `#${log.entity_id.substring(0, 8)}` : '-');
 
@@ -484,7 +484,7 @@ export default function AuditLogsClient({
               <div>
                 <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider">İşlemi Yapan</span>
                 <span className="font-semibold text-white mt-0.5 block truncate">
-                  {selectedLog.actor?.username ? `@${selectedLog.actor.username}` : (selectedLog.actor_id ? 'Yönetici' : 'Sistem / DB')}
+                  {selectedLog.actor?.username ? `@${selectedLog.actor.username}` : (selectedLog.actor_id ? 'Yönetici' : 'Admin')}
                 </span>
                 {selectedLog.actor_id && (
                   <span className="text-[10px] text-gray-500 font-mono truncate block">{selectedLog.actor_id}</span>

@@ -52,6 +52,7 @@ export default async function AdminAuditLogsPage({ searchParams }: PageProps) {
     let q = supabase
       .from('audit_logs')
       .select(selectCols, { count: 'exact' })
+      .not('description', 'is', null)
       .order('created_at', { ascending: false })
       .range(from, to);
 
@@ -149,6 +150,7 @@ export default async function AdminAuditLogsPage({ searchParams }: PageProps) {
   const { count: last24hCount } = await supabase
     .from('audit_logs')
     .select('id', { count: 'exact', head: true })
+    .not('description', 'is', null)
     .gte('created_at', twentyFourHoursAgo);
 
   const formattedLogs: AuditLogItem[] = logsData.map((row) => {
