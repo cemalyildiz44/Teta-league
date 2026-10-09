@@ -36,7 +36,9 @@ export async function loginAction(prevState: any, formData: FormData) {
     return { error: 'Hesabınız sistem kurallarını ihlal ettiği gerekçesiyle yasaklanmıştır (BANLI).' };
   }
 
-  redirect('/');
+  const redirectTo = (formData.get('redirectTo') as string)?.trim();
+  const safeRedirect = redirectTo && redirectTo.startsWith('/') && !redirectTo.startsWith('//') ? redirectTo : '/';
+  redirect(safeRedirect);
 }
 
 export async function registerAction(prevState: any, formData: FormData) {

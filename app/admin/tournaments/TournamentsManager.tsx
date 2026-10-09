@@ -1,22 +1,26 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Trophy, Plus, Trash2, ShieldAlert, X, Loader2, Users, CheckCircle2,
-  XCircle, User, Edit3, Calendar, Clock, Search
+  XCircle, User, Edit3, Calendar, Clock, Search, ExternalLink, Award, FileText, Swords,
+  Image as ImageIcon, Eye, AlertTriangle
 } from 'lucide-react';
 import {
-  create1V1WinnerAction, createKarmaWinnerAction, createNightCupAction,
+  create1V1WinnerAction, createKarmaWinnerAction,
   deleteTournamentAction, updateNightCupApplicationStatusAction, assignNightCupWinnerAction,
-  updateNightCupDetailsAction
+  updateNightCupDetailsAction, approveTournamentMatchSubmissionAction, rejectTournamentMatchSubmissionAction
 } from './actions';
 import TeamLogo from '@/components/TeamLogo';
+import TournamentGroupsAdminModal from './TournamentGroupsAdminModal';
+import NightCupCreateWizardModal from './NightCupCreateWizardModal';
 
-export function TournamentsManager({ tournaments, winners, applications, seasons, profiles }: any) {
+export function TournamentsManager({ tournaments, winners, applications, seasons, profiles, groups = [], matches = [], submissions = [] }: any) {
   const router = useRouter();
 
-  const [tab, setTab] = useState<'1V1' | 'KARMA' | 'NIGHT_CUP'>('1V1');
+  const [tab, setTab] = useState<'1V1' | 'KARMA' | 'NIGHT_CUP' | 'SONUC_ONAYLARI'>('1V1');
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
 
@@ -24,10 +28,19 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
   const [winner1V1PlayerSearch, setWinner1V1PlayerSearch] = useState('');
   const [karmaPlayerSearch, setKarmaPlayerSearch] = useState('');
 
+  // Submissions review states
+  const [submissionFilterStatus, setSubmissionFilterStatus] = useState<'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'ALL'>('PENDING_REVIEW');
+  const [submissionTournamentFilter, setSubmissionTournamentFilter] = useState<string>('ALL');
+  const [submissionSearch, setSubmissionSearch] = useState<string>('');
+  const [rejectModalSubmission, setRejectModalSubmission] = useState<any | null>(null);
+  const [rejectionReasonInput, setRejectionReasonInput] = useState<string>('');
+  const [previewImageModal, setPreviewImageModal] = useState<string | null>(null);
+
   const [create1V1Modal, setCreate1V1Modal] = useState(false);
   const [createKarmaModal, setCreateKarmaModal] = useState(false);
   const [createNightCupModal, setCreateNightCupModal] = useState(false);
   const [editNightCupModal, setEditNightCupModal] = useState<any>(null);
+  const [manageGroupsModal, setManageGroupsModal] = useState<any>(null);
 
   const [confirmModal, setConfirmModal] = useState<any>({ isOpen: false });
   const [karmaProfiles, setKarmaProfiles] = useState<string[]>([]);
@@ -58,15 +71,6 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
     else { showFeedback(res.success || '', 'success'); setCreateKarmaModal(false); setKarmaProfiles([]); router.refresh(); }
   };
 
-  const handleCreateNightCup = async (e: any) => {
-    e.preventDefault();
-    setLoading(true);
-    const res = await createNightCupAction(new FormData(e.target));
-    setLoading(false);
-    if (res.error) showFeedback(res.error, 'error');
-    else { showFeedback(res.success || '', 'success'); setCreateNightCupModal(false); router.refresh(); }
-  };
-
   const handleUpdateNightCup = async (e: any) => {
     e.preventDefault();
     setLoading(true);
@@ -87,6 +91,40 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
     setConfirmModal({ isOpen: false });
     if (res.error) showFeedback(res.error, 'error');
     else { showFeedback(res.success || '', 'success'); router.refresh(); }
+  };
+
+  const handleApproveSubmission = async (subId: string) => {
+    setLoading(true);
+    const res = await approveTournamentMatchSubmissionAction(subId);
+    setLoading(false);
+    if (res.error) showFeedback(res.error, 'error');
+    else {
+      showFeedback(res.success || 'Sonuç onaylandı ve maç skoru işlendi.', 'success');
+      router.refresh();
+    }
+  };
+
+  const handleRejectSubmission = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rejectModalSubmission) return;
+    if (!rejectionReasonInput.trim()) {
+      showFeedback('Lütfen bir ret gerekçesi belirtin.', 'error');
+      return;
+    }
+    setLoading(true);
+    const formData = new FormData();
+    formData.append('submission_id', rejectModalSubmission.id);
+    formData.append('rejection_reason', rejectionReasonInput.trim());
+
+    const res = await rejectTournamentMatchSubmissionAction(formData);
+    setLoading(false);
+    if (res.error) showFeedback(res.error, 'error');
+    else {
+      showFeedback(res.success || 'Sonuç reddedildi.', 'success');
+      setRejectModalSubmission(null);
+      setRejectionReasonInput('');
+      router.refresh();
+    }
   };
 
   const toggleKarmaProfile = (id: string) => {
@@ -161,6 +199,27 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
     return false;
   });
 
+  // Submissions calculations
+  const pendingSubmissionsCount = (submissions || []).filter((s: any) => s.status === 'PENDING_REVIEW').length;
+  const approvedSubmissionsCount = (submissions || []).filter((s: any) => s.status === 'APPROVED').length;
+  const rejectedSubmissionsCount = (submissions || []).filter((s: any) => s.status === 'REJECTED').length;
+
+  const filteredSubmissions = (submissions || []).filter((s: any) => {
+    if (submissionFilterStatus !== 'ALL' && s.status !== submissionFilterStatus) return false;
+    if (submissionTournamentFilter !== 'ALL' && s.tournament_id !== submissionTournamentFilter) return false;
+    if (submissionSearch.trim()) {
+      const q = submissionSearch.toLowerCase().trim();
+      const tourName = s.tournament?.name?.toLowerCase() || '';
+      const submitterU = s.submitter?.username?.toLowerCase() || '';
+      const submitterFn = s.submitter?.full_name?.toLowerCase() || '';
+      const teamName = s.team?.team_name?.toLowerCase() || '';
+      const homeName = s.match?.home?.team_name?.toLowerCase() || '';
+      const awayName = s.match?.away?.team_name?.toLowerCase() || '';
+      return tourName.includes(q) || submitterU.includes(q) || submitterFn.includes(q) || teamName.includes(q) || homeName.includes(q) || awayName.includes(q);
+    }
+    return true;
+  });
+
   return (
     <div className='space-y-6'>
       {feedback && (
@@ -171,18 +230,386 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
 
       {/* Tabs */}
       <div className='flex items-center gap-2 bg-[#060d18] p-1.5 rounded-xl border border-white/5'>
-        {(['1V1', 'KARMA', 'NIGHT_CUP'] as const).map(t => (
-          <button
-            key={t} onClick={() => setTab(t)}
-            className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${tab === t ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20' : 'text-zinc-500 hover:text-white'}`}
-          >
-            {t.replace('_', ' ')}
-          </button>
-        ))}
+        {(['1V1', 'KARMA', 'NIGHT_CUP', 'SONUC_ONAYLARI'] as const).map(t => {
+          const isReviewTab = t === 'SONUC_ONAYLARI';
+          return (
+            <button
+              key={t} onClick={() => setTab(t)}
+              className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${tab === t ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20' : 'text-zinc-500 hover:text-white'}`}
+            >
+              <span>{isReviewTab ? 'SONUÇ ONAYLARI' : t.replace('_', ' ')}</span>
+              {isReviewTab && pendingSubmissionsCount > 0 && (
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${tab === 'SONUC_ONAYLARI' ? 'bg-black text-[#00e5ff]' : 'bg-amber-500 text-black animate-pulse'}`}>
+                  {pendingSubmissionsCount}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Action Bar */}
-      <div className='space-y-4'>
+      {/* Tab Content: SONUC_ONAYLARI vs TOURNAMENTS */}
+      {tab === 'SONUC_ONAYLARI' ? (
+        <div className="space-y-6">
+          {/* Filter & Search Bar */}
+          <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-[#0a1628] p-4 rounded-2xl border border-white/5">
+            {/* Status Filter Tabs */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setSubmissionFilterStatus('PENDING_REVIEW')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 ${
+                  submissionFilterStatus === 'PENDING_REVIEW'
+                    ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20'
+                    : 'bg-white/5 text-zinc-400 hover:text-white'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>Onay Bekliyor</span>
+                {pendingSubmissionsCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-black/40 text-white">
+                    {pendingSubmissionsCount}
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => setSubmissionFilterStatus('APPROVED')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 ${
+                  submissionFilterStatus === 'APPROVED'
+                    ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
+                    : 'bg-white/5 text-zinc-400 hover:text-white'
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Onaylananlar ({approvedSubmissionsCount})</span>
+              </button>
+
+              <button
+                onClick={() => setSubmissionFilterStatus('REJECTED')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 ${
+                  submissionFilterStatus === 'REJECTED'
+                    ? 'bg-red-500 text-white shadow-lg shadow-red-500/20'
+                    : 'bg-white/5 text-zinc-400 hover:text-white'
+                }`}
+              >
+                <XCircle className="w-3.5 h-3.5" />
+                <span>Reddedilenler ({rejectedSubmissionsCount})</span>
+              </button>
+
+              <button
+                onClick={() => setSubmissionFilterStatus('ALL')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                  submissionFilterStatus === 'ALL'
+                    ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20'
+                    : 'bg-white/5 text-zinc-400 hover:text-white'
+                }`}
+              >
+                Tümü ({(submissions || []).length})
+              </button>
+            </div>
+
+            {/* Tournament Dropdown & Search Input */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+              <select
+                value={submissionTournamentFilter}
+                onChange={(e) => setSubmissionTournamentFilter(e.target.value)}
+                className="w-full sm:w-auto bg-[#060d18] border border-white/10 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:border-cyan-500"
+              >
+                <option value="ALL">Tüm Turnuvalar</option>
+                {tournaments
+                  .filter((t: any) => t.type === 'NIGHT_CUP')
+                  .map((t: any) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+              </select>
+
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+                <input
+                  type="text"
+                  placeholder="Takım, oyuncu veya maç ara..."
+                  value={submissionSearch}
+                  onChange={(e) => setSubmissionSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-[#060d18] border border-white/10 rounded-xl text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Submissions Cards */}
+          {filteredSubmissions.length === 0 ? (
+            <div className="py-24 text-center text-zinc-500 font-mono text-sm card-surface rounded-2xl border border-white/5 space-y-2">
+              <Trophy className="w-10 h-10 text-zinc-600 mx-auto opacity-50" />
+              <p>Kriterlere uygun sonuç bildirimi bulunamadı.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredSubmissions.map((sub: any) => {
+                const isPending = sub.status === 'PENDING_REVIEW';
+                const isApproved = sub.status === 'APPROVED';
+                const isRejected = sub.status === 'REJECTED';
+                const homeTeam = sub.match?.home;
+                const awayTeam = sub.match?.away;
+
+                return (
+                  <div
+                    key={sub.id}
+                    className="bg-[#0a1628] rounded-2xl border border-white/5 hover:border-cyan-500/20 transition-all p-5 md:p-6 space-y-5 shadow-xl"
+                  >
+                    {/* Header */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                          <Trophy className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-base font-black text-white uppercase tracking-wider">
+                            {sub.tournament?.name || 'Turnuva'}
+                          </h4>
+                          <span className="text-[11px] font-bold text-zinc-400 uppercase">
+                            {sub.match ? `${sub.match.round_number}. Hafta • Maç #${sub.match.match_order}` : 'Grup Maçı'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-zinc-400 font-mono">
+                          {formatDateTime(sub.created_at)}
+                        </span>
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
+                            isPending
+                              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse'
+                              : isApproved
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                              : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                          }`}
+                        >
+                          {isPending
+                            ? 'ONAY BEKLİYOR'
+                            : isApproved
+                            ? 'ONAYLANDI'
+                            : 'REDDEDİLDİ'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Main Content: 3-column layout */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                      {/* Column 1: Match Score & Goalscorers (5 cols) */}
+                      <div className="lg:col-span-5 bg-black/40 rounded-2xl border border-white/5 p-4 space-y-4">
+                        {/* Score display */}
+                        <div className="flex items-center justify-between gap-3">
+                          {/* Home */}
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <TeamLogo src={homeTeam?.logo_url} name={homeTeam?.team_name} size="sm" />
+                            <span className="font-black text-xs sm:text-sm text-white uppercase truncate">
+                              {homeTeam?.team_name || 'Ev Sahibi'}
+                            </span>
+                          </div>
+
+                          {/* Big Score Box */}
+                          <div className="px-4 py-2 rounded-xl bg-black/80 border border-cyan-500/30 text-center shrink-0">
+                            <span className="text-xl sm:text-2xl font-black text-[#00e5ff] font-mono tracking-wider">
+                              {sub.home_score} - {sub.away_score}
+                            </span>
+                          </div>
+
+                          {/* Away */}
+                          <div className="flex items-center justify-end gap-2 flex-1 min-w-0 text-right">
+                            <span className="font-black text-xs sm:text-sm text-white uppercase truncate">
+                              {awayTeam?.team_name || 'Deplasman'}
+                            </span>
+                            <TeamLogo src={awayTeam?.logo_url} name={awayTeam?.team_name} size="sm" />
+                          </div>
+                        </div>
+
+                        {/* Goalscorers breakdown */}
+                        <div className="pt-3 border-t border-white/5 space-y-2">
+                          <span className="text-[10px] font-black text-zinc-400 uppercase tracking-wider block">
+                            BİLDİRİLEN GOLCÜLER ({sub.goals?.length || 0})
+                          </span>
+
+                          {(!sub.goals || sub.goals.length === 0) ? (
+                            <p className="text-xs text-zinc-500 italic">
+                              {sub.home_score === 0 && sub.away_score === 0 ? 'Gol yok (0-0 berabere).' : 'Golcü kaydı girilmedi.'}
+                            </p>
+                          ) : (
+                            <div className="grid grid-cols-2 gap-3 text-xs">
+                              {/* Home goals */}
+                              <div className="space-y-1">
+                                {sub.goals
+                                  .filter((g: any) => g.team_application_id === sub.match?.home?.id || g.team_application_id === homeTeam?.id || g.team_application_id === sub.submitted_team_application_id)
+                                  .map((g: any) => (
+                                    <div key={g.id} className="flex items-center gap-1.5 text-zinc-300">
+                                      <span className="text-emerald-400">⚽</span>
+                                      <span className="font-bold truncate">{g.player?.username || g.player_name || 'Oyuncu'}</span>
+                                      {g.goals > 1 && <span className="text-zinc-500 font-black">({g.goals})</span>}
+                                      {g.is_own_goal && <span className="text-red-400 text-[10px] font-black">(K.K.)</span>}
+                                    </div>
+                                  ))}
+                              </div>
+
+                              {/* Away goals */}
+                              <div className="space-y-1 text-right">
+                                {sub.goals
+                                  .filter((g: any) => g.team_application_id === sub.match?.away?.id || g.team_application_id === awayTeam?.id)
+                                  .map((g: any) => (
+                                    <div key={g.id} className="flex items-center justify-end gap-1.5 text-zinc-300">
+                                      {g.is_own_goal && <span className="text-red-400 text-[10px] font-black">(K.K.)</span>}
+                                      {g.goals > 1 && <span className="text-zinc-500 font-black">({g.goals})</span>}
+                                      <span className="font-bold truncate">{g.player?.username || g.player_name || 'Oyuncu'}</span>
+                                      <span className="text-emerald-400">⚽</span>
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Column 2: Submitter & Notes (4 cols) */}
+                      <div className="lg:col-span-4 space-y-3">
+                        {/* Submitter */}
+                        <div className="p-3.5 rounded-xl bg-black/30 border border-white/5 space-y-2">
+                          <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block">
+                            BİLDİRİMİ YAPAN TEMSİLCİ
+                          </span>
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-zinc-800 overflow-hidden border border-white/10 shrink-0">
+                              {sub.submitter?.avatar_url ? (
+                                <img src={sub.submitter.avatar_url} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-zinc-400">
+                                  <User className="w-4 h-4" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <span className="text-xs font-black text-white block truncate">
+                                @{sub.submitter?.username || 'Kullanıcı'}
+                              </span>
+                              {sub.submitter?.full_name && (
+                                <span className="text-[11px] text-zinc-400 block truncate">
+                                  {sub.submitter.full_name}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 pt-1 border-t border-white/5 text-[11px] text-zinc-400">
+                            <span className="font-bold">Takım:</span>
+                            <span className="text-cyan-400 font-bold truncate">
+                              {sub.team?.team_name || 'Takım'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Notes */}
+                        {sub.notes && (
+                          <div className="p-3 rounded-xl bg-black/20 border border-white/5 text-xs text-zinc-300">
+                            <span className="text-[10px] font-black text-zinc-500 uppercase tracking-wider block mb-1">
+                              Açıklama / Not:
+                            </span>
+                            <p className="italic">{sub.notes}</p>
+                          </div>
+                        )}
+
+                        {/* If Rejected: Rejection Reason */}
+                        {isRejected && sub.rejection_reason && (
+                          <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-300 space-y-1">
+                            <div className="font-black text-red-200 uppercase tracking-wider flex items-center gap-1.5">
+                              <AlertTriangle className="w-3.5 h-3.5" /> Ret Gerekçesi
+                            </div>
+                            <p>{sub.rejection_reason}</p>
+                          </div>
+                        )}
+
+                        {/* If Approved: Info */}
+                        {isApproved && (
+                          <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-300 flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                            <span>Bu skor onaylanarak puan tablosuna işlenmiştir.</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Column 3: Screenshot Proof & Action Buttons (3 cols) */}
+                      <div className="lg:col-span-3 space-y-4">
+                        {/* Screenshot Thumbnail */}
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block">
+                            MAÇ KANITI (EKRAN GÖRÜNTÜSÜ)
+                          </span>
+                          {sub.screenshot_url ? (
+                            <div className="relative group rounded-xl overflow-hidden border border-white/10 bg-black/60 aspect-video flex items-center justify-center">
+                              <img
+                                src={sub.screenshot_url}
+                                alt="Maç Kanıtı"
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                              />
+                              <button
+                                onClick={() => setPreviewImageModal(sub.screenshot_url)}
+                                className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white font-black text-xs uppercase cursor-pointer"
+                              >
+                                <Eye className="w-4 h-4" /> Büyüt
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="p-4 rounded-xl bg-black/40 border border-white/5 text-center text-xs text-zinc-500">
+                              Görsel yüklenmedi
+                            </div>
+                          )}
+                          {sub.screenshot_url && (
+                            <a
+                              href={sub.screenshot_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[11px] text-cyan-400 hover:underline flex items-center gap-1 justify-end font-bold"
+                            >
+                              <ExternalLink className="w-3 h-3" /> Yeni Sekmede Aç
+                            </a>
+                          )}
+                        </div>
+
+                        {/* Actions for Pending */}
+                        {isPending && (
+                          <div className="space-y-2 pt-2 border-t border-white/5">
+                            <button
+                              disabled={loading}
+                              onClick={() => handleApproveSubmission(sub.id)}
+                              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-black font-black text-xs uppercase tracking-wider hover:brightness-110 shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                            >
+                              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                              <span>Sonucu Onayla</span>
+                            </button>
+
+                            <button
+                              disabled={loading}
+                              onClick={() => {
+                                setRejectModalSubmission(sub);
+                                setRejectionReasonInput('');
+                              }}
+                              className="w-full py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                            >
+                              <XCircle className="w-4 h-4" />
+                              <span>Reddet</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Action Bar */
+        <div className='space-y-4'>
         <div className='flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center'>
           <div className='relative w-full sm:w-80'>
             <Search className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500' />
@@ -277,10 +704,18 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
 
                       {tab === 'NIGHT_CUP' && (
                         <>
+                          {tour.prize && (
+                            <span className='inline-flex items-center gap-1.5 text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded border border-yellow-500/20'>
+                              <Award className='w-3.5 h-3.5 text-yellow-400' />
+                              Ödül: <strong className='text-yellow-300'>{tour.prize}</strong>
+                            </span>
+                          )}
+
                           <span className='inline-flex items-center gap-1.5 text-zinc-500'>
                             <Users className='w-3.5 h-3.5 text-cyan-400' />
                             Başvuru: <strong className='text-white'>{tourApps.length}</strong>
                             {tour.max_teams && <span className='text-zinc-500'>/ {tour.max_teams}</span>}
+                            <span className='text-emerald-400 font-bold'>({tourApps.filter((a: any) => a.status === 'APPROVED').length} Onaylı)</span>
                           </span>
 
                           {tour.tournament_date && (
@@ -301,15 +736,34 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
                   </div>
 
                   {/* Actions */}
-                  <div className='flex items-center gap-2 self-start'>
+                  <div className='flex items-center gap-2 self-start flex-wrap'>
                     {tab === 'NIGHT_CUP' && (
-                      <button
-                        onClick={() => setEditNightCupModal(tour)}
-                        className='p-2 bg-white/5 hover:bg-white/10 text-cyan-400 rounded-lg transition-colors border border-white/10'
-                        title='Night Cup Bilgilerini Düzenle'
-                      >
-                        <Edit3 className='w-4 h-4'/>
-                      </button>
+                      <>
+                        <Link
+                          href={`/turnuvalar/${tour.id}`}
+                          target='_blank'
+                          className='px-2.5 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 rounded-lg transition-colors border border-cyan-500/30 text-xs font-bold inline-flex items-center gap-1.5'
+                          title='Turnuva Genel Detay Sayfasını Aç'
+                        >
+                          <ExternalLink className='w-3.5 h-3.5' />
+                          <span>Sayfayı Gör</span>
+                        </Link>
+                        <button
+                          onClick={() => setManageGroupsModal(tour)}
+                          className='px-2.5 py-1.5 bg-[#00e5ff]/15 hover:bg-[#00e5ff]/25 text-[#00e5ff] rounded-lg transition-colors border border-[#00e5ff]/30 text-xs font-black inline-flex items-center gap-1.5'
+                          title='Grup ve Fikstür Yönetimi'
+                        >
+                          <Swords className='w-3.5 h-3.5' />
+                          <span>Grup & Fikstür</span>
+                        </button>
+                        <button
+                          onClick={() => setEditNightCupModal(tour)}
+                          className='p-2 bg-white/5 hover:bg-white/10 text-cyan-400 rounded-lg transition-colors border border-white/10'
+                          title='Night Cup Bilgilerini Düzenle'
+                        >
+                          <Edit3 className='w-4 h-4'/>
+                        </button>
+                      </>
                     )}
                     <button
                       onClick={() => setConfirmModal({ action: () => handleAction(deleteTournamentAction, tour.id), title: 'Turnuvayı Sil', type: 'danger', message: 'Bu turnuvayı silmek istiyor musunuz? İlgili kazanan ve başvuru kayıtları da silinecektir.' })}
@@ -444,6 +898,7 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
           })
         )}
       </div>
+      )}
 
       {/* 1V1 Create Modal */}
       {create1V1Modal && (
@@ -556,60 +1011,63 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
         </div>
       )}
 
-      {/* Night Cup Create Modal */}
+      {/* Night Cup 5-Step Create Wizard Modal */}
       {createNightCupModal && (
-        <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm'>
-          <div className='card-surface w-full max-w-md rounded-2xl border border-white/10 overflow-hidden shadow-2xl max-h-[90vh] overflow-y-auto'>
-            <div className='p-6 border-b border-white/5 flex justify-between items-center shrink-0'>
-              <h3 className='text-lg font-black text-white uppercase tracking-widest'>YENİ NIGHT CUP</h3>
-              <button onClick={() => setCreateNightCupModal(false)} className='text-zinc-500 hover:text-white'><X className='w-5 h-5'/></button>
-            </div>
-            <form onSubmit={handleCreateNightCup} className='p-6 space-y-4'>
-              <div><label className='block text-xs font-bold text-zinc-400 mb-1'>KUPA ADI</label><input required name='name' type='text' className='input-field'/></div>
-              <div>
-                <label className='block text-xs font-bold text-zinc-400 mb-1'>SEZON</label>
-                <select required name='season_id' className='input-field'>
-                  <option value=''>Seçiniz</option>
-                  {seasons.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              </div>
-              <div className='flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/5'>
-                <input type='checkbox' name='is_registration_open' value='true' id='reg_open' className='w-5 h-5 accent-cyan-500'/>
-                <label htmlFor='reg_open' className='text-sm font-bold text-white uppercase tracking-widest cursor-pointer'>BAŞVURULARI AÇ</label>
-              </div>
-              <div className='grid grid-cols-2 gap-4'>
-                <div><label className='block text-xs font-bold text-zinc-400 mb-1'>BAŞVURU BAŞLANGIÇ</label><input name='registration_start' type='datetime-local' className='input-field text-xs'/></div>
-                <div><label className='block text-xs font-bold text-zinc-400 mb-1'>BAŞVURU BİTİŞ</label><input name='registration_end' type='datetime-local' className='input-field text-xs'/></div>
-              </div>
-              <div className='grid grid-cols-2 gap-4'>
-                <div><label className='block text-xs font-bold text-zinc-400 mb-1'>MAÇ TARİHİ</label><input name='tournament_date' type='datetime-local' className='input-field text-xs'/></div>
-                <div><label className='block text-xs font-bold text-zinc-400 mb-1'>KONTENJAN</label><input name='max_teams' type='number' min="1" placeholder='Sınırsız' className='input-field'/></div>
-              </div>
-              <div><label className='block text-xs font-bold text-zinc-400 mb-1'>AÇIKLAMA</label><input name='description' type='text' className='input-field'/></div>
-              <div><label className='block text-xs font-bold text-zinc-400 mb-1'>GÖRSEL</label><input name='image_file' type='file' accept='image/*' className='input-field text-sm'/></div>
-              <button disabled={loading} className='btn-primary w-full py-3 mt-4'>KAYDET</button>
-            </form>
-          </div>
-        </div>
+        <NightCupCreateWizardModal
+          isOpen={createNightCupModal}
+          onClose={() => setCreateNightCupModal(false)}
+          seasons={seasons}
+          onSuccess={(msg) => {
+            showFeedback(msg, 'success');
+            setCreateNightCupModal(false);
+            router.refresh();
+          }}
+          onError={(msg) => {
+            showFeedback(msg, 'error');
+          }}
+        />
       )}
 
       {/* Night Cup Edit Modal */}
       {editNightCupModal && (
         <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm'>
-          <div className='card-surface w-full max-w-md rounded-2xl border border-white/10 overflow-hidden shadow-2xl max-h-[90vh] overflow-y-auto'>
+          <div className='card-surface w-full max-w-2xl rounded-2xl border border-white/10 overflow-hidden shadow-2xl max-h-[92vh] flex flex-col'>
             <div className='p-6 border-b border-white/5 flex justify-between items-center shrink-0'>
               <h3 className='text-lg font-black text-white uppercase tracking-widest flex items-center gap-2'>
                 <Edit3 className='w-4 h-4 text-cyan-400' />
-                NIGHT CUP DÜZENLE
+                NIGHT CUP DÜZENLE: {editNightCupModal.name}
               </h3>
               <button onClick={() => setEditNightCupModal(null)} className='text-zinc-500 hover:text-white'><X className='w-5 h-5'/></button>
             </div>
-            <form onSubmit={handleUpdateNightCup} className='p-6 space-y-4'>
+            <form onSubmit={handleUpdateNightCup} className='p-6 space-y-4 overflow-y-auto flex-1'>
               <input type='hidden' name='tournament_id' value={editNightCupModal.id} />
 
-              <div>
-                <label className='block text-xs font-bold text-zinc-400 mb-1'>KUPA ADI</label>
-                <input required name='name' type='text' defaultValue={editNightCupModal.name} className='input-field'/>
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                <div>
+                  <label className='block text-xs font-bold text-zinc-400 mb-1'>TURNUVA ADI <span className='text-red-400'>*</span></label>
+                  <input required name='name' type='text' defaultValue={editNightCupModal.name} className='input-field'/>
+                </div>
+                <div>
+                  <label className='block text-xs font-bold text-zinc-400 mb-1'>TURNUVA DURUMU</label>
+                  <select name='status' defaultValue={editNightCupModal.status || 'REGISTRATION'} className='input-field'>
+                    <option value='REGISTRATION'>Başvuru Sürecinde (Açık)</option>
+                    <option value='DRAFT'>Taslak (Gizli)</option>
+                    <option value='IN_PROGRESS'>Devam Ediyor (Maçlar Oynanıyor)</option>
+                    <option value='COMPLETED'>Tamamlandı (Şampiyon Belirlendi)</option>
+                    <option value='ARCHIVED'>Arşivlendi</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                <div>
+                  <label className='block text-xs font-bold text-zinc-400 mb-1'>ÖDÜL BİLGİSİ</label>
+                  <input name='prize' type='text' defaultValue={editNightCupModal.prize || ''} placeholder='Örn: 5.000 TL + Kupa' className='input-field'/>
+                </div>
+                <div>
+                  <label className='block text-xs font-bold text-zinc-400 mb-1'>DISCORD BAĞLANTISI</label>
+                  <input name='discord_url' type='url' defaultValue={editNightCupModal.discord_url || ''} placeholder='https://discord.gg/...' className='input-field text-xs'/>
+                </div>
               </div>
 
               <div className='flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/5'>
@@ -649,7 +1107,7 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
 
               <div className='grid grid-cols-2 gap-4'>
                 <div>
-                  <label className='block text-xs font-bold text-zinc-400 mb-1'>MAÇ TARİHİ</label>
+                  <label className='block text-xs font-bold text-zinc-400 mb-1'>MAÇ / BAŞLANGIÇ TARİHİ</label>
                   <input
                     name='tournament_date'
                     type='datetime-local'
@@ -670,8 +1128,33 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
                 </div>
               </div>
 
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                <div>
+                  <label className='block text-xs font-bold text-zinc-400 mb-1'>GRUP BAŞINA TAKIM</label>
+                  <input
+                    name='teams_per_group'
+                    type='number'
+                    min="2"
+                    max="16"
+                    defaultValue={editNightCupModal.teams_per_group || 4}
+                    className='input-field'
+                  />
+                </div>
+                <div>
+                  <label className='block text-xs font-bold text-zinc-400 mb-1'>ELEME TURUNA ÇIKACAK TAKIM</label>
+                  <input
+                    name='advancing_teams_per_group'
+                    type='number'
+                    min="1"
+                    max="8"
+                    defaultValue={editNightCupModal.advancing_teams_per_group || 2}
+                    className='input-field'
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className='block text-xs font-bold text-zinc-400 mb-1'>AÇIKLAMA</label>
+                <label className='block text-xs font-bold text-zinc-400 mb-1'>KISA AÇIKLAMA</label>
                 <input
                   name='description'
                   type='text'
@@ -680,18 +1163,43 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
                 />
               </div>
 
+              <div>
+                <label className='block text-xs font-bold text-zinc-400 mb-1'>TURNUVA KURALLARI</label>
+                <textarea
+                  name='rules'
+                  rows={4}
+                  defaultValue={editNightCupModal.rules || ''}
+                  className='input-field resize-y text-xs font-mono'
+                />
+              </div>
+
+              <div>
+                <label className='block text-xs font-bold text-zinc-400 mb-1'>DETAYLAR & BAŞVURU REHBERİ</label>
+                <textarea
+                  name='details'
+                  rows={4}
+                  defaultValue={editNightCupModal.details || ''}
+                  className='input-field resize-y text-xs font-mono'
+                />
+              </div>
+
+              <div>
+                <label className='block text-xs font-bold text-zinc-400 mb-1'>YENİ KAPAK GÖRSELİ (İSTEĞE BAĞLI)</label>
+                <input name='image_file' type='file' accept='image/*' className='input-field text-sm'/>
+              </div>
+
               <div className='flex gap-3 pt-2'>
                 <button
                   type='button'
                   onClick={() => setEditNightCupModal(null)}
-                  className='flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs'
+                  className='flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs'
                 >
                   İPTAL
                 </button>
                 <button
                   disabled={loading}
                   type='submit'
-                  className='btn-primary flex-1 py-2.5 text-xs font-black'
+                  className='btn-primary flex-1 py-3 text-xs font-black'
                 >
                   {loading ? <Loader2 className='w-4 h-4 animate-spin mx-auto'/> : 'GÜNCELLE'}
                 </button>
@@ -699,6 +1207,19 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
             </form>
           </div>
         </div>
+      )}
+
+      {/* Manage Groups & Fixtures Modal */}
+      {manageGroupsModal && (
+        <TournamentGroupsAdminModal
+          tournament={manageGroupsModal}
+          approvedApplications={applications.filter(
+            (a: any) => a.tournament_id === manageGroupsModal.id && a.status === 'APPROVED'
+          )}
+          groups={groups.filter((g: any) => g.tournament_id === manageGroupsModal.id)}
+          matches={matches.filter((m: any) => m.tournament_id === manageGroupsModal.id)}
+          onClose={() => setManageGroupsModal(null)}
+        />
       )}
 
       {/* Confirm Modal */}
@@ -716,6 +1237,115 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
                   {loading ? <Loader2 className='w-4 h-4 animate-spin mx-auto'/> : 'ONAYLA'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REJECT SUBMISSION MODAL */}
+      {rejectModalSubmission && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+          <div className="bg-[#0a1628] w-full max-w-lg rounded-3xl border border-white/10 p-6 md:p-8 space-y-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400">
+                  <XCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-white uppercase tracking-wider">
+                    Skor Bildirimini Reddet
+                  </h3>
+                  <span className="text-xs text-zinc-400 font-bold">
+                    {rejectModalSubmission.match?.home?.team_name || 'Ev Sahibi'} vs{' '}
+                    {rejectModalSubmission.match?.away?.team_name || 'Deplasman'}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setRejectModalSubmission(null)}
+                className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRejectSubmission} className="space-y-4">
+              <div className="space-y-2">
+                <label className="block text-xs font-black text-zinc-300 uppercase tracking-wider">
+                  RET NEDENİ / GEREKÇE <span className="text-red-400">*</span>
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  value={rejectionReasonInput}
+                  onChange={(e) => setRejectionReasonInput(e.target.value)}
+                  placeholder="Örn: Yüklenen ekran görüntüsü net değil veya skor bilgisi ile uyuşmuyor. Lütfen skoru ve golcüleri kontrol ederek tekrar iletiniz."
+                  className="w-full bg-black/50 border border-white/10 rounded-2xl p-4 text-xs text-white placeholder:text-zinc-600 focus:border-red-500 outline-none transition-all resize-none"
+                />
+                <p className="text-[11px] text-zinc-400 leading-relaxed">
+                  * Bu gerekçe takım temsilcisine gösterilecek ve maçı düzelterek yeniden göndermesine izin verilecektir.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/5">
+                <button
+                  type="button"
+                  onClick={() => setRejectModalSubmission(null)}
+                  className="px-5 py-2.5 rounded-xl bg-white/5 text-zinc-400 font-bold text-xs uppercase tracking-wider hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  Vazgeç
+                </button>
+                <button
+                  disabled={loading}
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-black text-xs uppercase tracking-wider transition-colors disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-red-500/20 cursor-pointer"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                  <span>Reddet ve Bildir</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* SCREENSHOT LIGHTBOX MODAL */}
+      {previewImageModal && (
+        <div
+          onClick={() => setPreviewImageModal(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-md cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-w-4xl max-h-[90vh] bg-[#0a1628] rounded-2xl border border-white/20 overflow-hidden shadow-2xl flex flex-col"
+          >
+            <div className="p-3 bg-black/60 border-b border-white/10 flex items-center justify-between">
+              <span className="text-xs font-black text-zinc-300 uppercase tracking-widest flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-cyan-400" /> Maç Kanıtı Ekran Görüntüsü
+              </span>
+              <div className="flex items-center gap-3">
+                <a
+                  href={previewImageModal}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-cyan-400 hover:underline flex items-center gap-1 font-bold"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" /> Orijinal Boyut
+                </a>
+                <button
+                  onClick={() => setPreviewImageModal(null)}
+                  className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="p-2 overflow-auto flex items-center justify-center bg-black/40">
+              <img
+                src={previewImageModal}
+                alt="Maç Kanıtı"
+                className="max-h-[80vh] w-auto object-contain rounded-lg shadow-xl"
+              />
             </div>
           </div>
         </div>

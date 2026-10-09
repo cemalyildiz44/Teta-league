@@ -13,6 +13,7 @@ function LoginForm() {
   const [state, formAction, isPending] = useActionState(loginAction as any, initialState);
   const searchParams = useSearchParams();
   const errorParam = searchParams.get('error');
+  const redirectTo = searchParams.get('redirectTo') || searchParams.get('next') || '';
   let urlError = '';
   if (errorParam === 'invalid_link') urlError = 'Şifre sıfırlama bağlantısı geçersiz veya süresi dolmuş.';
   if (errorParam === 'invalid_verification') urlError = 'E-posta doğrulama bağlantısı geçersiz, kullanılmış veya süresi dolmuş.';
@@ -35,6 +36,7 @@ function LoginForm() {
         )}
 
           <form action={formAction} className="space-y-4">
+            {redirectTo && <input type="hidden" name="redirectTo" value={redirectTo} />}
             <div>
               <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
                 E-posta

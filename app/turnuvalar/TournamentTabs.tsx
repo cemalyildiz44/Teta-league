@@ -49,7 +49,7 @@ export default function TournamentTabs({
     if (ncProfiles.includes(id)) {
       setNcProfiles(ncProfiles.filter(p => p !== id));
     } else {
-      if (ncProfiles.length >= 11) return showFeedback('En fazla 11 oyuncu seçebilirsiniz.', 'error');
+      if (ncProfiles.length >= 20) return showFeedback('En fazla 20 oyuncu seçebilirsiniz.', 'error');
       setNcProfiles([...ncProfiles, id]);
     }
   };
@@ -93,13 +93,15 @@ export default function TournamentTabs({
             const tWinners = winners.filter((w: any) => w.tournament_id === tour.id);
             const hasWinner = tWinners.length > 0;
             const tApps = applications.filter((a: any) => a.tournament_id === tour.id);
+            const approvedApps = tApps.filter((a: any) => a.status === 'APPROVED');
             const userApp = currentUser ? tApps.find((a: any) => a.applicant_id === currentUser.id) : null;
             
-            let isOpen = tour.is_registration_open;
+            let isOpen = tour.is_registration_open !== false;
             const now = new Date();
+            if (tour.status && tour.status !== 'REGISTRATION') isOpen = false;
             if (tour.registration_start && new Date(tour.registration_start) > now) isOpen = false;
             if (tour.registration_end && new Date(tour.registration_end) < now) isOpen = false;
-            if (tour.max_teams && tApps.length >= tour.max_teams) isOpen = false;
+            if (tour.max_teams && approvedApps.length >= tour.max_teams) isOpen = false;
 
             return (
               <div key={tour.id} className='relative group h-full'>
@@ -109,17 +111,24 @@ export default function TournamentTabs({
                   {/* Header */}
                   <div className='flex items-center gap-5 mb-6'>
                     <div className='w-20 h-20 rounded-2xl bg-black/50 border border-white/5 flex items-center justify-center shrink-0 overflow-hidden shadow-inner'>
-                      {tour.image_url ? (
-                        <img src={tour.image_url} alt={tour.name} className='w-full h-full object-cover' />
+                      {tour.banner_url || tour.image_url ? (
+                        <img src={tour.banner_url || tour.image_url} alt={tour.name} className='w-full h-full object-cover' />
                       ) : (
                         <Trophy className='w-8 h-8 text-[#00e5ff]/50' />
                       )}
                     </div>
-                    <div>
-                      <span className='px-2.5 py-1 rounded bg-white/5 text-xs font-bold text-[#00e5ff] uppercase tracking-widest mb-2 block w-max'>
-                        {tour.seasons?.name || 'Sezon'}
-                      </span>
-                      <h3 className='text-lg font-black text-white uppercase tracking-wider leading-tight'>
+                    <div className='flex-1 min-w-0'>
+                      <div className='flex items-center gap-2 mb-2 flex-wrap'>
+                        <span className='px-2.5 py-1 rounded bg-white/5 text-xs font-bold text-[#00e5ff] uppercase tracking-widest block w-max'>
+                          {tour.seasons?.name || 'Sezon'}
+                        </span>
+                        {tour.prize && (
+                          <span className='px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-black uppercase tracking-wider'>
+                            🏆 {tour.prize}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className='text-lg font-black text-white uppercase tracking-wider leading-tight truncate'>
                         {tour.name}
                       </h3>
                     </div>
@@ -184,11 +193,11 @@ export default function TournamentTabs({
                         <>
                           <div className='grid grid-cols-2 gap-4 text-[10px] font-bold uppercase tracking-widest text-zinc-500'>
                             <div>
-                              <span className='block mb-1 text-zinc-600 flex items-center gap-1'><Calendar className='w-3 h-3'/> Başvuru Bitiş</span>
+                              <span className='mb-1 text-zinc-600 flex items-center gap-1'><Calendar className='w-3 h-3'/> Başvuru Bitiş</span>
                               <span className='text-zinc-300'>{tour.registration_end ? new Date(tour.registration_end).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }) : 'Belirtilmedi'}</span>
                             </div>
                             <div>
-                              <span className='block mb-1 text-zinc-600 flex items-center gap-1'><Trophy className='w-3 h-3'/> Maç Tarihi</span>
+                              <span className='mb-1 text-zinc-600 flex items-center gap-1'><Trophy className='w-3 h-3'/> Turnuva Tarihi</span>
                               <span className='text-zinc-300'>{tour.tournament_date ? new Date(tour.tournament_date).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }) : 'Belirtilmedi'}</span>
                             </div>
                           </div>
@@ -196,32 +205,74 @@ export default function TournamentTabs({
                           <div className='flex items-center justify-between p-3 rounded-xl bg-black/40 border border-white/5'>
                             <div>
                               <span className='block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1'>KONTENJAN</span>
-                              <span className='text-sm font-black text-white'>{tApps.length} / {tour.max_teams || '?'} Takım</span>
+                              <span className='text-sm font-black text-white'>
+                                {approvedApps.length} / {tour.max_teams || '∞'} Onaylı Takım
+                              </span>
+                              {tApps.length > approvedApps.length && (
+                                <span className='block text-[9px] text-zinc-500 font-semibold'>({tApps.length} toplam başvuru)</span>
+                              )}
                             </div>
-                            <span className={`px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest ${isOpen ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                              {isOpen ? 'AÇIK' : 'KAPALI'}
+                            <span className={`px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest ${isOpen ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
+                              {isOpen ? 'KAYIT AÇIK' : 'KAYIT KAPALI'}
                             </span>
                           </div>
 
-                          {userApp ? (
+                          {userApp && (
                             <div className='p-3 text-center rounded-xl bg-cyan-500/10 border border-cyan-500/20'>
-                              <span className='text-xs font-black text-cyan-400 uppercase tracking-widest block mb-1'>BAŞVURUNUZ ALINDI</span>
-                              <span className='text-[10px] font-bold text-cyan-500 uppercase'>DURUM: {userApp.status}</span>
+                              <div className='flex items-center justify-between'>
+                                <span className='text-[10px] font-bold text-zinc-400 uppercase tracking-widest'>BAŞVURU DURUMU</span>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
+                                  userApp.status === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-400' :
+                                  userApp.status === 'REJECTED' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'
+                                }`}>
+                                  {userApp.status === 'APPROVED' ? 'ONAYLANDI' : userApp.status === 'REJECTED' ? 'REDDEDİLDİ' : 'BEKLEMEDE'}
+                                </span>
+                              </div>
                             </div>
-                          ) : (
-                            <button
-                              onClick={() => {
-                                if (!currentUser) router.push('/giris');
-                                else setApplyModal(tour);
-                              }}
-                              disabled={!isOpen}
-                              className='w-full py-3.5 rounded-xl bg-[#00e5ff] text-black font-black uppercase tracking-widest text-xs hover:bg-[#00c5ff] hover:shadow-[0_0_20px_rgba(0,229,255,0.3)] transition-all disabled:opacity-50 disabled:pointer-events-none'
-                            >
-                              KATIL
-                            </button>
                           )}
+
+                          <div className='grid grid-cols-2 gap-2 pt-2'>
+                            <Link
+                              href={`/turnuvalar/${tour.id}`}
+                              className='py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black uppercase tracking-widest text-xs text-center transition-all flex items-center justify-center'
+                            >
+                              Detayları İncele
+                            </Link>
+
+                            {userApp ? (
+                              <Link
+                                href={`/turnuvalar/${tour.id}`}
+                                className='py-3 rounded-xl bg-[#00e5ff]/20 hover:bg-[#00e5ff]/30 border border-[#00e5ff]/30 text-[#00e5ff] font-black uppercase tracking-widest text-xs text-center transition-all flex items-center justify-center'
+                              >
+                                Başvurumu Gör
+                              </Link>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  if (!currentUser) router.push(`/giris?redirectTo=${encodeURIComponent('/turnuvalar/' + tour.id)}`);
+                                  else setApplyModal(tour);
+                                }}
+                                disabled={!isOpen}
+                                className='py-3 rounded-xl bg-[#00e5ff] text-black font-black uppercase tracking-widest text-xs hover:bg-[#00c5ff] hover:shadow-[0_0_20px_rgba(0,229,255,0.3)] transition-all disabled:opacity-50 disabled:pointer-events-none'
+                              >
+                                Katıl
+                              </button>
+                            )}
+                          </div>
                         </>
                       )}
+                    </div>
+                  )}
+
+                  {/* 1V1 / KARMA Details Link */}
+                  {activeTab !== 'NIGHT_CUP' && (
+                    <div className='mt-auto pt-4 border-t border-white/5'>
+                      <Link
+                        href={`/turnuvalar/${tour.id}`}
+                        className='w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-zinc-400 hover:text-white font-bold uppercase tracking-wider text-xs text-center block transition-all'
+                      >
+                        Detayları İncele
+                      </Link>
                     </div>
                   )}
 
@@ -255,7 +306,7 @@ export default function TournamentTabs({
                     <input required name='team_name' type='text' placeholder='Takımınızın Adı' className='w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white font-bold placeholder:text-zinc-700 focus:border-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff] outline-none transition-all'/>
                   </div>
                   <div>
-                    <label className='block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2'>TAKIM LOGOSU</label>
+                    <label className='block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2'>TAKIM LOGOSU (İsteğe Bağlı)</label>
                     <div className='relative overflow-hidden group rounded-xl border border-dashed border-white/20 hover:border-[#00e5ff]/50 transition-colors bg-black/50'>
                       <input name='image_file' type='file' accept='image/*' className='absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10'/>
                       <div className='p-6 text-center'>
@@ -268,7 +319,11 @@ export default function TournamentTabs({
 
                 <div className='space-y-4'>
                   <div>
-                    <label className='block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2'>KADRO OLUŞTUR ({ncProfiles.length}/11) <span className='text-red-500'>*</span></label>
+                    <div className='flex items-center justify-between mb-2'>
+                      <label className='block text-xs font-bold text-zinc-500 uppercase tracking-widest'>KADRO OLUŞTUR ({ncProfiles.length} Seçili)</label>
+                      <span className='text-[10px] text-zinc-500 font-bold uppercase'>İsteğe Bağlı</span>
+                    </div>
+                    <p className='text-[11px] text-zinc-500 mb-2'>Başvuran olarak otomatik takım temsilcisisiniz. Kadronuza eklemek istediğiniz oyuncuları arayıp ekleyebilirsiniz.</p>
                     <input 
                       type='text' 
                       placeholder='Oyuncu Ara...' 
@@ -293,13 +348,11 @@ export default function TournamentTabs({
               </div>
 
               <div className='pt-6 border-t border-white/5'>
-                <button 
-                  disabled={loading || ncProfiles.length !== 11} 
+                <button
+                  disabled={loading}
                   className='w-full py-4 rounded-xl bg-[#00e5ff] text-black font-black uppercase tracking-widest text-sm hover:bg-[#00c5ff] hover:shadow-[0_0_20px_rgba(0,229,255,0.3)] transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2'
                 >
-                  {loading ? <Loader2 className='w-5 h-5 animate-spin'/> : (
-                    ncProfiles.length === 11 ? 'BAŞVURUYU TAMAMLA' : `${11 - ncProfiles.length} OYUNCU DAHA SEÇMELİSİN`
-                  )}
+                  {loading ? <Loader2 className='w-5 h-5 animate-spin'/> : 'BAŞVURUYU TAMAMLA'}
                 </button>
               </div>
             </form>
