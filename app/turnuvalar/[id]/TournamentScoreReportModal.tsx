@@ -163,59 +163,66 @@ export default function TournamentScoreReportModal({
 
     setLoading(true);
 
-    const formData = new FormData();
-    formData.append('match_id', match.id);
-    formData.append('tournament_id', tournamentId);
-    formData.append('home_score', homeParsedScore.toString());
-    formData.append('away_score', awayParsedScore.toString());
-    formData.append('notes', notes);
-    formData.append('screenshot_file', screenshotFile);
-    formData.append('goals_json', JSON.stringify(scorers));
+    try {
+      const formData = new FormData();
+      formData.append('match_id', match.id);
+      formData.append('home_score', homeScore);
+      formData.append('away_score', awayScore);
+      formData.append('screenshot', screenshotFile);
+      if (notes.trim()) formData.append('notes', notes.trim());
 
-    const res = await submitTournamentMatchScoreAction(formData);
-    setLoading(false);
+      const payloadGoals = scorers.map((s) => ({
+        team_application_id: s.team_application_id,
+        player_id: s.player_id,
+        player_name: s.player_name,
+        goals: s.goals,
+        is_own_goal: !!s.is_own_goal,
+      }));
+      formData.append('goals', JSON.stringify(payloadGoals));
 
-    if (res.error) {
-      setErrorMsg(res.error);
-    } else {
-      setSuccessMsg(res.success || 'Sonuç bildirimi başarıyla gönderildi.');
-      setTimeout(() => {
-        onClose();
-        router.refresh();
-      }, 1500);
+      const res = await submitTournamentMatchScoreAction(formData);
+      setLoading(false);
+
+      if (res.error) {
+        setErrorMsg(res.error);
+      } else {
+        setSuccessMsg(res.success || 'Maç skoru başarıyla iletildi. Yönetici onayına sunuldu.');
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+      }
+    } catch (err: any) {
+      setLoading(false);
+      setErrorMsg('Beklenmeyen bir hata oluştu: ' + (err?.message || err));
     }
   };
 
-  // Available squad or all registered profiles for scorer selection
-  const relevantTeamPlayers =
-    selectedTeamId === match.home_application_id ? homePlayers : awayPlayers;
-
-  // Filter profiles based on search
+  const relevantTeamPlayers = selectedTeamId === match.home_application_id ? homePlayers : awayPlayers;
   const filteredProfiles = profiles
     .filter((p) => p.username.toLowerCase().includes(playerSearch.toLowerCase()))
     .slice(0, 15);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-      <div className="bg-[#0a1628] w-full max-w-2xl rounded-[2.5rem] border border-white/10 shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
+      <div className="bg-[#0a1628] w-full max-w-2xl rounded-[2.5rem] border border-white/10 shadow-2xl flex flex-col max-h-[92vh] overflow-hidden animate-fade-in-up">
         {/* Header */}
         <div className="p-6 border-b border-white/10 flex items-center justify-between shrink-0 bg-[#060d18]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#00e5ff]/10 border border-[#00e5ff]/30 flex items-center justify-center text-[#00e5ff]">
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-[#00e5ff] shadow-md shadow-cyan-500/10">
               <Trophy className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-[#00e5ff] text-[10px] font-black tracking-widest uppercase block">
+              <span className="text-[#00e5ff] text-[10px] font-[900] tracking-widest uppercase block">
                 RESMİ MAÇ SKOR BİLDİRİMİ
               </span>
-              <h3 className="text-base font-black text-white uppercase tracking-wider">
+              <h3 className="text-base font-[900] text-white uppercase tracking-wider">
                 {match.home?.team_name} vs {match.away?.team_name}
               </h3>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -226,7 +233,7 @@ export default function TournamentScoreReportModal({
           <div className="p-4 bg-red-500/15 border-b border-red-500/30 text-red-300 text-xs flex items-start gap-2.5">
             <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
             <div>
-              <strong className="block font-black uppercase text-red-400 mb-0.5">
+              <strong className="block font-[900] uppercase text-red-400 mb-0.5">
                 Önceki Bildirim Yönetici Tarafından Reddedildi:
               </strong>
               <span>{match.rejection_reason}</span>
@@ -236,12 +243,12 @@ export default function TournamentScoreReportModal({
 
         {/* Feedback Alerts */}
         {errorMsg && (
-          <div className="p-3 bg-red-500/90 text-white text-xs font-black uppercase tracking-wider text-center">
+          <div className="p-3 bg-red-500/90 text-white text-xs font-[900] uppercase tracking-wider text-center">
             {errorMsg}
           </div>
         )}
         {successMsg && (
-          <div className="p-3 bg-emerald-500/90 text-black text-xs font-black uppercase tracking-wider text-center">
+          <div className="p-3 bg-emerald-500/90 text-black text-xs font-[900] uppercase tracking-wider text-center">
             {successMsg}
           </div>
         )}
@@ -250,7 +257,7 @@ export default function TournamentScoreReportModal({
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Match Score Input */}
           <div className="p-6 rounded-2xl bg-black/40 border border-white/5 space-y-4">
-            <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest block text-center">
+            <span className="text-[11px] font-[900] text-zinc-400 uppercase tracking-widest block text-center">
               MAÇ SKORU
             </span>
 
@@ -258,7 +265,7 @@ export default function TournamentScoreReportModal({
               {/* Home Team */}
               <div className="flex flex-col items-center gap-2 flex-1 max-w-[160px]">
                 <TeamLogo src={match.home?.logo_url} name={match.home?.team_name} size="md" />
-                <span className="text-xs font-black text-white uppercase text-center truncate w-full">
+                <span className="text-xs font-[900] text-white uppercase text-center truncate w-full">
                   {match.home?.team_name}
                 </span>
                 <input
@@ -267,16 +274,16 @@ export default function TournamentScoreReportModal({
                   required
                   value={homeScore}
                   onChange={(e) => setHomeScore(e.target.value)}
-                  className="w-20 bg-black/60 border border-white/20 rounded-xl px-3 py-2 text-2xl font-black text-center text-white focus:border-[#00e5ff] outline-none"
+                  className="w-20 bg-black/60 border border-white/20 rounded-xl px-3 py-2 text-2xl font-[900] text-center text-white focus:border-[#00e5ff] outline-none"
                 />
               </div>
 
-              <span className="text-xl font-black text-zinc-500 mb-6">-</span>
+              <span className="text-xl font-[900] text-zinc-500 mb-6">-</span>
 
               {/* Away Team */}
               <div className="flex flex-col items-center gap-2 flex-1 max-w-[160px]">
                 <TeamLogo src={match.away?.logo_url} name={match.away?.team_name} size="md" />
-                <span className="text-xs font-black text-white uppercase text-center truncate w-full">
+                <span className="text-xs font-[900] text-white uppercase text-center truncate w-full">
                   {match.away?.team_name}
                 </span>
                 <input
@@ -285,7 +292,7 @@ export default function TournamentScoreReportModal({
                   required
                   value={awayScore}
                   onChange={(e) => setAwayScore(e.target.value)}
-                  className="w-20 bg-black/60 border border-white/20 rounded-xl px-3 py-2 text-2xl font-black text-center text-white focus:border-[#00e5ff] outline-none"
+                  className="w-20 bg-black/60 border border-white/20 rounded-xl px-3 py-2 text-2xl font-[900] text-center text-white focus:border-[#00e5ff] outline-none"
                 />
               </div>
             </div>
@@ -315,7 +322,7 @@ export default function TournamentScoreReportModal({
           {/* Goalscorers Section */}
           <div className="p-6 rounded-2xl bg-[#081220] border border-white/10 space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-white uppercase tracking-wider">
+              <span className="text-xs font-[900] text-white uppercase tracking-wider">
                 GOL ATAN OYUNCULAR ({scorers.length})
               </span>
               <span className="text-[10px] text-zinc-400 uppercase">Toplam skorla birebir eşleşmeli</span>
@@ -394,7 +401,7 @@ export default function TournamentScoreReportModal({
                             }}
                             className={`p-1.5 rounded text-[11px] cursor-pointer flex items-center gap-1.5 ${
                               selectedPlayerId === p.id
-                                ? 'bg-[#00e5ff]/20 text-[#00e5ff] font-black'
+                                ? 'bg-cyan-500/20 text-[#00e5ff] font-black'
                                 : 'hover:bg-white/10 text-zinc-300 font-bold'
                             }`}
                           >
@@ -423,7 +430,7 @@ export default function TournamentScoreReportModal({
                 <button
                   type="button"
                   onClick={handleAddScorer}
-                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-[#00e5ff] hover:text-black text-white text-xs font-black uppercase transition-all flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-[#00e5ff] hover:text-black text-white text-xs font-[900] uppercase transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" /> Golcü Ekle
                 </button>
@@ -454,7 +461,7 @@ export default function TournamentScoreReportModal({
                       <button
                         type="button"
                         onClick={() => handleRemoveScorer(s.id)}
-                        className="p-1 rounded text-red-400 hover:bg-red-500/10 transition-colors"
+                        className="p-1 rounded text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -468,7 +475,7 @@ export default function TournamentScoreReportModal({
           {/* Match Screenshot Upload */}
           <div className="p-6 rounded-2xl bg-[#081220] border border-white/10 space-y-3">
             <div className="flex items-center justify-between">
-              <label className="block text-xs font-black text-white uppercase tracking-wider">
+              <label className="block text-xs font-[900] text-white uppercase tracking-wider">
                 MAÇ SONUCU EKRAN GÖRÜNTÜSÜ <span className="text-red-500">*</span>
               </label>
               <span className="text-[10px] text-zinc-500 uppercase">Max 5MB (JPG, PNG, WEBP)</span>
@@ -483,7 +490,7 @@ export default function TournamentScoreReportModal({
                     setScreenshotFile(null);
                     setScreenshotPreview(null);
                   }}
-                  className="absolute top-3 right-3 p-2 rounded-full bg-black/70 text-white hover:bg-red-500 transition-colors"
+                  className="absolute top-3 right-3 p-2 rounded-full bg-black/70 text-white hover:bg-red-500 transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -524,14 +531,14 @@ export default function TournamentScoreReportModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 font-black uppercase text-xs transition-colors"
+              className="px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 font-[900] uppercase text-xs transition-colors cursor-pointer"
             >
               Vazgeç
             </button>
             <button
               disabled={loading || !screenshotFile || !isScoreMatched}
               type="submit"
-              className="px-8 py-3 rounded-xl bg-[#00e5ff] text-black font-black uppercase tracking-widest text-xs hover:bg-[#00c5ff] hover:shadow-[0_0_20px_rgba(0,229,255,0.4)] transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2"
+              className="px-8 py-3.5 rounded-xl bg-gradient-to-r from-[#00e5ff] to-cyan-400 text-black font-[900] uppercase tracking-widest text-xs hover:brightness-110 hover:shadow-[0_0_20px_rgba(0,229,255,0.4)] transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2 cursor-pointer"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'SKORU BİLDİR (ONAYA GÖNDER)'}
             </button>

@@ -11,7 +11,7 @@ export default function TournamentTabs({
   tournaments, winners, applications, profiles, currentUser
 }: any) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'1V1' | 'KARMA' | 'NIGHT_CUP'>('1V1');
+  const [activeTab, setActiveTab] = useState<'NIGHT_CUP' | '1V1' | 'KARMA'>('NIGHT_CUP');
   const filteredTournaments = tournaments.filter((t: any) => t.type === activeTab);
 
   const [loading, setLoading] = useState(false);
@@ -66,7 +66,7 @@ export default function TournamentTabs({
 
       {/* TABS HEADER */}
       <div className='flex flex-wrap items-center justify-center gap-4 md:gap-8 mb-12 border-b border-white/5 pb-1'>
-        {['1V1', 'KARMA', 'NIGHT_CUP'].map(t => (
+        {['NIGHT_CUP', '1V1', 'KARMA'].map(t => (
           <button
             key={t}
             onClick={() => setActiveTab(t as any)}

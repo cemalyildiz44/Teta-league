@@ -23,6 +23,8 @@ import {
   Sparkles,
   X,
   AlertTriangle,
+  ChevronRight,
+  Share2,
 } from 'lucide-react';
 import { submitNightCupApplicationAction, cancelMyApplicationAction } from '../actions';
 import TeamLogo from '@/components/TeamLogo';
@@ -98,36 +100,40 @@ export default function TournamentDetailClient({
     const status = tournament.status || (winners.length > 0 ? 'COMPLETED' : isRegistrationOpen ? 'REGISTRATION' : 'DRAFT');
     switch (status) {
       case 'REGISTRATION':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+        return isRegistrationOpen ? (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-[900] uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-[0_0_12px_rgba(16,185,129,0.15)]">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             Kayıtlar Açık
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-[900] uppercase tracking-wider bg-zinc-800/80 text-zinc-400 border border-zinc-700">
+            Kayıt Kapalı
           </span>
         );
       case 'IN_PROGRESS':
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-[#00e5ff]/20 text-[#00e5ff] border border-[#00e5ff]/30">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-[900] uppercase tracking-wider bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/30 shadow-[0_0_12px_rgba(0,229,255,0.15)]">
             <span className="w-2 h-2 rounded-full bg-[#00e5ff] animate-pulse" />
             Turnuva Sürüyor
           </span>
         );
       case 'COMPLETED':
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-[900] uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.15)]">
             <Trophy className="w-3.5 h-3.5" />
             Tamamlandı
           </span>
         );
       case 'ARCHIVED':
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-zinc-500/20 text-zinc-400 border border-zinc-500/30">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-[900] uppercase tracking-wider bg-zinc-800/80 text-zinc-400 border border-zinc-700">
             Arşivlendi
           </span>
         );
       case 'DRAFT':
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-zinc-500/20 text-zinc-400 border border-zinc-500/30">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-[900] uppercase tracking-wider bg-zinc-800/80 text-zinc-400 border border-zinc-700">
             Kayıt Kapalı
           </span>
         );
@@ -192,356 +198,455 @@ export default function TournamentDetailClient({
       {/* Toast Notification */}
       {feedback && (
         <div
-          className={`fixed top-24 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-sm font-black uppercase tracking-widest ${
-            feedback.type === 'error' ? 'bg-red-500/95 text-white' : 'bg-[#00e5ff] text-black'
+          className={`fixed top-24 left-1/2 -translate-x-1/2 z-50 px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 text-xs md:text-sm font-[900] uppercase tracking-wider backdrop-blur-md transition-all animate-fade-in-up ${
+            feedback.type === 'error'
+              ? 'bg-red-500/90 text-white border border-red-400/40 shadow-red-500/20'
+              : 'bg-[#00e5ff] text-black shadow-[0_0_25px_rgba(0,229,255,0.4)]'
           }`}
         >
-          <Info className="w-5 h-5 shrink-0" />
+          <Info className="w-4 h-4 shrink-0" />
           {feedback.msg}
         </div>
       )}
 
-      {/* BACK & BREADCRUMB */}
+      {/* TOP NAVIGATION / BREADCRUMB */}
       <div className="max-w-[1400px] mx-auto px-4 lg:px-6 pt-6 pb-4">
-        <div className="flex items-center gap-3 text-xs font-bold text-zinc-400 uppercase tracking-widest">
-          <Link
-            href="/turnuvalar"
-            className="flex items-center gap-1.5 hover:text-[#00e5ff] transition-colors py-1 px-2.5 rounded-lg bg-white/5 border border-white/5"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" /> Turnuvalara Dön
-          </Link>
-          <span className="text-zinc-600">/</span>
-          <span className="text-zinc-500">{tournament.type.replace('_', ' ')}</span>
-          <span className="text-zinc-600">/</span>
-          <span className="text-white truncate max-w-xs">{tournament.name}</span>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-xs font-[800] text-zinc-400 uppercase tracking-widest">
+            <Link
+              href="/turnuvalar"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-[#00e5ff]/10 border border-white/10 hover:border-[#00e5ff]/30 text-zinc-300 hover:text-[#00e5ff] transition-all"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> Turnuvalar
+            </Link>
+            <span className="text-zinc-600">/</span>
+            <span className="text-zinc-400">{tournament.seasons?.name || 'Sezon'}</span>
+            <span className="text-zinc-600">/</span>
+            <span className="text-[#00e5ff] font-black truncate max-w-[200px] sm:max-w-md">
+              {tournament.name}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {getStatusBadge()}
+          </div>
         </div>
       </div>
 
-      {/* HERO SECTION */}
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-6 mb-10">
-        <div className="relative rounded-[2.5rem] overflow-hidden border border-white/10 bg-[#060d18] shadow-2xl">
-          {/* Background Banner */}
+      {/* ============================================================================== */}
+      {/* HERO SHOWCASE HEADER */}
+      {/* ============================================================================== */}
+      <div className="max-w-[1400px] mx-auto px-4 lg:px-6 mb-8 md:mb-10">
+        <div className="relative rounded-[2rem] md:rounded-[2.5rem] overflow-hidden border border-white/10 bg-gradient-to-b from-[#081324] via-[#050b14] to-[#03070c] shadow-2xl shadow-black/80">
+          {/* Subtle Ambient Background Layer */}
           {bannerImg ? (
-            <div className="absolute inset-0 z-0">
+            <div className="absolute inset-0 z-0 pointer-events-none">
               <img
                 src={bannerImg}
-                alt={tournament.name}
-                className="w-full h-full object-cover opacity-25 filter blur-xs scale-105"
+                alt=""
+                className="w-full h-full object-cover opacity-15 filter blur-md scale-110"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#060d18] via-[#060d18]/85 to-transparent" />
-              <div className="absolute inset-0 bg-gradient-to-r from-[#060d18] via-[#060d18]/70 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#050b14] via-[#050b14]/90 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-r from-[#050b14] via-[#050b14]/80 to-transparent" />
             </div>
           ) : (
-            <div className="absolute inset-0 z-0 bg-radial from-[#00e5ff]/10 via-transparent to-transparent opacity-50" />
+            <div className="absolute inset-0 z-0 bg-radial from-[#00e5ff]/10 via-transparent to-transparent opacity-40 pointer-events-none" />
           )}
 
-          {/* Hero Content */}
-          <div className="relative z-10 p-6 md:p-12 lg:p-14">
-            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
-              <div className="space-y-4 max-w-3xl">
-                {/* Badges */}
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-white/10 text-white border border-white/10">
+          {/* Main Hero Grid */}
+          <div className="relative z-10 p-6 sm:p-8 md:p-10 lg:p-12">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 lg:gap-12">
+              {/* Left Column: Badges, Title, Description & Action Box */}
+              <div className="space-y-5 flex-1 min-w-0">
+                {/* Badges Bar */}
+                <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+                  <span className="px-3 py-1 rounded-full text-[11px] font-[900] uppercase tracking-wider bg-white/5 text-gray-300 border border-white/10">
                     {tournament.seasons?.name || 'Özel Turnuva'}
                   </span>
-                  <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/20">
-                    {tournament.type.replace('_', ' ')}
+                  <span className="px-3 py-1 rounded-full text-[11px] font-[900] uppercase tracking-wider bg-cyan-500/10 text-[#00e5ff] border border-cyan-500/30 flex items-center gap-1.5 shadow-[0_0_15px_rgba(0,229,255,0.2)]">
+                    <Trophy className="w-3.5 h-3.5" /> NIGHT CUP
                   </span>
-                  {getStatusBadge()}
                   {tournament.prize && (
-                    <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1.5">
-                      <Trophy className="w-3.5 h-3.5" /> {tournament.prize}
+                    <span className="px-3.5 py-1 rounded-full text-[11px] font-[900] uppercase tracking-wider bg-amber-500/10 text-amber-300 border border-amber-500/30 flex items-center gap-1.5 shadow-[0_0_15px_rgba(245,158,11,0.2)]">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" /> {tournament.prize}
                     </span>
                   )}
                 </div>
 
-                {/* Title */}
-                <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-white uppercase tracking-tight leading-tight drop-shadow-[0_0_20px_rgba(0,229,255,0.3)]">
+                {/* Tournament Name */}
+                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-[900] text-white uppercase tracking-tight leading-[1.1] drop-shadow-[0_0_25px_rgba(0,229,255,0.25)]">
                   {tournament.name}
                 </h1>
 
-                {/* Short description */}
-                {tournament.description && (
-                  <p className="text-zinc-300 text-sm md:text-base leading-relaxed max-w-2xl font-normal">
+                {/* Tournament Description */}
+                {tournament.description ? (
+                  <p className="text-zinc-300 text-sm sm:text-base leading-relaxed max-w-2xl font-normal">
                     {tournament.description}
                   </p>
-                )}
-              </div>
-
-              {/* Action Button & Quota Quick Info */}
-              <div className="shrink-0 flex flex-col gap-3 min-w-[240px]">
-                {!currentUser ? (
-                  <Link
-                    href={`/giris?redirectTo=${encodeURIComponent('/turnuvalar/' + tournament.id)}`}
-                    className="w-full py-4 px-6 rounded-2xl bg-[#00e5ff] text-black font-black uppercase tracking-widest text-xs text-center hover:bg-[#00c5ff] hover:shadow-[0_0_25px_rgba(0,229,255,0.4)] transition-all flex items-center justify-center gap-2"
-                  >
-                    GİRİŞ YAP VE BAŞVUR
-                  </Link>
-                ) : userApp ? (
-                  <div className="p-4 rounded-2xl bg-[#0a1628]/90 border border-white/10 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-                        BAŞVURU DURUMUNUZ
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
-                          userApp.status === 'APPROVED'
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                            : userApp.status === 'REJECTED'
-                            ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                            : userApp.status === 'CANCELLED'
-                            ? 'bg-zinc-500/20 text-zinc-400 border border-zinc-500/30'
-                            : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                        }`}
-                      >
-                        {userApp.status === 'APPROVED'
-                          ? 'ONAYLANDI'
-                          : userApp.status === 'REJECTED'
-                          ? 'REDDEDİLDİ'
-                          : userApp.status === 'CANCELLED'
-                          ? 'İPTAL EDİLDİ'
-                          : 'BEKLEMEDE'}
-                      </span>
-                    </div>
-                    <div className="text-sm font-black text-white uppercase truncate flex items-center gap-2 pt-1">
-                      <TeamLogo src={userApp.logo_url} name={userApp.team_name} size="xs" />
-                      {userApp.team_name}
-                    </div>
-                    {userApp.status === 'PENDING' && (
-                      <button
-                        onClick={() => setCancelModalOpen(true)}
-                        className="w-full py-2 mt-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-[11px] font-black uppercase tracking-wider transition-colors"
-                      >
-                        Başvuruyu İptal Et
-                      </button>
-                    )}
-                  </div>
-                ) : isRegistrationOpen ? (
-                  <button
-                    onClick={() => setApplyModalOpen(true)}
-                    className="w-full py-4 px-6 rounded-2xl bg-[#00e5ff] text-black font-black uppercase tracking-widest text-xs text-center hover:bg-[#00c5ff] hover:shadow-[0_0_25px_rgba(0,229,255,0.4)] transition-all flex items-center justify-center gap-2"
-                  >
-                    <Sparkles className="w-4 h-4" /> TAKIMINLA BAŞVUR
-                  </button>
                 ) : (
-                  <div className="py-4 px-6 rounded-2xl bg-white/5 border border-white/5 text-zinc-500 font-bold uppercase tracking-widest text-xs text-center">
-                    Kayıtlar Kapalıdır
-                  </div>
+                  <p className="text-zinc-500 text-sm italic">
+                    TETA League resmi Night Cup turnuva aşaması ve grup fikstürü.
+                  </p>
                 )}
 
-                {tournament.discord_url && (
-                  <a
-                    href={tournament.discord_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-3 px-4 rounded-xl bg-[#5865F2]/20 hover:bg-[#5865F2]/30 border border-[#5865F2]/30 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2"
-                  >
-                    Discord Topluluğu <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                )}
+                {/* Primary CTA & User Registration State */}
+                <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 max-w-xl">
+                  {!currentUser ? (
+                    <Link
+                      href={`/giris?redirectTo=${encodeURIComponent('/turnuvalar/' + tournament.id)}`}
+                      className="px-6 py-4 rounded-xl bg-gradient-to-r from-[#00e5ff] to-cyan-400 text-black font-[900] uppercase tracking-wider text-xs text-center hover:brightness-110 hover:shadow-[0_0_25px_rgba(0,229,255,0.4)] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      GİRİŞ YAP VE BAŞVUR
+                    </Link>
+                  ) : userApp ? (
+                    <div className="flex-1 p-3.5 rounded-xl bg-[#0a1628]/95 border border-cyan-500/30 flex items-center justify-between gap-3 shadow-lg shadow-black/40">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <TeamLogo src={userApp.logo_url} name={userApp.team_name} size="sm" />
+                        <div className="min-w-0">
+                          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">
+                            BAŞVURU TAKIMINIZ
+                          </span>
+                          <span className="text-sm font-black text-white uppercase truncate block">
+                            {userApp.team_name}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
+                            userApp.status === 'APPROVED'
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                              : userApp.status === 'REJECTED'
+                              ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                              : userApp.status === 'CANCELLED'
+                              ? 'bg-zinc-500/20 text-zinc-400 border border-zinc-500/30'
+                              : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                          }`}
+                        >
+                          {userApp.status === 'APPROVED'
+                            ? 'ONAYLANDI'
+                            : userApp.status === 'REJECTED'
+                            ? 'REDDEDİLDİ'
+                            : userApp.status === 'CANCELLED'
+                            ? 'İPTAL'
+                            : 'BEKLEMEDE'}
+                        </span>
+
+                        {userApp.status === 'PENDING' && (
+                          <button
+                            onClick={() => setCancelModalOpen(true)}
+                            className="px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-[10px] font-black uppercase tracking-wider transition-colors cursor-pointer"
+                            title="Başvuruyu İptal Et"
+                          >
+                            İptal
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ) : isRegistrationOpen ? (
+                    <button
+                      onClick={() => setApplyModalOpen(true)}
+                      className="px-7 py-4 rounded-xl bg-gradient-to-r from-[#00e5ff] to-cyan-400 text-black font-[900] uppercase tracking-widest text-xs text-center hover:brightness-110 hover:shadow-[0_0_25px_rgba(0,229,255,0.45)] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Sparkles className="w-4 h-4" /> TAKIMINLA BAŞVUR
+                    </button>
+                  ) : (
+                    <div className="px-6 py-3.5 rounded-xl bg-white/5 border border-white/5 text-zinc-500 font-bold uppercase tracking-widest text-xs text-center">
+                      Kayıtlar Kapalıdır
+                    </div>
+                  )}
+
+                  {tournament.discord_url && (
+                    <a
+                      href={tournament.discord_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-5 py-3.5 rounded-xl bg-[#5865F2]/20 hover:bg-[#5865F2]/30 border border-[#5865F2]/40 text-white font-[800] text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(88,101,242,0.2)]"
+                    >
+                      <span>Discord</span>
+                      <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+                    </a>
+                  )}
+                </div>
               </div>
+
+              {/* Right Column: Dedicated Afiş / Banner Showcase (Preserves exact aspect ratio) */}
+              {bannerImg && (
+                <div className="w-full lg:w-[420px] xl:w-[480px] shrink-0">
+                  <div className="relative rounded-2xl overflow-hidden border border-white/15 bg-black/60 shadow-2xl group aspect-[16/9] w-full">
+                    <img
+                      src={bannerImg}
+                      alt={tournament.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-[11px] font-bold text-white">
+                      <span className="bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 uppercase tracking-wider text-[#00e5ff] text-[10px]">
+                        Turnuva Afişi
+                      </span>
+                      <span className="text-zinc-400 text-[10px]">TETA League</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Quick Stats Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-8 border-t border-white/10">
-              <div className="bg-black/30 backdrop-blur-md rounded-2xl p-4 border border-white/5">
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-1 flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-[#00e5ff]" /> Turnuva Tarihi
-                </span>
-                <span className="text-sm font-black text-white">
-                  {tourDate
-                    ? tourDate.toLocaleString('tr-TR', { dateStyle: 'medium', timeStyle: 'short' })
-                    : 'Belirtilmedi'}
-                </span>
-              </div>
-
-              <div className="bg-black/30 backdrop-blur-md rounded-2xl p-4 border border-white/5">
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-1 flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-amber-400" /> Son Başvuru
-                </span>
-                <span className="text-sm font-black text-white">
-                  {regEnd
-                    ? regEnd.toLocaleString('tr-TR', { dateStyle: 'medium', timeStyle: 'short' })
-                    : 'Belirtilmedi'}
-                </span>
-              </div>
-
-              <div className="bg-black/30 backdrop-blur-md rounded-2xl p-4 border border-white/5">
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-1 flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 text-emerald-400" /> Kontenjan
-                </span>
-                <span className="text-sm font-black text-white">
-                  {approvedApps.length} / {tournament.max_teams || '∞'} Takım
-                </span>
-                {applications.length > approvedApps.length && (
-                  <span className="block text-[10px] text-zinc-500 font-semibold mt-0.5">
-                    ({applications.length} toplam başvuru)
+            {/* Quick Stats Grid (4 Balanced Stat Cards) */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 mt-8 pt-8 border-t border-white/10">
+              {/* Stat 1: Tarih */}
+              <div className="bg-[#0a1628]/60 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/5 hover:border-cyan-500/30 transition-all flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-[900] text-gray-400 uppercase tracking-[0.2em] mb-1.5 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-[#00e5ff]" /> TURNUVA TARİHİ
                   </span>
-                )}
+                  <span className="text-sm sm:text-base font-[900] text-white uppercase tracking-tight block">
+                    {tourDate
+                      ? tourDate.toLocaleString('tr-TR', { dateStyle: 'medium', timeStyle: 'short' })
+                      : 'Belirtilmedi'}
+                  </span>
+                </div>
+                <span className="text-[10px] text-zinc-500 mt-2 block font-medium">Maç Başlangıcı</span>
               </div>
 
-              <div className="bg-black/30 backdrop-blur-md rounded-2xl p-4 border border-white/5">
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-1 flex items-center gap-1.5">
-                  <Swords className="w-3.5 h-3.5 text-purple-400" /> Grup & Eleme
-                </span>
-                <span className="text-sm font-black text-white">
-                  {tournament.teams_per_group ? `${tournament.teams_per_group}'erli Gruplar` : 'Standart Format'}
-                </span>
-                {tournament.advancing_teams_per_group && (
-                  <span className="block text-[10px] text-purple-400 font-semibold mt-0.5">
-                    İlk {tournament.advancing_teams_per_group} Üst Tura
+              {/* Stat 2: Son Başvuru */}
+              <div className="bg-[#0a1628]/60 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/5 hover:border-amber-500/30 transition-all flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-[900] text-gray-400 uppercase tracking-[0.2em] mb-1.5 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-amber-400" /> SON BAŞVURU
                   </span>
-                )}
+                  <span className="text-sm sm:text-base font-[900] text-white uppercase tracking-tight block">
+                    {regEnd
+                      ? regEnd.toLocaleString('tr-TR', { dateStyle: 'medium', timeStyle: 'short' })
+                      : 'Belirtilmedi'}
+                  </span>
+                </div>
+                <span className="text-[10px] text-zinc-500 mt-2 block font-medium">Kayıt Bitiş Tarihi</span>
+              </div>
+
+              {/* Stat 3: Kontenjan */}
+              <div className="bg-[#0a1628]/60 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/5 hover:border-emerald-500/30 transition-all flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-[900] text-gray-400 uppercase tracking-[0.2em] mb-1.5 flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-emerald-400" /> KONTENJAN
+                  </span>
+                  <span className="text-sm sm:text-base font-[900] text-white uppercase tracking-tight block">
+                    {approvedApps.length} / {tournament.max_teams || '∞'} Takım
+                  </span>
+                </div>
+                <span className="text-[10px] text-zinc-500 mt-2 block font-medium">
+                  {applications.length > approvedApps.length
+                    ? `${applications.length} başvuru alındı`
+                    : 'Onaylı Takım Sayısı'}
+                </span>
+              </div>
+
+              {/* Stat 4: Format */}
+              <div className="bg-[#0a1628]/60 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/5 hover:border-purple-500/30 transition-all flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-[900] text-gray-400 uppercase tracking-[0.2em] mb-1.5 flex items-center gap-1.5">
+                    <Swords className="w-3.5 h-3.5 text-purple-400" /> FORMAT & ELEME
+                  </span>
+                  <span className="text-sm sm:text-base font-[900] text-white uppercase tracking-tight block">
+                    {tournament.teams_per_group ? `${tournament.teams_per_group}'erli Gruplar` : 'Standart Format'}
+                  </span>
+                </div>
+                <span className="text-[10px] text-purple-400 mt-2 block font-bold">
+                  {tournament.advancing_teams_per_group
+                    ? `İlk ${tournament.advancing_teams_per_group} Üst Tura`
+                    : 'Grup + Eleme Ağacı'}
+                </span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Status Notice Banner (if Completed or Archived) */}
+      {/* Completed / Archived Status Notice */}
       {(tournament.status === 'COMPLETED' || tournament.status === 'ARCHIVED') && (
         <div className="max-w-[1400px] mx-auto px-4 lg:px-6 mb-6">
-          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-4">
+          <div className="p-4 sm:p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <Trophy className="w-5 h-5 text-amber-400 shrink-0" />
-              <span className="text-xs font-bold text-amber-300">
-                Bu turnuva {tournament.status === 'ARCHIVED' ? 'arşivlenmiştir' : 'tamamlanmıştır'}. Yeni takım başvuruları ve maç skoru bildirimleri kapatılmıştır.
+              <span className="text-xs sm:text-sm font-bold text-amber-200">
+                Bu turnuva {tournament.status === 'ARCHIVED' ? 'arşivlenmiştir' : 'tamamlanmıştır'}. Yeni takım başvuruları ve maç skoru bildirimleri kapanmıştır.
               </span>
             </div>
-            <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
+            <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
               {tournament.status === 'ARCHIVED' ? 'ARŞİVLENDİ' : 'TAMAMLANDI'}
             </span>
           </div>
         </div>
       )}
 
-      {/* TABS NAVIGATION */}
+      {/* ============================================================================== */}
+      {/* TABS NAVIGATION (Responsive & Elegant) */}
+      {/* ============================================================================== */}
       <div className="max-w-[1400px] mx-auto px-4 lg:px-6 mb-8">
-        <div className="flex items-center gap-2 border-b border-white/10 pb-2 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-2 border-b border-white/10 pb-3 overflow-x-auto no-scrollbar">
+          {/* Tab 1: Bilgiler */}
           <button
             onClick={() => setActiveTab('genel')}
-            className={`px-5 py-3 rounded-xl text-xs md:text-sm font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-2 ${
+            className={`px-4 sm:px-5 py-3 rounded-xl text-xs sm:text-sm font-[900] uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
               activeTab === 'genel'
-                ? 'bg-[#00e5ff]/15 text-[#00e5ff] border border-[#00e5ff]/30 shadow-[0_0_15px_rgba(0,229,255,0.15)]'
-                : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                ? 'bg-cyan-500/15 text-[#00e5ff] border border-cyan-500/40 shadow-[0_0_15px_rgba(0,229,255,0.2)]'
+                : 'text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent'
             }`}
           >
-            <FileText className="w-4 h-4" /> Genel Bakış & Bilgiler
+            <FileText className="w-4 h-4" /> Bilgiler
           </button>
 
+          {/* Tab 2: Kurallar & Rehber */}
           <button
             onClick={() => setActiveTab('kurallar')}
-            className={`px-5 py-3 rounded-xl text-xs md:text-sm font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-2 ${
+            className={`px-4 sm:px-5 py-3 rounded-xl text-xs sm:text-sm font-[900] uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
               activeTab === 'kurallar'
-                ? 'bg-[#00e5ff]/15 text-[#00e5ff] border border-[#00e5ff]/30 shadow-[0_0_15px_rgba(0,229,255,0.15)]'
-                : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                ? 'bg-cyan-500/15 text-[#00e5ff] border border-cyan-500/40 shadow-[0_0_15px_rgba(0,229,255,0.2)]'
+                : 'text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent'
             }`}
           >
             <Shield className="w-4 h-4" /> Kurallar & Rehber
           </button>
 
+          {/* Tab 3: Katılımcı Takımlar */}
           <button
             onClick={() => setActiveTab('takimlar')}
-            className={`px-5 py-3 rounded-xl text-xs md:text-sm font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-2 ${
+            className={`px-4 sm:px-5 py-3 rounded-xl text-xs sm:text-sm font-[900] uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
               activeTab === 'takimlar'
-                ? 'bg-[#00e5ff]/15 text-[#00e5ff] border border-[#00e5ff]/30 shadow-[0_0_15px_rgba(0,229,255,0.15)]'
-                : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                ? 'bg-cyan-500/15 text-[#00e5ff] border border-cyan-500/40 shadow-[0_0_15px_rgba(0,229,255,0.2)]'
+                : 'text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent'
             }`}
           >
-            <Users className="w-4 h-4" /> Katılımcı Takımlar ({approvedApps.length})
+            <Users className="w-4 h-4" /> Katılımcı Takımlar
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                activeTab === 'takimlar' ? 'bg-cyan-500/20 text-[#00e5ff]' : 'bg-white/10 text-zinc-400'
+              }`}
+            >
+              {approvedApps.length}
+            </span>
           </button>
 
+          {/* Tab 4: Gruplar & Puan Durumu */}
           <button
             onClick={() => setActiveTab('gruplar')}
-            className={`px-5 py-3 rounded-xl text-xs md:text-sm font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-2 ${
+            className={`px-4 sm:px-5 py-3 rounded-xl text-xs sm:text-sm font-[900] uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
               activeTab === 'gruplar'
-                ? 'bg-[#00e5ff]/15 text-[#00e5ff] border border-[#00e5ff]/30 shadow-[0_0_15px_rgba(0,229,255,0.15)]'
-                : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                ? 'bg-cyan-500/15 text-[#00e5ff] border border-cyan-500/40 shadow-[0_0_15px_rgba(0,229,255,0.2)]'
+                : 'text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent'
             }`}
           >
-            <Swords className="w-4 h-4" /> Gruplar & Puan Durumu ({groups.length})
+            <Swords className="w-4 h-4" /> Gruplar & Puan Durumu
+            {groups.length > 0 && (
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                  activeTab === 'gruplar' ? 'bg-cyan-500/20 text-[#00e5ff]' : 'bg-white/10 text-zinc-400'
+                }`}
+              >
+                {groups.length}
+              </span>
+            )}
           </button>
 
+          {/* Tab 5: Fikstür & Maçlar */}
           <button
             onClick={() => setActiveTab('fikstur')}
-            className={`px-5 py-3 rounded-xl text-xs md:text-sm font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-2 ${
+            className={`px-4 sm:px-5 py-3 rounded-xl text-xs sm:text-sm font-[900] uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
               activeTab === 'fikstur'
-                ? 'bg-[#00e5ff]/15 text-[#00e5ff] border border-[#00e5ff]/30 shadow-[0_0_15px_rgba(0,229,255,0.15)]'
-                : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                ? 'bg-cyan-500/15 text-[#00e5ff] border border-cyan-500/40 shadow-[0_0_15px_rgba(0,229,255,0.2)]'
+                : 'text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent'
             }`}
           >
-            <Calendar className="w-4 h-4" /> Fikstür & Maçlar ({matches.length})
+            <Calendar className="w-4 h-4" /> Fikstür & Maçlar
+            {matches.length > 0 && (
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                  activeTab === 'fikstur' ? 'bg-cyan-500/20 text-[#00e5ff]' : 'bg-white/10 text-zinc-400'
+                }`}
+              >
+                {matches.length}
+              </span>
+            )}
           </button>
 
+          {/* Tab 6: Eleme Ağacı */}
           <button
             onClick={() => setActiveTab('bracket')}
-            className={`px-5 py-3 rounded-xl text-xs md:text-sm font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-2 ${
+            className={`px-4 sm:px-5 py-3 rounded-xl text-xs sm:text-sm font-[900] uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
               activeTab === 'bracket'
-                ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.15)]'
-                : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                ? 'bg-amber-500/15 text-amber-400 border border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
+                : 'text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent'
             }`}
           >
-            <Trophy className="w-4 h-4 text-amber-400" /> Eleme Ağacı (Bracket)
+            <Trophy className="w-4 h-4 text-amber-400" /> Eleme Ağacı
             {knockoutMatches.length > 0 && (
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse ml-1" />
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse ml-0.5" />
             )}
           </button>
         </div>
       </div>
 
-      {/* TAB CONTENT */}
+      {/* ============================================================================== */}
+      {/* TAB CONTENTS */}
+      {/* ============================================================================== */}
       <div className="max-w-[1400px] mx-auto px-4 lg:px-6">
-        {/* 1. GENEL BAKIŞ */}
+        {/* ---------------- 1. BİLGİLER (OVERVIEW) ---------------- */}
         {activeTab === 'genel' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left 2 Cols: Details & Description */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+            {/* Left 2 Cols: Details & Format */}
             <div className="lg:col-span-2 space-y-6">
-              <div className="bg-[#0a1628]/80 border border-white/10 rounded-[2rem] p-6 md:p-8 backdrop-blur-md">
-                <h3 className="text-xl font-black text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+              {/* About card */}
+              <div className="bg-[#0a1628]/80 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-md shadow-xl">
+                <h3 className="text-lg sm:text-xl font-[900] text-white uppercase tracking-wider mb-4 flex items-center gap-2.5">
                   <FileText className="w-5 h-5 text-[#00e5ff]" /> Turnuva Hakkında
                 </h3>
                 {tournament.details || tournament.description ? (
-                  <div className="text-zinc-300 leading-relaxed space-y-3 whitespace-pre-wrap text-sm md:text-base font-normal">
+                  <div className="text-zinc-300 leading-relaxed space-y-3.5 whitespace-pre-wrap text-sm sm:text-base font-normal">
                     {tournament.details || tournament.description}
                   </div>
                 ) : (
-                  <p className="text-zinc-500 italic">Bu turnuva için henüz ayrıntılı bir açıklama girilmemiş.</p>
+                  <p className="text-zinc-500 italic text-sm">Bu turnuva için henüz ayrıntılı bir açıklama girilmemiş.</p>
                 )}
               </div>
 
-              {/* Tournament Format Details */}
-              <div className="bg-[#0a1628]/80 border border-white/10 rounded-[2rem] p-6 md:p-8 backdrop-blur-md">
-                <h3 className="text-xl font-black text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+              {/* Tournament Format Card */}
+              <div className="bg-[#0a1628]/80 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-md shadow-xl">
+                <h3 className="text-lg sm:text-xl font-[900] text-white uppercase tracking-wider mb-5 flex items-center gap-2.5">
                   <Swords className="w-5 h-5 text-purple-400" /> Turnuva Yapısı ve Formatı
                 </h3>
                 <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="p-4 rounded-xl bg-black/40 border border-white/5">
-                    <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest block mb-1">
+                  <div className="p-4 sm:p-5 rounded-2xl bg-black/40 border border-white/5">
+                    <span className="text-[10px] font-[900] text-gray-400 uppercase tracking-[0.2em] block mb-1">
                       Kategori & Tür
                     </span>
-                    <span className="text-base font-black text-white uppercase">{tournament.type.replace('_', ' ')}</span>
+                    <span className="text-base font-[900] text-white uppercase">
+                      {tournament.type.replace('_', ' ')}
+                    </span>
                   </div>
-                  <div className="p-4 rounded-xl bg-black/40 border border-white/5">
-                    <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest block mb-1">
+
+                  <div className="p-4 sm:p-5 rounded-2xl bg-black/40 border border-white/5">
+                    <span className="text-[10px] font-[900] text-gray-400 uppercase tracking-[0.2em] block mb-1">
                       Maksimum Takım Sayısı
                     </span>
-                    <span className="text-base font-black text-white uppercase">
+                    <span className="text-base font-[900] text-white uppercase">
                       {tournament.max_teams ? `${tournament.max_teams} Takım` : 'Sınırsız'}
                     </span>
                   </div>
-                  <div className="p-4 rounded-xl bg-black/40 border border-white/5">
-                    <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest block mb-1">
+
+                  <div className="p-4 sm:p-5 rounded-2xl bg-black/40 border border-white/5">
+                    <span className="text-[10px] font-[900] text-gray-400 uppercase tracking-[0.2em] block mb-1">
                       Grup Formatı
                     </span>
-                    <span className="text-base font-black text-white uppercase">
-                      {tournament.teams_per_group ? `${tournament.teams_per_group}'erli Takımlar` : 'Standart Grup Formatı'}
+                    <span className="text-base font-[900] text-white uppercase">
+                      {tournament.teams_per_group ? `${tournament.teams_per_group}'erli Takımlar` : 'Standart Format'}
                     </span>
                   </div>
-                  <div className="p-4 rounded-xl bg-black/40 border border-white/5">
-                    <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest block mb-1">
-                      Eleme Aşamasına Çıkış
+
+                  <div className="p-4 sm:p-5 rounded-2xl bg-black/40 border border-white/5">
+                    <span className="text-[10px] font-[900] text-gray-400 uppercase tracking-[0.2em] block mb-1">
+                      Eleme Turuna Yükselme
                     </span>
-                    <span className="text-base font-black text-white uppercase">
+                    <span className="text-base font-[900] text-white uppercase">
                       {tournament.advancing_teams_per_group
                         ? `Gruptan İlk ${tournament.advancing_teams_per_group} Takım`
                         : 'Standart Eleme'}
@@ -551,57 +656,69 @@ export default function TournamentDetailClient({
               </div>
             </div>
 
-            {/* Right 1 Col: Prize, Community, Winner if any */}
+            {/* Right 1 Col: Prize, Winners, Discord */}
             <div className="space-y-6">
-              {/* Prize Card */}
+              {/* Prize Card (Luxurious & Measured) */}
               {tournament.prize && (
-                <div className="bg-gradient-to-br from-amber-500/10 via-[#0a1628] to-[#060d18] border border-amber-500/30 rounded-[2rem] p-6 backdrop-blur-md shadow-[0_0_30px_rgba(245,158,11,0.1)]">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center mb-4 text-amber-400">
+                <div className="bg-gradient-to-br from-amber-500/15 via-[#0c182c] to-[#060d18] border border-amber-500/30 rounded-3xl p-6 sm:p-7 backdrop-blur-md shadow-[0_0_35px_rgba(245,158,11,0.12)]">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center mb-4 text-amber-400 shadow-md shadow-amber-500/20">
                     <Trophy className="w-6 h-6" />
                   </div>
-                  <span className="text-xs font-black text-amber-400 uppercase tracking-widest block mb-1">
+                  <span className="text-[10px] font-[900] text-amber-400 uppercase tracking-[0.2em] block mb-1">
                     ÖDÜL HAVUZU
                   </span>
-                  <h4 className="text-2xl font-black text-white uppercase tracking-tight">{tournament.prize}</h4>
-                  <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
-                    Turnuva şampiyonu ve dereceye giren takımlar için hazırlanan ödül paketi.
+                  <h4 className="text-2xl sm:text-3xl font-[900] text-amber-300 uppercase tracking-tight">
+                    {tournament.prize}
+                  </h4>
+                  <p className="text-xs text-zinc-400 mt-2.5 leading-relaxed font-normal">
+                    Turnuva şampiyonu ve dereceye giren takımlar için hazırlanan resmi ödül paketi.
                   </p>
                 </div>
               )}
 
-              {/* Winners (if any) */}
+              {/* Winners Podium (If Completed / Assigned) */}
               {winners.length > 0 && (
-                <div className="bg-[#0a1628]/80 border border-white/10 rounded-[2rem] p-6 backdrop-blur-md">
-                  <h4 className="text-sm font-black text-amber-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <div className="bg-[#0a1628]/80 border border-white/10 rounded-3xl p-6 backdrop-blur-md shadow-xl">
+                  <h4 className="text-xs font-[900] text-amber-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                     <Medal className="w-4 h-4" /> Turnuva Kazananları
                   </h4>
-                  <div className="space-y-3">
+                  <div className="space-y-2.5">
                     {winners.map((w) => (
                       <div
                         key={w.id}
-                        className="flex items-center gap-3 p-3 rounded-xl bg-black/40 border border-white/5"
+                        className="flex items-center gap-3 p-3 rounded-2xl bg-black/40 border border-white/5"
                       >
-                        <span className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 font-black text-xs flex items-center justify-center shrink-0">
+                        <span
+                          className={`w-7 h-7 rounded-xl flex items-center justify-center font-[900] text-xs shrink-0 ${
+                            w.placement === 1
+                              ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
+                              : w.placement === 2
+                              ? 'bg-slate-300/20 text-slate-300 border border-slate-300/30'
+                              : 'bg-amber-700/20 text-amber-500 border border-amber-700/30'
+                          }`}
+                        >
                           {w.placement || 1}
                         </span>
                         {w.tournament_applications?.team_name ? (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
                             <TeamLogo
                               src={w.tournament_applications.logo_url}
                               name={w.tournament_applications.team_name}
                               size="xs"
                             />
-                            <span className="text-sm font-black text-white uppercase">
+                            <span className="text-sm font-[900] text-white uppercase truncate">
                               {w.tournament_applications.team_name}
                             </span>
                           </div>
                         ) : w.profiles?.username ? (
-                          <div className="flex items-center gap-2">
-                            <User className="w-4 h-4 text-zinc-400" />
-                            <span className="text-sm font-black text-white">@{w.profiles.username}</span>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <User className="w-4 h-4 text-zinc-400 shrink-0" />
+                            <span className="text-sm font-bold text-white truncate">
+                              @{w.profiles.username}
+                            </span>
                           </div>
                         ) : (
-                          <span className="text-sm font-black text-white">Kazanan</span>
+                          <span className="text-sm font-bold text-white">Kazanan</span>
                         )}
                       </div>
                     ))}
@@ -610,87 +727,82 @@ export default function TournamentDetailClient({
               )}
 
               {/* Discord Support Card */}
-              <div className="bg-[#0a1628]/80 border border-white/10 rounded-[2rem] p-6 backdrop-blur-md">
+              <div className="bg-[#0a1628]/80 border border-white/10 rounded-3xl p-6 backdrop-blur-md shadow-xl">
                 <div className="w-12 h-12 rounded-2xl bg-[#5865F2]/20 border border-[#5865F2]/30 flex items-center justify-center mb-4 text-[#5865F2]">
                   <Users className="w-6 h-6" />
                 </div>
-                <h4 className="text-base font-black text-white uppercase tracking-wider mb-2">Turnuva İletişimi</h4>
-                <p className="text-xs text-zinc-400 mb-4 leading-relaxed">
-                  Maç saatleri, oda şifreleri, hakem duyuruları ve kura çekimleri Discord sunucumuz üzerinden
-                  yürütülmektedir.
+                <h4 className="text-base font-[900] text-white uppercase tracking-wider mb-2">Turnuva Koordinasyonu</h4>
+                <p className="text-xs text-zinc-400 mb-4 leading-relaxed font-normal">
+                  Maç saatleri, oda şifreleri, hakem duyuruları ve kura çekimleri Discord sunucumuz üzerinden yürütülür.
                 </p>
                 {tournament.discord_url ? (
                   <a
                     href={tournament.discord_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full py-3 px-4 rounded-xl bg-[#5865F2] hover:bg-[#4752c4] text-white font-black text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2"
+                    className="w-full py-3.5 px-4 rounded-xl bg-[#5865F2] hover:bg-[#4752c4] text-white font-[900] text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#5865F2]/20"
                   >
                     Discord Kanalına Katıl <ExternalLink className="w-3.5 h-3.5" />
                   </a>
                 ) : (
-                  <span className="text-xs text-zinc-500 italic block">Discord linki yönetici tarafından eklenecektir.</span>
+                  <span className="text-xs text-zinc-500 italic block">Discord bağlantısı yönetici tarafından eklenecektir.</span>
                 )}
               </div>
             </div>
           </div>
         )}
 
-        {/* 2. KURALLAR */}
+        {/* ---------------- 2. KURALLAR & REHBER ---------------- */}
         {activeTab === 'kurallar' && (
-          <div className="bg-[#0a1628]/80 border border-white/10 rounded-[2rem] p-6 md:p-10 backdrop-blur-md space-y-8">
-            <div>
-              <span className="text-[#00e5ff] text-xs font-black uppercase tracking-widest block mb-2">
+          <div className="bg-[#0a1628]/80 border border-white/10 rounded-3xl p-6 sm:p-8 md:p-10 backdrop-blur-md space-y-8 shadow-xl">
+            <div className="border-b border-white/5 pb-4">
+              <span className="text-[#00e5ff] text-[10px] font-[900] uppercase tracking-[0.2em] block mb-1">
                 TETA LEAGUE RESMİ TURNUVA YÖNERGESİ
               </span>
-              <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-wide">
+              <h3 className="text-xl sm:text-2xl md:text-3xl font-[900] text-white uppercase tracking-wider">
                 Turnuva Kuralları & Katılım Şartları
               </h3>
             </div>
 
             {tournament.rules ? (
-              <div className="text-zinc-300 leading-relaxed space-y-4 whitespace-pre-wrap text-sm md:text-base p-6 rounded-2xl bg-black/40 border border-white/5">
+              <div className="text-zinc-300 leading-relaxed space-y-4 whitespace-pre-wrap text-sm sm:text-base p-6 rounded-2xl bg-black/40 border border-white/5 font-normal">
                 {tournament.rules}
               </div>
             ) : (
-              <div className="space-y-6">
-                <div className="p-6 rounded-2xl bg-black/40 border border-white/5 space-y-3">
-                  <h4 className="text-base font-black text-white uppercase flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-[#00e5ff]" /> 1. Takım Temsilciliği ve Başvuru Sorumluluğu
+              <div className="grid md:grid-cols-2 gap-5">
+                <div className="p-6 rounded-2xl bg-black/40 border border-white/5 space-y-2.5">
+                  <h4 className="text-sm font-[900] text-white uppercase flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-[#00e5ff]" /> 1. Takım Temsilciliği ve Kaptanlık
                   </h4>
-                  <p className="text-sm text-zinc-400 leading-relaxed">
-                    Başvuruyu yapan oyuncu takımın resmi kaptanı ve temsilcisi kabul edilir. İletişim, oda davetleri ve maç
-                    raporlamaları kaptan sorumluluğundadır.
+                  <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed font-normal">
+                    Başvuruyu yapan oyuncu takımın resmi temsilcisi ve kaptanı kabul edilir. İletişim, oda davetleri ve maç skoru bildirimleri kaptan sorumluluğundadır.
                   </p>
                 </div>
 
-                <div className="p-6 rounded-2xl bg-black/40 border border-white/5 space-y-3">
-                  <h4 className="text-base font-black text-white uppercase flex items-center gap-2">
+                <div className="p-6 rounded-2xl bg-black/40 border border-white/5 space-y-2.5">
+                  <h4 className="text-sm font-[900] text-white uppercase flex items-center gap-2">
                     <Users className="w-4 h-4 text-emerald-400" /> 2. Kadro ve Oyuncu Katılımı
                   </h4>
-                  <p className="text-sm text-zinc-400 leading-relaxed">
-                    Kadroya eklenen oyuncular TETA League sistemine kayıtlı olmalıdır. Takım kurucusu tek başına veya
-                    belirlediği oyuncularla katılabilir; katı 11 oyuncu zorunluluğu aranmaz.
+                  <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed font-normal">
+                    Kadroya eklenen oyuncular TETA League sistemine kayıtlı olmalıdır. Takım kurucusu tek başına veya belirlediği kadroyla katılabilir; katı 11 oyuncu şartı aranmaz.
                   </p>
                 </div>
 
-                <div className="p-6 rounded-2xl bg-black/40 border border-white/5 space-y-3">
-                  <h4 className="text-base font-black text-white uppercase flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-amber-400" /> 3. Maç Saati ve Hükmen Yenilgi
+                <div className="p-6 rounded-2xl bg-black/40 border border-white/5 space-y-2.5">
+                  <h4 className="text-sm font-[900] text-white uppercase flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-amber-400" /> 3. Maç Saati ve Hükmen Mağlubiyet
                   </h4>
-                  <p className="text-sm text-zinc-400 leading-relaxed">
-                    Maç başlangıç saatinden itibaren 10 dakika içerisinde odada hazır bulunmayan takımlar hakem kararıyla
-                    hükmen mağlup sayılır.
+                  <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed font-normal">
+                    Maç saatinden itibaren 10 dakika içerisinde odada hazır bulunmayan takımlar hakem heyeti kararıyla hükmen mağlup sayılır.
                   </p>
                 </div>
 
-                <div className="p-6 rounded-2xl bg-black/40 border border-white/5 space-y-3">
-                  <h4 className="text-base font-black text-white uppercase flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-red-400" /> 4. Fair-Play ve Disiplin Yaptırımları
+                <div className="p-6 rounded-2xl bg-black/40 border border-white/5 space-y-2.5">
+                  <h4 className="text-sm font-[900] text-white uppercase flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-400" /> 4. Fair-Play ve Disiplin Kuralları
                   </h4>
-                  <p className="text-sm text-zinc-400 leading-relaxed">
-                    Oyun içi ve Discord üzerindeki sportmenlik dışı hareketler, hile veya hakaret doğrudan turnuvadan ihraç
-                    ve lig genelinde ceza puanı sebebidir.
+                  <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed font-normal">
+                    Oyun içi ve Discord üzerindeki sportmenlik dışı hareketler, hile veya hakaret doğrudan turnuvadan diskalifiye edilme sebebidir.
                   </p>
                 </div>
               </div>
@@ -698,46 +810,49 @@ export default function TournamentDetailClient({
           </div>
         )}
 
-        {/* 3. KATILIMCI TAKIMLAR */}
+        {/* ---------------- 3. KATILIMCI TAKIMLAR ---------------- */}
         {activeTab === 'takimlar' && (
           <div className="space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-4 bg-[#0a1628]/80 border border-white/10 rounded-2xl p-6 backdrop-blur-md">
+            {/* Header bar */}
+            <div className="flex flex-wrap items-center justify-between gap-4 bg-[#0a1628]/80 border border-white/10 rounded-3xl p-6 backdrop-blur-md shadow-xl">
               <div>
-                <h3 className="text-lg font-black text-white uppercase tracking-wider">
+                <h3 className="text-lg sm:text-xl font-[900] text-white uppercase tracking-wider">
                   Katılımcı Takımlar ({approvedApps.length} Onaylı)
                 </h3>
-                <p className="text-xs text-zinc-400 mt-1">
+                <p className="text-xs text-zinc-400 mt-1 font-medium">
                   Kontenjan: {approvedApps.length} / {tournament.max_teams || '∞'} onaylı takım
-                  {pendingApps.length > 0 && ` (${pendingApps.length} başvuru değerlendiriliyor)`}
+                  {pendingApps.length > 0 && ` • (${pendingApps.length} başvuru değerlendiriliyor)`}
                 </p>
               </div>
+
               {isRegistrationOpen && !userApp && (
                 <button
                   onClick={() => {
                     if (!currentUser) router.push(`/giris?redirectTo=${encodeURIComponent('/turnuvalar/' + tournament.id)}`);
                     else setApplyModalOpen(true);
                   }}
-                  className="px-5 py-2.5 rounded-xl bg-[#00e5ff] text-black font-black uppercase tracking-wider text-xs hover:bg-[#00c5ff] transition-all"
+                  className="px-5 py-3 rounded-xl bg-gradient-to-r from-[#00e5ff] to-cyan-400 text-black font-[900] uppercase tracking-wider text-xs hover:brightness-110 shadow-lg shadow-cyan-500/20 transition-all cursor-pointer"
                 >
                   Takımınla Başvur
                 </button>
               )}
             </div>
 
+            {/* Empty state or Grid */}
             {approvedApps.length === 0 ? (
-              <div className="text-center py-20 bg-[#0a1628]/50 border border-white/5 rounded-[2rem]">
+              <div className="text-center py-20 bg-[#0a1628]/50 border border-white/5 rounded-3xl p-8">
                 <Users className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
-                <h4 className="text-base font-black text-white uppercase tracking-widest mb-1">
+                <h4 className="text-base font-[900] text-white uppercase tracking-widest mb-1.5">
                   HENÜZ ONAYLANAN TAKIM YOK
                 </h4>
-                <p className="text-xs text-zinc-500 max-w-md mx-auto">
+                <p className="text-xs text-zinc-500 max-w-md mx-auto leading-relaxed">
                   {isRegistrationOpen
-                    ? 'Başvurular devam ediyor. İlk başvuran takımlardan biri olmak için hemen kaydolun!'
+                    ? 'Başvurular devam ediyor. İlk başvuran takımlardan biri olmak için hemen takımını kaydet!'
                     : 'Henüz onaylanmış takım bulunmuyor.'}
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
                 {approvedApps.map((app) => {
                   const teamGroup = groups.find((g) =>
                     (g.tournament_group_teams || []).some((gt: any) => gt.application_id === app.id)
@@ -746,24 +861,24 @@ export default function TournamentDetailClient({
                   return (
                     <div
                       key={app.id}
-                      className="bg-[#0a1628]/80 border border-white/10 rounded-[2rem] p-6 hover:border-[#00e5ff]/30 transition-all flex flex-col justify-between"
+                      className="bg-[#0a1628]/80 border border-white/10 hover:border-cyan-500/30 rounded-3xl p-6 transition-all flex flex-col justify-between shadow-lg"
                     >
                       <div>
                         {/* Team Header */}
                         <div className="flex items-center gap-4 mb-4">
-                          <div className="w-14 h-14 rounded-2xl bg-black/50 border border-white/10 flex items-center justify-center shrink-0 overflow-hidden">
+                          <div className="w-14 h-14 rounded-2xl bg-black/50 border border-white/10 flex items-center justify-center shrink-0 overflow-hidden shadow-inner">
                             <TeamLogo src={app.logo_url} name={app.team_name} size="md" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <h4 className="text-base font-black text-white uppercase tracking-wider truncate">
+                            <h4 className="text-base font-[900] text-white uppercase tracking-wider truncate">
                               {app.team_name}
                             </h4>
                             <div className="flex items-center gap-2 mt-1 flex-wrap">
                               <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3" /> Katılım Onaylandı
+                                <CheckCircle2 className="w-3 h-3" /> Onaylandı
                               </span>
                               {teamGroup && (
-                                <span className="px-2 py-0.5 rounded bg-[#00e5ff]/15 border border-[#00e5ff]/30 text-[#00e5ff] text-[10px] font-black uppercase">
+                                <span className="px-2 py-0.5 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-[#00e5ff] text-[10px] font-black uppercase">
                                   {teamGroup.name}
                                 </span>
                               )}
@@ -771,91 +886,90 @@ export default function TournamentDetailClient({
                           </div>
                         </div>
 
-                      {/* Captain */}
-                      <div className="p-3 rounded-xl bg-black/40 border border-white/5 mb-4">
-                        <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block mb-1">
-                          TAKIM KAPTANI
-                        </span>
-                        <Link
-                          href={`/oyuncular/${app.applicant?.username || ''}`}
-                          className="flex items-center gap-2 hover:text-[#00e5ff] transition-colors"
-                        >
-                          {app.applicant?.avatar_url ? (
-                            <img src={app.applicant.avatar_url} className="w-5 h-5 rounded-full object-cover" />
-                          ) : (
-                            <User className="w-5 h-5 p-1 bg-white/10 rounded-full text-zinc-400" />
-                          )}
-                          <span className="text-xs font-bold text-zinc-200">
-                            @{app.applicant?.username || 'Bilinmiyor'}
+                        {/* Captain row */}
+                        <div className="p-3 rounded-xl bg-black/40 border border-white/5 mb-4">
+                          <span className="text-[9px] font-[900] text-gray-500 uppercase tracking-[0.2em] block mb-1">
+                            TAKIM KAPTANI
                           </span>
-                        </Link>
+                          <Link
+                            href={`/oyuncular/${app.applicant?.username || ''}`}
+                            className="flex items-center gap-2 hover:text-[#00e5ff] transition-colors"
+                          >
+                            {app.applicant?.avatar_url ? (
+                              <img src={app.applicant.avatar_url} className="w-5 h-5 rounded-full object-cover" />
+                            ) : (
+                              <User className="w-5 h-5 p-1 bg-white/10 rounded-full text-zinc-400" />
+                            )}
+                            <span className="text-xs font-bold text-zinc-200">
+                              @{app.applicant?.username || 'Kaptan'}
+                            </span>
+                          </Link>
+                        </div>
+
+                        {/* Squad members */}
+                        {app.players && app.players.length > 0 && (
+                          <div>
+                            <span className="text-[9px] font-[900] text-gray-500 uppercase tracking-[0.2em] block mb-2">
+                              KADRO ({app.players.length} Oyuncu)
+                            </span>
+                            <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto no-scrollbar">
+                              {app.players.map((p: any) => (
+                                <Link
+                                  key={p.id}
+                                  href={`/oyuncular/${p.profile?.username || ''}`}
+                                  className="px-2 py-1 rounded-lg bg-white/5 hover:bg-cyan-500/10 border border-white/5 hover:border-cyan-500/20 text-[10px] font-bold text-zinc-300 transition-colors flex items-center gap-1.5"
+                                >
+                                  {p.profile?.avatar_url ? (
+                                    <img src={p.profile.avatar_url} className="w-3.5 h-3.5 rounded-full object-cover" />
+                                  ) : (
+                                    <User className="w-3 h-3 text-zinc-500" />
+                                  )}
+                                  <span>@{p.profile?.username || 'Oyuncu'}</span>
+                                </Link>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
 
-                      {/* Squad members */}
-                      {app.players && app.players.length > 0 && (
-                        <div>
-                          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block mb-2">
-                            KADRO ({app.players.length} Oyuncu)
-                          </span>
-                          <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto no-scrollbar">
-                            {app.players.map((p: any) => (
-                              <Link
-                                key={p.id}
-                                href={`/oyuncular/${p.profile?.username || ''}`}
-                                className="px-2 py-1 rounded-lg bg-white/5 hover:bg-[#00e5ff]/10 border border-white/5 hover:border-[#00e5ff]/20 text-[10px] font-bold text-zinc-300 transition-colors flex items-center gap-1.5"
-                              >
-                                {p.profile?.avatar_url ? (
-                                  <img src={p.profile.avatar_url} className="w-3.5 h-3.5 rounded-full" />
-                                ) : (
-                                  <User className="w-3 h-3 text-zinc-500" />
-                                )}
-                                <span>@{p.profile?.username || 'Oyuncu'}</span>
-                              </Link>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      <div className="pt-4 mt-4 border-t border-white/5 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                        Kayıt: {new Date(app.created_at).toLocaleDateString('tr-TR')}
+                      </div>
                     </div>
-
-                    <div className="pt-4 mt-4 border-t border-white/5 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-                      Kayıt: {new Date(app.created_at).toLocaleDateString('tr-TR')}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
-        {/* 4. GRUPLAR & PUAN DURUMU */}
+        {/* ---------------- 4. GRUPLAR & PUAN DURUMU ---------------- */}
         {activeTab === 'gruplar' && (
           <div className="space-y-8">
             {groups.length === 0 ? (
-              <div className="bg-[#0a1628]/80 border border-white/10 rounded-[2rem] p-8 md:p-12 backdrop-blur-md text-center max-w-2xl mx-auto space-y-6">
-                <div className="w-20 h-20 rounded-3xl bg-[#00e5ff]/10 border border-[#00e5ff]/30 flex items-center justify-center mx-auto text-[#00e5ff] shadow-[0_0_30px_rgba(0,229,255,0.2)]">
+              <div className="bg-[#0a1628]/80 border border-white/10 rounded-3xl p-8 md:p-12 backdrop-blur-md text-center max-w-2xl mx-auto space-y-6 shadow-xl">
+                <div className="w-20 h-20 rounded-3xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mx-auto text-[#00e5ff] shadow-[0_0_30px_rgba(0,229,255,0.2)]">
                   <Swords className="w-10 h-10" />
                 </div>
 
                 <div className="space-y-2">
-                  <span className="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-widest bg-white/10 text-[#00e5ff] border border-white/10">
+                  <span className="px-3 py-1 rounded-full text-[10px] font-[900] uppercase tracking-widest bg-white/10 text-[#00e5ff] border border-white/10">
                     KURA ÇEKİMİ BEKLENİYOR
                   </span>
-                  <h3 className="text-2xl font-black text-white uppercase tracking-wider">
-                    Grup Eşleşmeleri ve Puan Tablosu
+                  <h3 className="text-xl sm:text-2xl font-[900] text-white uppercase tracking-wider">
+                    Grup Eşleşmeleri ve Puan Durumu
                   </h3>
                 </div>
 
-                <p className="text-zinc-400 text-sm leading-relaxed">
-                  Başvurular tamamlandıktan ve kura çekimi gerçekleştirildikten sonra grup puan durumları, oynanan maçlar ve
-                  averajlar bu ekranda canlı olarak listelenecektir.
+                <p className="text-zinc-400 text-xs sm:text-sm leading-relaxed font-normal">
+                  Başvurular tamamlandıktan ve kura çekimi yapıldıktan sonra grup puan durumları, oynanan maçlar ve averajlar bu ekranda canlı olarak listelenecektir.
                 </p>
 
-                <div className="p-4 rounded-2xl bg-black/40 border border-white/5 text-xs text-zinc-400 space-y-1 text-left">
-                  <div className="font-bold text-white uppercase">📋 Hedeflenen Format:</div>
+                <div className="p-4 rounded-2xl bg-black/40 border border-white/5 text-xs text-zinc-400 space-y-1.5 text-left font-normal">
+                  <div className="font-[900] text-white uppercase mb-1">📋 Hedeflenen Format:</div>
                   <div>• {tournament.teams_per_group || 4}&apos;er takımlı gruplar</div>
                   <div>• Her gruptan ilk {tournament.advancing_teams_per_group || 2} takım eleme turlarına yükselir</div>
-                  <div>• Lig puan durumlarından bağımsız özel turnuva motoru</div>
+                  <div>• Resmî lig puan durumlarından tamamen bağımsız turnuva puan sistemi</div>
                 </div>
               </div>
             ) : (
@@ -874,23 +988,23 @@ export default function TournamentDetailClient({
                   return (
                     <div
                       key={g.id}
-                      className="bg-[#0a1628]/80 border border-white/10 rounded-[2rem] p-6 md:p-8 backdrop-blur-md space-y-4 shadow-xl"
+                      className="bg-[#0a1628]/80 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-md space-y-4 shadow-xl"
                     >
                       {/* Group Header */}
                       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-[#00e5ff]/10 border border-[#00e5ff]/30 flex items-center justify-center text-[#00e5ff]">
+                          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-[#00e5ff]">
                             <Trophy className="w-5 h-5" />
                           </div>
                           <div>
-                            <h4 className="text-lg font-black text-white uppercase tracking-wider">{g.name}</h4>
+                            <h4 className="text-lg font-[900] text-white uppercase tracking-wider">{g.name}</h4>
                             <span className="text-[10px] font-bold text-zinc-400 uppercase">
                               {gTeams.length} Takım • {gMatches.length} Maç
                             </span>
                           </div>
                         </div>
 
-                        <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
+                        <span className="px-3 py-1 rounded-full text-xs font-[900] uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           İlk {advancingCount} Takım Üst Tura Yükselir
                         </span>
@@ -900,7 +1014,7 @@ export default function TournamentDetailClient({
                       <div className="overflow-x-auto no-scrollbar">
                         <table className="w-full text-xs text-left min-w-[620px]">
                           <thead>
-                            <tr className="text-zinc-500 uppercase border-b border-white/5 font-black text-[10px]">
+                            <tr className="text-zinc-500 uppercase border-b border-white/5 font-[900] text-[10px]">
                               <th className="py-3 px-3 w-12">#</th>
                               <th className="py-3 px-4">Takım</th>
                               <th className="py-3 px-3 text-center" title="Oynanan Maç">O</th>
@@ -921,7 +1035,7 @@ export default function TournamentDetailClient({
                                   key={row.application_id}
                                   className={`border-b border-white/5 font-bold transition-colors ${
                                     isAdvancing
-                                      ? 'bg-emerald-500/5 hover:bg-emerald-500/10'
+                                      ? 'bg-emerald-500/5 hover:bg-emerald-500/10 border-l-2 border-emerald-400'
                                       : 'hover:bg-white/5'
                                   }`}
                                 >
@@ -939,7 +1053,7 @@ export default function TournamentDetailClient({
                                   <td className="py-3.5 px-4">
                                     <div className="flex items-center gap-3">
                                       <TeamLogo src={row.logo_url} name={row.team_name} size="xs" />
-                                      <span className="text-white uppercase truncate font-black text-sm">
+                                      <span className="text-white uppercase truncate font-[900] text-sm">
                                         {row.team_name}
                                       </span>
                                       {isAdvancing && (
@@ -968,7 +1082,7 @@ export default function TournamentDetailClient({
                                       {row.goal_difference > 0 ? `+${row.goal_difference}` : row.goal_difference}
                                     </span>
                                   </td>
-                                  <td className="py-3.5 px-4 text-center text-white font-black text-base text-[#00e5ff] font-mono">
+                                  <td className="py-3.5 px-4 text-center font-[900] text-base text-[#00e5ff] font-mono">
                                     {row.points}
                                   </td>
                                 </tr>
@@ -979,9 +1093,9 @@ export default function TournamentDetailClient({
                       </div>
 
                       {/* Footnote */}
-                      <div className="pt-2 flex flex-wrap items-center justify-between gap-2 text-[10px] text-zinc-500 font-semibold border-t border-white/5">
+                      <div className="pt-2 flex flex-wrap items-center justify-between gap-2 text-[10px] text-zinc-500 font-medium border-t border-white/5">
                         <span>* Puan Eşitliği Kriterleri: 1. Puan, 2. Genel Averaj, 3. Atılan Gol, 4. Galibiyet Sayısı.</span>
-                        <span>* Yalnızca onaylanmış ve tamamlanan maç skorları puan durumuna yansır.</span>
+                        <span>* Yalnızca onaylanmış ve tamamlanan maç skorları puan tablosuna yansır.</span>
                       </div>
                     </div>
                   );
@@ -991,27 +1105,26 @@ export default function TournamentDetailClient({
           </div>
         )}
 
-        {/* 5. FİKSTÜR & MAÇLAR */}
+        {/* ---------------- 5. FİKSTÜR & MAÇLAR ---------------- */}
         {activeTab === 'fikstur' && (
           <div className="space-y-8">
             {matches.length === 0 ? (
-              <div className="bg-[#0a1628]/80 border border-white/10 rounded-[2rem] p-8 md:p-12 backdrop-blur-md text-center max-w-2xl mx-auto space-y-6">
+              <div className="bg-[#0a1628]/80 border border-white/10 rounded-3xl p-8 md:p-12 backdrop-blur-md text-center max-w-2xl mx-auto space-y-6 shadow-xl">
                 <div className="w-20 h-20 rounded-3xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center mx-auto text-purple-400 shadow-[0_0_30px_rgba(168,85,247,0.2)]">
                   <Calendar className="w-10 h-10" />
                 </div>
 
                 <div className="space-y-2">
-                  <span className="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-widest bg-white/10 text-purple-400 border border-white/10">
+                  <span className="px-3 py-1 rounded-full text-[10px] font-[900] uppercase tracking-widest bg-white/10 text-purple-400 border border-white/10">
                     FİKSTÜR HAZIRLANIYOR
                   </span>
-                  <h3 className="text-2xl font-black text-white uppercase tracking-wider">
+                  <h3 className="text-xl sm:text-2xl font-[900] text-white uppercase tracking-wider">
                     Turnuva Fikstürü ve Canlı Maçlar
                   </h3>
                 </div>
 
-                <p className="text-zinc-400 text-sm leading-relaxed">
-                  Grup kuraları tamamlandıktan sonra maç eşleşmeleri, maç günleri ve skorlar bu alanda canlı olarak
-                  yayınlanacaktır.
+                <p className="text-zinc-400 text-xs sm:text-sm leading-relaxed font-normal">
+                  Grup kuraları tamamlandıktan sonra maç eşleşmeleri, maç günleri ve skorlar bu alanda canlı olarak listelenecektir.
                 </p>
               </div>
             ) : (
@@ -1021,7 +1134,7 @@ export default function TournamentDetailClient({
                   <div className="flex flex-wrap items-center gap-3">
                     {/* Group Filter */}
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-zinc-400 uppercase">Grup:</span>
+                      <span className="text-xs font-[800] text-zinc-400 uppercase">Grup:</span>
                       <select
                         value={fixtureGroupFilter}
                         onChange={(e) => setFixtureGroupFilter(e.target.value)}
@@ -1038,7 +1151,7 @@ export default function TournamentDetailClient({
 
                     {/* Round Filter */}
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-zinc-400 uppercase">Hafta:</span>
+                      <span className="text-xs font-[800] text-zinc-400 uppercase">Hafta:</span>
                       <select
                         value={fixtureRoundFilter}
                         onChange={(e) => setFixtureRoundFilter(e.target.value)}
@@ -1089,7 +1202,7 @@ export default function TournamentDetailClient({
                     return (
                       <div key={roundNum} className="space-y-3">
                         <div className="flex items-center gap-3">
-                          <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-white/10 text-[#00e5ff] border border-white/10">
+                          <span className="px-3 py-1 rounded-full text-xs font-[900] uppercase tracking-wider bg-white/10 text-[#00e5ff] border border-white/10">
                             {roundNum}. Hafta Maçları
                           </span>
                           <span className="h-px flex-1 bg-white/10" />
@@ -1120,7 +1233,7 @@ export default function TournamentDetailClient({
                             return (
                               <div
                                 key={m.id}
-                                className="bg-[#0a1628]/80 border border-white/10 hover:border-[#00e5ff]/30 rounded-2xl p-4 md:p-5 transition-all flex flex-col justify-between gap-4 shadow-lg"
+                                className="bg-[#0a1628]/80 border border-white/10 hover:border-cyan-500/30 rounded-2xl p-4 sm:p-5 transition-all flex flex-col justify-between gap-4 shadow-lg"
                               >
                                 {/* Match Top Bar */}
                                 <div className="flex items-center justify-between text-[11px] font-bold text-zinc-400">
@@ -1175,20 +1288,20 @@ export default function TournamentDetailClient({
                                 </div>
 
                                 {/* Teams & Scores */}
-                                <div className="flex items-center justify-between gap-4 py-2">
+                                <div className="flex items-center justify-between gap-3 sm:gap-4 py-2">
                                   {/* Home Team */}
-                                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  <div className="flex items-center gap-2.5 sm:gap-3 flex-1 min-w-0">
                                     <TeamLogo src={m.home?.logo_url} name={m.home?.team_name} size="sm" />
-                                    <span className="font-black text-sm text-white uppercase truncate">
+                                    <span className="font-[900] text-xs sm:text-sm text-white uppercase truncate">
                                       {m.home?.team_name || 'Ev Sahibi'}
                                     </span>
                                   </div>
 
                                   {/* Score Box */}
-                                  <div className="shrink-0 px-3 py-1.5 rounded-xl bg-black/60 border border-white/10 text-center min-w-[70px]">
+                                  <div className="shrink-0 px-3 py-1.5 rounded-xl bg-black/60 border border-white/10 text-center min-w-[65px] sm:min-w-[70px]">
                                     {isApproved || isPlaying || isPendingReview ? (
                                       <span
-                                        className={`text-base font-black font-mono tracking-wider ${
+                                        className={`text-sm sm:text-base font-[900] font-mono tracking-wider ${
                                           isApproved ? 'text-[#00e5ff]' : 'text-white'
                                         }`}
                                       >
@@ -1202,8 +1315,8 @@ export default function TournamentDetailClient({
                                   </div>
 
                                   {/* Away Team */}
-                                  <div className="flex items-center justify-end gap-3 flex-1 min-w-0">
-                                    <span className="font-black text-sm text-white uppercase truncate text-right">
+                                  <div className="flex items-center justify-end gap-2.5 sm:gap-3 flex-1 min-w-0">
+                                    <span className="font-[900] text-xs sm:text-sm text-white uppercase truncate text-right">
                                       {m.away?.team_name || 'Deplasman'}
                                     </span>
                                     <TeamLogo src={m.away?.logo_url} name={m.away?.team_name} size="sm" />
@@ -1258,7 +1371,7 @@ export default function TournamentDetailClient({
                                     <div className="flex items-center gap-2">
                                       <Clock className="w-4 h-4 shrink-0 text-amber-400" />
                                       <span>
-                                        Bildirilen Skor: <strong className="text-white font-mono">{m.home_score} - {m.away_score}</strong> (Yönetici Onayı Bekleniyor)
+                                        Bildirilen Skor: <strong className="text-white font-mono">{m.home_score} - {m.away_score}</strong> (Onay Bekliyor)
                                       </span>
                                     </div>
                                     {m.screenshot_url && (
@@ -1292,7 +1405,7 @@ export default function TournamentDetailClient({
                                   <div className="pt-2 border-t border-white/5 flex items-center justify-end">
                                     <button
                                       onClick={() => setScoreReportMatch(m)}
-                                      className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-[#00e5ff] to-cyan-400 text-black font-black text-xs uppercase tracking-wider hover:brightness-110 shadow-lg shadow-[#00e5ff]/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#00e5ff] to-cyan-400 text-black font-[900] text-xs uppercase tracking-wider hover:brightness-110 shadow-lg shadow-[#00e5ff]/20 transition-all flex items-center gap-1.5 cursor-pointer"
                                     >
                                       <Swords className="w-3.5 h-3.5" />
                                       {isRejected ? 'Skoru Yeniden Gönder' : 'Skor Bildir'}
@@ -1312,7 +1425,7 @@ export default function TournamentDetailClient({
           </div>
         )}
 
-        {/* 6. ELEME AĞACI & BRACKET */}
+        {/* ---------------- 6. ELEME AĞACI & BRACKET ---------------- */}
         {activeTab === 'bracket' && (
           <div className="space-y-8">
             <TournamentKnockoutBracket
@@ -1325,16 +1438,18 @@ export default function TournamentDetailClient({
         )}
       </div>
 
+      {/* ============================================================================== */}
       {/* APPLICATION MODAL */}
+      {/* ============================================================================== */}
       {applyModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-          <div className="bg-[#0a1628] w-full max-w-3xl rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl flex flex-col max-h-[95vh]">
+          <div className="bg-[#0a1628] w-full max-w-3xl rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl flex flex-col max-h-[95vh] animate-fade-in-up">
             <div className="p-6 md:p-8 border-b border-white/10 flex justify-between items-center shrink-0">
               <div>
-                <span className="text-[#00e5ff] text-[10px] font-black tracking-widest uppercase mb-1 block">
+                <span className="text-[#00e5ff] text-[10px] font-[900] tracking-widest uppercase mb-1 block">
                   TURNUVA TAKIM BAŞVURUSU
                 </span>
-                <h3 className="text-xl md:text-2xl font-black text-white uppercase tracking-widest">
+                <h3 className="text-xl md:text-2xl font-[900] text-white uppercase tracking-widest">
                   {tournament.name}
                 </h3>
               </div>
@@ -1343,7 +1458,7 @@ export default function TournamentDetailClient({
                   setApplyModalOpen(false);
                   setSelectedSquad([]);
                 }}
-                className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1354,7 +1469,7 @@ export default function TournamentDetailClient({
                 {/* Left col: Team name and Logo */}
                 <div className="space-y-5">
                   <div>
-                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2">
+                    <label className="block text-xs font-[900] text-zinc-300 uppercase tracking-widest mb-2">
                       TAKIM ADI <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -1367,7 +1482,7 @@ export default function TournamentDetailClient({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2">
+                    <label className="block text-xs font-[900] text-zinc-300 uppercase tracking-widest mb-2">
                       TAKIM LOGOSU (İsteğe Bağlı)
                     </label>
                     <div className="relative overflow-hidden group rounded-xl border border-dashed border-white/20 hover:border-[#00e5ff]/50 transition-colors bg-black/50">
@@ -1389,25 +1504,23 @@ export default function TournamentDetailClient({
 
                   <div className="p-4 rounded-xl bg-white/5 border border-white/5 text-xs text-zinc-400 space-y-1">
                     <span className="font-bold text-white uppercase block">👑 Takım Temsilcisi:</span>
-                    <p>
-                      Başvuruyu gönderen kullanıcı olarak otomatik olarak takım kaptanı ve yöneticisi olarak
-                      atanacaksınız.
+                    <p className="font-normal leading-relaxed">
+                      Başvuruyu gönderen kullanıcı olarak otomatik olarak takım kaptanı ve yöneticisi olarak atanacaksınız.
                     </p>
                   </div>
                 </div>
 
-                {/* Right col: Squad Selection (Flexible, optional) */}
+                {/* Right col: Squad Selection */}
                 <div className="space-y-4">
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest">
+                      <label className="block text-xs font-[900] text-zinc-300 uppercase tracking-widest">
                         KADRO OLUŞTUR ({selectedSquad.length} Oyuncu)
                       </label>
                       <span className="text-[10px] text-zinc-500 font-bold uppercase">İsteğe Bağlı</span>
                     </div>
                     <p className="text-[11px] text-zinc-500 mb-2 leading-relaxed">
-                      Turnuvada takımınızda yer almasını istediğiniz kayıtlı oyuncuları aratıp ekleyebilirsiniz. Katı 11
-                      oyuncu şartı yoktur.
+                      Turnuvada takımınızda yer almasını istediğiniz kayıtlı oyuncuları aratıp ekleyebilirsiniz. Katı 11 oyuncu şartı yoktur.
                     </p>
 
                     <input
@@ -1427,7 +1540,7 @@ export default function TournamentDetailClient({
                             onClick={() => toggleSquadMember(p.id)}
                             className={`p-2 rounded-lg border text-[11px] cursor-pointer flex items-center gap-2 transition-all select-none ${
                               isSelected
-                                ? 'bg-[#00e5ff]/20 border-[#00e5ff]/50 text-[#00e5ff] font-black'
+                                ? 'bg-cyan-500/20 border-cyan-500/50 text-[#00e5ff] font-black'
                                 : 'bg-white/5 border-transparent text-zinc-400 font-bold hover:bg-white/10'
                             }`}
                           >
@@ -1452,14 +1565,14 @@ export default function TournamentDetailClient({
                     setApplyModalOpen(false);
                     setSelectedSquad([]);
                   }}
-                  className="px-6 py-3.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 font-black uppercase tracking-wider text-xs transition-colors"
+                  className="px-6 py-3.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 font-[900] uppercase tracking-wider text-xs transition-colors cursor-pointer"
                 >
                   Vazgeç
                 </button>
                 <button
                   disabled={loading}
                   type="submit"
-                  className="px-8 py-3.5 rounded-xl bg-[#00e5ff] text-black font-black uppercase tracking-widest text-xs hover:bg-[#00c5ff] hover:shadow-[0_0_20px_rgba(0,229,255,0.4)] transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2"
+                  className="px-8 py-3.5 rounded-xl bg-gradient-to-r from-[#00e5ff] to-cyan-400 text-black font-[900] uppercase tracking-widest text-xs hover:brightness-110 hover:shadow-[0_0_20px_rgba(0,229,255,0.4)] transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2 cursor-pointer"
                 >
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'BAŞVURUYU GÖNDER'}
                 </button>
@@ -1469,17 +1582,19 @@ export default function TournamentDetailClient({
         </div>
       )}
 
+      {/* ============================================================================== */}
       {/* CANCEL APPLICATION CONFIRMATION MODAL */}
+      {/* ============================================================================== */}
       {cancelModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-          <div className="bg-[#0a1628] w-full max-w-md rounded-3xl border border-white/10 p-6 space-y-6 shadow-2xl">
+          <div className="bg-[#0a1628] w-full max-w-md rounded-3xl border border-white/10 p-6 space-y-6 shadow-2xl animate-fade-in-up">
             <div className="w-14 h-14 rounded-2xl bg-red-500/20 border border-red-500/30 flex items-center justify-center mx-auto text-red-400">
               <AlertTriangle className="w-7 h-7" />
             </div>
 
             <div className="text-center space-y-2">
-              <h3 className="text-xl font-black text-white uppercase tracking-wider">Başvuruyu İptal Et</h3>
-              <p className="text-xs text-zinc-400 leading-relaxed">
+              <h3 className="text-xl font-[900] text-white uppercase tracking-wider">Başvuruyu İptal Et</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed font-normal">
                 Bu turnuvaya yapmış olduğunuz başvuruyu iptal etmek istediğinize emin misiniz? Bu işlem geri alınamaz.
               </p>
             </div>
@@ -1487,14 +1602,14 @@ export default function TournamentDetailClient({
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setCancelModalOpen(false)}
-                className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 font-black uppercase tracking-wider text-xs transition-colors"
+                className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 font-[900] uppercase tracking-wider text-xs transition-colors cursor-pointer"
               >
                 Vazgeç
               </button>
               <button
                 disabled={loading}
                 onClick={handleCancelApplication}
-                className="flex-1 py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-black uppercase tracking-wider text-xs transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-[900] uppercase tracking-wider text-xs transition-colors disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Evet, İptal Et'}
               </button>
@@ -1503,7 +1618,9 @@ export default function TournamentDetailClient({
         </div>
       )}
 
+      {/* ============================================================================== */}
       {/* MATCH SCORE REPORT MODAL */}
+      {/* ============================================================================== */}
       {scoreReportMatch && (
         <TournamentScoreReportModal
           match={scoreReportMatch}
