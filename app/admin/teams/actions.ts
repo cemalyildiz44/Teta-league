@@ -49,7 +49,7 @@ export async function createTeam(formData: FormData) {
   if (ea_club_name_input && (ea_club_name_input.length < 2 || ea_club_name_input.length > 5)) {
     return { error: 'Takım kısaltması 2 ile 5 karakter arasında olmalıdır.' };
   }
-  
+
   const ea_club_id = ea_club_id_str ? parseInt(ea_club_id_str, 10) : null;
   const slug = slugInput ? slugInput.toLowerCase().trim().replace(/[\s\W-]+/g, '-') : name.toLowerCase().trim().replace(/[\s\W-]+/g, '-');
   const ea_club_name = ea_club_name_input || null;
@@ -60,6 +60,9 @@ export async function createTeam(formData: FormData) {
   if (logo_file && logo_file.size > 0) {
     if (logo_file.size > 5 * 1024 * 1024) {
       return { error: 'Logo boyutu 5MB sınırını aşıyor.' };
+    }
+    if (!logo_file.type.startsWith('image/')) {
+      return { error: 'Geçersiz dosya formatı. Lütfen geçerli bir görsel (PNG, JPG, WEBP) seçin.' };
     }
     const ext = logo_file.name.split('.').pop() || 'webp';
     uploadedFileName = `team_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
@@ -121,15 +124,19 @@ export async function editTeam(formData: FormData) {
   if (!(await checkAdmin(supabase, user))) return { error: 'Yetkisiz erişim.' };
 
   const id = formData.get('id') as string;
-  const name = formData.get('name') as string;
+  const name = (formData.get('name') as string || '').trim();
   const ea_club_id_str = formData.get('ea_club_id') as string;
   const ea_club_name_input = (formData.get('ea_club_name') as string || '').trim().toUpperCase();
   const logo_file = (formData.get('logo_file') || formData.get('image_file')) as File;
   const remove_logo = formData.get('remove_logo') === 'true' || formData.get('remove_image') === 'true';
   const logo_url_input = formData.get('logo_url') as string;
-  const slugInput = formData.get('slug') as string;
+  const slugInput = (formData.get('slug') as string || '').trim();
+  const stream_url_input = (formData.get('stream_url') as string || '').trim();
+  const instagram_url_input = (formData.get('instagram_url') as string || '').trim();
 
-  if (!id || !name || !slugInput) return { error: 'Eksik bilgi.' };
+  if (!id) return { error: 'Takım ID zorunludur.' };
+  if (!name) return { error: 'Takım adı zorunludur ve boş bırakılamaz.' };
+  if (!slugInput) return { error: 'Slug zorunludur ve boş bırakılamaz.' };
 
   // Validate abbreviation (optional, 2-5 chars)
   if (ea_club_name_input && (ea_club_name_input.length < 2 || ea_club_name_input.length > 5)) {
@@ -143,9 +150,11 @@ export async function editTeam(formData: FormData) {
   // Fetch current team data for cleanup
   const { data: currentTeam } = await supabase
     .from('teams')
-    .select('logo_url')
+    .select('id, name, logo_url, slug')
     .eq('id', id)
     .single();
+
+  if (!currentTeam) return { error: 'Takım bulunamadı.' };
 
   const oldLogoUrl = currentTeam?.logo_url;
   let new_logo_url: string | null = null;
@@ -154,6 +163,9 @@ export async function editTeam(formData: FormData) {
   if (logo_file && logo_file.size > 0) {
     if (logo_file.size > 5 * 1024 * 1024) {
       return { error: 'Logo boyutu 5MB sınırını aşıyor.' };
+    }
+    if (!logo_file.type.startsWith('image/')) {
+      return { error: 'Geçersiz dosya formatı. Lütfen geçerli bir görsel (PNG, JPG, WEBP) seçin.' };
     }
     const ext = logo_file.name.split('.').pop() || 'webp';
     uploadedFileName = `team_${id}_${Date.now()}.${ext}`;
@@ -179,7 +191,10 @@ export async function editTeam(formData: FormData) {
     name,
     slug,
     ea_club_id,
-    ea_club_name
+    ea_club_name,
+    stream_url: stream_url_input || null,
+    instagram_url: instagram_url_input || null,
+    updated_at: new Date().toISOString()
   };
 
   if (new_logo_url) {
@@ -196,16 +211,24 @@ export async function editTeam(formData: FormData) {
     if (uploadedFileName) {
       await supabase.storage.from('team-logos').remove([uploadedFileName]);
     }
-    if (error.code === '23505') return { error: 'Bu slug zaten kullanımda.' };
+    if (error.code === '23505') return { error: 'Bu takım adı veya slug zaten kullanımda.' };
     return { error: 'Takım güncellenemedi: ' + error.message };
   }
 
-  // Garbage collection: clean up old logo from storage if changed or removed
+  // Garbage collection: clean up old logo from storage if changed or removed and not used by other teams
   if ((new_logo_url || remove_logo) && oldLogoUrl && oldLogoUrl !== new_logo_url) {
     try {
-      const parts = oldLogoUrl.split('/public/team-logos/');
-      if (parts.length === 2) {
-        await supabase.storage.from('team-logos').remove([parts[1]]);
+      const { count: otherUsage } = await supabase
+        .from('teams')
+        .select('id', { count: 'exact', head: true })
+        .eq('logo_url', oldLogoUrl)
+        .neq('id', id);
+
+      if (!otherUsage || otherUsage === 0) {
+        const parts = oldLogoUrl.split('/public/team-logos/');
+        if (parts.length === 2) {
+          await supabase.storage.from('team-logos').remove([parts[1]]);
+        }
       }
     } catch (cleanupErr) {
       console.error('Failed to cleanup old team logo:', cleanupErr);
@@ -217,6 +240,7 @@ export async function editTeam(formData: FormData) {
     entity_type: 'teams',
     entity_id: id,
     entity_label: name,
+    old_data: { name: currentTeam.name, slug: currentTeam.slug },
     new_data: updatePayload,
     description: `"${name}" takımı güncellendi.`,
     actor_id: user?.id
@@ -224,6 +248,10 @@ export async function editTeam(formData: FormData) {
 
   revalidatePath('/admin/teams');
   revalidatePath('/takimlar');
+  revalidatePath(`/takim/${slug}`);
+  if (currentTeam.slug && currentTeam.slug !== slug) {
+    revalidatePath(`/takim/${currentTeam.slug}`);
+  }
   revalidatePath('/', 'layout');
   return { success: 'Takım başarıyla güncellendi.' };
 }
@@ -391,17 +419,18 @@ export async function uploadTeamLogoAction(formData: FormData) {
   const teamId = formData.get('teamId') as string;
 
   if (!file || !teamId) return { error: 'Eksik dosya veya takım.' };
-  
-  if (file.size > 5 * 1024 * 1024) return { error: 'Dosya boyutu limitini aşıyor.' };
-  
+
+  if (file.size > 5 * 1024 * 1024) return { error: 'Logo boyutu 5MB limitini aşıyor.' };
+  if (!file.type.startsWith('image/')) return { error: 'Geçersiz dosya formatı. Lütfen geçerli bir görsel (PNG, JPG, WEBP) yükleyin.' };
+
   const ext = file.name.split('.').pop() || 'webp';
   const fileName = `team_${teamId}_${Date.now()}.${ext}`;
 
   const { error: uploadError } = await supabase.storage
     .from('team-logos')
-    .upload(fileName, file, { 
+    .upload(fileName, file, {
       cacheControl: '31536000',
-      upsert: true 
+      upsert: true
     });
 
   if (uploadError) return { error: 'Logo yüklenirken hata oluştu: ' + uploadError.message };
@@ -409,25 +438,119 @@ export async function uploadTeamLogoAction(formData: FormData) {
   const { data } = supabase.storage.from('team-logos').getPublicUrl(fileName);
 
   // Fetch old logo url for garbage collection
-  const { data: oldTeam } = await supabase.from('teams').select('logo_url').eq('id', teamId).single();
+  const { data: oldTeam } = await supabase.from('teams').select('id, name, logo_url, slug').eq('id', teamId).single();
 
-  const { error: updateError } = await supabase.from('teams').update({ logo_url: data.publicUrl }).eq('id', teamId);
-  if (updateError) return { error: "Takım logosu DB'ye kaydedilemedi." };
+  const { error: updateError } = await supabase.from('teams').update({
+    logo_url: data.publicUrl,
+    updated_at: new Date().toISOString()
+  }).eq('id', teamId);
 
-  // Garbage collection
+  if (updateError) {
+    await supabase.storage.from('team-logos').remove([fileName]);
+    return { error: "Takım logosu veritabanına kaydedilemedi: " + updateError.message };
+  }
+
+  // Garbage collection: only delete old logo if no other team is using it
   if (oldTeam?.logo_url && oldTeam.logo_url !== data.publicUrl) {
     try {
-      const parts = oldTeam.logo_url.split('/public/team-logos/');
-      if (parts.length === 2) {
-        await supabase.storage.from('team-logos').remove([parts[1]]);
+      const { count: otherUsage } = await supabase
+        .from('teams')
+        .select('id', { count: 'exact', head: true })
+        .eq('logo_url', oldTeam.logo_url)
+        .neq('id', teamId);
+
+      if (!otherUsage || otherUsage === 0) {
+        const parts = oldTeam.logo_url.split('/public/team-logos/');
+        if (parts.length === 2) {
+          await supabase.storage.from('team-logos').remove([parts[1]]);
+        }
       }
     } catch (e) {
       console.error('Failed to cleanup old team logo:', e);
     }
   }
 
+  await logAdminAudit({
+    action: 'UPDATE_TEAM_LOGO',
+    entity_type: 'teams',
+    entity_id: teamId,
+    entity_label: oldTeam?.name || 'Takım',
+    description: `"${oldTeam?.name || 'Takım'}" logosu güncellendi.`,
+    actor_id: user?.id
+  });
+
+  revalidatePath('/admin/teams');
+  revalidatePath('/takimlar');
+  if (oldTeam?.slug) {
+    revalidatePath(`/takim/${oldTeam.slug}`);
+  }
   revalidatePath('/', 'layout');
-  return { success: 'Logo başarıyla yüklendi.' };
+  return { success: 'Logo başarıyla güncellendi.' };
+}
+
+export async function updateTeamApplicationStatusAction(application_id: string, status: 'APPROVED' | 'REJECTED') {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!(await checkAdmin(supabase, user)) || !user) return { error: 'Yetkisiz erişim.' };
+
+  if (!application_id || typeof application_id !== 'string') {
+    return { error: 'Geçersiz başvuru ID.' };
+  }
+
+  if (status !== 'APPROVED' && status !== 'REJECTED') {
+    return { error: 'Geçersiz durum değeri. Yalnızca ONAYLANDI veya REDDEDİLDİ seçilebilir.' };
+  }
+
+  // Fetch current application
+  const { data: appData, error: fetchError } = await supabase
+    .from('tournament_applications')
+    .select('id, team_name, tournament_id, status')
+    .eq('id', application_id)
+    .maybeSingle();
+
+  if (fetchError || !appData) {
+    return { error: 'Başvuru bulunamadı.' };
+  }
+
+  if (appData.status === status) {
+    return { error: `Bu başvuru zaten ${status === 'APPROVED' ? 'onaylanmış' : 'reddedilmiş'}.` };
+  }
+
+  const { error: updateError } = await supabase
+    .from('tournament_applications')
+    .update({
+      status,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', application_id);
+
+  if (updateError) {
+    return { error: 'Başvuru durumu güncellenemedi: ' + updateError.message };
+  }
+
+  await logAdminAudit({
+    action: status === 'APPROVED' ? 'APPROVE_TEAM_APPLICATION' : 'REJECT_TEAM_APPLICATION',
+    entity_type: 'tournament_applications',
+    entity_id: application_id,
+    entity_label: appData.team_name || `Başvuru #${application_id.substring(0, 8)}`,
+    old_data: { status: appData.status },
+    new_data: { status, team_name: appData.team_name, tournament_id: appData.tournament_id },
+    description: `"${appData.team_name || 'Takım'}" başvurusu ${status === 'APPROVED' ? 'onaylandı' : 'reddedildi'}.`,
+    actor_id: user.id
+  });
+
+  revalidatePath('/admin/teams');
+  revalidatePath('/admin/tournaments');
+  revalidatePath('/turnuvalar');
+  if (appData.tournament_id) {
+    revalidatePath(`/turnuvalar/${appData.tournament_id}`);
+  }
+  return {
+    success: status === 'APPROVED'
+      ? `"${appData.team_name}" başvurusu başarıyla onaylandı.`
+      : `"${appData.team_name}" başvurusu reddedildi.`
+  };
 }
 
 export async function deleteTeamAction(teamId: string) {
@@ -485,26 +608,33 @@ export async function deleteTeamAction(teamId: string) {
     .update({ is_active: false })
     .eq('team_id', teamId);
 
-  // 5. Check if the team has any career history or historical records (matches, stats, fixtures, transfers, or memberships)
+  // 5. Check if the team has any career history or historical records
+  //    (matches, stats, fixtures, transfers, memberships, penalties, or legacy career stats)
   const [
     { count: matchCount },
     { count: statCount },
     { count: fixtureCount },
     { count: transferCount },
-    { count: membershipCount }
+    { count: membershipCount },
+    { count: penaltyCount },
+    { count: legacyStatCount }
   ] = await Promise.all([
     supabase.from('matches').select('id', { count: 'exact', head: true }).or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`),
     supabase.from('match_player_stats').select('id', { count: 'exact', head: true }).eq('team_id', teamId),
     supabase.from('fixtures').select('id', { count: 'exact', head: true }).or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`),
     supabase.from('transfers').select('id', { count: 'exact', head: true }).or(`from_team_id.eq.${teamId},to_team_id.eq.${teamId}`),
-    supabase.from('team_memberships').select('id', { count: 'exact', head: true }).eq('team_id', teamId)
+    supabase.from('team_memberships').select('id', { count: 'exact', head: true }).eq('team_id', teamId),
+    supabase.from('team_penalties').select('id', { count: 'exact', head: true }).eq('team_id', teamId),
+    supabase.from('player_legacy_career_stats').select('id', { count: 'exact', head: true }).eq('team_id', teamId)
   ]);
 
   const hasCareerOrHistory = (matchCount && matchCount > 0) ||
                              (statCount && statCount > 0) ||
                              (fixtureCount && fixtureCount > 0) ||
                              (transferCount && transferCount > 0) ||
-                             (membershipCount && membershipCount > 0);
+                             (membershipCount && membershipCount > 0) ||
+                             (penaltyCount && penaltyCount > 0) ||
+                             (legacyStatCount && legacyStatCount > 0);
 
   let successMsg = '';
 
@@ -528,12 +658,20 @@ export async function deleteTeamAction(teamId: string) {
     const { error: deleteError } = await supabase.from('teams').delete().eq('id', teamId);
     if (deleteError) return { error: 'Takım silinemedi: ' + deleteError.message };
 
-    // Garbage collect team logo
+    // Garbage collect team logo (only if not used by any other team)
     if (team.logo_url) {
       try {
-        const parts = team.logo_url.split('/public/team-logos/');
-        if (parts.length === 2) {
-          await supabase.storage.from('team-logos').remove([parts[1]]);
+        const { count: otherUsage } = await supabase
+          .from('teams')
+          .select('id', { count: 'exact', head: true })
+          .eq('logo_url', team.logo_url)
+          .neq('id', teamId);
+
+        if (!otherUsage || otherUsage === 0) {
+          const parts = team.logo_url.split('/public/team-logos/');
+          if (parts.length === 2) {
+            await supabase.storage.from('team-logos').remove([parts[1]]);
+          }
         }
       } catch (cleanupErr) {
         console.error('Failed to cleanup team logo:', cleanupErr);

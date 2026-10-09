@@ -4,16 +4,19 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { 
+import {
   Search, Plus, Edit2, Shield, Users, Crown,
-  CheckCircle2, Trash2, AlertTriangle, X, Loader2, Upload
+  CheckCircle2, Trash2, AlertTriangle, X, Loader2, Upload,
+  XCircle, Eye, Clock, Calendar, Trophy, ExternalLink, Filter
 } from 'lucide-react';
-import { 
+import {
   createTeam, editTeam, updateTeamStatus,
   assignCaptain, assignTeamCaptainAction, removeTeamCaptainAction,
   addPlayerToTeam, removePlayerFromTeam, uploadTeamLogoAction,
-  deleteTeamAction, forceDeleteTestTeamAction
+  deleteTeamAction, forceDeleteTestTeamAction,
+  updateTeamApplicationStatusAction
 } from './actions';
+import { formatTournamentDate } from '@/lib/date-utils';
 
 import imageCompression from 'browser-image-compression';
 import TeamLogo from '@/components/TeamLogo';
@@ -23,13 +26,29 @@ const APPROVED_TEST_TEAM_IDS = [
   'd0f69110-5fff-4e83-bfdb-c0fbe0f5ae9f', // Teta Test FC
 ];
 
-export function TeamsManager({ initialTeams, initialCaptains, initialMemberships, initialLeagueTeams, allProfiles }: any) {
+export function TeamsManager({
+  initialTeams,
+  initialCaptains,
+  initialMemberships,
+  initialLeagueTeams,
+  allProfiles,
+  initialApplications = []
+}: any) {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'APPROVED_TEAMS' | 'APPLICATIONS'>('APPROVED_TEAMS');
   const [teams, setTeams] = useState(initialTeams);
+  const [applications, setApplications] = useState<any[]>(initialApplications || []);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('ALL');
-  
+
+  // Application specific state
+  const [appSearch, setAppSearch] = useState('');
+  const [appFilter, setAppFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'>('ALL');
+  const [appActionLoading, setAppActionLoading] = useState<string | null>(null);
+  const [applicationDetailModal, setApplicationDetailModal] = useState<any | null>(null);
+
   useEffect(() => { setTeams(initialTeams); }, [initialTeams]);
+  useEffect(() => { setApplications(initialApplications || []); }, [initialApplications]);
 
   // Modals
   const [createModal, setCreateModal] = useState(false);
@@ -38,7 +57,7 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
   const [captainModal, setCaptainModal] = useState<any>(null); // holds team info
   const [addPlayerModal, setAddPlayerModal] = useState<any>(null); // holds team info
   const [logoModal, setLogoModal] = useState<any>(null); // holds team info
-  
+
   // Team Logo States
   const [createImageFile, setCreateImageFile] = useState<File | null>(null);
   const [createImagePreview, setCreateImagePreview] = useState<string | null>(null);
@@ -91,6 +110,30 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
   const activeTeams = teams.filter((t: any) => t.is_active).length;
   const withCaptain = new Set(initialCaptains.map((c: any) => c.team_id)).size;
   const withoutCaptain = totalTeams - withCaptain;
+
+  // Applications Filtering & Summary
+  const filteredApplications = applications.filter((a: any) => {
+    const q = appSearch.toLowerCase().trim();
+    const teamMatch = a.team_name?.toLowerCase().includes(q);
+    const captainMatch =
+      a.profiles?.username?.toLowerCase().includes(q) ||
+      a.profiles?.full_name?.toLowerCase().includes(q);
+    const tournamentMatch = a.tournaments?.name?.toLowerCase().includes(q);
+    const s = !q || teamMatch || captainMatch || tournamentMatch;
+
+    let f = true;
+    if (appFilter === 'PENDING') f = a.status === 'PENDING';
+    else if (appFilter === 'APPROVED') f = a.status === 'APPROVED';
+    else if (appFilter === 'REJECTED') f = a.status === 'REJECTED';
+    else if (appFilter === 'CANCELLED') f = a.status === 'CANCELLED';
+
+    return s && f;
+  });
+
+  const totalApps = applications.length;
+  const pendingApps = applications.filter((a: any) => a.status === 'PENDING').length;
+  const approvedApps = applications.filter((a: any) => a.status === 'APPROVED').length;
+  const rejectedApps = applications.filter((a: any) => a.status === 'REJECTED' || a.status === 'CANCELLED').length;
 
   const showFeedback = (msg: string, type: 'success' | 'error') => {
     setFeedback({ msg, type });
@@ -290,8 +333,9 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
   const handleDeleteTeam = (t: any) => {
     setConfirmModal({
       isOpen: true,
-      title: 'Takımı Sil',
-      message: `"${t.name}" takımını silmek istediğinize emin misiniz? Takımın geçmiş maç, fikstür veya transfer kaydı varsa veri bütünlüğünü korumak adına arşivlenecektir (inaktif yapılacaktır). Geçmiş kaydı yoksa tamamen silinecektir.`,
+      title: 'TAKIMI SİL / ARŞİVLE',
+      teamName: t.name,
+      message: `"${t.name}" takımını silmek istediğinize emin misiniz? Takımın geçmiş maç, fikstür veya transfer kaydı varsa veri bütünlüğünü korumak adına arşivlenecektir (inaktif yapılacaktır). Takıma bağlı tüm oyuncuların aktif sözleşmeleri sonlandırılarak oyuncular serbest bırakılacak, kariyer geçmişleri korunacaktır. Geçmiş kaydı yoksa takım sistemden tamamen silinecektir.`,
       type: 'danger',
       action: async () => {
         setLoading(true);
@@ -306,6 +350,34 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
         closeConfirm();
       }
     });
+  };
+
+  const handleApplicationStatus = async (appId: string, status: 'APPROVED' | 'REJECTED') => {
+    if (appActionLoading) return;
+    setAppActionLoading(appId);
+    try {
+      const res = await updateTeamApplicationStatusAction(appId, status);
+      if (res.error) {
+        showFeedback(res.error, 'error');
+      } else {
+        showFeedback(res.success || 'Başvuru durumu güncellendi.', 'success');
+        setApplications((prev: any[]) =>
+          prev.map((a: any) =>
+            a.id === appId ? { ...a, status, updated_at: new Date().toISOString() } : a
+          )
+        );
+        if (applicationDetailModal && applicationDetailModal.id === appId) {
+          setApplicationDetailModal((prev: any) =>
+            prev ? { ...prev, status, updated_at: new Date().toISOString() } : null
+          );
+        }
+        router.refresh();
+      }
+    } catch (err: any) {
+      showFeedback(err?.message || 'İşlem sırasında bir hata oluştu.', 'error');
+    } finally {
+      setAppActionLoading(null);
+    }
   };
 
   const handleForceDeleteTestTeam = (t: any) => {
@@ -378,173 +450,432 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
   return (
     <div className='space-y-6'>
       {feedback && (
-        <div className={'fixed top-4 right-4 z-50 p-4 rounded-xl border shadow-xl flex items-center gap-3 transition-all ' + 
+        <div className={'fixed top-4 right-4 z-50 p-4 rounded-xl border shadow-xl flex items-center gap-3 transition-all ' +
           (feedback.type === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400')}>
           {feedback.type === 'error' ? <AlertTriangle className='w-5 h-5' /> : <CheckCircle2 className='w-5 h-5' />}
           <p className='text-sm font-medium'>{feedback.msg}</p>
         </div>
       )}
 
-      {/* Summary Cards */}
-      <div className='grid grid-cols-2 md:grid-cols-4 gap-4'>
-        <div className='card-surface p-4 rounded-xl border border-white/5'>
-          <p className='text-xs text-zinc-400 font-medium mb-1'>TOPLAM TAKIM</p>
-          <p className='text-2xl font-black text-white'>{totalTeams}</p>
-        </div>
-        <div className='card-surface p-4 rounded-xl border border-white/5'>
-          <p className='text-xs text-emerald-400 font-medium mb-1'>AKTİF TAKIM</p>
-          <p className='text-2xl font-black text-white'>{activeTeams}</p>
-        </div>
-        <div className='card-surface p-4 rounded-xl border border-white/5'>
-          <p className='text-xs text-cyan-400 font-medium mb-1'>KAPTANI OLAN</p>
-          <p className='text-2xl font-black text-white'>{withCaptain}</p>
-        </div>
-        <div className='card-surface p-4 rounded-xl border border-white/5'>
-          <p className='text-xs text-amber-400 font-medium mb-1'>KAPTANSIZ</p>
-          <p className='text-2xl font-black text-white'>{withoutCaptain}</p>
-        </div>
-      </div>
+      {/* Top Primary Tabs */}
+      <div className='flex items-center gap-2 border-b border-white/10 pb-4'>
+        <button
+          type='button'
+          onClick={() => setActiveTab('APPROVED_TEAMS')}
+          className={'flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black tracking-wider uppercase transition-all ' +
+            (activeTab === 'APPROVED_TEAMS'
+              ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20'
+              : 'bg-[#0a1628] text-zinc-400 hover:text-white hover:bg-white/5 border border-white/5')}
+        >
+          <Shield className='w-4 h-4' />
+          <span>ONAYLANMIŞ TAKIMLAR</span>
+          <span className={'px-2 py-0.5 rounded-full text-[10px] font-bold ' +
+            (activeTab === 'APPROVED_TEAMS' ? 'bg-black/20 text-black' : 'bg-white/10 text-zinc-300')}>
+            {totalTeams}
+          </span>
+        </button>
 
-      {/* Toolbar */}
-      <div className='flex flex-col md:flex-row gap-4 items-start md:items-center justify-between'>
-        <div className='flex items-center gap-2 w-full md:w-auto'>
-          <div className='relative w-full md:w-80'>
-            <Search className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500' />
-            <input
-              type='text' placeholder='Takım, Kaptan veya Oyuncu Ara...'
-              value={search} onChange={e => setSearch(e.target.value)}
-              className='w-full pl-9 pr-4 py-2 bg-[#060d18] border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/50'
-            />
-          </div>
-          <div className='flex bg-[#060d18] rounded-lg border border-white/10 p-1'>
-            {['ALL', 'ACTIVE', 'INACTIVE', 'NO_CAPTAIN'].map(f => (
-              <button 
-                key={f} onClick={() => setFilter(f)}
-                className={'px-3 py-1.5 text-[10px] font-bold rounded-md transition-colors ' + 
-                  (filter === f ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-zinc-300')}
-              >
-                {f === 'ALL' ? 'TÜMÜ' : f === 'NO_CAPTAIN' ? 'KAPTANSIZ' : f}
-              </button>
-            ))}
-          </div>
-        </div>
-        
-        <button onClick={() => setCreateModal(true)} className='flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-black px-4 py-2 rounded-lg text-sm font-black transition-colors w-full md:w-auto justify-center'>
-          <Plus className='w-4 h-4' /> YENİ TAKIM
+        <button
+          type='button'
+          onClick={() => setActiveTab('APPLICATIONS')}
+          className={'flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black tracking-wider uppercase transition-all ' +
+            (activeTab === 'APPLICATIONS'
+              ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20'
+              : 'bg-[#0a1628] text-zinc-400 hover:text-white hover:bg-white/5 border border-white/5')}
+        >
+          <Users className='w-4 h-4' />
+          <span>BAŞVURAN TAKIMLAR</span>
+          {pendingApps > 0 ? (
+            <span className='px-2 py-0.5 rounded-full bg-amber-500 text-black text-[10px] font-black animate-pulse'>
+              {pendingApps} BEKLEYEN
+            </span>
+          ) : (
+            <span className={'px-2 py-0.5 rounded-full text-[10px] font-bold ' +
+              (activeTab === 'APPLICATIONS' ? 'bg-black/20 text-black' : 'bg-white/10 text-zinc-300')}>
+              {totalApps}
+            </span>
+          )}
         </button>
       </div>
 
-      {/* Table */}
-      <div className='card-surface rounded-xl border border-white/5 overflow-x-auto'>
-        <table className='w-full text-left text-sm text-zinc-400'>
-          <thead className='bg-[#0a1628] border-b border-white/5 text-xs uppercase font-black text-cyan-400'>
-            <tr>
-              <th className='px-4 py-4'>Takım</th>
-              <th className='px-4 py-4'>Kaptan</th>
-              <th className='px-4 py-4'>Lig / Sezon</th>
-              <th className='px-4 py-4'>Kadro</th>
-              <th className='px-4 py-4'>Durum</th>
-              <th className='px-4 py-4 text-right'>İşlemler</th>
-            </tr>
-          </thead>
-          <tbody className='divide-y divide-white/5'>
-            {filtered.map((t: any) => {
-              const teamCaps = initialCaptains.filter((c:any) => c.team_id === t.id);
-              const mems = initialMemberships.filter((m:any) => m.team_id === t.id && !m.left_at);
-              const lts = initialLeagueTeams.filter((l:any) => l.team_id === t.id);
+      {activeTab === 'APPROVED_TEAMS' && (
+        <div className='space-y-6'>
+          {/* Summary Cards */}
+          <div className='grid grid-cols-2 md:grid-cols-4 gap-4'>
+            <div className='card-surface p-4 rounded-xl border border-white/5'>
+              <p className='text-xs text-zinc-400 font-medium mb-1'>TOPLAM TAKIM</p>
+              <p className='text-2xl font-black text-white'>{totalTeams}</p>
+            </div>
+            <div className='card-surface p-4 rounded-xl border border-white/5'>
+              <p className='text-xs text-emerald-400 font-medium mb-1'>AKTİF TAKIM</p>
+              <p className='text-2xl font-black text-white'>{activeTeams}</p>
+            </div>
+            <div className='card-surface p-4 rounded-xl border border-white/5'>
+              <p className='text-xs text-cyan-400 font-medium mb-1'>KAPTANI OLAN</p>
+              <p className='text-2xl font-black text-white'>{withCaptain}</p>
+            </div>
+            <div className='card-surface p-4 rounded-xl border border-white/5'>
+              <p className='text-xs text-amber-400 font-medium mb-1'>KAPTANSIZ</p>
+              <p className='text-2xl font-black text-white'>{withoutCaptain}</p>
+            </div>
+          </div>
 
-              return (
-                <tr key={t.id} className='hover:bg-white/5 transition-colors group'>
-                  <td className='px-4 py-4'>
-                    <div className='flex items-center gap-3'>
-                      <TeamLogo src={t.logo_url} name={t.name} size="md" />
-                      <Link href={'/takim/' + t.slug} target='_blank' className='font-bold text-white hover:text-cyan-400 transition-colors'>{t.name}</Link>
-                    </div>
-                  </td>
-                  <td className='px-4 py-4'>
-                    {teamCaps.length > 0 ? (
-                      <div className='flex flex-wrap items-center gap-1.5'>
-                        <span className='text-[10px] font-mono font-bold text-zinc-400 mr-0.5'>
-                          {teamCaps.length}/3
-                        </span>
-                        {teamCaps.map((c: any) => (
-                          <span key={c.user_id} className='inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded text-[10px] font-bold'>
-                            <Crown className='w-3 h-3 text-amber-400 shrink-0' /> {c.profiles?.username}
-                          </span>
-                        ))}
-                      </div>
-                    ) : <span className='text-[10px] font-bold text-zinc-600 uppercase'>Yok (0/3)</span>}
-                  </td>
-                  <td className='px-4 py-4'>
-                    {lts.length > 0 ? (
-                      <div className='flex flex-col gap-1'>
-                        {lts.map((l:any, i:number) => (
-                          <div key={i} className='text-xs'><span className='text-white font-medium'>{l.leagues?.name}</span> <span className='text-zinc-500'>({l.seasons?.name})</span></div>
-                        ))}
-                      </div>
-                    ) : <span className='text-[10px] font-bold text-zinc-600 uppercase'>Atanmamış</span>}
-                  </td>
-                  <td className='px-4 py-4 font-mono text-xs text-white'>{mems.length} Oyuncu</td>
-                  <td className='px-4 py-4'>
-                    <button onClick={() => handleStatus(t)} className={'px-2 py-1 rounded-md text-[10px] font-bold ring-1 inset-ring ' + (t.is_active ? 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/30' : 'bg-zinc-500/10 text-zinc-400 ring-zinc-500/30')}>
-                      {t.is_active ? 'ACTIVE' : 'INACTIVE'}
-                    </button>
-                  </td>
-                  <td className='px-4 py-4'>
-                    <div className='flex justify-end items-center gap-2'>
-                      {!t.is_active && APPROVED_TEST_TEAM_IDS.includes(t.id) && (
-                        <button
-                          onClick={() => handleForceDeleteTestTeam(t)}
-                          className='px-2.5 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-md text-[10px] font-black flex items-center gap-1.5 shadow-lg shadow-red-900/30 transition-all shrink-0'
-                          title='TEST TAKIMINI KALICI SİL'
-                        >
-                          <Trash2 className='w-3.5 h-3.5' />
-                          <span>TEST TAKIMINI KALICI SİL</span>
-                        </button>
-                      )}
-                      <div className='flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity'>
-                        <button onClick={() => setLogoModal(t)} className='p-1.5 bg-pink-500/10 hover:bg-pink-500/20 rounded-md text-pink-400' title='Logo Yükle'>
-                          <Upload className='w-4 h-4' />
-                        </button>
-                        <button onClick={() => setCaptainModal(t)} className='p-1.5 bg-amber-500/10 hover:bg-amber-500/20 rounded-md text-amber-400' title='Kaptan Yönetimi'>
-                          <Crown className='w-4 h-4' />
-                        </button>
-                        <button onClick={() => setRosterModal(t)} className='p-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 rounded-md text-indigo-400' title='Kadro Yönetimi'>
-                          <Users className='w-4 h-4' />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditData(t);
-                            setEditImagePreview(t.logo_url || null);
-                            setEditImageFile(null);
-                            setEditRemoveImage(false);
-                          }}
-                          className='p-1.5 bg-white/5 hover:bg-white/10 rounded-md text-zinc-300'
-                          title='Düzenle'
-                        >
-                          <Edit2 className='w-4 h-4' />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteTeam(t)}
-                          className='p-1.5 bg-red-500/10 hover:bg-red-500/20 rounded-md text-red-400'
-                          title='Takımı Sil'
-                        >
-                          <Trash2 className='w-4 h-4' />
-                        </button>
-                      </div>
-                    </div>
-                  </td>
+          {/* Toolbar */}
+          <div className='flex flex-col md:flex-row gap-4 items-start md:items-center justify-between'>
+            <div className='flex items-center gap-2 w-full md:w-auto'>
+              <div className='relative w-full md:w-80'>
+                <Search className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500' />
+                <input
+                  type='text' placeholder='Takım, Kaptan veya Oyuncu Ara...'
+                  value={search} onChange={e => setSearch(e.target.value)}
+                  className='w-full pl-9 pr-4 py-2 bg-[#060d18] border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/50'
+                />
+              </div>
+              <div className='flex bg-[#060d18] rounded-lg border border-white/10 p-1'>
+                {['ALL', 'ACTIVE', 'INACTIVE', 'NO_CAPTAIN'].map(f => (
+                  <button
+                    key={f} onClick={() => setFilter(f)}
+                    className={'px-3 py-1.5 text-[10px] font-bold rounded-md transition-colors ' +
+                      (filter === f ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-zinc-300')}
+                  >
+                    {f === 'ALL' ? 'TÜMÜ' : f === 'NO_CAPTAIN' ? 'KAPTANSIZ' : f}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button onClick={() => setCreateModal(true)} className='flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-black px-4 py-2 rounded-lg text-sm font-black transition-colors w-full md:w-auto justify-center'>
+              <Plus className='w-4 h-4' /> YENİ TAKIM
+            </button>
+          </div>
+
+          {/* Table */}
+          <div className='card-surface rounded-xl border border-white/5 overflow-x-auto'>
+            <table className='w-full text-left text-sm text-zinc-400'>
+              <thead className='bg-[#0a1628] border-b border-white/5 text-xs uppercase font-black text-cyan-400'>
+                <tr>
+                  <th className='px-4 py-4'>Takım</th>
+                  <th className='px-4 py-4'>Kaptan</th>
+                  <th className='px-4 py-4'>Lig / Sezon</th>
+                  <th className='px-4 py-4'>Kadro</th>
+                  <th className='px-4 py-4'>Durum</th>
+                  <th className='px-4 py-4 text-right'>İşlemler</th>
                 </tr>
-              );
-            })}
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={6} className='px-4 py-12 text-center text-zinc-500'>HENÜZ TAKIM OLUŞTURULMADI VEYA BULUNAMADI</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody className='divide-y divide-white/5'>
+                {filtered.map((t: any) => {
+                  const teamCaps = initialCaptains.filter((c:any) => c.team_id === t.id);
+                  const mems = initialMemberships.filter((m:any) => m.team_id === t.id && !m.left_at);
+                  const lts = initialLeagueTeams.filter((l:any) => l.team_id === t.id);
+
+                  return (
+                    <tr key={t.id} className='hover:bg-white/5 transition-colors group'>
+                      <td className='px-4 py-4'>
+                        <div className='flex items-center gap-3'>
+                          <TeamLogo src={t.logo_url} name={t.name} size="md" />
+                          <Link href={'/takim/' + t.slug} target='_blank' className='font-bold text-white hover:text-cyan-400 transition-colors'>{t.name}</Link>
+                        </div>
+                      </td>
+                      <td className='px-4 py-4'>
+                        {teamCaps.length > 0 ? (
+                          <div className='flex flex-wrap items-center gap-1.5'>
+                            <span className='text-[10px] font-mono font-bold text-zinc-400 mr-0.5'>
+                              {teamCaps.length}/3
+                            </span>
+                            {teamCaps.map((c: any) => (
+                              <span key={c.user_id} className='inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded text-[10px] font-bold'>
+                                <Crown className='w-3 h-3 text-amber-400 shrink-0' /> {c.profiles?.username}
+                              </span>
+                            ))}
+                          </div>
+                        ) : <span className='text-[10px] font-bold text-zinc-600 uppercase'>Yok (0/3)</span>}
+                      </td>
+                      <td className='px-4 py-4'>
+                        {lts.length > 0 ? (
+                          <div className='flex flex-col gap-1'>
+                            {lts.map((l:any, i:number) => (
+                              <div key={i} className='text-xs'><span className='text-white font-medium'>{l.leagues?.name}</span> <span className='text-zinc-500'>({l.seasons?.name})</span></div>
+                            ))}
+                          </div>
+                        ) : <span className='text-[10px] font-bold text-zinc-600 uppercase'>Atanmamış</span>}
+                      </td>
+                      <td className='px-4 py-4 font-mono text-xs text-white'>{mems.length} Oyuncu</td>
+                      <td className='px-4 py-4'>
+                        <button onClick={() => handleStatus(t)} className={'px-2 py-1 rounded-md text-[10px] font-bold ring-1 inset-ring ' + (t.is_active ? 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/30' : 'bg-zinc-500/10 text-zinc-400 ring-zinc-500/30')}>
+                          {t.is_active ? 'ACTIVE' : 'INACTIVE'}
+                        </button>
+                      </td>
+                      <td className='px-4 py-4'>
+                        <div className='flex justify-end items-center gap-2'>
+                          {!t.is_active && APPROVED_TEST_TEAM_IDS.includes(t.id) && (
+                            <button
+                              onClick={() => handleForceDeleteTestTeam(t)}
+                              className='px-2.5 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-md text-[10px] font-black flex items-center gap-1.5 shadow-lg shadow-red-900/30 transition-all shrink-0'
+                              title='TEST TAKIMINI KALICI SİL'
+                            >
+                              <Trash2 className='w-3.5 h-3.5' />
+                              <span>TEST TAKIMINI KALICI SİL</span>
+                            </button>
+                          )}
+                          <div className='flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity'>
+                            <button onClick={() => setLogoModal(t)} className='p-1.5 bg-pink-500/10 hover:bg-pink-500/20 rounded-md text-pink-400' title='Logo Yükle'>
+                              <Upload className='w-4 h-4' />
+                            </button>
+                            <button onClick={() => setCaptainModal(t)} className='p-1.5 bg-amber-500/10 hover:bg-amber-500/20 rounded-md text-amber-400' title='Kaptan Yönetimi'>
+                              <Crown className='w-4 h-4' />
+                            </button>
+                            <button onClick={() => setRosterModal(t)} className='p-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 rounded-md text-indigo-400' title='Kadro Yönetimi'>
+                              <Users className='w-4 h-4' />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditData(t);
+                                setEditImagePreview(t.logo_url || null);
+                                setEditImageFile(null);
+                                setEditRemoveImage(false);
+                              }}
+                              className='p-1.5 bg-white/5 hover:bg-white/10 rounded-md text-zinc-300'
+                              title='Düzenle'
+                            >
+                              <Edit2 className='w-4 h-4' />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteTeam(t)}
+                              className='p-1.5 bg-red-500/10 hover:bg-red-500/20 rounded-md text-red-400'
+                              title='Takımı Sil'
+                            >
+                              <Trash2 className='w-4 h-4' />
+                            </button>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className='px-4 py-12 text-center text-zinc-500'>HENÜZ TAKIM OLUŞTURULMADI VEYA BULUNAMADI</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'APPLICATIONS' && (
+        <div className='space-y-6'>
+          {/* Applications Summary Cards */}
+          <div className='grid grid-cols-2 md:grid-cols-4 gap-4'>
+            <div className='card-surface p-4 rounded-xl border border-white/5'>
+              <p className='text-xs text-zinc-400 font-medium mb-1 uppercase tracking-wider'>TOPLAM BAŞVURU</p>
+              <p className='text-2xl font-black text-white'>{totalApps}</p>
+            </div>
+            <div className='card-surface p-4 rounded-xl border border-amber-500/20 bg-amber-500/5'>
+              <p className='text-xs text-amber-400 font-medium mb-1 uppercase tracking-wider'>BEKLEYEN BAŞVURULAR</p>
+              <p className='text-2xl font-black text-amber-400'>{pendingApps}</p>
+            </div>
+            <div className='card-surface p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5'>
+              <p className='text-xs text-emerald-400 font-medium mb-1 uppercase tracking-wider'>ONAYLANANLAR</p>
+              <p className='text-2xl font-black text-emerald-400'>{approvedApps}</p>
+            </div>
+            <div className='card-surface p-4 rounded-xl border border-white/5'>
+              <p className='text-xs text-zinc-400 font-medium mb-1 uppercase tracking-wider'>REDDEDİLEN / DİĞER</p>
+              <p className='text-2xl font-black text-zinc-300'>{rejectedApps}</p>
+            </div>
+          </div>
+
+          {/* Applications Toolbar */}
+          <div className='flex flex-col md:flex-row gap-4 items-start md:items-center justify-between'>
+            <div className='flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto'>
+              <div className='relative w-full sm:w-80'>
+                <Search className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500' />
+                <input
+                  type='text'
+                  placeholder='Takım, Kaptan veya Turnuva Ara...'
+                  value={appSearch}
+                  onChange={(e) => setAppSearch(e.target.value)}
+                  className='w-full pl-9 pr-4 py-2 bg-[#060d18] border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/50'
+                />
+              </div>
+
+              {/* Status Filter Pills */}
+              <div className='flex flex-wrap bg-[#060d18] rounded-lg border border-white/10 p-1 gap-1'>
+                {[
+                  { key: 'ALL', label: 'TÜMÜ' },
+                  { key: 'PENDING', label: `BEKLEMEDE ${pendingApps > 0 ? `(${pendingApps})` : ''}` },
+                  { key: 'APPROVED', label: 'ONAYLANDI' },
+                  { key: 'REJECTED', label: 'REDDEDİLDİ' },
+                  { key: 'CANCELLED', label: 'İPTAL' },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    type='button'
+                    onClick={() => setAppFilter(item.key as any)}
+                    className={'px-3 py-1.5 text-[10px] font-bold rounded-md transition-colors ' +
+                      (appFilter === item.key
+                        ? item.key === 'PENDING'
+                          ? 'bg-amber-500 text-black font-black'
+                          : 'bg-white/10 text-white'
+                        : 'text-zinc-500 hover:text-zinc-300')}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Applications Table */}
+          <div className='card-surface rounded-xl border border-white/5 overflow-x-auto'>
+            <table className='w-full text-left text-sm text-zinc-400'>
+              <thead className='bg-[#0a1628] border-b border-white/5 text-xs uppercase font-black text-cyan-400'>
+                <tr>
+                  <th className='px-4 py-4'>Takım</th>
+                  <th className='px-4 py-4'>Başvuran Kaptan</th>
+                  <th className='px-4 py-4'>Turnuva / Kategori</th>
+                  <th className='px-4 py-4'>Kadro</th>
+                  <th className='px-4 py-4'>Başvuru Tarihi</th>
+                  <th className='px-4 py-4'>Durum</th>
+                  <th className='px-4 py-4 text-right'>İşlemler</th>
+                </tr>
+              </thead>
+              <tbody className='divide-y divide-white/5'>
+                {filteredApplications.map((app: any) => {
+                  const isActionInProgress = appActionLoading === app.id;
+                  const squadCount = app.tournament_application_players?.length || 0;
+
+                  return (
+                    <tr key={app.id} className='hover:bg-white/5 transition-colors group'>
+                      {/* Takım */}
+                      <td className='px-4 py-4'>
+                        <div className='flex items-center gap-3'>
+                          <TeamLogo src={app.logo_url} name={app.team_name} size='md' className='w-10 h-10 shrink-0' />
+                          <div className='min-w-0'>
+                            <p className='font-bold text-white uppercase tracking-wider truncate'>{app.team_name}</p>
+                            <span className='text-[10px] text-zinc-500 font-mono'>ID: #{app.id.substring(0, 8)}</span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Başvuran Kaptan */}
+                      <td className='px-4 py-4'>
+                        <div className='flex items-center gap-2'>
+                          <div className='w-7 h-7 rounded-full bg-cyan-500/10 border border-cyan-500/30 overflow-hidden flex items-center justify-center shrink-0'>
+                            {app.profiles?.avatar_url ? (
+                              <img src={app.profiles.avatar_url} alt={app.profiles.username} className='w-full h-full object-cover' />
+                            ) : (
+                              <Crown className='w-3.5 h-3.5 text-amber-400' />
+                            )}
+                          </div>
+                          <div>
+                            <span className='text-xs font-bold text-white block'>@{app.profiles?.username || 'Kaptan'}</span>
+                            {app.profiles?.full_name && (
+                              <span className='text-[10px] text-zinc-500 block truncate'>{app.profiles.full_name}</span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Turnuva / Kategori */}
+                      <td className='px-4 py-4'>
+                        <div>
+                          <span className='text-xs font-bold text-white block'>{app.tournaments?.name || 'Turnuva'}</span>
+                          <div className='flex items-center gap-1.5 mt-0.5'>
+                            <span className='px-1.5 py-0.5 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded text-[9px] font-black tracking-wider uppercase'>
+                              {app.tournaments?.type || 'NIGHT_CUP'}
+                            </span>
+                            {app.tournaments?.seasons?.name && (
+                              <span className='text-[10px] text-zinc-500 truncate'>{app.tournaments.seasons.name}</span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Kadro */}
+                      <td className='px-4 py-4'>
+                        <span className='font-mono text-xs text-white'>{squadCount} Oyuncu</span>
+                      </td>
+
+                      {/* Başvuru Tarihi */}
+                      <td className='px-4 py-4'>
+                        <div className='text-xs text-zinc-300 font-mono'>
+                          {formatTournamentDate(app.created_at)}
+                        </div>
+                      </td>
+
+                      {/* Durum */}
+                      <td className='px-4 py-4'>
+                        <span className={'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ' +
+                          (app.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' :
+                           app.status === 'PENDING' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' :
+                           app.status === 'REJECTED' ? 'bg-red-500/10 text-red-400 border border-red-500/30' :
+                           'bg-zinc-500/10 text-zinc-400 border border-zinc-500/30')}>
+                          {app.status === 'APPROVED' && <CheckCircle2 className='w-3 h-3' />}
+                          {app.status === 'PENDING' && <Clock className='w-3 h-3' />}
+                          {app.status === 'REJECTED' && <XCircle className='w-3 h-3' />}
+                          {app.status === 'APPROVED' ? 'ONAYLANDI' :
+                           app.status === 'PENDING' ? 'BEKLEMEDE' :
+                           app.status === 'REJECTED' ? 'REDDEDİLDİ' : 'İPTAL EDİLDİ'}
+                        </span>
+                      </td>
+
+                      {/* İşlemler */}
+                      <td className='px-4 py-4 text-right'>
+                        <div className='flex justify-end items-center gap-1.5'>
+                          {/* Görüntüle */}
+                          <button
+                            type='button'
+                            onClick={() => setApplicationDetailModal(app)}
+                            className='p-1.5 bg-white/5 hover:bg-white/10 rounded-md text-zinc-300 transition-colors'
+                            title='Başvuruyu Görüntüle'
+                          >
+                            <Eye className='w-4 h-4' />
+                          </button>
+
+                          {/* Onayla */}
+                          {app.status !== 'APPROVED' && (
+                            <button
+                              type='button'
+                              disabled={isActionInProgress}
+                              onClick={() => handleApplicationStatus(app.id, 'APPROVED')}
+                              className='p-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-md transition-colors disabled:opacity-50'
+                              title='Onayla'
+                            >
+                              {isActionInProgress ? <Loader2 className='w-4 h-4 animate-spin' /> : <CheckCircle2 className='w-4 h-4' />}
+                            </button>
+                          )}
+
+                          {/* Reddet */}
+                          {app.status !== 'REJECTED' && (
+                            <button
+                              type='button'
+                              disabled={isActionInProgress}
+                              onClick={() => handleApplicationStatus(app.id, 'REJECTED')}
+                              className='p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-md transition-colors disabled:opacity-50'
+                              title='Reddet'
+                            >
+                              {isActionInProgress ? <Loader2 className='w-4 h-4 animate-spin' /> : <XCircle className='w-4 h-4' />}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+
+                {filteredApplications.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className='px-4 py-12 text-center text-zinc-500'>
+                      {appSearch ? 'ARAMANIZA UYGUN BAŞVURU BULUNAMADI' : 'HENÜZ BAŞVURU BULUNMUYOR'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Create Modal */}
       {createModal && (
@@ -682,6 +1013,26 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
               <div>
                 <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>EA Club ID</label>
                 <input name='ea_club_id' type='number' defaultValue={editData.ea_club_id || ''} className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm' />
+              </div>
+              <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
+                <div>
+                  <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>Canlı Yayın Linki</label>
+                  <input
+                    name='stream_url'
+                    defaultValue={editData.stream_url || ''}
+                    placeholder='https://twitch.tv/...'
+                    className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm placeholder:text-zinc-600'
+                  />
+                </div>
+                <div>
+                  <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>Instagram Linki</label>
+                  <input
+                    name='instagram_url'
+                    defaultValue={editData.instagram_url || ''}
+                    placeholder='https://instagram.com/...'
+                    className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm placeholder:text-zinc-600'
+                  />
+                </div>
               </div>
 
               {/* Takım Logosu */}
@@ -984,7 +1335,7 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
                   <div className='p-8 text-center text-zinc-500 text-sm'>BU TAKIMDA HENÜZ OYUNCU YOK</div>
                 )}
               </div>
-              
+
               <div className='p-4 border-y border-white/5 bg-[#060d18] mt-4'>
                 <h3 className='text-xs font-bold text-zinc-500 uppercase tracking-widest'>GEÇMİŞ OYUNCULAR (HİSTORİCAL)</h3>
               </div>
@@ -1049,12 +1400,164 @@ export function TeamsManager({ initialTeams, initialCaptains, initialMemberships
               </h2>
             </div>
             <div className='p-6'>
-              <p className='text-sm text-zinc-300 leading-relaxed mb-6'>{confirmModal.message}</p>
+              {confirmModal.teamName && (
+                <div className='p-3 mb-4 rounded-xl bg-red-500/10 border border-red-500/20 text-center'>
+                  <p className='text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-0.5'>İşlem Yapılacak Takım</p>
+                  <p className='text-sm font-black text-white uppercase tracking-wider'>{confirmModal.teamName}</p>
+                </div>
+              )}
+              <p className='text-xs text-zinc-300 leading-relaxed mb-6'>{confirmModal.message}</p>
               <div className='flex gap-2'>
                 <button onClick={closeConfirm} className='flex-1 py-2.5 bg-white/5 text-white rounded-lg text-xs font-bold'>Vazgeç</button>
                 <button onClick={confirmModal.action} disabled={loading} className={'flex-1 py-2.5 rounded-lg text-xs font-black flex justify-center items-center gap-2 ' + (confirmModal.type === 'danger' ? 'bg-red-500 text-white' : confirmModal.type === 'warning' ? 'bg-amber-500 text-black' : 'bg-cyan-500 text-black')}>
                   {loading && <Loader2 className='w-4 h-4 animate-spin' />} Onayla
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Application Detail Modal */}
+      {applicationDetailModal && (
+        <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm'>
+          <div className='card-surface w-full max-w-xl rounded-2xl border border-white/10 overflow-hidden flex flex-col max-h-[90vh]'>
+            {/* Header */}
+            <div className='flex justify-between items-center p-5 border-b border-white/5 bg-[#0a1628]'>
+              <div>
+                <h2 className='text-sm font-black text-white tracking-widest uppercase'>BAŞVURU DETAYI</h2>
+                <p className='text-xs text-cyan-400 font-bold mt-0.5'>{applicationDetailModal.tournaments?.name || 'Turnuva Başvurusu'}</p>
+              </div>
+              <button onClick={() => setApplicationDetailModal(null)} className='text-zinc-400 hover:text-white p-1'>
+                <X className='w-5 h-5' />
+              </button>
+            </div>
+
+            <div className='p-6 overflow-y-auto space-y-6'>
+              {/* Team Banner */}
+              <div className='flex items-center gap-4 p-4 rounded-xl bg-[#060d18] border border-white/5'>
+                <TeamLogo src={applicationDetailModal.logo_url} name={applicationDetailModal.team_name} size='lg' className='w-16 h-16 shrink-0' />
+                <div className='flex-1 min-w-0'>
+                  <div className='flex items-center gap-2 flex-wrap'>
+                    <h3 className='text-lg font-black text-white uppercase tracking-wider truncate'>{applicationDetailModal.team_name}</h3>
+                    <span className={'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1 ' +
+                      (applicationDetailModal.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                       applicationDetailModal.status === 'PENDING' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                       applicationDetailModal.status === 'REJECTED' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                       'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20')}>
+                      {applicationDetailModal.status === 'APPROVED' && <CheckCircle2 className='w-3 h-3' />}
+                      {applicationDetailModal.status === 'PENDING' && <Clock className='w-3 h-3' />}
+                      {applicationDetailModal.status === 'REJECTED' && <XCircle className='w-3 h-3' />}
+                      {applicationDetailModal.status === 'APPROVED' ? 'ONAYLANDI' :
+                       applicationDetailModal.status === 'PENDING' ? 'BEKLEMEDE' :
+                       applicationDetailModal.status === 'REJECTED' ? 'REDDEDİLDİ' : 'İPTAL EDİLDİ'}
+                    </span>
+                  </div>
+                  <p className='text-xs text-zinc-400 mt-1'>
+                    Turnuva: <span className='text-white font-medium'>{applicationDetailModal.tournaments?.name || 'Turnuva'}</span>
+                    {applicationDetailModal.tournaments?.seasons?.name && (
+                      <span className='text-zinc-500'> ({applicationDetailModal.tournaments.seasons.name})</span>
+                    )}
+                  </p>
+                  <p className='text-[11px] text-zinc-500 mt-0.5'>
+                    Başvuru Tarihi: <span className='text-zinc-300 font-mono'>{formatTournamentDate(applicationDetailModal.created_at)}</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Captain Info */}
+              <div>
+                <h4 className='text-[10px] font-black tracking-widest text-zinc-500 uppercase mb-2'>BAŞVURAN KAPTAN</h4>
+                <div className='flex items-center gap-3 p-3 rounded-xl bg-[#060d18] border border-white/5'>
+                  <div className='w-10 h-10 rounded-full bg-cyan-500/10 border border-cyan-500/30 overflow-hidden flex items-center justify-center shrink-0'>
+                    {applicationDetailModal.profiles?.avatar_url ? (
+                      <img src={applicationDetailModal.profiles.avatar_url} alt={applicationDetailModal.profiles.username} className='w-full h-full object-cover' />
+                    ) : (
+                      <Crown className='w-5 h-5 text-amber-400' />
+                    )}
+                  </div>
+                  <div>
+                    <div className='flex items-center gap-2'>
+                      <span className='text-sm font-bold text-white'>@{applicationDetailModal.profiles?.username || 'Bilinmiyor'}</span>
+                      <span className='px-1.5 py-0.5 bg-amber-500/10 text-amber-400 rounded text-[9px] font-bold border border-amber-500/20'>KAPTAN</span>
+                    </div>
+                    {applicationDetailModal.profiles?.full_name && (
+                      <p className='text-xs text-zinc-400'>{applicationDetailModal.profiles.full_name}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Squad / Players */}
+              <div>
+                <div className='flex items-center justify-between mb-2'>
+                  <h4 className='text-[10px] font-black tracking-widest text-zinc-500 uppercase'>
+                    KAYITLI KADRO ({applicationDetailModal.tournament_application_players?.length || 0})
+                  </h4>
+                </div>
+                {applicationDetailModal.tournament_application_players && applicationDetailModal.tournament_application_players.length > 0 ? (
+                  <div className='grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1'>
+                    {applicationDetailModal.tournament_application_players.map((item: any) => {
+                      const p = item.profiles || {};
+                      return (
+                        <div key={item.id} className='flex items-center gap-2.5 p-2.5 rounded-lg bg-[#060d18] border border-white/5'>
+                          <div className='w-7 h-7 rounded-full bg-white/5 border border-white/10 overflow-hidden flex items-center justify-center shrink-0 text-xs font-bold text-zinc-400'>
+                            {p.avatar_url ? (
+                              <img src={p.avatar_url} alt={p.username} className='w-full h-full object-cover' />
+                            ) : (
+                              (p.username?.[0] || 'O').toUpperCase()
+                            )}
+                          </div>
+                          <div className='min-w-0 flex-1'>
+                            <p className='text-xs font-bold text-white truncate'>@{p.username || 'Oyuncu'}</p>
+                            {p.full_name && <p className='text-[10px] text-zinc-500 truncate'>{p.full_name}</p>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className='p-4 rounded-xl bg-[#060d18] border border-white/5 text-center text-xs text-zinc-500'>
+                    Kadroda henüz ek oyuncu belirtilmemiş.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className='p-4 border-t border-white/5 bg-[#0a1628] flex items-center justify-between gap-3'>
+              <button
+                type='button'
+                onClick={() => setApplicationDetailModal(null)}
+                className='px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-xs font-bold transition-colors'
+              >
+                Kapat
+              </button>
+
+              <div className='flex items-center gap-2'>
+                {applicationDetailModal.status !== 'APPROVED' && (
+                  <button
+                    type='button'
+                    disabled={appActionLoading === applicationDetailModal.id}
+                    onClick={() => handleApplicationStatus(applicationDetailModal.id, 'APPROVED')}
+                    className='px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black rounded-lg text-xs font-black transition-colors flex items-center gap-1.5 disabled:opacity-50'
+                  >
+                    {appActionLoading === applicationDetailModal.id ? <Loader2 className='w-3.5 h-3.5 animate-spin' /> : <CheckCircle2 className='w-3.5 h-3.5' />}
+                    BAŞVURUYU ONAYLA
+                  </button>
+                )}
+
+                {applicationDetailModal.status !== 'REJECTED' && (
+                  <button
+                    type='button'
+                    disabled={appActionLoading === applicationDetailModal.id}
+                    onClick={() => handleApplicationStatus(applicationDetailModal.id, 'REJECTED')}
+                    className='px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded-lg text-xs font-black transition-colors flex items-center gap-1.5 disabled:opacity-50'
+                  >
+                    {appActionLoading === applicationDetailModal.id ? <Loader2 className='w-3.5 h-3.5 animate-spin' /> : <XCircle className='w-3.5 h-3.5' />}
+                    BAŞVURUYU REDDET
+                  </button>
+                )}
               </div>
             </div>
           </div>
