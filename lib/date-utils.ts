@@ -94,20 +94,41 @@ export function formatTournamentDate(
   const d = typeof value === 'string' || typeof value === 'number' ? new Date(value) : value;
   if (!d || isNaN(d.getTime())) return 'Belirtilmedi';
 
-  const defaultOpts: Intl.DateTimeFormatOptions = {
-    timeZone: TURKEY_TIMEZONE,
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  };
+  try {
+    let finalOpts: Intl.DateTimeFormatOptions;
+    if (options && (options.dateStyle || options.timeStyle)) {
+      // ECMA-402: dateStyle/timeStyle cannot be used with day, month, year, hour, minute
+      finalOpts = {
+        timeZone: TURKEY_TIMEZONE,
+        ...options,
+      };
+    } else {
+      finalOpts = {
+        timeZone: TURKEY_TIMEZONE,
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        ...options,
+      };
+    }
 
-  return new Intl.DateTimeFormat('tr-TR', {
-    ...defaultOpts,
-    ...options,
-    timeZone: TURKEY_TIMEZONE,
-  }).format(d);
+    return new Intl.DateTimeFormat('tr-TR', finalOpts).format(d);
+  } catch {
+    try {
+      return new Intl.DateTimeFormat('tr-TR', {
+        timeZone: TURKEY_TIMEZONE,
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(d);
+    } catch {
+      return 'Belirtilmedi';
+    }
+  }
 }
 
 /**
