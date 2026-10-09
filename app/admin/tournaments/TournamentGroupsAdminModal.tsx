@@ -20,6 +20,7 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import TeamLogo from '@/components/TeamLogo';
+import { formatTournamentDate, formatForDateTimeLocal } from '@/lib/date-utils';
 import {
   generateTournamentGroupsAction,
   updateTournamentGroupNameAction,
@@ -205,7 +206,7 @@ export default function TournamentGroupsAdminModal({
     setMatchHomeScore(m.home_score !== null ? m.home_score.toString() : '');
     setMatchAwayScore(m.away_score !== null ? m.away_score.toString() : '');
     setMatchStatus(m.status || 'SCHEDULED');
-    setMatchDate(m.scheduled_at ? new Date(m.scheduled_at).toISOString().slice(0, 16) : '');
+    setMatchDate(m.scheduled_at ? formatForDateTimeLocal(m.scheduled_at) : '');
   };
 
   // 6. Save Match
@@ -818,7 +819,7 @@ export default function TournamentGroupsAdminModal({
                           {m.scheduled_at && (
                             <span className="text-zinc-500 text-[10px] flex items-center gap-1">
                               <Clock className="w-3 h-3 text-amber-400" />
-                              {new Date(m.scheduled_at).toLocaleDateString('tr-TR', {
+                              {formatTournamentDate(m.scheduled_at, {
                                 dateStyle: 'short',
                                 timeStyle: 'short',
                               })}

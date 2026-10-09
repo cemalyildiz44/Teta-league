@@ -27,6 +27,7 @@ import {
   Award
 } from 'lucide-react';
 import { createNightCupAction } from './actions';
+import { formatTournamentDate, parseToTurkeyISO } from '@/lib/date-utils';
 
 interface NightCupCreateWizardModalProps {
   isOpen: boolean;
@@ -191,7 +192,9 @@ export default function NightCupCreateWizardModal({
 
     if (stepNumber === 2) {
       if (formData.registration_start && formData.registration_end) {
-        if (new Date(formData.registration_end) <= new Date(formData.registration_start)) {
+        const startIso = parseToTurkeyISO(formData.registration_start);
+        const endIso = parseToTurkeyISO(formData.registration_end);
+        if (startIso && endIso && new Date(endIso).getTime() <= new Date(startIso).getTime()) {
           stepErrors.registration_end = 'Başvuru bitiş tarihi, başlangıç tarihinden sonra olmalıdır.';
         }
       }
@@ -300,17 +303,7 @@ export default function NightCupCreateWizardModal({
   // Helper date format for preview
   const formatDateTimeDisplay = (val: string) => {
     if (!val) return 'Belirtilmedi';
-    try {
-      return new Date(val).toLocaleString('tr-TR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return val;
-    }
+    return formatTournamentDate(parseToTurkeyISO(val) || val);
   };
 
   const selectedSeasonName = seasons.find((s) => s.id === formData.season_id)?.name || 'Sezon Seçilmedi';

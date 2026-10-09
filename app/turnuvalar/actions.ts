@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { formatTournamentDate } from '@/lib/date-utils';
 
 const MAX_LOGO_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -82,13 +83,13 @@ export async function submitNightCupApplicationAction(formData: FormData) {
   const now = new Date();
   if (tour.registration_start && new Date(tour.registration_start) > now) {
     return {
-      error: `Başvurular henüz başlamadı. Başlangıç tarihi: ${new Date(tour.registration_start).toLocaleString('tr-TR')}`
+      error: `Başvurular henüz başlamadı. Başlangıç tarihi: ${formatTournamentDate(tour.registration_start)}`
     };
   }
 
   if (tour.registration_end && new Date(tour.registration_end) < now) {
     return {
-      error: `Başvuru süresi dolmuştur. Bitiş tarihi: ${new Date(tour.registration_end).toLocaleString('tr-TR')}`
+      error: `Başvuru süresi dolmuştur. Bitiş tarihi: ${formatTournamentDate(tour.registration_end)}`
     };
   }
 

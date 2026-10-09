@@ -32,6 +32,7 @@ import TournamentScoreReportModal from './TournamentScoreReportModal';
 import TournamentKnockoutBracket from '@/components/TournamentKnockoutBracket';
 
 import { calculateGroupStandings, getTournamentStageLabel } from '@/lib/tournament-engine';
+import { formatTournamentDate } from '@/lib/date-utils';
 
 interface TournamentDetailClientProps {
   tournament: any;
@@ -401,9 +402,7 @@ export default function TournamentDetailClient({
                     <Calendar className="w-3.5 h-3.5 text-[#00e5ff]" /> TURNUVA TARİHİ
                   </span>
                   <span className="text-sm sm:text-base font-[900] text-white uppercase tracking-tight block">
-                    {tourDate
-                      ? tourDate.toLocaleString('tr-TR', { dateStyle: 'medium', timeStyle: 'short' })
-                      : 'Belirtilmedi'}
+                    {formatTournamentDate(tournament.tournament_date, { dateStyle: 'medium', timeStyle: 'short' })}
                   </span>
                 </div>
                 <span className="text-[10px] text-zinc-500 mt-2 block font-medium">Maç Başlangıcı</span>
@@ -416,9 +415,7 @@ export default function TournamentDetailClient({
                     <Clock className="w-3.5 h-3.5 text-amber-400" /> SON BAŞVURU
                   </span>
                   <span className="text-sm sm:text-base font-[900] text-white uppercase tracking-tight block">
-                    {regEnd
-                      ? regEnd.toLocaleString('tr-TR', { dateStyle: 'medium', timeStyle: 'short' })
-                      : 'Belirtilmedi'}
+                    {formatTournamentDate(tournament.registration_end, { dateStyle: 'medium', timeStyle: 'short' })}
                   </span>
                 </div>
                 <span className="text-[10px] text-zinc-500 mt-2 block font-medium">Kayıt Bitiş Tarihi</span>
@@ -933,7 +930,7 @@ export default function TournamentDetailClient({
                       </div>
 
                       <div className="pt-4 mt-4 border-t border-white/5 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-                        Kayıt: {new Date(app.created_at).toLocaleDateString('tr-TR')}
+                        Kayıt: {formatTournamentDate(app.created_at, { dateStyle: 'short' })}
                       </div>
                     </div>
                   );
@@ -1250,7 +1247,7 @@ export default function TournamentDetailClient({
                                     {m.scheduled_at && (
                                       <span className="flex items-center gap-1 text-zinc-400">
                                         <Clock className="w-3 h-3 text-amber-400" />
-                                        {new Date(m.scheduled_at).toLocaleDateString('tr-TR', {
+                                        {formatTournamentDate(m.scheduled_at, {
                                           dateStyle: 'short',
                                           timeStyle: 'short',
                                         })}

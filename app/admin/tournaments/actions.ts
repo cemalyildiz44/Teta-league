@@ -11,6 +11,7 @@ import {
   generateCrossGroupPairings,
   buildFullKnockoutBracket,
 } from '@/lib/tournament-engine';
+import { parseToTurkeyISO } from '@/lib/date-utils';
 
 async function checkAdmin(supabase: any, user: any) {
   if (!user) return false;
@@ -153,9 +154,9 @@ export async function createNightCupAction(formData: FormData) {
   const season_id = formData.get('season_id') as string;
   const max_teams = formData.get('max_teams') as string;
   const is_registration_open = formData.get('is_registration_open') === 'true';
-  const registration_start = formData.get('registration_start') as string;
-  const registration_end = formData.get('registration_end') as string;
-  const tournament_date = formData.get('tournament_date') as string;
+  const registration_start = parseToTurkeyISO(formData.get('registration_start') as string);
+  const registration_end = parseToTurkeyISO(formData.get('registration_end') as string);
+  const tournament_date = parseToTurkeyISO(formData.get('tournament_date') as string);
   const description = formData.get('description') as string;
   const rules = formData.get('rules') as string;
   const details = formData.get('details') as string;
@@ -167,6 +168,15 @@ export async function createNightCupAction(formData: FormData) {
   const image_file = formData.get('image_file') as File;
 
   if (!name || !name.trim() || !season_id) return { error: 'Turnuva adı ve sezon seçimi zorunludur.' };
+
+  // Tarih sıralama kontrolü
+  if (registration_start && registration_end) {
+    const start = new Date(registration_start).getTime();
+    const end = new Date(registration_end).getTime();
+    if (!isNaN(start) && !isNaN(end) && end < start) {
+      return { error: 'Başvuru bitiş tarihi, başlangıç tarihinden önce olamaz.' };
+    }
+  }
 
   let image_url = null;
   if (image_file && image_file.size > 0) {
@@ -341,9 +351,9 @@ export async function updateNightCupDetailsAction(formData: FormData) {
   const description = formData.get('description') as string;
   const max_teams = formData.get('max_teams') as string;
   const is_registration_open = formData.get('is_registration_open') === 'true';
-  const registration_start = formData.get('registration_start') as string;
-  const registration_end = formData.get('registration_end') as string;
-  const tournament_date = formData.get('tournament_date') as string;
+  const registration_start = parseToTurkeyISO(formData.get('registration_start') as string);
+  const registration_end = parseToTurkeyISO(formData.get('registration_end') as string);
+  const tournament_date = parseToTurkeyISO(formData.get('tournament_date') as string);
   const rules = formData.get('rules') as string;
   const details = formData.get('details') as string;
   const prize = formData.get('prize') as string;
@@ -772,7 +782,7 @@ export async function updateTournamentMatchAction(formData: FormData) {
     home_score,
     away_score,
     status,
-    scheduled_at: scheduled_at_raw ? new Date(scheduled_at_raw).toISOString() : null,
+    scheduled_at: parseToTurkeyISO(scheduled_at_raw),
     updated_at: new Date().toISOString(),
   };
 

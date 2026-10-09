@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Trophy, Medal, User, Users, Calendar, ShieldAlert, X, Loader2, Info, Image as ImageIcon } from 'lucide-react';
 import { submitNightCupApplicationAction } from './actions';
 import TeamLogo from '@/components/TeamLogo';
+import { formatTournamentDate } from '@/lib/date-utils';
 
 export default function TournamentTabs({
   tournaments, winners, applications, profiles, currentUser
@@ -194,11 +195,11 @@ export default function TournamentTabs({
                           <div className='grid grid-cols-2 gap-4 text-[10px] font-bold uppercase tracking-widest text-zinc-500'>
                             <div>
                               <span className='mb-1 text-zinc-600 flex items-center gap-1'><Calendar className='w-3 h-3'/> Başvuru Bitiş</span>
-                              <span className='text-zinc-300'>{tour.registration_end ? new Date(tour.registration_end).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }) : 'Belirtilmedi'}</span>
+                              <span className='text-zinc-300'>{formatTournamentDate(tour.registration_end, { dateStyle: 'short', timeStyle: 'short' })}</span>
                             </div>
                             <div>
                               <span className='mb-1 text-zinc-600 flex items-center gap-1'><Trophy className='w-3 h-3'/> Turnuva Tarihi</span>
-                              <span className='text-zinc-300'>{tour.tournament_date ? new Date(tour.tournament_date).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }) : 'Belirtilmedi'}</span>
+                              <span className='text-zinc-300'>{formatTournamentDate(tour.tournament_date, { dateStyle: 'short', timeStyle: 'short' })}</span>
                             </div>
                           </div>
 

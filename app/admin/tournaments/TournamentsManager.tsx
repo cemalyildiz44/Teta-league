@@ -16,6 +16,7 @@ import {
 import TeamLogo from '@/components/TeamLogo';
 import TournamentGroupsAdminModal from './TournamentGroupsAdminModal';
 import NightCupCreateWizardModal from './NightCupCreateWizardModal';
+import { formatTournamentDate, formatForDateTimeLocal } from '@/lib/date-utils';
 
 export function TournamentsManager({ tournaments, winners, applications, seasons, profiles, groups = [], matches = [], submissions = [] }: any) {
   const router = useRouter();
@@ -138,28 +139,11 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
 
   const formatDateTime = (val: string | null) => {
     if (!val) return '-';
-    try {
-      return new Date(val).toLocaleString('tr-TR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch {
-      return val;
-    }
+    return formatTournamentDate(val);
   };
 
   const formatForInput = (val: string | null) => {
-    if (!val) return '';
-    try {
-      const d = new Date(val);
-      const pad = (n: number) => String(n).padStart(2, '0');
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    } catch {
-      return '';
-    }
+    return formatForDateTimeLocal(val);
   };
 
   const filteredTournaments = tournaments.filter((t: any) => {
