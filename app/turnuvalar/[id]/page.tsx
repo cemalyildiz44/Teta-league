@@ -113,7 +113,7 @@ export default async function TournamentDetailPage({
     .select(`
       id,
       tournament_id,
-      player_id,
+      profile_id,
       team_id,
       application_id,
       placement,
@@ -129,7 +129,7 @@ export default async function TournamentDetailPage({
   if (user) {
     const { data: prof } = await supabase
       .from('profiles')
-      .select('id, username, avatar_url, role')
+      .select('id, username, avatar_url')
       .eq('id', user.id)
       .maybeSingle();
     currentUserProfile = prof || { id: user.id, email: user.email };

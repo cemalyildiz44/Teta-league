@@ -136,7 +136,7 @@ export default async function TeamPage({ params }: Props) {
         .select('*')
         .eq('team_id', team.id)
         .eq('season_id', activeSeason.id)
-        .single(),
+        .maybeSingle(),
       supabase
         .from('fixtures')
         .select(`

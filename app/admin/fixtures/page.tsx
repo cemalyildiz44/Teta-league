@@ -1,4 +1,4 @@
-﻿
+
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { FixturesManager } from './FixturesManager';
@@ -13,10 +13,22 @@ export default async function AdminFixturesPage() {
   
   const { data: fixtures } = await supabase
     .from('fixtures')
-    .select('*, home:teams!fixtures_home_team_id_fkey(id, name, logo_url), away:teams!fixtures_away_team_id_fkey(id, name, logo_url), leagues(name), seasons(name)')
+    .select('*')
     .order('scheduled_at', { ascending: true });
 
   const { data: teams } = await supabase.from('teams').select('id, name, logo_url');
+
+  const teamMap = new Map((teams || []).map(t => [t.id, t]));
+  const leagueMap = new Map((leagues || []).map(l => [l.id, l]));
+  const seasonMap = new Map((seasons || []).map(s => [s.id, s]));
+
+  const formattedFixtures = (fixtures || []).map(f => ({
+    ...f,
+    home: f.home_team_id ? teamMap.get(f.home_team_id) || null : null,
+    away: f.away_team_id ? teamMap.get(f.away_team_id) || null : null,
+    leagues: f.league_id ? { name: leagueMap.get(f.league_id)?.name } : null,
+    seasons: f.season_id ? { name: seasonMap.get(f.season_id)?.name } : null,
+  }));
 
   return (
     <div className='max-w-6xl mx-auto'>
@@ -28,7 +40,7 @@ export default async function AdminFixturesPage() {
       </div>
 
       <FixturesManager 
-        initialFixtures={fixtures || []} 
+        initialFixtures={formattedFixtures}
         seasons={seasons || []} 
         leagues={leagues || []}
         leagueTeams={leagueTeams || []}

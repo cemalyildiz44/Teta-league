@@ -23,8 +23,8 @@ export default async function AdminDashboard() {
     { count: leaguesCount },
     { count: matchesCount },
     { data: activeSeason },
-    { data: recentMatches },
-    { data: upcomingFixtures },
+    { data: rawRecentMatches },
+    { data: rawUpcomingFixtures },
     { data: latestProfiles },
     { data: activeMemberships },
     { data: allMatches },
@@ -37,13 +37,13 @@ export default async function AdminDashboard() {
     supabase.from('leagues').select('*', { count: 'exact', head: true }),
     supabase.from('matches').select('*', { count: 'exact', head: true }),
     supabase.from('seasons').select('id, name, status, start_date, end_date').eq('status', 'ACTIVE').maybeSingle(),
-    supabase.from('matches').select('id, home_score, away_score, status, played_at, leagues(name), home:teams!matches_home_team_id_fkey(name, logo_url), away:teams!matches_away_team_id_fkey(name, logo_url)').order('played_at', { ascending: false }).limit(6),
-    supabase.from('fixtures').select('id, week_number, scheduled_at, leagues(name), home:teams!fixtures_home_team_id_fkey(name), away:teams!fixtures_away_team_id_fkey(name)').eq('status', 'SCHEDULED').order('scheduled_at', { ascending: true }).limit(5),
+    supabase.from('matches').select('id, home_team_id, away_team_id, league_id, home_score, away_score, status, played_at').order('played_at', { ascending: false }).limit(6),
+    supabase.from('fixtures').select('id, home_team_id, away_team_id, league_id, week_number, scheduled_at').eq('status', 'SCHEDULED').order('scheduled_at', { ascending: true }).limit(5),
     supabase.from('profiles').select('id, username, created_at').order('created_at', { ascending: false }).limit(5),
     supabase.from('team_memberships').select('team_id').is('left_at', null),
     supabase.from('matches').select('status'),
     supabase.from('posts').select('*', { count: 'exact', head: true }),
-    supabase.from('posts').select('id, created_at, profiles(username)').order('created_at', { ascending: false }).limit(1),
+    supabase.from('posts').select('id, created_at, profiles:profiles!posts_author_id_fkey(username)').order('created_at', { ascending: false }).limit(1),
     supabase.from('teams').select('id, name, logo_url').eq('is_active', true).limit(6)
   ]);
 
@@ -53,6 +53,42 @@ export default async function AdminDashboard() {
   const { data: activeLeagues } = activeSeason ? await supabase.from('leagues').select('id, name, level').eq('season_id', activeSeason.id).order('level') : { data: [] };
   const { data: activeLeagueTeams } = activeSeason && activeLeagues?.length ? await supabase.from('league_teams').select('league_id, team_id').in('league_id', activeLeagues.map(l=>l.id)) : { data: [] };
   const { data: activeLeagueMatches } = activeSeason && activeLeagues?.length ? await supabase.from('matches').select('league_id, status').in('league_id', activeLeagues.map(l=>l.id)) : { data: [] };
+
+  // Fetch related teams and leagues for recentMatches and upcomingFixtures
+  const referencedTeamIds = Array.from(new Set([
+    ...(rawRecentMatches || []).flatMap((m: any) => [m.home_team_id, m.away_team_id]),
+    ...(rawUpcomingFixtures || []).flatMap((f: any) => [f.home_team_id, f.away_team_id])
+  ].filter(Boolean)));
+
+  const referencedLeagueIds = Array.from(new Set([
+    ...(rawRecentMatches || []).map((m: any) => m.league_id),
+    ...(rawUpcomingFixtures || []).map((f: any) => f.league_id)
+  ].filter(Boolean)));
+
+  const [
+    { data: referencedTeams },
+    { data: referencedLeagues }
+  ] = await Promise.all([
+    referencedTeamIds.length > 0 ? supabase.from('teams').select('id, name, logo_url').in('id', referencedTeamIds) : { data: [] },
+    referencedLeagueIds.length > 0 ? supabase.from('leagues').select('id, name').in('id', referencedLeagueIds) : { data: [] }
+  ]);
+
+  const dashTeamMap = new Map((referencedTeams || []).map((t: any) => [t.id, t]));
+  const dashLeagueMap = new Map((referencedLeagues || []).map((l: any) => [l.id, l]));
+
+  const recentMatches = (rawRecentMatches || []).map((m: any) => ({
+    ...m,
+    home: m.home_team_id ? dashTeamMap.get(m.home_team_id) || null : null,
+    away: m.away_team_id ? dashTeamMap.get(m.away_team_id) || null : null,
+    leagues: m.league_id ? dashLeagueMap.get(m.league_id) || null : null,
+  }));
+
+  const upcomingFixtures = (rawUpcomingFixtures || []).map((f: any) => ({
+    ...f,
+    home: f.home_team_id ? dashTeamMap.get(f.home_team_id) || null : null,
+    away: f.away_team_id ? dashTeamMap.get(f.away_team_id) || null : null,
+    leagues: f.league_id ? dashLeagueMap.get(f.league_id) || null : null,
+  }));
 
   // Calculate Match Statuses
   const pendingMatches = (allMatches || []).filter(m => m.status === 'PENDING_REVIEW').length;
