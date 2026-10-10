@@ -6,7 +6,26 @@ import { revalidatePath } from 'next/cache';
 import { formatTournamentDate } from '@/lib/date-utils';
 
 const MAX_LOGO_SIZE = 5 * 1024 * 1024; // 5MB
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+function detectImageFormat(buffer: Buffer): 'jpeg' | 'png' | 'webp' | null {
+  if (!buffer || buffer.length < 12) return null;
+  // JPEG: FF D8 FF
+  if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+    return 'jpeg';
+  }
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
+    return 'png';
+  }
+  // WebP: "RIFF" at offset 0, "WEBP" at offset 8
+  if (
+    buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
+    buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50
+  ) {
+    return 'webp';
+  }
+  return null;
+}
 
 export async function submitNightCupApplicationAction(formData: FormData) {
   const cookieStore = await cookies();
@@ -124,51 +143,55 @@ export async function submitNightCupApplicationAction(formData: FormData) {
     }
   }
 
-  // 6. Safe Logo Upload
+  // 6. Safe Logo Upload (Strictly tournament-logos, isolated from official league teams)
   let logo_url: string | null = null;
+  let uploadedStoragePath: string | null = null;
+
   if (image_file && image_file.size > 0) {
     if (image_file.size > MAX_LOGO_SIZE) {
       return { error: 'Logo görsel boyutu en fazla 5MB olabilir.' };
     }
 
-    if (!ALLOWED_MIME_TYPES.includes(image_file.type)) {
-      return { error: 'Yalnızca JPEG, PNG veya WEBP formatında logo yükleyebilirsiniz.' };
+    // Read file buffer and verify authentic image magic bytes
+    const imageBuffer = Buffer.from(await image_file.arrayBuffer());
+    const detectedFormat = detectImageFormat(imageBuffer);
+
+    if (!detectedFormat) {
+      return { error: 'Yalnızca geçerli JPEG, PNG veya WEBP formatında görsel yükleyebilirsiniz.' };
     }
 
-    const ext = image_file.name.split('.').pop()?.toLowerCase() || 'png';
-    const fileName = `${user.id}/nc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
+    const normalizedExt = detectedFormat === 'jpeg' ? 'jpeg' : detectedFormat;
+    const contentType = `image/${detectedFormat}`;
 
-    // Try uploading to tournament-logos bucket first, fallback to team-logos
-    let uploadSuccess = false;
-    let uploadedBucket = 'tournament-logos';
+    // Storage path format: ${user.id}/nc_${Date.now()}_${random}.${ext} (required by RLS policy)
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const fileName = `${user.id}/nc_${Date.now()}_${randomSuffix}.${normalizedExt}`;
 
-    const { error: primaryUploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('tournament-logos')
-      .upload(fileName, image_file, { cacheControl: '3600', upsert: true });
+      .upload(fileName, imageBuffer, {
+        contentType,
+        cacheControl: '3600',
+        upsert: false,
+      });
 
-    if (!primaryUploadError) {
-      uploadSuccess = true;
-    } else {
-      // Fallback attempt to team-logos if tournament-logos is not yet provisioned in remote DB
-      const fallbackFileName = `nc_${user.id}_${Date.now()}.${ext}`;
-      const { error: fallbackError } = await supabase.storage
-        .from('team-logos')
-        .upload(fallbackFileName, image_file, { cacheControl: '3600', upsert: true });
-
-      if (!fallbackError) {
-        uploadSuccess = true;
-        uploadedBucket = 'team-logos';
-        const { data: fbUrl } = supabase.storage.from('team-logos').getPublicUrl(fallbackFileName);
-        logo_url = fbUrl.publicUrl;
-      } else {
-        return { error: 'Logo yüklenemedi: ' + (primaryUploadError.message || fallbackError.message) };
+    if (uploadError) {
+      console.error('[Night Cup Logo Upload Error]:', uploadError);
+      let errMsg = uploadError.message || 'Depolama hatası oluştu.';
+      if (errMsg.toLowerCase().includes('row-level security') || errMsg.toLowerCase().includes('violates')) {
+        errMsg = 'Logo yükleme izni reddedildi. Hesabınızın aktif durumda olduğundan emin olun.';
+      } else if (errMsg.toLowerCase().includes('entity too large') || errMsg.toLowerCase().includes('file size')) {
+        errMsg = 'Logo boyutu izin verilen sınırı aşıyor (Maksimum 5MB).';
       }
+      return { error: `Logo yüklenemedi: ${errMsg}` };
     }
 
-    if (uploadSuccess && !logo_url) {
-      const { data } = supabase.storage.from(uploadedBucket).getPublicUrl(fileName);
-      logo_url = data.publicUrl;
-    }
+    uploadedStoragePath = fileName;
+    const { data: urlData } = supabase.storage
+      .from('tournament-logos')
+      .getPublicUrl(fileName);
+
+    logo_url = urlData.publicUrl;
   }
 
   // 7. Insert tournament application with PENDING status
@@ -185,6 +208,14 @@ export async function submitNightCupApplicationAction(formData: FormData) {
     .single();
 
   if (appError || !appData) {
+    // Clean up uploaded orphan file if DB insert fails
+    if (uploadedStoragePath) {
+      try {
+        await supabase.storage.from('tournament-logos').remove([uploadedStoragePath]);
+      } catch (cleanErr) {
+        console.error('[Night Cup Storage Cleanup Error]:', cleanErr);
+      }
+    }
     return { error: 'Başvuru kaydedilemedi: ' + (appError?.message || 'Bilinmeyen hata') };
   }
 
@@ -200,8 +231,15 @@ export async function submitNightCupApplicationAction(formData: FormData) {
       .insert(playersToInsert);
 
     if (playersError) {
-      // Rollback application if player insert fails
+      // Rollback application and cleanup orphan logo if player insert fails
       await supabase.from('tournament_applications').delete().eq('id', appData.id);
+      if (uploadedStoragePath) {
+        try {
+          await supabase.storage.from('tournament-logos').remove([uploadedStoragePath]);
+        } catch (cleanErr) {
+          console.error('[Night Cup Storage Cleanup Error]:', cleanErr);
+        }
+      }
       return { error: 'Kadro oyuncuları kaydedilemedi: ' + playersError.message };
     }
   }

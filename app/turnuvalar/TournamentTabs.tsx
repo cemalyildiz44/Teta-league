@@ -1,9 +1,10 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Trophy, Medal, User, Users, Calendar, ShieldAlert, X, Loader2, Info, Image as ImageIcon } from 'lucide-react';
+import { Trophy, Medal, User, Users, Calendar, ShieldAlert, X, Loader2, Info, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import imageCompression from 'browser-image-compression';
 import { submitNightCupApplicationAction } from './actions';
 import TeamLogo from '@/components/TeamLogo';
 import { formatTournamentDate } from '@/lib/date-utils';
@@ -17,8 +18,14 @@ export default function TournamentTabs({
 
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
-  
+
   const [applyModal, setApplyModal] = useState<any>(null);
+  const [teamName, setTeamName] = useState('');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [ncProfiles, setNcProfiles] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -27,22 +34,164 @@ export default function TournamentTabs({
     setTimeout(() => setFeedback(null), 5000);
   };
 
-  const handleApply = async (e: any) => {
+  useEffect(() => {
+    return () => {
+      if (logoPreview) {
+        URL.revokeObjectURL(logoPreview);
+      }
+    };
+  }, [logoPreview]);
+
+  const handleOpenApplyModal = (tour: any) => {
+    setApplyModal(tour);
+    setTeamName('');
+    setLogoFile(null);
+    if (logoPreview) {
+      URL.revokeObjectURL(logoPreview);
+      setLogoPreview(null);
+    }
+    setLogoError(null);
+    setModalError(null);
+    setNcProfiles([]);
+    setSearchTerm('');
+  };
+
+  const handleCloseModal = () => {
+    if (loading || isCompressing) return;
+    setApplyModal(null);
+    setTeamName('');
+    setLogoFile(null);
+    if (logoPreview) {
+      URL.revokeObjectURL(logoPreview);
+      setLogoPreview(null);
+    }
+    setLogoError(null);
+    setModalError(null);
+    setNcProfiles([]);
+    setSearchTerm('');
+  };
+
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLogoError(null);
+    setModalError(null);
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg', 'image/pjpeg', 'image/x-png', 'image/heic', 'image/heif'];
+    const validExts = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'];
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+
+    if (!validTypes.includes(file.type) && !validExts.includes(ext) && !file.type.startsWith('image/')) {
+      setLogoError('Yalnızca JPEG, PNG veya WEBP formatında logo yükleyebilirsiniz.');
+      return;
+    }
+
+    if (file.size > 25 * 1024 * 1024) {
+      setLogoError('Görsel boyutu çok yüksek (maksimum 25MB).');
+      return;
+    }
+
+    try {
+      setIsCompressing(true);
+
+      const options = {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 1024,
+        useWebWorker: true,
+        fileType: 'image/webp' as const,
+        initialQuality: 0.85,
+      };
+
+      let processedFile: File;
+      try {
+        const compressedBlob = await imageCompression(file, options);
+        processedFile = new File([compressedBlob], `logo_${Date.now()}.webp`, {
+          type: 'image/webp',
+        });
+      } catch (compErr) {
+        console.warn('Görsel sıkıştırma atlandı/başarısız oldu:', compErr);
+        if (file.size > 5 * 1024 * 1024) {
+          throw new Error('Görsel sıkıştırılamadı ve 5MB sınırından büyük.');
+        }
+        processedFile = file;
+      }
+
+      setLogoFile(processedFile);
+      if (logoPreview) {
+        URL.revokeObjectURL(logoPreview);
+      }
+      const preview = URL.createObjectURL(processedFile);
+      setLogoPreview(preview);
+    } catch (err: any) {
+      setLogoError(err?.message || 'Görsel işlenirken bir hata oluştu.');
+      setLogoFile(null);
+      if (logoPreview) {
+        URL.revokeObjectURL(logoPreview);
+        setLogoPreview(null);
+      }
+    } finally {
+      setIsCompressing(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoFile(null);
+    if (logoPreview) {
+      URL.revokeObjectURL(logoPreview);
+      setLogoPreview(null);
+    }
+    setLogoError(null);
+  };
+
+  const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isCompressing) {
+      setModalError('Lütfen logonun optimize edilmesinin tamamlanmasını bekleyin.');
+      return;
+    }
+
+    const trimmedName = teamName.trim();
+    if (!trimmedName) {
+      setModalError('Takım adı zorunludur.');
+      return;
+    }
+
+    if (trimmedName.length < 2 || trimmedName.length > 60) {
+      setModalError('Takım adı 2 ile 60 karakter arasında olmalıdır.');
+      return;
+    }
+
     setLoading(true);
-    const formData = new FormData(e.target);
+    setModalError(null);
+
+    const formData = new FormData();
     formData.append('tournament_id', applyModal.id);
+    formData.append('team_name', trimmedName);
     formData.append('profiles', JSON.stringify(ncProfiles));
-    
-    const res = await submitNightCupApplicationAction(formData);
-    setLoading(false);
-    
-    if (res.error) showFeedback(res.error, 'error');
-    else { 
-      showFeedback(res.success || '', 'success'); 
-      setApplyModal(null); 
-      setNcProfiles([]); 
-      router.refresh(); 
+    if (logoFile) {
+      formData.append('image_file', logoFile);
+    }
+
+    try {
+      const res = await submitNightCupApplicationAction(formData);
+      setLoading(false);
+
+      if (res.error) {
+        setModalError(res.error);
+        showFeedback(res.error, 'error');
+        // Takım adı, kadro ve logo önizlemesi ASLA sıfırlanmaz
+      } else {
+        showFeedback(res.success || 'Başvurunuz başarıyla kaydedildi.', 'success');
+        handleCloseModal();
+        router.refresh();
+      }
+    } catch (err: any) {
+      setLoading(false);
+      const msg = err?.message || 'Başvuru gönderilirken bir hata oluştu.';
+      setModalError(msg);
+      showFeedback(msg, 'error');
     }
   };
 
@@ -96,7 +245,7 @@ export default function TournamentTabs({
             const tApps = applications.filter((a: any) => a.tournament_id === tour.id);
             const approvedApps = tApps.filter((a: any) => a.status === 'APPROVED');
             const userApp = currentUser ? tApps.find((a: any) => a.applicant_id === currentUser.id) : null;
-            
+
             let isOpen = tour.is_registration_open !== false;
             const now = new Date();
             if (tour.status && tour.status !== 'REGISTRATION') isOpen = false;
@@ -108,7 +257,7 @@ export default function TournamentTabs({
               <div key={tour.id} className='relative group h-full'>
                 <div className='absolute inset-0 bg-gradient-to-b from-[#00e5ff]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-[2rem]' />
                 <div className='relative bg-[#060d18]/80 backdrop-blur-md border border-white/5 rounded-[2rem] p-6 hover:border-[#00e5ff]/20 transition-colors h-full flex flex-col'>
-                  
+
                   {/* Header */}
                   <div className='flex items-center gap-5 mb-6'>
                     <div className='w-20 h-20 rounded-2xl bg-black/50 border border-white/5 flex items-center justify-center shrink-0 overflow-hidden shadow-inner'>
@@ -178,7 +327,7 @@ export default function TournamentTabs({
                   {/* NIGHT CUP Details */}
                   {activeTab === 'NIGHT_CUP' && (
                     <div className='mt-auto pt-6 border-t border-white/5 space-y-4'>
-                      
+
                       {hasWinner ? (
                         <div>
                            <div className='flex items-center gap-2 mb-3'>
@@ -251,7 +400,7 @@ export default function TournamentTabs({
                               <button
                                 onClick={() => {
                                   if (!currentUser) router.push(`/giris?redirectTo=${encodeURIComponent('/turnuvalar/' + tour.id)}`);
-                                  else setApplyModal(tour);
+                                  else handleOpenApplyModal(tour);
                                 }}
                                 disabled={!isOpen}
                                 className='py-3 rounded-xl bg-[#00e5ff] text-black font-black uppercase tracking-widest text-xs hover:bg-[#00c5ff] hover:shadow-[0_0_20px_rgba(0,229,255,0.3)] transition-all disabled:opacity-50 disabled:pointer-events-none'
@@ -293,28 +442,107 @@ export default function TournamentTabs({
                 <span className='text-[#00e5ff] text-[10px] font-black tracking-widest uppercase mb-1 block'>NIGHT CUP BAŞVURUSU</span>
                 <h3 className='text-xl md:text-2xl font-black text-white uppercase tracking-widest'>{applyModal.name}</h3>
               </div>
-              <button onClick={() => { setApplyModal(null); setNcProfiles([]); }} className='w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-colors'>
+              <button
+                type='button'
+                onClick={handleCloseModal}
+                disabled={loading || isCompressing}
+                className='w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50'
+              >
                 <X className='w-5 h-5'/>
               </button>
             </div>
-            
-            <form onSubmit={handleApply} className='flex-1 overflow-y-auto p-6 md:p-8 space-y-8'>
-              
+
+            <form onSubmit={handleApply} className='flex-1 overflow-y-auto p-6 md:p-8 space-y-6'>
+
+              {/* Modal Error Alert Banner */}
+              {modalError && (
+                <div className='p-4 rounded-xl bg-red-500/15 border border-red-500/40 text-red-400 text-xs font-bold flex items-center gap-3'>
+                  <ShieldAlert className='w-5 h-5 shrink-0 text-red-400' />
+                  <span className='flex-1 leading-relaxed'>{modalError}</span>
+                </div>
+              )}
+
               <div className='grid md:grid-cols-2 gap-8'>
                 <div className='space-y-4'>
                   <div>
-                    <label className='block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2'>TAKIM ADI <span className='text-red-500'>*</span></label>
-                    <input required name='team_name' type='text' placeholder='Takımınızın Adı' className='w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white font-bold placeholder:text-zinc-700 focus:border-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff] outline-none transition-all'/>
+                    <label className='block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2'>
+                      TAKIM ADI <span className='text-red-500'>*</span>
+                    </label>
+                    <input
+                      required
+                      type='text'
+                      value={teamName}
+                      onChange={(e) => {
+                        setTeamName(e.target.value);
+                        if (modalError) setModalError(null);
+                      }}
+                      placeholder='Takımınızın Adı'
+                      maxLength={60}
+                      className='w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white font-bold placeholder:text-zinc-700 focus:border-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff] outline-none transition-all'
+                    />
                   </div>
                   <div>
-                    <label className='block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2'>TAKIM LOGOSU (İsteğe Bağlı)</label>
-                    <div className='relative overflow-hidden group rounded-xl border border-dashed border-white/20 hover:border-[#00e5ff]/50 transition-colors bg-black/50'>
-                      <input name='image_file' type='file' accept='image/*' className='absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10'/>
-                      <div className='p-6 text-center'>
-                        <ImageIcon className='w-8 h-8 text-zinc-600 mx-auto mb-2 group-hover:text-[#00e5ff] transition-colors'/>
-                        <span className='text-xs font-bold text-zinc-500 uppercase tracking-widest'>Logo Yükle (Max 5MB)</span>
-                      </div>
+                    <div className='flex items-center justify-between mb-2'>
+                      <label className='block text-xs font-bold text-zinc-500 uppercase tracking-widest'>
+                        TAKIM LOGOSU (İsteğe Bağlı)
+                      </label>
+                      <span className='text-[10px] text-zinc-500 font-bold uppercase'>Max 5MB</span>
                     </div>
+
+                    {logoPreview ? (
+                      <div className='relative flex items-center gap-4 p-4 rounded-xl border border-[#00e5ff]/30 bg-black/60'>
+                        <div className='w-16 h-16 rounded-xl bg-black border border-white/10 overflow-hidden shrink-0 flex items-center justify-center shadow-inner'>
+                          <img src={logoPreview} alt="Takım Logosu Önizleme" className='w-full h-full object-cover' />
+                        </div>
+                        <div className='flex-1 min-w-0'>
+                          <span className='text-xs font-black text-white block truncate uppercase tracking-wider'>
+                            {logoFile?.name || 'logo.webp'}
+                          </span>
+                          <span className='text-[10px] text-[#00e5ff] font-bold block mt-0.5'>
+                            {logoFile ? `${Math.round(logoFile.size / 1024)} KB (Optimize Edildi)` : 'Görsel Hazır'}
+                          </span>
+                        </div>
+                        <button
+                          type='button'
+                          onClick={handleRemoveLogo}
+                          disabled={loading || isCompressing}
+                          className='p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold transition-colors'
+                          title='Logoyu Kaldır'
+                        >
+                          <X className='w-4 h-4' />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className='relative overflow-hidden group rounded-xl border border-dashed border-white/20 hover:border-[#00e5ff]/50 transition-colors bg-black/50'>
+                        <input
+                          type='file'
+                          accept='image/jpeg,image/png,image/webp,image/jpg'
+                          onChange={handleLogoChange}
+                          disabled={loading || isCompressing}
+                          className='absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed'
+                        />
+                        <div className='p-6 text-center'>
+                          {isCompressing ? (
+                            <>
+                              <Loader2 className='w-8 h-8 text-[#00e5ff] mx-auto mb-2 animate-spin' />
+                              <span className='text-xs font-bold text-[#00e5ff] uppercase tracking-widest block'>Logo Optimize Ediliyor...</span>
+                            </>
+                          ) : (
+                            <>
+                              <ImageIcon className='w-8 h-8 text-zinc-600 mx-auto mb-2 group-hover:text-[#00e5ff] transition-colors'/>
+                              <span className='text-xs font-bold text-zinc-400 uppercase tracking-widest block'>Logo Seç (JPEG, PNG, WEBP)</span>
+                              <span className='text-[10px] text-zinc-600 block mt-1'>Otomatik optimize edilir (Max 5MB)</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {logoError && (
+                      <p className='text-[11px] text-red-400 font-bold mt-2 flex items-center gap-1.5'>
+                        <AlertCircle className='w-3.5 h-3.5 shrink-0' /> {logoError}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -325,17 +553,17 @@ export default function TournamentTabs({
                       <span className='text-[10px] text-zinc-500 font-bold uppercase'>İsteğe Bağlı</span>
                     </div>
                     <p className='text-[11px] text-zinc-500 mb-2'>Başvuran olarak otomatik takım temsilcisisiniz. Kadronuza eklemek istediğiniz oyuncuları arayıp ekleyebilirsiniz.</p>
-                    <input 
-                      type='text' 
-                      placeholder='Oyuncu Ara...' 
+                    <input
+                      type='text'
+                      placeholder='Oyuncu Ara...'
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className='w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white font-bold placeholder:text-zinc-700 focus:border-[#00e5ff] outline-none transition-all mb-2'
                     />
                     <div className='h-48 overflow-y-auto bg-black/30 rounded-xl border border-white/5 p-2 grid grid-cols-2 gap-2 content-start'>
                       {searchProfiles.map((p: any) => (
-                        <div 
-                          key={p.id} 
+                        <div
+                          key={p.id}
                           onClick={() => toggleNcProfile(p.id)}
                           className={`p-2 rounded-lg border text-[11px] cursor-pointer flex items-center gap-2 transition-all ${ncProfiles.includes(p.id) ? 'bg-[#00e5ff]/20 border-[#00e5ff]/50 text-[#00e5ff] font-black' : 'bg-white/5 border-transparent text-zinc-400 font-bold hover:bg-white/10'}`}
                         >
@@ -350,10 +578,18 @@ export default function TournamentTabs({
 
               <div className='pt-6 border-t border-white/5'>
                 <button
-                  disabled={loading}
+                  type='submit'
+                  disabled={loading || isCompressing}
                   className='w-full py-4 rounded-xl bg-[#00e5ff] text-black font-black uppercase tracking-widest text-sm hover:bg-[#00c5ff] hover:shadow-[0_0_20px_rgba(0,229,255,0.3)] transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2'
                 >
-                  {loading ? <Loader2 className='w-5 h-5 animate-spin'/> : 'BAŞVURUYU TAMAMLA'}
+                  {loading ? (
+                    <>
+                      <Loader2 className='w-5 h-5 animate-spin'/>
+                      <span>KAYDEDİLİYOR...</span>
+                    </>
+                  ) : (
+                    'BAŞVURUYU TAMAMLA'
+                  )}
                 </button>
               </div>
             </form>
