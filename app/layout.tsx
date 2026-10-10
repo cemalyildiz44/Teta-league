@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 import CookieBanner from "@/components/CookieBanner";
 import { createClient } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
+import { Analytics } from '@vercel/analytics/next';
 
 import { getCachedUser, getTeamById } from "@/lib/fetchers";
 
@@ -89,6 +90,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <main className="flex-1">{children}</main>
         <Footer />
         <CookieBanner />
+        <Analytics />
       </body>
     </html>
   );
