@@ -40,7 +40,7 @@ export default async function AdminTournamentsPage() {
   ] = await Promise.all([
     supabase.from('tournaments').select('*, seasons(id, name)').order('created_at', { ascending: false }),
     supabase.from('tournament_winners').select('*, profiles(username, full_name, avatar_url), teams(name, logo_url), tournament_applications(team_name, logo_url)').order('placement', { ascending: true }),
-    supabase.from('tournament_applications').select('*, profiles(username, full_name, avatar_url), tournament_application_players(profiles(username, full_name, avatar_url))').order('created_at', { ascending: false }),
+    supabase.from('tournament_applications').select('*, profiles(id, username, full_name, avatar_url), tournament_application_players(id, profile_id, profiles(id, username, full_name, avatar_url))').order('created_at', { ascending: false }),
     supabase.from('seasons').select('id, name, status').order('created_at', { ascending: false }),
     supabase.from('profiles').select('id, username, full_name, avatar_url').order('username', { ascending: true }),
     supabase.from('tournament_groups').select('*, tournament_group_teams(*, tournament_applications(id, team_name, logo_url))').order('order_index', { ascending: true }),

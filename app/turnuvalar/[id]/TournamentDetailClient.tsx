@@ -25,8 +25,15 @@ import {
   AlertTriangle,
   ChevronRight,
   Share2,
+  Search,
+  UserPlus,
 } from 'lucide-react';
-import { submitNightCupApplicationAction, cancelMyApplicationAction } from '../actions';
+import {
+  submitNightCupApplicationAction,
+  cancelMyApplicationAction,
+  captainAddPlayerToSquadAction,
+  captainRemovePlayerFromSquadAction,
+} from '../actions';
 import TeamLogo from '@/components/TeamLogo';
 import TournamentScoreReportModal from './TournamentScoreReportModal';
 import TournamentKnockoutBracket from '@/components/TournamentKnockoutBracket';
@@ -71,9 +78,70 @@ export default function TournamentDetailClient({
   const [fixtureRoundFilter, setFixtureRoundFilter] = useState<string>('ALL');
   const [scoreReportMatch, setScoreReportMatch] = useState<any | null>(null);
 
+  // Captain squad edit states
+  const [captainEditApp, setCaptainEditApp] = useState<any | null>(null);
+  const [captainSearch, setCaptainSearch] = useState('');
+  const [captainActionLoading, setCaptainActionLoading] = useState(false);
+  const [captainFeedback, setCaptainFeedback] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+
   const showFeedback = (msg: string, type: 'success' | 'error') => {
     setFeedback({ msg, type });
     setTimeout(() => setFeedback(null), 5000);
+  };
+
+  const handleCaptainAddPlayer = async (profileId: string) => {
+    if (!captainEditApp) return;
+    setCaptainActionLoading(true);
+    setCaptainFeedback(null);
+    try {
+      const res = await captainAddPlayerToSquadAction(captainEditApp.id, profileId);
+      if (res.error) {
+        setCaptainFeedback({ msg: res.error, type: 'error' });
+      } else {
+        setCaptainFeedback({ msg: res.success || 'Oyuncu kadroya eklendi.', type: 'success' });
+        const targetProf = profiles.find((p) => p.id === profileId);
+        const newPlayer = {
+          id: 'temp-' + Date.now(),
+          profile_id: profileId,
+          profile: targetProf || { id: profileId, username: 'Oyuncu' },
+        };
+        setCaptainEditApp((prev: any) =>
+          prev ? { ...prev, players: [...(prev.players || []), newPlayer] } : null
+        );
+        router.refresh();
+      }
+    } catch (err: any) {
+      setCaptainFeedback({ msg: err.message || 'Oyuncu eklenirken bir hata oluştu.', type: 'error' });
+    } finally {
+      setCaptainActionLoading(false);
+    }
+  };
+
+  const handleCaptainRemovePlayer = async (profileId: string) => {
+    if (!captainEditApp) return;
+    setCaptainActionLoading(true);
+    setCaptainFeedback(null);
+    try {
+      const res = await captainRemovePlayerFromSquadAction(captainEditApp.id, profileId);
+      if (res.error) {
+        setCaptainFeedback({ msg: res.error, type: 'error' });
+      } else {
+        setCaptainFeedback({ msg: res.success || 'Oyuncu kadrodan çıkarıldı.', type: 'success' });
+        setCaptainEditApp((prev: any) =>
+          prev
+            ? {
+                ...prev,
+                players: (prev.players || []).filter((p: any) => p.profile_id !== profileId),
+              }
+            : null
+        );
+        router.refresh();
+      }
+    } catch (err: any) {
+      setCaptainFeedback({ msg: err.message || 'Oyuncu çıkarılırken bir hata oluştu.', type: 'error' });
+    } finally {
+      setCaptainActionLoading(false);
+    }
   };
 
   const now = new Date();
@@ -929,6 +997,36 @@ export default function TournamentDetailClient({
                         )}
                       </div>
 
+                      {/* Captain squad edit action button / deadline notice */}
+                      {Boolean(currentUser && app.applicant_id === currentUser.id) && (
+                        <div className="mt-4 pt-3 border-t border-white/10">
+                          {!(
+                            (tournament.registration_end && new Date() > new Date(tournament.registration_end)) ||
+                            tournament.is_registration_open === false ||
+                            tournament.status === 'COMPLETED' ||
+                            tournament.status === 'ARCHIVED'
+                          ) ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCaptainFeedback(null);
+                                setCaptainSearch('');
+                                setCaptainEditApp(app);
+                              }}
+                              className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-cyan-500/20 to-blue-500/20 hover:from-cyan-500/30 hover:to-blue-500/30 border border-cyan-400/40 text-cyan-300 font-[900] uppercase text-[11px] tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-cyan-500/10 hover:shadow-cyan-500/20"
+                            >
+                              <Users className="w-4 h-4 text-[#00e5ff]" />
+                              KADROYU DÜZENLE
+                            </button>
+                          ) : (
+                            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] font-bold text-center flex items-center justify-center gap-1.5 leading-tight">
+                              <Clock className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+                              Başvuru süresi sona erdiği için kadro düzenleme kapatıldı.
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       <div className="pt-4 mt-4 border-t border-white/5 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
                         Kayıt: {formatTournamentDate(app.created_at, { dateStyle: 'short' })}
                       </div>
@@ -1609,6 +1707,323 @@ export default function TournamentDetailClient({
                 className="flex-1 py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-[900] uppercase tracking-wider text-xs transition-colors disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Evet, İptal Et'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================================== */}
+      {/* CAPTAIN SQUAD EDIT MODAL */}
+      {/* ============================================================================== */}
+      {captainEditApp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+          <div className="bg-[#0a1628] w-full max-w-xl max-h-[90vh] flex flex-col rounded-3xl border border-white/10 shadow-2xl animate-fade-in-up overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-white/10 flex items-center justify-between shrink-0 bg-black/20">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-black/50 border border-white/10 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+                  <TeamLogo src={captainEditApp.logo_url} name={captainEditApp.team_name} size="sm" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#00e5ff] text-[10px] font-[900] uppercase tracking-[0.2em]">
+                      KAPTAN KADRO YÖNETİMİ
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-cyan-500/15 border border-cyan-500/30 text-[#00e5ff] text-[9px] font-black uppercase">
+                      Night Cup
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-[900] text-white uppercase tracking-wider truncate max-w-[280px] sm:max-w-md">
+                    {captainEditApp.team_name}
+                  </h3>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setCaptainEditApp(null);
+                  setCaptainFeedback(null);
+                  setCaptainSearch('');
+                }}
+                className="w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Content - scrollable */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              {/* Deadline Check Banner */}
+              {(tournament.registration_end && new Date() > new Date(tournament.registration_end)) ||
+              tournament.is_registration_open === false ||
+              tournament.status === 'COMPLETED' ||
+              tournament.status === 'ARCHIVED' ? (
+                <div className="p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold flex items-center gap-2.5">
+                  <Clock className="w-5 h-5 text-amber-400 shrink-0" />
+                  <div>
+                    <span className="font-black text-amber-200 block mb-0.5">SÜRE DOLDU</span>
+                    Başvuru süresi sona erdiği için kadro düzenleme kapatıldı.
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-xs text-cyan-200 flex items-start gap-2.5">
+                  <Info className="w-4 h-4 text-[#00e5ff] shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold text-white block mb-0.5">Kadro Düzenleme Kuralları</span>
+                    Turnuva başvuru süresi sona erene kadar takım kadronuza yeni oyuncu ekleyebilir veya çıkarabilirsiniz. Yapılan değişiklikler yalnızca bu Night Cup turnuvasını kapsar.
+                  </div>
+                </div>
+              )}
+
+              {/* Feedback Alert */}
+              {captainFeedback && (
+                <div
+                  className={`p-3.5 rounded-xl text-xs font-bold flex items-center gap-2 ${
+                    captainFeedback.type === 'success'
+                      ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300'
+                      : 'bg-red-500/15 border border-red-500/30 text-red-300'
+                  }`}
+                >
+                  {captainFeedback.type === 'success' ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
+                  )}
+                  <span>{captainFeedback.msg}</span>
+                </div>
+              )}
+
+              {/* Current Squad list */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-[900] text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-[#00e5ff]" />
+                    Mevcut Kadro ({(captainEditApp.players || []).length} Oyuncu)
+                  </h4>
+                  <span className="text-[10px] text-zinc-500">
+                    Kaptan hariç oyuncuları çıkarabilirsiniz
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  {/* Captain Row */}
+                  <div className="p-3 rounded-xl bg-black/40 border border-[#00e5ff]/20 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {captainEditApp.applicant?.avatar_url ? (
+                        <img
+                          src={captainEditApp.applicant.avatar_url}
+                          className="w-8 h-8 rounded-full object-cover border border-[#00e5ff]/40"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-[#00e5ff]">
+                          <User className="w-4 h-4" />
+                        </div>
+                      )}
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-white">
+                            @{captainEditApp.applicant?.username || 'Kaptan'}
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded bg-[#00e5ff]/20 text-[#00e5ff] text-[9px] font-black uppercase">
+                            KAPTAN
+                          </span>
+                        </div>
+                        {captainEditApp.applicant?.full_name && (
+                          <span className="text-[10px] text-zinc-400 block">
+                            {captainEditApp.applicant.full_name}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest px-2 py-1">
+                      Çıkarılamaz
+                    </span>
+                  </div>
+
+                  {/* Other Players in squad */}
+                  {(captainEditApp.players || []).map((p: any) => {
+                    const isCaptainSelf = p.profile_id === captainEditApp.applicant_id;
+                    if (isCaptainSelf) return null;
+
+                    const deadlineExpired =
+                      (tournament.registration_end && new Date() > new Date(tournament.registration_end)) ||
+                      tournament.is_registration_open === false ||
+                      tournament.status === 'COMPLETED' ||
+                      tournament.status === 'ARCHIVED';
+
+                    return (
+                      <div
+                        key={p.id || p.profile_id}
+                        className="p-3 rounded-xl bg-black/40 border border-white/5 hover:border-white/10 flex items-center justify-between transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          {p.profile?.avatar_url ? (
+                            <img
+                              src={p.profile.avatar_url}
+                              className="w-8 h-8 rounded-full object-cover border border-white/10"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-zinc-400">
+                              <User className="w-4 h-4" />
+                            </div>
+                          )}
+                          <div>
+                            <span className="text-xs font-black text-zinc-200 block">
+                              @{p.profile?.username || 'Oyuncu'}
+                            </span>
+                            {p.profile?.full_name && (
+                              <span className="text-[10px] text-zinc-400 block">
+                                {p.profile.full_name}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {!deadlineExpired && (
+                          <button
+                            type="button"
+                            disabled={captainActionLoading}
+                            onClick={() => handleCaptainRemovePlayer(p.profile_id)}
+                            title="Kadrodan Çıkar"
+                            className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/20 transition-colors disabled:opacity-50 cursor-pointer"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Add New Player Section */}
+              {!(
+                (tournament.registration_end && new Date() > new Date(tournament.registration_end)) ||
+                tournament.is_registration_open === false ||
+                tournament.status === 'COMPLETED' ||
+                tournament.status === 'ARCHIVED'
+              ) && (
+                <div className="pt-4 border-t border-white/10">
+                  <h4 className="text-xs font-[900] text-zinc-300 uppercase tracking-wider flex items-center gap-1.5 mb-3">
+                    <UserPlus className="w-3.5 h-3.5 text-emerald-400" />
+                    Kadroya Oyuncu Ekle
+                  </h4>
+
+                  {/* Search bar */}
+                  <div className="relative mb-3">
+                    <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={captainSearch}
+                      onChange={(e) => setCaptainSearch(e.target.value)}
+                      placeholder="Oyuncu ara (kullanıcı adı veya isim)..."
+                      className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-black/50 border border-white/10 text-white text-xs placeholder:text-zinc-600 focus:outline-none focus:border-[#00e5ff]/50 transition-colors"
+                    />
+                  </div>
+
+                  {/* Filtered Profile List */}
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                    {profiles
+                      .filter((prof: any) => {
+                        if (prof.id === captainEditApp.applicant_id) return false;
+                        if (prof.status === 'BANNED' || prof.status === 'SUSPENDED' || prof.is_active === false) return false;
+                        const alreadyInSquad = (captainEditApp.players || []).some(
+                          (p: any) => p.profile_id === prof.id
+                        );
+                        if (alreadyInSquad) return false;
+                        if (!captainSearch.trim()) return false;
+                        const q = captainSearch.toLowerCase();
+                        const un = (prof.username || '').toLowerCase();
+                        const fn = (prof.full_name || '').toLowerCase();
+                        return un.includes(q) || fn.includes(q);
+                      })
+                      .slice(0, 6)
+                      .map((prof: any) => (
+                        <div
+                          key={prof.id}
+                          className="p-2.5 rounded-xl bg-black/40 border border-white/5 hover:border-cyan-500/20 flex items-center justify-between transition-colors"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            {prof.avatar_url ? (
+                              <img
+                                src={prof.avatar_url}
+                                className="w-7 h-7 rounded-full object-cover border border-white/10"
+                              />
+                            ) : (
+                              <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-zinc-400">
+                                <User className="w-3.5 h-3.5" />
+                              </div>
+                            )}
+                            <div>
+                              <span className="text-xs font-bold text-white block">
+                                @{prof.username}
+                              </span>
+                              {prof.full_name && (
+                                <span className="text-[10px] text-zinc-400 block">
+                                  {prof.full_name}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={captainActionLoading}
+                            onClick={() => handleCaptainAddPlayer(prof.id)}
+                            className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1"
+                          >
+                            {captainActionLoading ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <>
+                                <UserPlus className="w-3 h-3" />
+                                Ekle
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      ))}
+
+                    {captainSearch.trim().length > 0 &&
+                      profiles.filter((prof: any) => {
+                        if (prof.id === captainEditApp.applicant_id) return false;
+                        if (prof.status === 'BANNED' || prof.status === 'SUSPENDED' || prof.is_active === false) return false;
+                        const alreadyInSquad = (captainEditApp.players || []).some(
+                          (p: any) => p.profile_id === prof.id
+                        );
+                        if (alreadyInSquad) return false;
+                        const q = captainSearch.toLowerCase();
+                        const un = (prof.username || '').toLowerCase();
+                        const fn = (prof.full_name || '').toLowerCase();
+                        return un.includes(q) || fn.includes(q);
+                      }).length === 0 && (
+                        <p className="text-center py-4 text-xs text-zinc-500">
+                          Aramanıza uygun eklenebilir oyuncu bulunamadı.
+                        </p>
+                      )}
+
+                    {!captainSearch.trim() && (
+                      <p className="text-center py-3 text-[11px] text-zinc-600">
+                        Kadroya oyuncu eklemek için yukarıdaki arama kutusuna oyuncu adı yazın.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-white/10 flex justify-end shrink-0 bg-black/20">
+              <button
+                type="button"
+                onClick={() => {
+                  setCaptainEditApp(null);
+                  setCaptainFeedback(null);
+                  setCaptainSearch('');
+                }}
+                className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-zinc-200 text-xs font-[900] uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                Kapat
               </button>
             </div>
           </div>

@@ -510,3 +510,193 @@ export async function submitTournamentMatchScoreAction(formData: FormData) {
   };
 }
 
+export async function captainAddPlayerToSquadAction(application_id: string, profile_id: string) {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Kadro düzenlemek için giriş yapmanız gerekmektedir.' };
+  }
+
+  if (!application_id || !profile_id) {
+    return { error: 'Geçersiz başvuru veya oyuncu kimliği.' };
+  }
+
+  // 1. Fetch application and tournament with deadline info
+  const { data: app, error: appErr } = await supabase
+    .from('tournament_applications')
+    .select(`
+      id,
+      tournament_id,
+      applicant_id,
+      status,
+      tournaments (
+        id,
+        registration_end,
+        is_registration_open,
+        status
+      )
+    `)
+    .eq('id', application_id)
+    .maybeSingle();
+
+  if (appErr || !app) {
+    return { error: 'Başvuru bulunamadı.' };
+  }
+
+  // 2. Authorization check - only the applicant captain can edit
+  if (app.applicant_id !== user.id) {
+    return { error: 'Bu takımın kadrosunu düzenleme yetkiniz yok.' };
+  }
+
+  if (app.status === 'CANCELLED' || app.status === 'REJECTED') {
+    return { error: 'İptal edilmiş veya reddedilmiş başvuruların kadrosu düzenlenemez.' };
+  }
+
+  // 3. Strict Server-Side Deadline Check (Europe/Istanbul normalized)
+  const tour: any = app.tournaments;
+  if (!tour) {
+    return { error: 'İlgili turnuva bulunamadı.' };
+  }
+
+  const now = new Date();
+  if (tour.registration_end && new Date(tour.registration_end) < now) {
+    return { error: 'Başvuru süresi sona erdiği için kadro düzenleme kapatıldı.' };
+  }
+
+  if (!tour.is_registration_open || tour.status === 'COMPLETED' || tour.status === 'ARCHIVED') {
+    return { error: 'Başvuru süresi sona erdiği için kadro düzenleme kapatıldı.' };
+  }
+
+  // 4. Validate player profile exists and is eligible
+  const { data: playerProfile, error: profErr } = await supabase
+    .from('profiles')
+    .select('id, username, status, is_active')
+    .eq('id', profile_id)
+    .maybeSingle();
+
+  if (profErr || !playerProfile) {
+    return { error: 'Seçilen oyuncu profili bulunamadı.' };
+  }
+
+  if (playerProfile.status === 'BANNED') {
+    return { error: 'Bu oyuncu sistemden yasaklı olduğu için kadroya eklenemez.' };
+  }
+  if (playerProfile.status === 'SUSPENDED' || playerProfile.is_active === false) {
+    return { error: 'Bu oyuncunun hesabı askıya alınmıştır.' };
+  }
+
+  // 5. Check if already in squad
+  const { data: existing } = await supabase
+    .from('tournament_application_players')
+    .select('id')
+    .eq('application_id', application_id)
+    .eq('profile_id', profile_id)
+    .maybeSingle();
+
+  if (existing) {
+    return { error: 'Bu oyuncu zaten kadroda yer alıyor.' };
+  }
+
+  // 6. Insert player into tournament_application_players only
+  const { error: insertErr } = await supabase
+    .from('tournament_application_players')
+    .insert({
+      application_id,
+      profile_id
+    });
+
+  if (insertErr) {
+    return { error: 'Oyuncu kadroya eklenemedi: ' + insertErr.message };
+  }
+
+  revalidatePath(`/turnuvalar/${app.tournament_id}`);
+  revalidatePath('/turnuvalar');
+  revalidatePath('/admin/tournaments');
+
+  return { success: `@${playerProfile.username} kadroya eklendi.` };
+}
+
+export async function captainRemovePlayerFromSquadAction(application_id: string, profile_id: string) {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Kadro düzenlemek için giriş yapmanız gerekmektedir.' };
+  }
+
+  if (!application_id || !profile_id) {
+    return { error: 'Geçersiz başvuru veya oyuncu kimliği.' };
+  }
+
+  // 1. Fetch application and tournament with deadline info
+  const { data: app, error: appErr } = await supabase
+    .from('tournament_applications')
+    .select(`
+      id,
+      tournament_id,
+      applicant_id,
+      status,
+      tournaments (
+        id,
+        registration_end,
+        is_registration_open,
+        status
+      )
+    `)
+    .eq('id', application_id)
+    .maybeSingle();
+
+  if (appErr || !app) {
+    return { error: 'Başvuru bulunamadı.' };
+  }
+
+  // 2. Authorization check - only the applicant captain can edit
+  if (app.applicant_id !== user.id) {
+    return { error: 'Bu takımın kadrosunu düzenleme yetkiniz yok.' };
+  }
+
+  if (app.status === 'CANCELLED' || app.status === 'REJECTED') {
+    return { error: 'İptal edilmiş veya reddedilmiş başvuruların kadrosu düzenlenemez.' };
+  }
+
+  // 3. Strict Server-Side Deadline Check (Europe/Istanbul normalized)
+  const tour: any = app.tournaments;
+  if (!tour) {
+    return { error: 'İlgili turnuva bulunamadı.' };
+  }
+
+  const now = new Date();
+  if (tour.registration_end && new Date(tour.registration_end) < now) {
+    return { error: 'Başvuru süresi sona erdiği için kadro düzenleme kapatıldı.' };
+  }
+
+  if (!tour.is_registration_open || tour.status === 'COMPLETED' || tour.status === 'ARCHIVED') {
+    return { error: 'Başvuru süresi sona erdiği için kadro düzenleme kapatıldı.' };
+  }
+
+  // 4. Captain cannot remove themselves
+  if (profile_id === app.applicant_id) {
+    return { error: 'Takım kaptanı kadrodan çıkarılamaz.' };
+  }
+
+  // 5. Delete player from tournament_application_players only
+  const { error: delErr } = await supabase
+    .from('tournament_application_players')
+    .delete()
+    .eq('application_id', application_id)
+    .eq('profile_id', profile_id);
+
+  if (delErr) {
+    return { error: 'Oyuncu kadrodan çıkarılamadı: ' + delErr.message };
+  }
+
+  revalidatePath(`/turnuvalar/${app.tournament_id}`);
+  revalidatePath('/turnuvalar');
+  revalidatePath('/admin/tournaments');
+
+  return { success: 'Oyuncu kadrodan çıkarıldı.' };
+}
+

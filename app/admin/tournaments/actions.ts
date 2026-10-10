@@ -258,28 +258,332 @@ export async function createNightCupAction(formData: FormData) {
   return { success: 'Night Cup turnuvası başarıyla oluşturuldu.' };
 }
 
-export async function updateNightCupApplicationStatusAction(application_id: string, status: string) {
+export async function updateNightCupApplicationStatusAction(
+  application_id: string,
+  status: 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'PENDING'
+) {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
   const { data: { user } } = await supabase.auth.getUser();
-  if (!(await checkAdmin(supabase, user))) return { error: 'Yetkisiz erişim.' };
+  if (!(await checkAdmin(supabase, user)) || !user) return { error: 'Yetkisiz erişim.' };
 
-  const { error } = await supabase.from('tournament_applications').update({ status }).eq('id', application_id);
-  
-  if (error) return { error: 'Başvuru durumu güncellenemedi.' };
-  
+  if (!application_id || typeof application_id !== 'string') {
+    return { error: 'Geçersiz başvuru ID.' };
+  }
+
+  const validStatuses = ['APPROVED', 'REJECTED', 'CANCELLED', 'PENDING'];
+  if (!validStatuses.includes(status)) {
+    return { error: 'Geçersiz durum değeri. (APPROVED, REJECTED, CANCELLED, PENDING)' };
+  }
+
+  const { data: appData, error: fetchError } = await supabase
+    .from('tournament_applications')
+    .select('id, team_name, tournament_id, status')
+    .eq('id', application_id)
+    .maybeSingle();
+
+  if (fetchError || !appData) {
+    return { error: 'Başvuru bulunamadı.' };
+  }
+
+  if (appData.status === status) {
+    return { error: `Bu başvuru zaten "${status}" durumunda.` };
+  }
+
+  const { error: updateError } = await supabase
+    .from('tournament_applications')
+    .update({
+      status,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', application_id);
+
+  if (updateError) {
+    return { error: 'Başvuru durumu güncellenemedi: ' + updateError.message };
+  }
+
   await logAdminAudit({
-    action: 'UPDATE_TOURNAMENT_APPLICATION',
+    action: status === 'APPROVED' ? 'APPROVE_TOURNAMENT_APPLICATION' : 'UPDATE_TOURNAMENT_APPLICATION',
     entity_type: 'tournament_applications',
     entity_id: application_id,
-    entity_label: `Başvuru #${application_id.substring(0, 8)}`,
-    new_data: { status },
-    description: `Night Cup başvurusu (#${application_id.substring(0, 8)}) durumu "${status}" yapıldı.`,
-    actor_id: user?.id
+    entity_label: appData.team_name || `Başvuru #${application_id.substring(0, 8)}`,
+    old_data: { status: appData.status },
+    new_data: { status, team_name: appData.team_name, tournament_id: appData.tournament_id },
+    description: `"${appData.team_name || 'Takım'}" turnuva başvurusu durumu "${status}" yapıldı.`,
+    actor_id: user.id
   });
 
   revalidatePath('/admin/tournaments');
-  return { success: 'Başvuru başarıyla güncellendi.' };
+  revalidatePath('/turnuvalar');
+  if (appData.tournament_id) {
+    revalidatePath(`/turnuvalar/${appData.tournament_id}`);
+  }
+
+  const statusLabel = status === 'APPROVED' ? 'onaylandı' : status === 'REJECTED' ? 'reddedildi' : status === 'CANCELLED' ? 'iptal edildi' : 'beklemeye alındı';
+  return { success: `"${appData.team_name}" başvurusu ${statusLabel}.` };
+}
+
+export async function adminUpdateNightCupTeamAction(formData: FormData) {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!(await checkAdmin(supabase, user)) || !user) return { error: 'Yetkisiz erişim.' };
+
+  const application_id = formData.get('application_id') as string;
+  const team_name = (formData.get('team_name') as string)?.trim();
+  const logo_file = formData.get('logo_file') as File | null;
+  const remove_logo = formData.get('remove_logo') === 'true';
+
+  if (!application_id) return { error: 'Geçersiz başvuru ID.' };
+  if (!team_name || team_name.length < 2 || team_name.length > 60) {
+    return { error: 'Takım adı 2 ile 60 karakter arasında olmalıdır.' };
+  }
+
+  const { data: appData, error: fetchErr } = await supabase
+    .from('tournament_applications')
+    .select('id, team_name, logo_url, tournament_id')
+    .eq('id', application_id)
+    .maybeSingle();
+
+  if (fetchErr || !appData) return { error: 'Başvuru bulunamadı.' };
+
+  let new_logo_url: string | null = null;
+  let uploadedFileName: string | null = null;
+  let uploadedBucket = 'team-logos';
+
+  if (logo_file && logo_file.size > 0) {
+    if (logo_file.size > 5 * 1024 * 1024) {
+      return { error: 'Logo boyutu 5MB sınırını aşıyor.' };
+    }
+    if (!logo_file.type.startsWith('image/')) {
+      return { error: 'Geçersiz dosya formatı. Lütfen geçerli bir görsel (PNG, JPG, WEBP) seçin.' };
+    }
+
+    const ext = logo_file.name.split('.').pop() || 'webp';
+    uploadedFileName = `nc_admin_${application_id}_${Date.now()}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('team-logos')
+      .upload(uploadedFileName, logo_file, { cacheControl: '31536000', upsert: true });
+
+    if (uploadError) {
+      // Fallback attempt to tournaments bucket
+      uploadedBucket = 'tournaments';
+      const { error: fallbackError } = await supabase.storage
+        .from('tournaments')
+        .upload(uploadedFileName, logo_file, { cacheControl: '31536000', upsert: true });
+
+      if (fallbackError) {
+        return { error: 'Logo yüklenemedi: ' + (uploadError.message || fallbackError.message) };
+      }
+    }
+
+    const { data: urlData } = supabase.storage.from(uploadedBucket).getPublicUrl(uploadedFileName);
+    new_logo_url = urlData.publicUrl;
+  }
+
+  const updatePayload: any = {
+    team_name,
+    updated_at: new Date().toISOString()
+  };
+
+  if (new_logo_url) {
+    updatePayload.logo_url = new_logo_url;
+  } else if (remove_logo) {
+    updatePayload.logo_url = null;
+  }
+
+  const { error: updateError } = await supabase
+    .from('tournament_applications')
+    .update(updatePayload)
+    .eq('id', application_id);
+
+  if (updateError) {
+    if (uploadedFileName) {
+      await supabase.storage.from(uploadedBucket).remove([uploadedFileName]);
+    }
+    return { error: 'Takım bilgileri güncellenemedi: ' + updateError.message };
+  }
+
+  await logAdminAudit({
+    action: 'UPDATE_TOURNAMENT_TEAM',
+    entity_type: 'tournament_applications',
+    entity_id: application_id,
+    entity_label: team_name,
+    old_data: { team_name: appData.team_name, logo_url: appData.logo_url },
+    new_data: updatePayload,
+    description: `"${team_name}" Night Cup takımı admin tarafından güncellendi.`,
+    actor_id: user.id
+  });
+
+  revalidatePath('/admin/tournaments');
+  revalidatePath('/turnuvalar');
+  if (appData.tournament_id) {
+    revalidatePath(`/turnuvalar/${appData.tournament_id}`);
+  }
+
+  return { success: 'Takım bilgileri başarıyla güncellendi.' };
+}
+
+export async function adminAddPlayerToNightCupSquadAction(application_id: string, profile_id: string) {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!(await checkAdmin(supabase, user)) || !user) return { error: 'Yetkisiz erişim.' };
+
+  if (!application_id || !profile_id) {
+    return { error: 'Başvuru ve oyuncu kimliği zorunludur.' };
+  }
+
+  // 1. Verify player profile exists
+  const { data: playerProfile, error: profileErr } = await supabase
+    .from('profiles')
+    .select('id, username')
+    .eq('id', profile_id)
+    .maybeSingle();
+
+  if (profileErr || !playerProfile) {
+    return { error: 'Seçilen oyuncu profili bulunamadı.' };
+  }
+
+  // 2. Verify application exists
+  const { data: appData, error: appErr } = await supabase
+    .from('tournament_applications')
+    .select('id, team_name, tournament_id')
+    .eq('id', application_id)
+    .maybeSingle();
+
+  if (appErr || !appData) return { error: 'Başvuru bulunamadı.' };
+
+  // 3. Check duplicate player in squad
+  const { data: existingPlayer } = await supabase
+    .from('tournament_application_players')
+    .select('id')
+    .eq('application_id', application_id)
+    .eq('profile_id', profile_id)
+    .maybeSingle();
+
+  if (existingPlayer) {
+    return { error: 'Bu oyuncu zaten bu takımın turnuva kadrosunda yer alıyor.' };
+  }
+
+  const { error: insertError } = await supabase
+    .from('tournament_application_players')
+    .insert({
+      application_id,
+      profile_id
+    });
+
+  if (insertError) {
+    return { error: 'Oyuncu kadroya eklenemedi: ' + insertError.message };
+  }
+
+  await logAdminAudit({
+    action: 'ADD_TOURNAMENT_SQUAD_PLAYER',
+    entity_type: 'tournament_application_players',
+    entity_id: application_id,
+    entity_label: `${appData.team_name} - @${playerProfile.username}`,
+    new_data: { application_id, profile_id, username: playerProfile.username },
+    description: `"${appData.team_name}" takımına @${playerProfile.username} eklendi.`,
+    actor_id: user.id
+  });
+
+  revalidatePath('/admin/tournaments');
+  revalidatePath('/turnuvalar');
+  if (appData.tournament_id) {
+    revalidatePath(`/turnuvalar/${appData.tournament_id}`);
+  }
+
+  return { success: `@${playerProfile.username} başarıyla kadroya eklendi.` };
+}
+
+export async function adminRemovePlayerFromNightCupSquadAction(application_id: string, profile_id: string) {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!(await checkAdmin(supabase, user)) || !user) return { error: 'Yetkisiz erişim.' };
+
+  if (!application_id || !profile_id) {
+    return { error: 'Başvuru ve oyuncu kimliği zorunludur.' };
+  }
+
+  const { data: appData } = await supabase
+    .from('tournament_applications')
+    .select('id, team_name, tournament_id')
+    .eq('id', application_id)
+    .maybeSingle();
+
+  const { error: deleteError } = await supabase
+    .from('tournament_application_players')
+    .delete()
+    .eq('application_id', application_id)
+    .eq('profile_id', profile_id);
+
+  if (deleteError) {
+    return { error: 'Oyuncu kadrodan çıkarılamadı: ' + deleteError.message };
+  }
+
+  await logAdminAudit({
+    action: 'REMOVE_TOURNAMENT_SQUAD_PLAYER',
+    entity_type: 'tournament_application_players',
+    entity_id: application_id,
+    entity_label: appData?.team_name || 'Takım',
+    new_data: { application_id, profile_id },
+    description: `"${appData?.team_name || 'Takım'}" kadrosundan oyuncu çıkarıldı.`,
+    actor_id: user.id
+  });
+
+  revalidatePath('/admin/tournaments');
+  revalidatePath('/turnuvalar');
+  if (appData?.tournament_id) {
+    revalidatePath(`/turnuvalar/${appData.tournament_id}`);
+  }
+
+  return { success: 'Oyuncu başarıyla kadrodan çıkarıldı.' };
+}
+
+export async function adminDeleteNightCupApplicationAction(application_id: string) {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!(await checkAdmin(supabase, user)) || !user) return { error: 'Yetkisiz erişim.' };
+
+  if (!application_id) return { error: 'Geçersiz başvuru ID.' };
+
+  const { data: appData } = await supabase
+    .from('tournament_applications')
+    .select('id, team_name, tournament_id')
+    .eq('id', application_id)
+    .maybeSingle();
+
+  if (!appData) return { error: 'Başvuru bulunamadı.' };
+
+  // Delete application (cascades to tournament_application_players)
+  const { error: deleteErr } = await supabase
+    .from('tournament_applications')
+    .delete()
+    .eq('id', application_id);
+
+  if (deleteErr) {
+    return { error: 'Başvuru silinemedi: ' + deleteErr.message };
+  }
+
+  await logAdminAudit({
+    action: 'DELETE_TOURNAMENT_APPLICATION',
+    entity_type: 'tournament_applications',
+    entity_id: application_id,
+    entity_label: appData.team_name,
+    description: `"${appData.team_name}" başvurusu admin tarafından silindi.`,
+    actor_id: user.id
+  });
+
+  revalidatePath('/admin/tournaments');
+  revalidatePath('/turnuvalar');
+  if (appData.tournament_id) {
+    revalidatePath(`/turnuvalar/${appData.tournament_id}`);
+  }
+
+  return { success: `"${appData.team_name}" başvurusu başarıyla silindi.` };
 }
 
 export async function assignNightCupWinnerAction(tournament_id: string, application_id: string) {

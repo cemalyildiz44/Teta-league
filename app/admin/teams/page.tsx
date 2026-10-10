@@ -7,14 +7,13 @@ export default async function AdminTeamsPage() {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  // Fetch teams, captains, memberships, league teams, profiles, and tournament applications concurrently
+  // Fetch teams, captains, memberships, league teams, and profiles concurrently
   const [
     { data: teams },
     { data: captains },
     { data: memberships },
     { data: leagueTeams },
-    { data: profiles },
-    { data: applications }
+    { data: profiles }
   ] = await Promise.all([
     supabase.from('teams').select('*').order('name'),
     supabase
@@ -33,45 +32,7 @@ export default async function AdminTeamsPage() {
     supabase
       .from('profiles')
       .select('id, username, full_name, avatar_url')
-      .order('username'),
-    supabase
-      .from('tournament_applications')
-      .select(`
-        id,
-        tournament_id,
-        applicant_id,
-        team_name,
-        logo_url,
-        status,
-        created_at,
-        updated_at,
-        tournaments (
-          id,
-          name,
-          type,
-          seasons (
-            id,
-            name
-          )
-        ),
-        profiles (
-          id,
-          username,
-          full_name,
-          avatar_url
-        ),
-        tournament_application_players (
-          id,
-          profile_id,
-          profiles (
-            id,
-            username,
-            full_name,
-            avatar_url
-          )
-        )
-      `)
-      .order('created_at', { ascending: false })
+      .order('username')
   ]);
 
   return (
@@ -79,7 +40,7 @@ export default async function AdminTeamsPage() {
       <div className='flex items-center justify-between mb-8'>
         <div>
           <h1 className='text-2xl font-black text-white tracking-widest'>TAKIM YÖNETİM MERKEZİ</h1>
-          <p className='text-sm text-zinc-400 mt-1'>Takımları, takım başvurularını, kaptanları ve kadroları profesyonel şekilde yönetin</p>
+          <p className='text-sm text-zinc-400 mt-1'>Resmî TETA League takımlarını, kaptanları ve kadroları profesyonel şekilde yönetin</p>
         </div>
       </div>
 
@@ -89,7 +50,6 @@ export default async function AdminTeamsPage() {
         initialMemberships={memberships || []}
         initialLeagueTeams={leagueTeams || []}
         allProfiles={profiles || []}
-        initialApplications={applications || []}
       />
     </div>
   );

@@ -6,12 +6,13 @@ import { useRouter } from 'next/navigation';
 import {
   Trophy, Plus, Trash2, ShieldAlert, X, Loader2, Users, CheckCircle2,
   XCircle, User, Edit3, Calendar, Clock, Search, ExternalLink, Award, FileText, Swords,
-  Image as ImageIcon, Eye, AlertTriangle
+  Image as ImageIcon, Eye, AlertTriangle, Crown
 } from 'lucide-react';
 import {
   create1V1WinnerAction, createKarmaWinnerAction,
   deleteTournamentAction, updateNightCupApplicationStatusAction, assignNightCupWinnerAction,
-  updateNightCupDetailsAction, approveTournamentMatchSubmissionAction, rejectTournamentMatchSubmissionAction
+  updateNightCupDetailsAction, approveTournamentMatchSubmissionAction, rejectTournamentMatchSubmissionAction,
+  adminUpdateNightCupTeamAction, adminAddPlayerToNightCupSquadAction, adminRemovePlayerFromNightCupSquadAction, adminDeleteNightCupApplicationAction
 } from './actions';
 import TeamLogo from '@/components/TeamLogo';
 import TournamentGroupsAdminModal from './TournamentGroupsAdminModal';
@@ -47,9 +48,89 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
   const [karmaProfiles, setKarmaProfiles] = useState<string[]>([]);
   const [selectedNightCup, setSelectedNightCup] = useState<string | null>(null);
 
+  // Night Cup temporary team management states
+  const [editingNightCupTeam, setEditingNightCupTeam] = useState<any | null>(null);
+  const [editTeamLogoPreview, setEditTeamLogoPreview] = useState<string | null>(null);
+  const [selectedSquadPlayerToAdd, setSelectedSquadPlayerToAdd] = useState<string>('');
+  const [playerSearchQuery, setPlayerSearchQuery] = useState<string>('');
+  const [nightCupAppFilter, setNightCupAppFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'>('ALL');
+  const [nightCupAppSearch, setNightCupAppSearch] = useState<string>('');
+  const [teamActionLoading, setTeamActionLoading] = useState<boolean>(false);
+
   const showFeedback = (msg: string, type: 'success' | 'error') => {
     setFeedback({ msg, type });
     setTimeout(() => setFeedback(null), 4000);
+  };
+
+  const handleEditNightCupTeamSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingNightCupTeam) return;
+    setTeamActionLoading(true);
+    const formData = new FormData(e.currentTarget);
+    formData.append('application_id', editingNightCupTeam.id);
+    const res = await adminUpdateNightCupTeamAction(formData);
+    setTeamActionLoading(false);
+    if (res.error) {
+      showFeedback(res.error, 'error');
+    } else {
+      showFeedback(res.success || 'Takım bilgileri güncellendi.', 'success');
+      setEditingNightCupTeam(null);
+      setEditTeamLogoPreview(null);
+      router.refresh();
+    }
+  };
+
+  const handleAddSquadPlayer = async (applicationId: string) => {
+    if (!selectedSquadPlayerToAdd) {
+      showFeedback('Lütfen eklenecek bir oyuncu seçin.', 'error');
+      return;
+    }
+    setTeamActionLoading(true);
+    const res = await adminAddPlayerToNightCupSquadAction(applicationId, selectedSquadPlayerToAdd);
+    setTeamActionLoading(false);
+    if (res.error) {
+      showFeedback(res.error, 'error');
+    } else {
+      showFeedback(res.success || 'Oyuncu kadroya eklendi.', 'success');
+      setSelectedSquadPlayerToAdd('');
+      router.refresh();
+    }
+  };
+
+  const handleRemoveSquadPlayer = async (applicationId: string, profileId: string) => {
+    setTeamActionLoading(true);
+    const res = await adminRemovePlayerFromNightCupSquadAction(applicationId, profileId);
+    setTeamActionLoading(false);
+    if (res.error) {
+      showFeedback(res.error, 'error');
+    } else {
+      showFeedback(res.success || 'Oyuncu kadrodan çıkarıldı.', 'success');
+      router.refresh();
+    }
+  };
+
+  const handleDeleteApplication = (app: any) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'BAŞVURUYU SİL',
+      message: `"${app.team_name}" takımının Night Cup başvurusunu silmek istiyor musunuz? Bu işlem takımın geçici başvuru ve turnuva kadro kayıtlarını kaldırır.`,
+      type: 'danger',
+      action: async () => {
+        setLoading(true);
+        const res = await adminDeleteNightCupApplicationAction(app.id);
+        setLoading(false);
+        setConfirmModal({ isOpen: false });
+        if (res.error) {
+          showFeedback(res.error, 'error');
+        } else {
+          showFeedback(res.success || 'Başvuru silindi.', 'success');
+          if (editingNightCupTeam && editingNightCupTeam.id === app.id) {
+            setEditingNightCupTeam(null);
+          }
+          router.refresh();
+        }
+      }
+    });
   };
 
   const handleCreate1V1 = async (e: any) => {
@@ -825,56 +906,215 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
                       </div>
                     )}
 
-                    {selectedNightCup === tour.id && (
-                      <div className='p-4 space-y-4'>
-                        {tourApps.length === 0 ? (
-                          <div className='p-6 text-center text-xs text-zinc-500 font-mono'>
-                            Henüz başvuru yapılmadı.
-                          </div>
-                        ) : (
-                          tourApps.map((app: any) => (
-                            <div key={app.id} className='bg-[#0a1628] border border-white/5 rounded-xl p-4'>
-                              <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4'>
-                                <div className='flex items-center gap-4'>
-                                  <TeamLogo src={app.logo_url} name={app.team_name} size="md" className="w-12 h-12" />
-                                  <div>
-                                    <h4 className='text-base font-black text-white uppercase'>{app.team_name}</h4>
-                                    <span className='text-[10px] text-zinc-500 uppercase'>Başvuran Kaptan: @{app.profiles?.username}</span>
-                                  </div>
-                                </div>
-                                <div className='flex items-center gap-2'>
-                                  {app.status === 'PENDING' && (
-                                    <>
-                                      <button onClick={() => handleAction(updateNightCupApplicationStatusAction, app.id, 'APPROVED')} className='p-2 bg-emerald-500/10 text-emerald-400 rounded-lg hover:bg-emerald-500/20' title='Onayla'><CheckCircle2 className='w-4 h-4'/></button>
-                                      <button onClick={() => handleAction(updateNightCupApplicationStatusAction, app.id, 'REJECTED')} className='p-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20' title='Reddet'><XCircle className='w-4 h-4'/></button>
-                                    </>
-                                  )}
-                                  {app.status === 'APPROVED' && (
-                                    <span className='px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-black rounded uppercase'>Onaylandı</span>
-                                  )}
-                                  {app.status === 'REJECTED' && (
-                                    <span className='px-3 py-1 bg-red-500/20 text-red-400 text-xs font-black rounded uppercase'>Reddedildi</span>
-                                  )}
-                                  {app.status === 'APPROVED' && !hasWinner && (
-                                    <button onClick={() => setConfirmModal({ action: () => handleAction(assignNightCupWinnerAction, tour.id, app.id), title: 'Şampiyon İlan Et', type: 'warning', message: `${app.team_name} takımını bu Night Cup'ın kazananı olarak belirlemek istiyor musunuz?` })} className='ml-2 px-3 py-1 bg-amber-500/20 text-amber-500 hover:bg-amber-500/30 text-xs font-black rounded uppercase'>
-                                      <Trophy className='w-3 h-3 inline mr-1'/> Şampiyon Yap
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                              <div className='grid grid-cols-2 md:grid-cols-4 gap-2'>
-                                {app.tournament_application_players?.map((p: any, i: number) => (
-                                  <div key={i} className='bg-black/40 px-2 py-1.5 rounded flex items-center gap-2'>
-                                    {p.profiles?.avatar_url ? <img src={p.profiles.avatar_url} alt="" className='w-4 h-4 rounded-full object-cover'/> : <User className='w-3 h-3 text-zinc-500'/>}
-                                    <span className='text-[10px] font-bold text-zinc-300 truncate'>@{p.profiles?.username}</span>
-                                  </div>
-                                ))}
-                              </div>
+                    {selectedNightCup === tour.id && (() => {
+                      const filteredTourApps = tourApps.filter((app: any) => {
+                        const q = nightCupAppSearch.toLowerCase().trim();
+                        const nameMatch = app.team_name?.toLowerCase().includes(q);
+                        const captainMatch = app.profiles?.username?.toLowerCase().includes(q) || app.profiles?.full_name?.toLowerCase().includes(q);
+                        const matchesQuery = !q || nameMatch || captainMatch;
+
+                        let matchesStatus = true;
+                        if (nightCupAppFilter === 'PENDING') matchesStatus = app.status === 'PENDING';
+                        else if (nightCupAppFilter === 'APPROVED') matchesStatus = app.status === 'APPROVED';
+                        else if (nightCupAppFilter === 'REJECTED') matchesStatus = app.status === 'REJECTED';
+                        else if (nightCupAppFilter === 'CANCELLED') matchesStatus = app.status === 'CANCELLED';
+
+                        return matchesQuery && matchesStatus;
+                      });
+
+                      const pendingCount = tourApps.filter((a: any) => a.status === 'PENDING').length;
+                      const approvedCount = tourApps.filter((a: any) => a.status === 'APPROVED').length;
+                      const rejectedCount = tourApps.filter((a: any) => a.status === 'REJECTED').length;
+
+                      return (
+                        <div className='p-4 space-y-4'>
+                          {/* Filter and Search Toolbar */}
+                          <div className='flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#060d18] p-3 rounded-xl border border-white/5'>
+                            <div className='flex flex-wrap items-center gap-1.5'>
+                              {[
+                                { key: 'ALL', label: `TÜMÜ (${tourApps.length})` },
+                                { key: 'PENDING', label: `BEKLEMEDE (${pendingCount})` },
+                                { key: 'APPROVED', label: `ONAYLANDI (${approvedCount})` },
+                                { key: 'REJECTED', label: `REDDEDİLDİ (${rejectedCount})` },
+                              ].map(item => (
+                                <button
+                                  key={item.key}
+                                  type='button'
+                                  onClick={() => setNightCupAppFilter(item.key as any)}
+                                  className={'px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors ' +
+                                    (nightCupAppFilter === item.key
+                                      ? 'bg-cyan-500 text-black shadow-sm'
+                                      : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10')}
+                                >
+                                  {item.label}
+                                </button>
+                              ))}
                             </div>
-                          ))
-                        )}
-                      </div>
-                    )}
+
+                            <div className='relative w-full sm:w-60'>
+                              <Search className='w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2' />
+                              <input
+                                type='text'
+                                placeholder='Takım veya kaptan ara...'
+                                value={nightCupAppSearch}
+                                onChange={(e) => setNightCupAppSearch(e.target.value)}
+                                className='w-full pl-8 pr-3 py-1.5 bg-black/40 border border-white/10 rounded-lg text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-cyan-500/50'
+                              />
+                            </div>
+                          </div>
+
+                          {/* Applications Cards Grid */}
+                          {filteredTourApps.length === 0 ? (
+                            <div className='p-8 text-center text-xs text-zinc-500 font-mono card-surface rounded-xl border border-white/5'>
+                              {tourApps.length === 0 ? 'Bu turnuvaya henüz başvuru yapılmadı.' : 'Arama kriterlerine uygun başvuru bulunamadı.'}
+                            </div>
+                          ) : (
+                            <div className='grid grid-cols-1 gap-3'>
+                              {filteredTourApps.map((app: any) => {
+                                const squadPlayers = app.tournament_application_players || [];
+                                return (
+                                  <div key={app.id} className='bg-[#0a1628] border border-white/10 hover:border-cyan-500/20 rounded-xl p-4 transition-all'>
+                                    <div className='flex flex-col md:flex-row justify-between items-start md:items-center gap-4'>
+                                      {/* Team Info */}
+                                      <div className='flex items-center gap-3.5 min-w-0 flex-1'>
+                                        <TeamLogo src={app.logo_url} name={app.team_name} size="md" className="w-12 h-12 shrink-0 rounded-xl" />
+                                        <div className='min-w-0'>
+                                          <div className='flex items-center gap-2 flex-wrap'>
+                                            <h4 className='text-base font-black text-white uppercase tracking-wider truncate'>{app.team_name}</h4>
+                                            <span className={'px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ' +
+                                              (app.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' :
+                                               app.status === 'PENDING' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' :
+                                               app.status === 'REJECTED' ? 'bg-red-500/10 text-red-400 border border-red-500/30' :
+                                               'bg-zinc-500/10 text-zinc-400 border border-zinc-500/30')}>
+                                              {app.status === 'APPROVED' ? 'ONAYLANDI' :
+                                               app.status === 'PENDING' ? 'BEKLEMEDE' :
+                                               app.status === 'REJECTED' ? 'REDDEDİLDİ' : 'İPTAL'}
+                                            </span>
+                                          </div>
+                                          <div className='flex items-center gap-3 mt-1 text-xs text-zinc-400 flex-wrap'>
+                                            <span className='inline-flex items-center gap-1.5'>
+                                              <Crown className='w-3 h-3 text-amber-400' />
+                                              Kaptan: <strong className='text-zinc-200'>@{app.profiles?.username || 'Kaptan'}</strong>
+                                            </span>
+                                            <span className='inline-flex items-center gap-1 text-zinc-500'>
+                                              <Users className='w-3 h-3 text-cyan-400' />
+                                              Kadro: <strong className='text-white'>{squadPlayers.length} Oyuncu</strong>
+                                            </span>
+                                            <span className='text-[10px] text-zinc-500 font-mono'>
+                                              {formatTournamentDate(app.created_at)}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Action Buttons */}
+                                      <div className='flex items-center gap-2 shrink-0 flex-wrap'>
+                                        {/* Edit & Squad button */}
+                                        <button
+                                          type='button'
+                                          onClick={() => {
+                                            setEditingNightCupTeam(app);
+                                            setEditTeamLogoPreview(app.logo_url || null);
+                                            setSelectedSquadPlayerToAdd('');
+                                            setPlayerSearchQuery('');
+                                          }}
+                                          className='px-3 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg text-xs font-black uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors'
+                                          title='Takım Bilgilerini & Kadroyu Düzenle'
+                                        >
+                                          <Edit3 className='w-3.5 h-3.5' />
+                                          <span>Düzenle & Kadro</span>
+                                        </button>
+
+                                        {app.status === 'PENDING' && (
+                                          <>
+                                            <button
+                                              onClick={() => handleAction(updateNightCupApplicationStatusAction, app.id, 'APPROVED')}
+                                              className='p-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg border border-emerald-500/20 transition-colors'
+                                              title='Başvuruyu Onayla'
+                                            >
+                                              <CheckCircle2 className='w-4 h-4'/>
+                                            </button>
+                                            <button
+                                              onClick={() => handleAction(updateNightCupApplicationStatusAction, app.id, 'REJECTED')}
+                                              className='p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg border border-red-500/20 transition-colors'
+                                              title='Başvuruyu Reddet'
+                                            >
+                                              <XCircle className='w-4 h-4'/>
+                                            </button>
+                                          </>
+                                        )}
+
+                                        {app.status === 'APPROVED' && (
+                                          <>
+                                            {!hasWinner && (
+                                              <button
+                                                onClick={() => setConfirmModal({
+                                                  action: () => handleAction(assignNightCupWinnerAction, tour.id, app.id),
+                                                  title: 'Şampiyon İlan Et',
+                                                  type: 'warning',
+                                                  message: `${app.team_name} takımını bu Night Cup'ın kazananı olarak belirlemek istiyor musunuz?`
+                                                })}
+                                                className='px-2.5 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/30 rounded-lg text-xs font-black uppercase tracking-wider inline-flex items-center gap-1 transition-colors'
+                                                title='Şampiyon İlan Et'
+                                              >
+                                                <Trophy className='w-3 h-3'/> Şampiyon Yap
+                                              </button>
+                                            )}
+                                            <button
+                                              onClick={() => handleAction(updateNightCupApplicationStatusAction, app.id, 'REJECTED')}
+                                              className='p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg border border-red-500/20 transition-colors'
+                                              title='Onayı Geri Al / Reddet'
+                                            >
+                                              <XCircle className='w-4 h-4'/>
+                                            </button>
+                                          </>
+                                        )}
+
+                                        {app.status === 'REJECTED' && (
+                                          <button
+                                            onClick={() => handleAction(updateNightCupApplicationStatusAction, app.id, 'APPROVED')}
+                                            className='p-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg border border-emerald-500/20 transition-colors'
+                                            title='Tekrar Onayla'
+                                          >
+                                            <CheckCircle2 className='w-4 h-4'/>
+                                          </button>
+                                        )}
+
+                                        {/* Delete button */}
+                                        <button
+                                          type='button'
+                                          onClick={() => handleDeleteApplication(app)}
+                                          className='p-1.5 bg-white/5 hover:bg-red-500/20 text-zinc-400 hover:text-red-400 rounded-lg transition-colors border border-white/5 hover:border-red-500/30'
+                                          title='Başvuruyu Sil'
+                                        >
+                                          <Trash2 className='w-4 h-4'/>
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    {/* Squad Preview Pills */}
+                                    {squadPlayers.length > 0 && (
+                                      <div className='mt-3 pt-3 border-t border-white/5 flex flex-wrap gap-1.5'>
+                                        {squadPlayers.map((p: any, i: number) => (
+                                          <div key={i} className='bg-black/40 px-2 py-1 rounded-md flex items-center gap-1.5 border border-white/5'>
+                                            {p.profiles?.avatar_url ? (
+                                              <img src={p.profiles.avatar_url} alt="" className='w-3.5 h-3.5 rounded-full object-cover'/>
+                                            ) : (
+                                              <User className='w-3 h-3 text-zinc-500'/>
+                                            )}
+                                            <span className='text-[10px] font-bold text-zinc-300 truncate'>@{p.profiles?.username || 'Oyuncu'}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
@@ -1334,6 +1574,252 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
           </div>
         </div>
       )}
+      {/* EDIT NIGHT CUP TEAM & SQUAD MODAL */}
+      {editingNightCupTeam && (() => {
+        const currentApp = applications.find((a: any) => a.id === editingNightCupTeam.id) || editingNightCupTeam;
+        const squadPlayers = currentApp.tournament_application_players || [];
+        const squadProfileIds = new Set(squadPlayers.map((p: any) => p.profile_id));
+        const availableProfiles = profiles.filter((p: any) => !squadProfileIds.has(p.id) && p.id !== currentApp.applicant_id);
+        const filteredAvailableProfiles = availableProfiles.filter((p: any) => {
+          const q = playerSearchQuery.toLowerCase().trim();
+          return !q || p.username?.toLowerCase().includes(q) || p.full_name?.toLowerCase().includes(q);
+        });
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+            <div className="bg-[#0a1628] w-full max-w-2xl rounded-3xl border border-white/10 overflow-hidden flex flex-col max-h-[90vh] shadow-2xl">
+              {/* Modal Header */}
+              <div className="p-6 border-b border-white/10 bg-[#060d18] flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-[#00e5ff]">
+                    <Edit3 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-white uppercase tracking-wider">
+                      GEÇİCİ TAKIM & KADRO YÖNETİMİ
+                    </h3>
+                    <p className="text-xs text-cyan-400 font-bold mt-0.5">
+                      {currentApp.team_name}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingNightCupTeam(null);
+                    setEditTeamLogoPreview(null);
+                  }}
+                  className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 overflow-y-auto space-y-6">
+                {/* 1. Team Name and Logo Form */}
+                <form onSubmit={handleEditNightCupTeamSubmit} className="space-y-4 p-4 rounded-2xl bg-black/40 border border-white/5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+                      <TeamLogo src={currentApp.logo_url} name={currentApp.team_name} size="sm" className="w-6 h-6 rounded" />
+                      Takım Bilgileri
+                    </span>
+                    <button
+                      type="submit"
+                      disabled={teamActionLoading}
+                      className="px-4 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-black uppercase tracking-wider transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      {teamActionLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      Bilgileri Kaydet
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">
+                        Takım Adı <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="team_name"
+                        required
+                        minLength={2}
+                        maxLength={60}
+                        defaultValue={currentApp.team_name}
+                        className="w-full bg-[#060d18] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-600 focus:border-cyan-500/50 outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">
+                        Takım Logosu Değiştir (Maks 5MB)
+                      </label>
+                      <input
+                        type="file"
+                        name="logo_file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            if (file.size > 5 * 1024 * 1024) {
+                              showFeedback('Logo 5MB sınırını aşıyor.', 'error');
+                              return;
+                            }
+                            setEditTeamLogoPreview(URL.createObjectURL(file));
+                          }
+                        }}
+                        className="w-full text-xs text-zinc-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-cyan-500/10 file:text-cyan-400 hover:file:bg-cyan-500/20"
+                      />
+                    </div>
+                  </div>
+
+                  {editTeamLogoPreview && (
+                    <div className="flex items-center gap-3 pt-2">
+                      <img src={editTeamLogoPreview} alt="Logo Önizleme" className="w-12 h-12 rounded-xl object-contain bg-black/60 border border-white/10" />
+                      <span className="text-[11px] text-zinc-400">Yeni logo önizlemesi hazır. Kaydetmek için &apos;Bilgileri Kaydet&apos;e tıklayın.</span>
+                    </div>
+                  )}
+                </form>
+
+                {/* 2. Squad / Roster Management */}
+                <div className="space-y-4 p-4 rounded-2xl bg-black/40 border border-white/5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+                        <Users className="w-4 h-4 text-cyan-400" />
+                        Turnuva Kadrosu ({squadPlayers.length} Oyuncu)
+                      </h4>
+                      <p className="text-[10px] text-zinc-400 mt-0.5">
+                        Yalnızca bu turnuvaya özel geçici kadrodur; resmî kulüp üyeliklerini etkilemez.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Captain Banner */}
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                        <Crown className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-white">@{currentApp.profiles?.username || 'Kaptan'}</span>
+                          <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-amber-500/20 text-amber-300">KAPTAN</span>
+                        </div>
+                        {currentApp.profiles?.full_name && (
+                          <span className="text-[10px] text-zinc-400 block">{currentApp.profiles.full_name}</span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-mono text-zinc-400">Başvuru Sahibi</span>
+                  </div>
+
+                  {/* Squad Players List */}
+                  <div className="space-y-2">
+                    <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+                      KADRODAKİ OYUNCULAR
+                    </label>
+
+                    {squadPlayers.length === 0 ? (
+                      <div className="p-4 rounded-xl bg-[#060d18] border border-white/5 text-center text-xs text-zinc-500">
+                        Kadroda ek oyuncu bulunmuyor. Aşağıdan oyuncu ekleyebilirsiniz.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                        {squadPlayers.map((sp: any) => {
+                          const prof = sp.profiles || {};
+                          return (
+                            <div key={sp.id || sp.profile_id} className="flex items-center justify-between p-2.5 rounded-xl bg-[#060d18] border border-white/5 hover:border-white/10 transition-colors">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-7 h-7 rounded-full bg-white/5 border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
+                                  {prof.avatar_url ? (
+                                    <img src={prof.avatar_url} alt="" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <User className="w-3.5 h-3.5 text-zinc-400" />
+                                  )}
+                                </div>
+                                <div className="min-w-0">
+                                  <span className="text-xs font-bold text-white truncate block">@{prof.username || 'Oyuncu'}</span>
+                                  {prof.full_name && <span className="text-[10px] text-zinc-500 truncate block">{prof.full_name}</span>}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                disabled={teamActionLoading}
+                                onClick={() => handleRemoveSquadPlayer(currentApp.id, sp.profile_id)}
+                                className="p-1 hover:bg-red-500/20 text-zinc-500 hover:text-red-400 rounded-lg transition-colors"
+                                title="Kadrodan Çıkar"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Add Player to Squad */}
+                  <div className="pt-2 border-t border-white/5 space-y-2">
+                    <label className="block text-[10px] font-black text-cyan-400 uppercase tracking-widest">
+                      KADROYA OYUNCU EKLE
+                    </label>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                      <div className="flex-1 relative">
+                        <select
+                          value={selectedSquadPlayerToAdd}
+                          onChange={(e) => setSelectedSquadPlayerToAdd(e.target.value)}
+                          className="w-full bg-[#060d18] border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-cyan-500/50"
+                        >
+                          <option value="">Oyuncu Seçin ({filteredAvailableProfiles.length} Uygun Oyuncu)...</option>
+                          {filteredAvailableProfiles.slice(0, 100).map((p: any) => (
+                            <option key={p.id} value={p.id}>
+                              @{p.username} {p.full_name ? `(${p.full_name})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={!selectedSquadPlayerToAdd || teamActionLoading}
+                        onClick={() => handleAddSquadPlayer(currentApp.id)}
+                        className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl text-xs font-black uppercase tracking-wider transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 shrink-0"
+                      >
+                        {teamActionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                        Kadroya Ekle
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 border-t border-white/10 bg-[#060d18] flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => handleDeleteApplication(currentApp)}
+                  className="px-3.5 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Başvuruyu Sil
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingNightCupTeam(null);
+                    setEditTeamLogoPreview(null);
+                  }}
+                  className="px-5 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-bold transition-colors"
+                >
+                  Kapat
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
