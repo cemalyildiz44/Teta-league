@@ -51,55 +51,27 @@ export async function submitMatchAction(prevState: any, formData: FormData) {
   if (!ctx) return { error: 'Yetkisiz işlem. Kaptan yetkiniz yok.' };
   if ('error' in ctx) return { error: ctx.error };
 
-  const fixture_id = (formData.get('fixture_id') as string)?.trim();
-  const rawHomeScore = formData.get('home_score');
-  const rawAwayScore = formData.get('away_score');
-  const confirmed = formData.get('confirmed');
+  const fixture_id = formData.get('fixture_id') as string;
+  const home_score = parseInt(formData.get('home_score') as string, 10);
+  const away_score = parseInt(formData.get('away_score') as string, 10);
+  const played_at = formData.get('played_at') as string;
+  const notes = (formData.get('notes') as string)?.trim() || null;
+  const screenshot_url = (formData.get('screenshot_url') as string)?.trim() || null;
 
-  // 1. Mandatory disciplinary confirmation
-  if (confirmed !== 'true' && confirmed !== 'on') {
-    return { error: 'Skor bildirimini tamamlamak için doğruluk ve disiplin onay kutucuğunu işaretlemelisiniz.' };
+  if (!fixture_id || isNaN(home_score) || isNaN(away_score) || !played_at) {
+    return { error: 'Gerekli alanları doldurun.' };
   }
 
-  // 2. Score input validation
-  if (!fixture_id || rawHomeScore === null || rawAwayScore === null || rawHomeScore === '' || rawAwayScore === '') {
-    return { error: 'Lütfen ev sahibi ve deplasman skorlarını eksiksiz girin.' };
-  }
-
-  const home_score = Number(rawHomeScore);
-  const away_score = Number(rawAwayScore);
-
-  if (!Number.isInteger(home_score) || !Number.isInteger(away_score)) {
-    return { error: 'Skorlar tam sayı olmalıdır.' };
-  }
-
-  if (home_score < 0 || away_score < 0) {
-    return { error: 'Skorlar negatif bir sayı olamaz.' };
-  }
-
-  if (home_score > 50 || away_score > 50) {
-    return { error: 'Girilen skor geçerli bir futbol skoru aralığında olmalıdır (en fazla 50).' };
-  }
-
-  // 3. Find and validate the fixture
+  // Find the fixture
   const { data: fixture } = await supabase
     .from('fixtures')
-    .select('id, season_id, league_id, home_team_id, away_team_id, status, scheduled_at')
+    .select('*')
     .eq('id', fixture_id)
     .maybeSingle();
 
   if (!fixture) return { error: 'Fikstür bulunamadı.' };
 
-  if (fixture.status !== 'SCHEDULED') {
-    return { error: 'Bu maç tamamlanmış veya iptal edilmiş olduğu için skor girilemez.' };
-  }
-
-  // 4. Verify captain authorization for this fixture
-  if (fixture.home_team_id !== ctx.teamId && fixture.away_team_id !== ctx.teamId) {
-    return { error: 'Sadece kendi takımınızın maçlarına skor girebilirsiniz.' };
-  }
-
-  // 5. Check if a match already exists for this fixture (prevent duplicate/concurrent submissions)
+  // Check if a match already exists for this fixture
   const { data: existingMatch } = await supabase
     .from('matches')
     .select('id')
@@ -107,68 +79,35 @@ export async function submitMatchAction(prevState: any, formData: FormData) {
     .maybeSingle();
 
   if (existingMatch) {
-    return { error: 'Bu fikstür için zaten bir maç sonucu bildirilmiş.' };
+    return { error: 'Bu fikstür için zaten bir maç sonucu girilmiş.' };
   }
 
-  // 6. Try Controlled RPC for atomic score submission and auto-recalculation
-  const { data: rpcData, error: rpcError } = await supabase.rpc('submit_official_match_score', {
-    p_fixture_id: fixture_id,
-    p_home_score: home_score,
-    p_away_score: away_score,
-    p_confirmation_accepted: true,
-  });
-
-  let matchId = '';
-  let isApproved = false;
-
-  if (!rpcError && rpcData) {
-    if (!rpcData.success) {
-      return { error: rpcData.error || 'Skor kaydedilemedi.' };
-    }
-    matchId = rpcData.match_id;
-    isApproved = true;
-  } else {
-    // Fallback: If RPC function does not exist in DB yet (e.g. before migration is run), perform safe manual insert
-    const played_at = fixture.scheduled_at
-      ? new Date(fixture.scheduled_at).toISOString()
-      : new Date().toISOString();
-
-    const { data: insertedMatch, error: insertErr } = await supabase.from('matches').insert({
-      fixture_id,
-      season_id: ctx.seasonId,
-      league_id: fixture.league_id,
-      home_team_id: fixture.home_team_id,
-      away_team_id: fixture.away_team_id,
-      home_score,
-      away_score,
-      source: 'MANUAL',
-      status: 'PENDING_REVIEW',
-      played_at,
-      notes: 'Kaptan tarafından onaylı skor bildirimi.',
-      screenshot_url: null,
-      submitted_by: user!.id
-    }).select('id').maybeSingle();
-
-    if (insertErr) {
-      if (insertErr.code === '23505' || insertErr.message?.includes('duplicate') || insertErr.message?.includes('unique')) {
-        return { error: 'Bu fikstür için zaten bir maç skoru kaydedilmiş.' };
-      }
-      return { error: `Skor kaydedilemedi: ${insertErr.message}` };
-    }
-    matchId = insertedMatch?.id;
+  // Verify the captain's team is part of the fixture
+  if (fixture.home_team_id !== ctx.teamId && fixture.away_team_id !== ctx.teamId) {
+    return { error: 'Sadece kendi takımınızın maçlarını girebilirsiniz.' };
   }
 
-  // 7. Invalidate caches
+  // Insert match
+  const { data: insertedMatch, error } = await supabase.from('matches').insert({
+    fixture_id,
+    season_id: ctx.seasonId,
+    league_id: fixture.league_id,
+    home_team_id: fixture.home_team_id,
+    away_team_id: fixture.away_team_id,
+    home_score,
+    away_score,
+    source: 'MANUAL',
+    status: 'PENDING_REVIEW', // enforce_match_rules ensures this
+    played_at: new Date(played_at).toISOString(),
+    notes,
+    screenshot_url,
+    submitted_by: user!.id
+  }).select('id').maybeSingle();
+
+  if (error) return { error: error.message };
+
   revalidatePath('/takim/yonet/maclar');
-  revalidatePath('/takim/yonet/maclar/yeni');
-  revalidatePath('/ligler');
-  revalidatePath('/');
-
-  const successMessage = isApproved
-    ? 'Maç skoru başarıyla kaydedildi, puan durumu ve fikstür güncellendi.'
-    : 'Maç skoru kaydedildi ve incelemeye alındı.';
-
-  return { success: successMessage, matchId };
+  return { success: 'Maç başarıyla gönderildi.', matchId: insertedMatch?.id };
 }
 
 export async function submitPlayerStatsAction(matchId: string, statsPayload: any[]) {

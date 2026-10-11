@@ -89,11 +89,9 @@ export default async function CaptainMatchesPage() {
                           <span className={`px-2 py-1 rounded text-[10px] font-black ${
                             match.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-500' :
                             match.status === 'REJECTED' ? 'bg-red-500/10 text-red-500' :
-                            'bg-emerald-500/10 text-emerald-400'
+                            'bg-yellow-500/10 text-yellow-500'
                           }`}>
-                            {match.status === 'APPROVED' ? 'ONAYLANDI' :
-                             match.status === 'REJECTED' ? 'REDDEDİLDİ' :
-                             'İŞLENDİ'}
+                            {match.status}
                           </span>
                         </div>
                       ) : (
@@ -106,12 +104,9 @@ export default async function CaptainMatchesPage() {
                     </td>
                     <td className="px-4 py-3">
                       {match ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-emerald-400 font-bold">Sonuç Kaydedildi</span>
-                          <Link href={`/takim/yonet/maclar/${match.id}`} className="text-gray-500 hover:text-gray-300 text-[11px] underline">
-                            Detay
-                          </Link>
-                        </div>
+                        <Link href={`/takim/yonet/maclar/${match.id}`} className="text-[#00e5ff] font-bold text-xs hover:underline">
+                          İncele / İstatistik Gir &rarr;
+                        </Link>
                       ) : f.status === 'SCHEDULED' ? (
                         <Link href={`/takim/yonet/maclar/yeni?fixture=${f.id}`} className="px-3 py-1.5 bg-[#00e5ff] text-black font-black text-[10px] rounded hover:bg-[#00b8d4] transition-colors">
                           SONUÇ GİR

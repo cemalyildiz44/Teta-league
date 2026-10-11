@@ -78,7 +78,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
       <div className="max-w-6xl mx-auto px-4 lg:px-6">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-black text-white tracking-widest uppercase mb-1">MAÇ DETAYI</h1>
+            <h1 className="text-2xl font-black text-white tracking-widest uppercase mb-1">MAÇ DETAYI / İSTATİSTİK GİRİŞİ</h1>
             <p className="text-sm font-bold text-gray-400">
               Hafta {(match.fixtures as any)?.week_number} • {new Date(match.played_at).toLocaleString('tr-TR')}
             </p>
