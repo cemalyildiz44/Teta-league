@@ -25,26 +25,44 @@ export default async function NewMatchPage({ searchParams }: { searchParams: Pro
 
   if (!role || !role.team_id) redirect('/profil');
 
-  if (!fixtureId) return <div className="p-8 text-white">Fikstür ID gerekli.</div>;
+  if (!fixtureId) return (
+    <main className="min-h-screen bg-[#060d18] pt-24 pb-12">
+      <div className="max-w-3xl mx-auto px-4 lg:px-6 p-8 text-white">Fikstür ID gerekli.</div>
+    </main>
+  );
 
   const { data: fixture } = await supabase
     .from('fixtures')
     .select('id, home_team_id, away_team_id, scheduled_at, status')
     .eq('id', fixtureId)
-    .single();
+    .maybeSingle();
 
-  if (!fixture) return <div className="p-8 text-white">Fikstür bulunamadı.</div>;
+  if (!fixture) return (
+    <main className="min-h-screen bg-[#060d18] pt-24 pb-12">
+      <div className="max-w-3xl mx-auto px-4 lg:px-6 p-8 text-white">Fikstür bulunamadı.</div>
+    </main>
+  );
 
   if (fixture.home_team_id !== role.team_id && fixture.away_team_id !== role.team_id) {
-    return <div className="p-8 text-red-500">Bu maçı raporlama yetkiniz yok.</div>;
+    return (
+      <main className="min-h-screen bg-[#060d18] pt-24 pb-12">
+        <div className="max-w-3xl mx-auto px-4 lg:px-6 p-8 text-red-500">Bu maçı raporlama yetkiniz yok.</div>
+      </main>
+    );
   }
   
   if (fixture.status !== 'SCHEDULED') {
-    return <div className="p-8 text-yellow-500">Sadece SCHEDULED durumundaki maçlara sonuç girebilirsiniz.</div>;
+    return (
+      <main className="min-h-screen bg-[#060d18] pt-24 pb-12">
+        <div className="max-w-3xl mx-auto px-4 lg:px-6 p-8 text-yellow-500">Sadece SCHEDULED durumundaki maçlara sonuç girebilirsiniz.</div>
+      </main>
+    );
   }
 
-  const { data: homeTeam } = await supabase.from('teams').select('name').eq('id', fixture.home_team_id).single();
-  const { data: awayTeam } = await supabase.from('teams').select('name').eq('id', fixture.away_team_id).single();
+  const [{ data: homeTeam }, { data: awayTeam }] = await Promise.all([
+    supabase.from('teams').select('name').eq('id', fixture.home_team_id).maybeSingle(),
+    supabase.from('teams').select('name').eq('id', fixture.away_team_id).maybeSingle()
+  ]);
 
   return (
     <main className="min-h-screen bg-[#060d18] pt-24 pb-12">
