@@ -5,15 +5,9 @@ import { useRouter } from 'next/navigation';
 import {
   X,
   Trophy,
-  Upload,
   AlertTriangle,
   CheckCircle2,
   Loader2,
-  Plus,
-  Trash2,
-  User,
-  Image as ImageIcon,
-  Info,
 } from 'lucide-react';
 import TeamLogo from '@/components/TeamLogo';
 import { submitTournamentMatchScoreAction } from '../actions';
@@ -21,129 +15,27 @@ import { submitTournamentMatchScoreAction } from '../actions';
 interface TournamentScoreReportModalProps {
   match: any;
   tournamentId: string;
-  currentUser: any;
-  profiles: any[];
-  homePlayers: any[];
-  awayPlayers: any[];
+  currentUser?: any;
+  profiles?: any[];
+  homePlayers?: any[];
+  awayPlayers?: any[];
   onClose: () => void;
 }
 
 export default function TournamentScoreReportModal({
   match,
   tournamentId,
-  currentUser,
-  profiles,
-  homePlayers,
-  awayPlayers,
   onClose,
 }: TournamentScoreReportModalProps) {
   const router = useRouter();
 
   const [homeScore, setHomeScore] = useState<string>('0');
   const [awayScore, setAwayScore] = useState<string>('0');
-  const [notes, setNotes] = useState<string>('');
-
-  const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
-  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
-
-  // Scorers list: { team_application_id, player_id, player_name, goals, is_own_goal }
-  const [scorers, setScorers] = useState<
-    Array<{
-      id: string;
-      team_application_id: string;
-      player_id?: string | null;
-      player_name: string;
-      goals: number;
-      is_own_goal?: boolean;
-    }>
-  >([]);
-
-  // Add scorer form temp states
-  const [selectedTeamId, setSelectedTeamId] = useState<string>(match.home_application_id);
-  const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
-  const [scorerGoals, setScorerGoals] = useState<number>(1);
-  const [isOwnGoal, setIsOwnGoal] = useState<boolean>(false);
-  const [playerSearch, setPlayerSearch] = useState<string>('');
+  const [isConfirmed, setIsConfirmed] = useState<boolean>(false);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-
-  const homeParsedScore = parseInt(homeScore, 10) || 0;
-  const awayParsedScore = parseInt(awayScore, 10) || 0;
-
-  // Calculate current sum of assigned goals
-  const homeAssignedGoals = scorers
-    .filter((s) => s.team_application_id === match.home_application_id)
-    .reduce((sum, s) => sum + s.goals, 0);
-
-  const awayAssignedGoals = scorers
-    .filter((s) => s.team_application_id === match.away_application_id)
-    .reduce((sum, s) => sum + s.goals, 0);
-
-  const isHomeGoalsMatched = homeAssignedGoals === homeParsedScore;
-  const isAwayGoalsMatched = awayAssignedGoals === awayParsedScore;
-  const isScoreMatched = isHomeGoalsMatched && isAwayGoalsMatched;
-
-  // Handle screenshot file change
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      setErrorMsg('Ekran görüntüsü boyutu 5MB limitini aşıyor.');
-      return;
-    }
-
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setErrorMsg('Yalnızca JPG, PNG veya WEBP formatında ekran görüntüsü yükleyebilirsiniz.');
-      return;
-    }
-
-    setErrorMsg(null);
-    setScreenshotFile(file);
-    setScreenshotPreview(URL.createObjectURL(file));
-  };
-
-  // Add a goalscorer to list
-  const handleAddScorer = () => {
-    setErrorMsg(null);
-
-    let playerName = '';
-    let playerId: string | null = selectedPlayerId || null;
-
-    if (isOwnGoal) {
-      playerName = 'Kendi Kalesine Gol (KK)';
-      playerId = null;
-    } else {
-      if (!selectedPlayerId) {
-        setErrorMsg('Lütfen gol atan oyuncuyu seçiniz.');
-        return;
-      }
-      const p = profiles.find((prof) => prof.id === selectedPlayerId);
-      playerName = p ? `@${p.username}` : 'Oyuncu';
-    }
-
-    const newScorer = {
-      id: Math.random().toString(36).substring(2, 9),
-      team_application_id: selectedTeamId,
-      player_id: playerId,
-      player_name: playerName,
-      goals: scorerGoals,
-      is_own_goal: isOwnGoal,
-    };
-
-    setScorers([...scorers, newScorer]);
-    setSelectedPlayerId('');
-    setScorerGoals(1);
-    setIsOwnGoal(false);
-    setPlayerSearch('');
-  };
-
-  // Remove a goalscorer
-  const handleRemoveScorer = (id: string) => {
-    setScorers(scorers.filter((s) => s.id !== id));
-  };
 
   // Submit report
   const handleSubmit = async (e: React.FormEvent) => {
@@ -151,13 +43,26 @@ export default function TournamentScoreReportModal({
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    if (!screenshotFile) {
-      setErrorMsg('Maç sonucu kanıtı için ekran görüntüsü yüklenmesi zorunludur.');
+    if (!isConfirmed) {
+      setErrorMsg('Skor bildirimini tamamlamak için doğruluk ve disiplin onay kutucuğunu işaretlemelisiniz.');
       return;
     }
 
-    if (!isScoreMatched) {
-      setErrorMsg('Girilen golcülerin toplam gol sayısı, takım skorları ile birebir eşleşmelidir.');
+    const homeParsed = parseInt(homeScore, 10);
+    const awayParsed = parseInt(awayScore, 10);
+
+    if (isNaN(homeParsed) || isNaN(awayParsed)) {
+      setErrorMsg('Lütfen geçerli bir ev sahibi ve deplasman skoru giriniz.');
+      return;
+    }
+
+    if (homeParsed < 0 || awayParsed < 0) {
+      setErrorMsg('Skorlar negatif bir sayı olamaz.');
+      return;
+    }
+
+    if (homeParsed > 50 || awayParsed > 50) {
+      setErrorMsg('Girilen skor geçerli bir futbol skoru aralığında olmalıdır (en fazla 50).');
       return;
     }
 
@@ -166,19 +71,10 @@ export default function TournamentScoreReportModal({
     try {
       const formData = new FormData();
       formData.append('match_id', match.id);
-      formData.append('home_score', homeScore);
-      formData.append('away_score', awayScore);
-      formData.append('screenshot', screenshotFile);
-      if (notes.trim()) formData.append('notes', notes.trim());
-
-      const payloadGoals = scorers.map((s) => ({
-        team_application_id: s.team_application_id,
-        player_id: s.player_id,
-        player_name: s.player_name,
-        goals: s.goals,
-        is_own_goal: !!s.is_own_goal,
-      }));
-      formData.append('goals', JSON.stringify(payloadGoals));
+      formData.append('tournament_id', tournamentId);
+      formData.append('home_score', homeParsed.toString());
+      formData.append('away_score', awayParsed.toString());
+      formData.append('confirmed', 'true');
 
       const res = await submitTournamentMatchScoreAction(formData);
       setLoading(false);
@@ -189,6 +85,7 @@ export default function TournamentScoreReportModal({
         setSuccessMsg(res.success || 'Maç skoru başarıyla iletildi. Yönetici onayına sunuldu.');
         setTimeout(() => {
           onClose();
+          router.refresh();
         }, 1500);
       }
     } catch (err: any) {
@@ -197,16 +94,11 @@ export default function TournamentScoreReportModal({
     }
   };
 
-  const relevantTeamPlayers = selectedTeamId === match.home_application_id ? homePlayers : awayPlayers;
-  const filteredProfiles = profiles
-    .filter((p) => p.username.toLowerCase().includes(playerSearch.toLowerCase()))
-    .slice(0, 15);
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-      <div className="bg-[#0a1628] w-full max-w-2xl rounded-[2.5rem] border border-white/10 shadow-2xl flex flex-col max-h-[92vh] overflow-hidden animate-fade-in-up">
+      <div className="bg-[#0a1628] w-full max-w-xl rounded-2xl sm:rounded-[2rem] border border-white/10 shadow-2xl flex flex-col max-h-[92vh] overflow-hidden animate-fade-in-up">
         {/* Header */}
-        <div className="p-6 border-b border-white/10 flex items-center justify-between shrink-0 bg-[#060d18]">
+        <div className="p-5 sm:p-6 border-b border-white/10 flex items-center justify-between shrink-0 bg-[#060d18]">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-[#00e5ff] shadow-md shadow-cyan-500/10">
               <Trophy className="w-5 h-5" />
@@ -215,14 +107,14 @@ export default function TournamentScoreReportModal({
               <span className="text-[#00e5ff] text-[10px] font-[900] tracking-widest uppercase block">
                 RESMİ MAÇ SKOR BİLDİRİMİ
               </span>
-              <h3 className="text-base font-[900] text-white uppercase tracking-wider">
+              <h3 className="text-sm sm:text-base font-[900] text-white uppercase tracking-wider">
                 {match.home?.team_name} vs {match.away?.team_name}
               </h3>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -248,22 +140,23 @@ export default function TournamentScoreReportModal({
           </div>
         )}
         {successMsg && (
-          <div className="p-3 bg-emerald-500/90 text-black text-xs font-[900] uppercase tracking-wider text-center">
-            {successMsg}
+          <div className="p-3 bg-emerald-500/90 text-black text-xs font-[900] uppercase tracking-wider text-center flex items-center justify-center gap-2">
+            <CheckCircle2 className="w-4 h-4" />
+            <span>{successMsg}</span>
           </div>
         )}
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5">
           {/* Match Score Input */}
-          <div className="p-6 rounded-2xl bg-black/40 border border-white/5 space-y-4">
+          <div className="p-5 sm:p-6 rounded-2xl bg-black/40 border border-white/5 space-y-4">
             <span className="text-[11px] font-[900] text-zinc-400 uppercase tracking-widest block text-center">
               MAÇ SKORU
             </span>
 
-            <div className="flex items-center justify-center gap-6">
+            <div className="flex items-center justify-center gap-4 sm:gap-6">
               {/* Home Team */}
-              <div className="flex flex-col items-center gap-2 flex-1 max-w-[160px]">
+              <div className="flex flex-col items-center gap-2 flex-1 max-w-[150px]">
                 <TeamLogo src={match.home?.logo_url} name={match.home?.team_name} size="md" />
                 <span className="text-xs font-[900] text-white uppercase text-center truncate w-full">
                   {match.home?.team_name}
@@ -271,17 +164,20 @@ export default function TournamentScoreReportModal({
                 <input
                   type="number"
                   min={0}
+                  max={50}
+                  step={1}
                   required
+                  disabled={loading}
                   value={homeScore}
                   onChange={(e) => setHomeScore(e.target.value)}
-                  className="w-20 bg-black/60 border border-white/20 rounded-xl px-3 py-2 text-2xl font-[900] text-center text-white focus:border-[#00e5ff] outline-none"
+                  className="w-20 bg-black/60 border border-white/20 rounded-xl px-3 py-2 text-2xl font-[900] text-center text-white focus:border-[#00e5ff] outline-none disabled:opacity-50"
                 />
               </div>
 
               <span className="text-xl font-[900] text-zinc-500 mb-6">-</span>
 
               {/* Away Team */}
-              <div className="flex flex-col items-center gap-2 flex-1 max-w-[160px]">
+              <div className="flex flex-col items-center gap-2 flex-1 max-w-[150px]">
                 <TeamLogo src={match.away?.logo_url} name={match.away?.team_name} size="md" />
                 <span className="text-xs font-[900] text-white uppercase text-center truncate w-full">
                   {match.away?.team_name}
@@ -289,258 +185,72 @@ export default function TournamentScoreReportModal({
                 <input
                   type="number"
                   min={0}
+                  max={50}
+                  step={1}
                   required
+                  disabled={loading}
                   value={awayScore}
                   onChange={(e) => setAwayScore(e.target.value)}
-                  className="w-20 bg-black/60 border border-white/20 rounded-xl px-3 py-2 text-2xl font-[900] text-center text-white focus:border-[#00e5ff] outline-none"
+                  className="w-20 bg-black/60 border border-white/20 rounded-xl px-3 py-2 text-2xl font-[900] text-center text-white focus:border-[#00e5ff] outline-none disabled:opacity-50"
                 />
               </div>
             </div>
+          </div>
 
-            {/* Score Match Status Badges */}
-            <div className="flex flex-wrap items-center justify-center gap-4 pt-2 border-t border-white/5 text-[11px] font-bold">
-              <span
-                className={`px-3 py-1 rounded-full ${
-                  isHomeGoalsMatched ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
-                }`}
-              >
-                {match.home?.team_name}: {homeAssignedGoals} / {homeParsedScore} Gol{' '}
-                {isHomeGoalsMatched ? '✓' : '⚠️'}
-              </span>
-
-              <span
-                className={`px-3 py-1 rounded-full ${
-                  isAwayGoalsMatched ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
-                }`}
-              >
-                {match.away?.team_name}: {awayAssignedGoals} / {awayParsedScore} Gol{' '}
-                {isAwayGoalsMatched ? '✓' : '⚠️'}
-              </span>
+          {/* Disciplinary Warning Banner */}
+          <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <div className="text-xs font-black text-amber-300 uppercase tracking-wider">
+                DİSİPLİN VE DOĞRULUK UYARISI
+              </div>
+              <p className="text-xs text-amber-200/90 leading-relaxed font-medium">
+                Hatalı veya gerçeğe aykırı skor bildirimi disiplin yaptırımlarına neden olabilir.
+                Bildirdiğiniz skor diğer takım ve turnuva yönetimi tarafından görüntülenebilmektedir.
+              </p>
             </div>
           </div>
 
-          {/* Goalscorers Section */}
-          <div className="p-6 rounded-2xl bg-[#081220] border border-white/10 space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-[900] text-white uppercase tracking-wider">
-                GOL ATAN OYUNCULAR ({scorers.length})
+          {/* Mandatory Confirmation Checkbox */}
+          <div className="p-4 bg-[#060d18] border border-white/10 rounded-xl hover:border-white/20 transition-colors">
+            <label className="flex items-start gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                required
+                disabled={loading}
+                checked={isConfirmed}
+                onChange={(e) => setIsConfirmed(e.target.checked)}
+                className="w-4 h-4 mt-0.5 rounded border border-white/20 bg-black/60 text-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff] focus:ring-offset-0 cursor-pointer disabled:opacity-50"
+              />
+              <span className="text-xs text-gray-300 font-medium leading-relaxed">
+                Girdiğim skorun doğru olduğunu ve hatalı bildirim durumunda uygulanabilecek yaptırımları kabul ediyorum.
               </span>
-              <span className="text-[10px] text-zinc-400 uppercase">Toplam skorla birebir eşleşmeli</span>
-            </div>
-
-            {/* Add Scorer Sub-Form */}
-            <div className="p-4 rounded-xl bg-black/40 border border-white/5 space-y-3">
-              <div className="grid sm:grid-cols-2 gap-3">
-                {/* Team selector */}
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">Takım</label>
-                  <select
-                    value={selectedTeamId}
-                    onChange={(e) => setSelectedTeamId(e.target.value)}
-                    className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:border-[#00e5ff]"
-                  >
-                    <option value={match.home_application_id}>{match.home?.team_name} (Ev Sahibi)</option>
-                    <option value={match.away_application_id}>{match.away?.team_name} (Deplasman)</option>
-                  </select>
-                </div>
-
-                {/* Goals count */}
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">Gol Sayısı</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={15}
-                    value={scorerGoals}
-                    onChange={(e) => setScorerGoals(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:border-[#00e5ff]"
-                  />
-                </div>
-              </div>
-
-              {/* Player selector / search */}
-              {!isOwnGoal ? (
-                <div className="space-y-2">
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase">
-                    Oyuncu Seçimi (Kayıtlı Profiller)
-                  </label>
-
-                  {/* If team has squad members */}
-                  {relevantTeamPlayers.length > 0 ? (
-                    <select
-                      value={selectedPlayerId}
-                      onChange={(e) => setSelectedPlayerId(e.target.value)}
-                      className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:border-[#00e5ff]"
-                    >
-                      <option value="">Kadrodan Oyuncu Seçin...</option>
-                      {relevantTeamPlayers.map((p: any) => (
-                        <option key={p.profile_id} value={p.profile_id}>
-                          @{p.profile?.username}
-                        </option>
-                      ))}
-                    </select>
-                  ) : null}
-
-                  {/* Search in all profiles fallback */}
-                  <div className="space-y-1.5">
-                    <input
-                      type="text"
-                      placeholder="Oyuncu ara (Kullanıcı adı)..."
-                      value={playerSearch}
-                      onChange={(e) => setPlayerSearch(e.target.value)}
-                      className="w-full bg-black/30 border border-white/5 rounded-xl px-3 py-1.5 text-xs text-zinc-300 placeholder:text-zinc-600 outline-none focus:border-[#00e5ff]"
-                    />
-                    {playerSearch.trim() && (
-                      <div className="max-h-28 overflow-y-auto bg-black/60 rounded-xl border border-white/10 p-1 grid grid-cols-2 gap-1">
-                        {filteredProfiles.map((p) => (
-                          <div
-                            key={p.id}
-                            onClick={() => {
-                              setSelectedPlayerId(p.id);
-                              setPlayerSearch('');
-                            }}
-                            className={`p-1.5 rounded text-[11px] cursor-pointer flex items-center gap-1.5 ${
-                              selectedPlayerId === p.id
-                                ? 'bg-cyan-500/20 text-[#00e5ff] font-black'
-                                : 'hover:bg-white/10 text-zinc-300 font-bold'
-                            }`}
-                          >
-                            <User className="w-3 h-3 text-zinc-500" />
-                            <span className="truncate">@{p.username}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : null}
-
-              {/* Own Goal toggle & Add button */}
-              <div className="flex items-center justify-between pt-1">
-                <label className="flex items-center gap-2 text-xs font-bold text-zinc-400 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={isOwnGoal}
-                    onChange={(e) => setIsOwnGoal(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded text-[#00e5ff]"
-                  />
-                  <span>Kendi Kalesine Gol (KK)</span>
-                </label>
-
-                <button
-                  type="button"
-                  onClick={handleAddScorer}
-                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-[#00e5ff] hover:text-black text-white text-xs font-[900] uppercase transition-all flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Golcü Ekle
-                </button>
-              </div>
-            </div>
-
-            {/* Added Scorers List */}
-            {scorers.length > 0 && (
-              <div className="space-y-1.5 pt-2">
-                {scorers.map((s) => {
-                  const isHome = s.team_application_id === match.home_application_id;
-                  return (
-                    <div
-                      key={s.id}
-                      className="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-white/5 text-xs font-bold"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                            isHome ? 'bg-cyan-500/20 text-cyan-400' : 'bg-purple-500/20 text-purple-400'
-                          }`}
-                        >
-                          {isHome ? match.home?.team_name : match.away?.team_name}
-                        </span>
-                        <span className="text-white font-black">{s.player_name}</span>
-                        <span className="text-[#00e5ff] font-mono font-black">({s.goals} Gol)</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveScorer(s.id)}
-                        className="p-1 rounded text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Match Screenshot Upload */}
-          <div className="p-6 rounded-2xl bg-[#081220] border border-white/10 space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-[900] text-white uppercase tracking-wider">
-                MAÇ SONUCU EKRAN GÖRÜNTÜSÜ <span className="text-red-500">*</span>
-              </label>
-              <span className="text-[10px] text-zinc-500 uppercase">Max 5MB (JPG, PNG, WEBP)</span>
-            </div>
-
-            {screenshotPreview ? (
-              <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-black/50 group max-h-56">
-                <img src={screenshotPreview} alt="Screenshot" className="w-full h-full object-contain" />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setScreenshotFile(null);
-                    setScreenshotPreview(null);
-                  }}
-                  className="absolute top-3 right-3 p-2 rounded-full bg-black/70 text-white hover:bg-red-500 transition-colors cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <label className="border-2 border-dashed border-white/10 hover:border-[#00e5ff]/50 rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer transition-all bg-black/30 group">
-                <Upload className="w-8 h-8 text-zinc-600 group-hover:text-[#00e5ff] mb-2 transition-colors" />
-                <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider block mb-1">
-                  Ekran Görüntüsü Seç veya Sürükle
-                </span>
-                <span className="text-[10px] text-zinc-500">Oyun sonu maç istatistikleri veya skor tablosu</span>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-              </label>
-            )}
-          </div>
-
-          {/* Notes textarea */}
-          <div>
-            <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">
-              İsteğe Bağlı Not / Açıklama
             </label>
-            <textarea
-              rows={2}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Hakem veya maçla ilgili eklemek istediğiniz notlar..."
-              className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-zinc-600 focus:border-[#00e5ff] outline-none"
-            />
           </div>
 
           {/* Submit Actions */}
-          <div className="pt-4 border-t border-white/10 flex items-center justify-end gap-3">
+          <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 font-[900] uppercase text-xs transition-colors cursor-pointer"
+              disabled={loading}
+              className="px-5 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 font-[900] uppercase text-xs transition-colors cursor-pointer disabled:opacity-50"
             >
               Vazgeç
             </button>
             <button
-              disabled={loading || !screenshotFile || !isScoreMatched}
+              disabled={loading || !isConfirmed}
               type="submit"
-              className="px-8 py-3.5 rounded-xl bg-gradient-to-r from-[#00e5ff] to-cyan-400 text-black font-[900] uppercase tracking-widest text-xs hover:brightness-110 hover:shadow-[0_0_20px_rgba(0,229,255,0.4)] transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2 cursor-pointer"
+              className="px-7 py-3 rounded-xl bg-gradient-to-r from-[#00e5ff] to-cyan-400 text-black font-[900] uppercase tracking-widest text-xs hover:brightness-110 hover:shadow-[0_0_20px_rgba(0,229,255,0.4)] transition-all disabled:opacity-40 disabled:pointer-events-none flex items-center gap-2 cursor-pointer"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'SKORU BİLDİR (ONAYA GÖNDER)'}
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>KAYDEDİLİYOR...</span>
+                </>
+              ) : (
+                'SONUCU KAYDET'
+              )}
             </button>
           </div>
         </form>

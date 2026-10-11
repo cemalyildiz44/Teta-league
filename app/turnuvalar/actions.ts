@@ -313,32 +313,43 @@ export async function submitTournamentMatchScoreAction(formData: FormData) {
   // Check active profile status
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, status, username')
+    .select('id, status, is_active, username')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
-  if (!profile || profile.status === 'SUSPENDED' || profile.status === 'BANNED') {
+  if (!profile || profile.status === 'SUSPENDED' || profile.status === 'BANNED' || profile.is_active === false) {
     return { error: 'Hesabınız askıya alındığı veya kısıtlandığı için işlem yapamazsınız.' };
   }
 
   // 2. Parse form data
-  const match_id = formData.get('match_id') as string;
-  const tournament_id = formData.get('tournament_id') as string;
-  const home_score_raw = formData.get('home_score') as string;
-  const away_score_raw = formData.get('away_score') as string;
-  const goals_json = formData.get('goals_json') as string;
-  const notes = (formData.get('notes') as string)?.trim() || null;
-  const screenshot_file = formData.get('screenshot_file') as File | null;
+  const match_id = (formData.get('match_id') as string)?.trim();
+  const tournament_id = (formData.get('tournament_id') as string)?.trim();
+  const raw_home_score = formData.get('home_score');
+  const raw_away_score = formData.get('away_score');
+  const confirmed = formData.get('confirmed');
 
-  if (!match_id || !tournament_id) {
-    return { error: 'Geçersiz maç veya turnuva bilgisi.' };
+  // Mandatory confirmation check
+  if (confirmed !== 'true' && confirmed !== 'on') {
+    return { error: 'Skor bildirimini tamamlamak için doğruluk ve disiplin onay kutucuğunu işaretlemelisiniz.' };
   }
 
-  const home_score = parseInt(home_score_raw, 10);
-  const away_score = parseInt(away_score_raw, 10);
+  if (!match_id || !tournament_id || raw_home_score === null || raw_away_score === null || raw_home_score === '' || raw_away_score === '') {
+    return { error: 'Lütfen ev sahibi ve deplasman skorlarını eksiksiz girin.' };
+  }
 
-  if (isNaN(home_score) || isNaN(away_score) || home_score < 0 || away_score < 0) {
+  const home_score = Number(raw_home_score);
+  const away_score = Number(raw_away_score);
+
+  if (!Number.isInteger(home_score) || !Number.isInteger(away_score)) {
+    return { error: 'Skorlar tam sayı olmalıdır.' };
+  }
+
+  if (home_score < 0 || away_score < 0) {
     return { error: 'Skorlar 0 veya daha büyük bir tam sayı olmalıdır.' };
+  }
+
+  if (home_score > 50 || away_score > 50) {
+    return { error: 'Girilen skor geçerli bir futbol skoru aralığında olmalıdır (en fazla 50).' };
   }
 
   // 3. Fetch match and verify authorization
@@ -394,94 +405,21 @@ export async function submitTournamentMatchScoreAction(formData: FormData) {
     return { error: 'Bu maçın sonucu zaten onaylanmıştır. Yeni bildirim gönderilemez.' };
   }
 
-  // 4. Validate goalscorers
-  let goals: Array<{
-    team_application_id: string;
-    player_id?: string | null;
-    player_name?: string | null;
-    goals: number;
-    is_own_goal?: boolean;
-  }> = [];
-
-  if (goals_json) {
-    try {
-      goals = JSON.parse(goals_json);
-    } catch {
-      return { error: 'Golcü bilgileri geçersiz formatta.' };
-    }
-  }
-
-  // Sum goals for home and away
-  const homeGoalsCount = goals
-    .filter((g) => g.team_application_id === match.home_application_id)
-    .reduce((sum, g) => sum + (Number(g.goals) || 0), 0);
-
-  const awayGoalsCount = goals
-    .filter((g) => g.team_application_id === match.away_application_id)
-    .reduce((sum, g) => sum + (Number(g.goals) || 0), 0);
-
-  if (homeGoalsCount !== home_score) {
-    return {
-      error: `Ev sahibi takımın skoru (${home_score}) ile bildirilen golcülerin toplam gol sayısı (${homeGoalsCount}) eşleşmiyor. Lütfen golcüleri kontrol ediniz.`
-    };
-  }
-
-  if (awayGoalsCount !== away_score) {
-    return {
-      error: `Deplasman takımın skoru (${away_score}) ile bildirilen golcülerin toplam gol sayısı (${awayGoalsCount}) eşleşmiyor. Lütfen golcüleri kontrol ediniz.`
-    };
-  }
-
-  // 5. Validate and upload screenshot proof
-  if (!screenshot_file || screenshot_file.size === 0) {
-    return { error: 'Maç sonucu kanıtı için ekran görüntüsü yüklenmesi zorunludur.' };
-  }
-
-  if (screenshot_file.size > MAX_SCREENSHOT_SIZE) {
-    return { error: 'Ekran görüntüsü boyutu 5MB limitini aşıyor.' };
-  }
-
-  if (!ALLOWED_SCREENSHOT_TYPES.includes(screenshot_file.type)) {
-    return { error: 'Geçersiz dosya formatı. Yalnızca JPEG, PNG veya WEBP yükleyebilirsiniz.' };
-  }
-
-  const ext = screenshot_file.name.split('.').pop() || 'png';
-  const fileName = `${user.id}_${Date.now()}.${ext}`;
-  const filePath = `${tournament_id}/${match_id}/${fileName}`;
-
-  // Try tournament-proofs bucket first, fallback if bucket not created
-  let screenshot_url = '';
-  let uploadErr = null;
-
-  const { error: proofErr } = await supabase.storage
-    .from('tournament-proofs')
-    .upload(filePath, screenshot_file, { upsert: true });
-
-  if (!proofErr) {
-    const { data } = supabase.storage.from('tournament-proofs').getPublicUrl(filePath);
-    screenshot_url = data.publicUrl;
-  } else {
-    // Fallback attempt to tournament-logos bucket
-    const fbPath = `proofs_${user.id}_${Date.now()}.${ext}`;
-    const { error: fbErr } = await supabase.storage
-      .from('tournament-logos')
-      .upload(fbPath, screenshot_file, { upsert: true });
-
-    if (fbErr) {
-      return { error: 'Ekran görüntüsü yüklenemedi: ' + proofErr.message };
-    }
-    const { data } = supabase.storage.from('tournament-logos').getPublicUrl(fbPath);
-    screenshot_url = data.publicUrl;
-  }
-
-  // 6. Insert into tournament_match_submissions
-  // Clean up any old rejected submission for this match if re-submitting
+  // 4. Clean up any old rejected submission for this match if re-submitting
   await supabase
     .from('tournament_match_submissions')
     .delete()
     .eq('match_id', match_id)
     .eq('status', 'REJECTED');
 
+  // Also clean old goals if any exist from a rejected submission
+  await supabase
+    .from('tournament_match_goals')
+    .delete()
+    .eq('match_id', match_id);
+
+  // 5. Insert into tournament_match_submissions
+  // Note: screenshot_url has NOT NULL in DB schema, so 'MANUAL_ENTRY' satisfies constraint without requiring file upload
   const { data: submission, error: subError } = await supabase
     .from('tournament_match_submissions')
     .insert({
@@ -491,60 +429,40 @@ export async function submitTournamentMatchScoreAction(formData: FormData) {
       submitted_team_application_id: submitterTeamAppId,
       home_score,
       away_score,
-      screenshot_url,
-      notes,
+      screenshot_url: 'MANUAL_ENTRY',
+      notes: 'Kaptan tarafından doğrulanmış skor bildirimi.',
       status: 'PENDING_REVIEW',
     })
     .select('id')
-    .single();
+    .maybeSingle();
 
   if (subError || !submission) {
-    return { error: 'Maç bildirimi kaydedilemedi: ' + subError?.message };
+    return { error: 'Maç bildirimi kaydedilemedi: ' + (subError?.message || 'Bilinmeyen hata') };
   }
 
-  // 7. Insert goalscorers into tournament_match_goals
-  if (goals.length > 0) {
-    const goalsPayload = goals.map((g) => ({
-      submission_id: submission.id,
-      match_id,
-      tournament_id,
-      team_application_id: g.team_application_id,
-      player_id: g.player_id || null,
-      player_name: g.player_name || null,
-      goals: Number(g.goals) || 1,
-      is_own_goal: Boolean(g.is_own_goal),
-    }));
-
-    const { error: goalsErr } = await supabase
-      .from('tournament_match_goals')
-      .insert(goalsPayload);
-
-    if (goalsErr) {
-      // Rollback submission
-      await supabase.from('tournament_match_submissions').delete().eq('id', submission.id);
-      return { error: 'Golcüler kaydedilemedi: ' + goalsErr.message };
-    }
-  }
-
-  // 8. Update tournament_matches status to PENDING_REVIEW
-  await supabase
+  // 6. Update tournament_matches status to PENDING_REVIEW
+  const { error: matchUpdateErr } = await supabase
     .from('tournament_matches')
     .update({
       status: 'PENDING_REVIEW',
       home_score,
       away_score,
-      screenshot_url,
+      screenshot_url: null,
       rejection_reason: null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', match_id);
+
+  if (matchUpdateErr) {
+    return { error: 'Maç durumu güncellenemedi: ' + matchUpdateErr.message };
+  }
 
   revalidatePath('/turnuvalar');
   revalidatePath(`/turnuvalar/${tournament_id}`);
   revalidatePath('/admin/tournaments');
 
   return {
-    success: 'Skor bildirimi ve kanıt ekran görüntüsü başarıyla gönderildi. Yönetici onayının ardından sonuç puan tablosuna yansıtılacaktır.'
+    success: 'Skor bildirimi başarıyla gönderildi. Yönetici onayının ardından sonuç puan tablosuna yansıtılacaktır.'
   };
 }
 
