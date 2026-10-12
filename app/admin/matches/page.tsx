@@ -15,7 +15,7 @@ export default async function AdminMatchesPage() {
   ] = await Promise.all([
     supabase
       .from('matches')
-      .select('*, fixtures(week_number), stats:match_player_stats(*, profiles!match_player_stats_player_id_fkey(username))')
+      .select('*, fixtures(week_number), stats:match_player_stats(*, profiles!match_player_stats_player_id_fkey(id, username, full_name, current_ea_player_id))')
       .order('played_at', { ascending: false })
       .limit(500),
     supabase.from('seasons').select('id, name').order('created_at', { ascending: false }),

@@ -6,10 +6,19 @@ import { fetchClubMatches } from '@/lib/ea/client';
 import { normalizeMatch } from '@/lib/ea/normalizer';
 import { matchFixture, FixtureCandidate } from '@/lib/ea/matcher';
 import { NormalizedMatch } from '@/lib/ea/types';
+import { matchPlayerToProfile, validateRosterMembership } from '@/lib/ea/roster-validator';
 
 async function checkAdmin(supabase: any, user: any) {
   if (!user) return false;
-  const { data } = await supabase.from('user_roles').select('role').eq('user_id', user.id).in('role', ['ADMIN', 'SUPER_ADMIN']).single();
+  const { data } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id)
+    .in('role', ['ADMIN', 'SUPER_ADMIN'])
+    .eq('is_active', true)
+    .is('revoked_at', null)
+    .limit(1)
+    .maybeSingle();
   return !!data;
 }
 
@@ -30,10 +39,9 @@ export async function fetchEaPreviewAction(leagueId: string, weekNumber: number)
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: 'Unauthorized' };
     
-    const { data: roleData } = await supabase.from('user_roles')
-      .select('role').eq('user_id', user.id).in('role', ['ADMIN', 'SUPER_ADMIN']).single();
-      
-    if (!roleData) return { error: 'Unauthorized: Admins only' };
+    if (!(await checkAdmin(supabase, user))) {
+      return { error: 'Unauthorized: Admins only' };
+    }
 
     // 2. Fetch fixtures for the league & week (NO composite FK shorthand for teams, we map it manually)
     const { data: fixtures, error: fixErr } = await supabase
@@ -149,13 +157,20 @@ export async function importEaMatchAction(matchData: EAPreviewMatch, seasonId: s
     return { error: 'Maç READY statüsünde değil.' };
   }
 
+  if (!matchData.home_team_id || !matchData.away_team_id) {
+    return { error: 'Takım ID eşleştirmeleri bulunamadı.' };
+  }
+
+  const homeTeamId = matchData.home_team_id;
+  const awayTeamId = matchData.away_team_id;
+
   // 1. Insert Match
   const { data: newMatch, error: matchErr } = await supabase.from('matches').insert({
     fixture_id: matchData.fixture_id,
     season_id: seasonId,
     league_id: leagueId,
-    home_team_id: matchData.home_team_id,
-    away_team_id: matchData.away_team_id,
+    home_team_id: homeTeamId,
+    away_team_id: awayTeamId,
     home_score: matchData.is_reversed ? matchData.away_team.score : matchData.home_team.score,
     away_score: matchData.is_reversed ? matchData.home_team.score : matchData.away_team.score,
     source: 'AUTO',
@@ -175,29 +190,83 @@ export async function importEaMatchAction(matchData: EAPreviewMatch, seasonId: s
     platform: 'common-gen5'
   });
 
-  // 3. Match players to profiles
+  // 3. Match players to profiles with case-insensitive normalization & collision detection
   const allPlayers = [
     ...matchData.home_team.players.map(p => ({ ...p, _eaClub: matchData.home_team.ea_club_id })),
     ...matchData.away_team.players.map(p => ({ ...p, _eaClub: matchData.away_team.ea_club_id }))
   ];
 
-  const eaPlayerIds = allPlayers.map(p => p.ea_player_id);
-  const { data: profiles } = await supabase
+  const { data: allProfiles } = await supabase
     .from('profiles')
-    .select('id, current_ea_player_id')
-    .in('current_ea_player_id', eaPlayerIds);
+    .select('id, username, full_name, current_ea_player_id')
+    .not('current_ea_player_id', 'is', null);
 
-  const profileMap = new Map(profiles?.map(p => [p.current_ea_player_id, p.id]));
+  // Initial individual matches
+  const individualMatches = allPlayers.map(p => ({
+    player: p,
+    matchRes: matchPlayerToProfile(p, allProfiles || [])
+  }));
 
-  // 4. Insert Player Stats
-  const statsToInsert = allPlayers.map(p => {
+  // Detect and resolve in-match collisions (if same profile is matched to >1 player in this match)
+  const profileUsageCount = new Map<string, number>();
+  for (const { matchRes } of individualMatches) {
+    if (matchRes.player_id) {
+      profileUsageCount.set(matchRes.player_id, (profileUsageCount.get(matchRes.player_id) || 0) + 1);
+    }
+  }
+
+  // Fetch active memberships for all candidate player_ids in this season
+  const matchedPlayerIds = Array.from(new Set(
+    individualMatches
+      .map(m => m.matchRes.player_id)
+      .filter((id): id is string => Boolean(id) && (profileUsageCount.get(id as string) || 0) === 1)
+  ));
+
+  let memberships: any[] = [];
+  if (matchedPlayerIds.length > 0) {
+    const { data: memData } = await supabase
+      .from('team_memberships')
+      .select('id, player_id, team_id, season_id, left_at, teams:team_id(id, name)')
+      .eq('season_id', seasonId)
+      .is('left_at', null)
+      .in('player_id', matchedPlayerIds);
+    memberships = memData || [];
+  }
+
+  // 4. Insert Player Stats with extra_stats validation metadata
+  const statsToInsert = individualMatches.map(({ player: p, matchRes }) => {
     const isHome = p._eaClub === matchData.home_team.ea_club_id;
     // Account for reversed fixtures
-    const team_id = (isHome !== matchData.is_reversed) ? matchData.home_team_id : matchData.away_team_id;
+    const team_id = (isHome !== matchData.is_reversed) ? homeTeamId : awayTeamId;
+
+    let finalPlayerId: string | null = matchRes.player_id;
+    let matchWarning: string | null = matchRes.warning || null;
+
+    // Guard: In-match collision
+    if (finalPlayerId && (profileUsageCount.get(finalPlayerId) || 0) > 1) {
+      finalPlayerId = null;
+      matchWarning = 'Belirsiz/çakışan eşleşme: Bu profil aynı maçta birden fazla EA oyuncusuyla eşleşti';
+    }
+
+    const rosterVal = validateRosterMembership({
+      player_id: finalPlayerId,
+      match_team_id: team_id,
+      season_id: seasonId,
+      memberships
+    });
+
+    const extra_stats = {
+      roster_status: rosterVal.roster_status,
+      roster_warning: rosterVal.roster_warning || matchWarning || null,
+      registered_team_id: rosterVal.registered_team_id,
+      registered_team_name: rosterVal.registered_team_name,
+      match_team_id: team_id,
+      ea_identifier_status: matchRes.status
+    };
 
     return {
       match_id: newMatch.id,
-      player_id: profileMap.get(p.ea_player_id) || null,
+      player_id: finalPlayerId,
       ea_player_id: p.ea_player_id,
       ea_player_name: p.ea_player_name,
       team_id: team_id,
@@ -215,7 +284,8 @@ export async function importEaMatchAction(matchData: EAPreviewMatch, seasonId: s
       cleansheets_gk: p.cleansheets_gk,
       cleansheets_def: p.cleansheets_def,
       red_cards: p.red_cards,
-      is_mom: p.is_mom
+      is_mom: p.is_mom,
+      extra_stats
     };
   });
 

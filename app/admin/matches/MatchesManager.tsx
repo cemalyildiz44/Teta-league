@@ -6,10 +6,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
   Search, Shield, X, AlertTriangle, CheckCircle2, Loader2, Trash2, Edit2, Check, XCircle,
-  Camera, Image as ImageIcon, ExternalLink
+  Camera, Image as ImageIcon, ExternalLink, UserCheck, UserX, AlertCircle, ShieldAlert
 } from 'lucide-react';
 import { 
-  reviewMatchAction, deleteMatchAction, updateMatchScoreAction
+  reviewMatchAction, deleteMatchAction, updateMatchScoreAction,
+  assignPlayerStatsProfileAction, getTeamRosterCandidatesAction, searchProfilesAction
 } from './actions';
 import TeamLogo from '@/components/TeamLogo';
 
@@ -25,6 +26,13 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
   const [detailModal, setDetailModal] = useState<any>(null); // holds match info
   const [editScoreModal, setEditScoreModal] = useState<any>(null);
   const [confirmModal, setConfirmModal] = useState<any>({ isOpen: false });
+  const [assignModal, setAssignModal] = useState<any>(null);
+  const [rosterCandidates, setRosterCandidates] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchProfileQuery, setSearchProfileQuery] = useState('');
+  const [assignReason, setAssignReason] = useState('');
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
 
@@ -64,11 +72,33 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
   };
 
   const handleStatus = (m: any, status: 'APPROVED' | 'REJECTED' | 'PENDING_REVIEW' | 'CANCELLED') => {
+    const warningDetails: string[] = [];
+    if (status === 'APPROVED' && m.stats && m.stats.length > 0) {
+      const unmatched = m.stats.filter((s: any) => !s.player_id).length;
+      const mismatch = m.stats.filter((s: any) => s.extra_stats?.roster_status === 'ROSTER_MISMATCH').length;
+      const unlicensed = m.stats.filter((s: any) => s.extra_stats?.roster_status === 'UNLICENSED').length;
+
+      if (unmatched > 0) {
+        warningDetails.push(`${unmatched} oyuncunun profili eşleşmedi (istatistikleri bireysel tablolara yazılmayacaktır).`);
+      }
+      if (mismatch > 0) {
+        warningDetails.push(`${mismatch} oyuncu farklı takımda lisanslı görünüyor (kadro uyuşmazlığı).`);
+      }
+      if (unlicensed > 0) {
+        warningDetails.push(`${unlicensed} lisanssız oyuncu yer alıyor.`);
+      }
+    }
+
+    const hasWarnings = warningDetails.length > 0;
+    const message = hasWarnings
+      ? `Bu maçı ONAYLAMAK istediğinize emin misiniz? Aşağıdaki durumlar tespit edildi:\n\n• ` + warningDetails.join('\n• ') + `\n\nBu şekilde onaylarsanız puan durumu güncellenecek, ancak eşleşmemiş oyuncuların istatistikleri hiçbir profile yazılmayacaktır.`
+      : 'Maçı ' + status + ' olarak işaretlemek istediğinize emin misiniz? Bu işlem puan durumu ve istatistik hesaplamalarını doğrudan etkileyecektir.';
+
     setConfirmModal({
       isOpen: true,
-      title: 'Maç Durumunu Değiştir',
-      message: 'Maçı ' + status + ' olarak işaretlemek istediğinize emin misiniz? Bu işlem puan durumu ve istatistik hesaplamalarını doğrudan etkileyecektir.',
-      type: status === 'REJECTED' || status === 'CANCELLED' ? 'danger' : status === 'APPROVED' ? 'success' : 'warning',
+      title: hasWarnings ? 'Uyarılarla Maçı Onayla' : 'Maç Durumunu Değiştir',
+      message,
+      type: status === 'REJECTED' || status === 'CANCELLED' ? 'danger' : hasWarnings ? 'warning' : 'success',
       action: async () => {
         setLoading(true);
         const res = await reviewMatchAction(m.id, status);
@@ -78,6 +108,77 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
         closeConfirm();
       }
     });
+  };
+
+  const openAssignModal = async (stat: any) => {
+    setAssignModal(stat);
+    setSelectedProfileId(stat.player_id || null);
+    setAssignReason('');
+    setSearchProfileQuery('');
+    setSearchResults([]);
+    setLoadingCandidates(true);
+
+    try {
+      const res = await getTeamRosterCandidatesAction(stat.team_id, detailModal?.season_id);
+      if (res.data) {
+        setRosterCandidates(res.data);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingCandidates(false);
+    }
+  };
+
+  const handleSearchProfiles = async (q: string) => {
+    setSearchProfileQuery(q);
+    if (q.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    const res = await searchProfilesAction(q);
+    if (res.data) {
+      setSearchResults(res.data);
+    }
+  };
+
+  const handleAssignSubmit = async (e: any) => {
+    e.preventDefault();
+    if (!assignModal) return;
+    setLoading(true);
+    const res = await assignPlayerStatsProfileAction(assignModal.id, selectedProfileId, assignReason);
+    if (res.error) {
+      showFeedback(res.error, 'error');
+    } else {
+      showFeedback(res.success || '', 'success');
+      if (detailModal && detailModal.stats) {
+        const updatedStats = detailModal.stats.map((s: any) => {
+          if (s.id === assignModal.id) {
+            let matchedProfile = null;
+            if (selectedProfileId) {
+              matchedProfile = rosterCandidates.find((c: any) => c.id === selectedProfileId) ||
+                searchResults.find((c: any) => c.id === selectedProfileId) ||
+                (s.profiles?.id === selectedProfileId ? s.profiles : { id: selectedProfileId, username: 'Atandı' });
+            }
+            return {
+              ...s,
+              player_id: selectedProfileId,
+              profiles: matchedProfile,
+              extra_stats: {
+                ...(s.extra_stats || {}),
+                roster_status: selectedProfileId ? (s.team_id === assignModal.team_id ? 'VALID' : 'ROSTER_MISMATCH') : 'UNMATCHED',
+                roster_warning: selectedProfileId ? null : 'PROFİL EŞLEŞMEDİ'
+              }
+            };
+          }
+          return s;
+        });
+        setDetailModal({ ...detailModal, stats: updatedStats });
+      }
+      setAssignModal(null);
+      router.refresh();
+    }
+    setLoading(false);
   };
 
   const handleDelete = (m: any) => {
@@ -362,8 +463,8 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                     <table className='w-full text-left text-sm text-zinc-400'>
                       <thead className='bg-[#0a1628] text-[10px] uppercase font-black text-zinc-500'>
                         <tr>
-                          <th className='px-3 py-2'>Oyuncu</th>
-                          <th className='px-3 py-2'>Takım</th>
+                          <th className='px-3 py-2'>Oyuncu & Profil</th>
+                          <th className='px-3 py-2'>Maç / Kadro Durumu</th>
                           <th className='px-3 py-2'>Poz</th>
                           <th className='px-3 py-2 text-center'>Gol</th>
                           <th className='px-3 py-2 text-center'>Asist</th>
@@ -371,26 +472,80 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                           <th className='px-3 py-2 text-center'>Şut</th>
                           <th className='px-3 py-2 text-center'>Pas</th>
                           <th className='px-3 py-2 text-center'>MOM</th>
+                          <th className='px-3 py-2 text-right'>Profil Ata</th>
                         </tr>
                       </thead>
                       <tbody className='divide-y divide-white/5 bg-[#060d18]'>
-                        {detailModal.stats.map((s:any) => (
-                          <tr key={s.id} className='hover:bg-white/5'>
-                            <td className='px-3 py-2 font-bold text-white'>
-                              {s.profiles?.username || s.ea_player_name || 'Bilinmiyor'}
-                            </td>
-                            <td className='px-3 py-2 text-xs'>
-                              {s.team_id === detailModal.home_team_id ? detailModal.home?.name : detailModal.away?.name}
-                            </td>
-                            <td className='px-3 py-2 text-[10px] font-mono'>{s.position}</td>
-                            <td className='px-3 py-2 text-center font-bold text-white'>{s.goals}</td>
-                            <td className='px-3 py-2 text-center font-bold text-white'>{s.assists}</td>
-                            <td className='px-3 py-2 text-center text-amber-400 font-mono'>{s.rating}</td>
-                            <td className='px-3 py-2 text-center'>{s.shots}</td>
-                            <td className='px-3 py-2 text-center'>{s.passes_made}/{s.pass_attempts}</td>
-                            <td className='px-3 py-2 text-center'>{s.is_mom ? <span className='text-amber-400'>⭐</span> : '-'}</td>
-                          </tr>
-                        ))}
+                        {detailModal.stats.map((s:any) => {
+                          const matchTeamName = s.team_id === detailModal.home_team_id ? detailModal.home?.name : detailModal.away?.name;
+                          const rosterStatus = s.extra_stats?.roster_status;
+                          const registeredName = s.extra_stats?.registered_team_name;
+                          const hasWarning = !s.player_id || rosterStatus === 'ROSTER_MISMATCH' || rosterStatus === 'UNLICENSED';
+
+                          return (
+                            <tr key={s.id} className={'hover:bg-white/5 ' + (hasWarning ? 'bg-amber-500/[0.03]' : '')}>
+                              <td className='px-3 py-2'>
+                                {s.profiles?.username ? (
+                                  <div className='flex flex-col'>
+                                    <span className='font-bold text-white text-xs flex items-center gap-1.5'>
+                                      {s.profiles.username}
+                                      {s.profiles.full_name && <span className='text-[10px] text-zinc-500 font-normal'>({s.profiles.full_name})</span>}
+                                    </span>
+                                    <span className='text-[10px] text-zinc-400 font-mono'>
+                                      EA: {s.ea_player_name || s.ea_player_id || '-'}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className='flex flex-col gap-1'>
+                                    <span className='inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30 w-fit'>
+                                      <AlertTriangle className='w-2.5 h-2.5' /> PROFİL EŞLEŞMEDİ
+                                    </span>
+                                    <span className='text-[10px] text-zinc-300 font-mono'>
+                                      EA: {s.ea_player_name || s.ea_player_id || 'Bilinmiyor'}
+                                    </span>
+                                  </div>
+                                )}
+                              </td>
+                              <td className='px-3 py-2 text-xs'>
+                                <div className='flex flex-col gap-0.5'>
+                                  <span className='text-zinc-300 font-semibold'>{matchTeamName}</span>
+                                  {rosterStatus === 'ROSTER_MISMATCH' && (
+                                    <span className='inline-flex items-center gap-1 text-[9px] font-black text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20 w-fit'>
+                                      <ShieldAlert className='w-2.5 h-2.5' /> Kayıtlı: {registeredName || 'Başka Takım'}
+                                    </span>
+                                  )}
+                                  {rosterStatus === 'UNLICENSED' && (
+                                    <span className='inline-flex items-center gap-1 text-[9px] font-black text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 w-fit'>
+                                      <AlertCircle className='w-2.5 h-2.5' /> Lisanssız
+                                    </span>
+                                  )}
+                                  {rosterStatus === 'VALID' && (
+                                    <span className='text-[9px] font-bold text-emerald-400'>
+                                      ✓ Lisanslı
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className='px-3 py-2 text-[10px] font-mono'>{s.position}</td>
+                              <td className='px-3 py-2 text-center font-bold text-white'>{s.goals}</td>
+                              <td className='px-3 py-2 text-center font-bold text-white'>{s.assists}</td>
+                              <td className='px-3 py-2 text-center text-amber-400 font-mono'>{s.rating}</td>
+                              <td className='px-3 py-2 text-center'>{s.shots}</td>
+                              <td className='px-3 py-2 text-center'>{s.passes_made}/{s.pass_attempts}</td>
+                              <td className='px-3 py-2 text-center'>{s.is_mom ? <span className='text-amber-400'>⭐</span> : '-'}</td>
+                              <td className='px-3 py-2 text-right'>
+                                <button
+                                  type='button'
+                                  onClick={() => openAssignModal(s)}
+                                  className='px-2 py-1 bg-white/5 hover:bg-cyan-500/10 text-zinc-300 hover:text-cyan-400 border border-white/10 hover:border-cyan-500/30 rounded text-[10px] font-bold transition-all inline-flex items-center gap-1'
+                                >
+                                  <UserCheck className='w-3 h-3' />
+                                  {s.player_id ? 'Değiştir' : 'Ata'}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -447,7 +602,7 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
               </h2>
             </div>
             <div className='p-6'>
-              <p className='text-sm text-zinc-300 leading-relaxed mb-6'>{confirmModal.message}</p>
+              <p className='text-sm text-zinc-300 leading-relaxed mb-6 whitespace-pre-line'>{confirmModal.message}</p>
               <div className='flex gap-2'>
                 <button onClick={closeConfirm} className='flex-1 py-2.5 bg-white/5 text-white rounded-lg text-xs font-bold'>Vazgeç</button>
                 <button onClick={confirmModal.action} disabled={loading} className={'flex-1 py-2.5 rounded-lg text-xs font-black flex justify-center items-center gap-2 ' + (confirmModal.type === 'danger' ? 'bg-red-500 text-white' : confirmModal.type === 'warning' ? 'bg-amber-500 text-black' : 'bg-emerald-500 text-black')}>
@@ -455,6 +610,154 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Player Profile Modal */}
+      {assignModal && (
+        <div className='fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm'>
+          <div className='card-surface w-full max-w-lg rounded-2xl border border-white/10 overflow-hidden flex flex-col'>
+            <div className='flex justify-between items-center p-4 border-b border-white/5 bg-[#0a1628]'>
+              <div className='flex items-center gap-2'>
+                <UserCheck className='w-4 h-4 text-cyan-400' />
+                <h2 className='text-sm font-black text-white tracking-widest uppercase'>
+                  OYUNCU PROFİLİ EŞLEŞTİRME
+                </h2>
+              </div>
+              <button onClick={() => setAssignModal(null)} className='text-zinc-400 hover:text-white'>
+                <X className='w-5 h-5'/>
+              </button>
+            </div>
+
+            <form onSubmit={handleAssignSubmit} className='p-6 space-y-5'>
+              {/* Target EA Info */}
+              <div className='p-3 rounded-lg bg-[#060d18] border border-white/5 flex flex-col gap-1 text-xs'>
+                <div className='flex justify-between'>
+                  <span className='text-zinc-400'>EA Oyuncu Adı:</span>
+                  <span className='font-bold text-white font-mono'>{assignModal.ea_player_name || 'Bilinmiyor'}</span>
+                </div>
+                <div className='flex justify-between'>
+                  <span className='text-zinc-400'>EA Player ID:</span>
+                  <span className='text-zinc-400 font-mono'>{assignModal.ea_player_id || '-'}</span>
+                </div>
+                <div className='flex justify-between'>
+                  <span className='text-zinc-400'>Maçta Oynadığı Takım:</span>
+                  <span className='font-bold text-cyan-400'>
+                    {assignModal.team_id === detailModal?.home_team_id ? detailModal?.home?.name : detailModal?.away?.name}
+                  </span>
+                </div>
+              </div>
+
+              {/* Quick Select: Team Roster Candidates */}
+              <div>
+                <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2'>
+                  1. Takım Kadrosundan Seç ({rosterCandidates.length} Oyuncu)
+                </label>
+                {loadingCandidates ? (
+                  <div className='p-3 text-center text-xs text-zinc-500 flex items-center justify-center gap-2'>
+                    <Loader2 className='w-4 h-4 animate-spin text-cyan-400' /> Kadro yükleniyor...
+                  </div>
+                ) : (
+                  <select
+                    value={selectedProfileId || ''}
+                    onChange={(e) => setSelectedProfileId(e.target.value || null)}
+                    className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2.5 text-white text-xs focus:outline-none focus:border-cyan-500/50'
+                  >
+                    <option value=''>-- Seçim Yapın veya Boş Bırakın --</option>
+                    {rosterCandidates.map((c: any) => (
+                      <option key={c.id} value={c.id}>
+                        {c.username} {c.full_name ? `(${c.full_name})` : ''} {c.current_ea_player_id ? `[EA: ${c.current_ea_player_id}]` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Or Search: Any Profile */}
+              <div>
+                <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2'>
+                  2. Veya Tüm Sistemde Oyuncu Ara
+                </label>
+                <div className='relative'>
+                  <Search className='absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500' />
+                  <input
+                    type='text'
+                    placeholder='Kullanıcı adı veya EA ID ara...'
+                    value={searchProfileQuery}
+                    onChange={(e) => handleSearchProfiles(e.target.value)}
+                    className='w-full pl-9 pr-3 py-2 bg-[#060d18] border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:border-cyan-500/50'
+                  />
+                </div>
+                {searchResults.length > 0 && (
+                  <div className='mt-2 max-h-36 overflow-y-auto rounded-lg border border-white/10 bg-[#060d18] divide-y divide-white/5'>
+                    {searchResults.map((p: any) => (
+                      <div
+                        key={p.id}
+                        onClick={() => { setSelectedProfileId(p.id); setSearchResults([]); }}
+                        className={'p-2 hover:bg-white/5 cursor-pointer flex justify-between items-center text-xs ' + (selectedProfileId === p.id ? 'bg-cyan-500/10 text-cyan-300' : 'text-zinc-300')}
+                      >
+                        <span className='font-bold'>{p.username} {p.full_name && `(${p.full_name})`}</span>
+                        <span className='text-[10px] text-zinc-500 font-mono'>EA: {p.current_ea_player_id || '-'}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Reason for change */}
+              <div>
+                <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>
+                  İşlem Açıklaması / Gerekçe (Audit Log)
+                </label>
+                <input
+                  type='text'
+                  placeholder='Örn: Gamertag harf hatası düzeltildi, doğru profile bağlandı'
+                  value={assignReason}
+                  onChange={(e) => setAssignReason(e.target.value)}
+                  className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-cyan-500/50'
+                />
+              </div>
+
+              {/* Selected Profile Status Summary */}
+              <div className='p-3 rounded-lg border border-white/5 bg-[#0a1628] flex items-center justify-between text-xs'>
+                <span className='text-zinc-400'>Seçili Durum:</span>
+                {selectedProfileId ? (
+                  <span className='font-bold text-emerald-400 flex items-center gap-1'>
+                    <Check className='w-3.5 h-3.5' /> Profil Seçildi
+                  </span>
+                ) : (
+                  <span className='font-bold text-amber-400 flex items-center gap-1'>
+                    <UserX className='w-3.5 h-3.5' /> Boş Bırakılacak (player_id = NULL)
+                  </span>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className='flex gap-2 pt-2'>
+                <button
+                  type='button'
+                  onClick={() => setSelectedProfileId(null)}
+                  className='px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs font-bold border border-red-500/20'
+                >
+                  Boş Bırak
+                </button>
+                <button
+                  type='button'
+                  onClick={() => setAssignModal(null)}
+                  className='flex-1 py-2 bg-white/5 text-white rounded-lg text-xs font-bold'
+                >
+                  İptal
+                </button>
+                <button
+                  type='submit'
+                  disabled={loading}
+                  className='flex-1 py-2 bg-cyan-500 text-black rounded-lg text-xs font-black flex justify-center items-center gap-2'
+                >
+                  {loading && <Loader2 className='w-4 h-4 animate-spin' />} Kaydet
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
