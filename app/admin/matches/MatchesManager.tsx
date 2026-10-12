@@ -6,13 +6,50 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
   Search, Shield, X, AlertTriangle, CheckCircle2, Loader2, Trash2, Edit2, Check, XCircle,
-  Camera, Image as ImageIcon, ExternalLink, UserCheck, UserX, AlertCircle, ShieldAlert
+  Camera, Image as ImageIcon, ExternalLink, UserCheck, UserX, AlertCircle, ShieldAlert,
+  Calendar, ArrowRight, RefreshCw, Layers
 } from 'lucide-react';
 import { 
   reviewMatchAction, deleteMatchAction, updateMatchScoreAction,
   assignPlayerStatsProfileAction, getTeamRosterCandidatesAction, searchProfilesAction
 } from './actions';
 import TeamLogo from '@/components/TeamLogo';
+
+function getMatchEaData(m: any) {
+  if (!m) return null;
+  const rawEa = Array.isArray(m.match_raw_ea_data) ? m.match_raw_ea_data[0] : m.match_raw_ea_data;
+  if (!rawEa || !rawEa.raw_data) return null;
+  const rawData = rawEa.raw_data;
+  const clubs = rawData.clubs;
+  if (!clubs) return null;
+
+  const homeEaClub = m.home?.ea_club_id ? String(m.home.ea_club_id) : null;
+  const awayEaClub = m.away?.ea_club_id ? String(m.away.ea_club_id) : null;
+
+  let homeEaScore: number | null = null;
+  let awayEaScore: number | null = null;
+
+  if (homeEaClub && clubs[homeEaClub] !== undefined) {
+    homeEaScore = Number(clubs[homeEaClub].goals ?? clubs[homeEaClub].score ?? 0);
+  }
+  if (awayEaClub && clubs[awayEaClub] !== undefined) {
+    awayEaScore = Number(clubs[awayEaClub].goals ?? clubs[awayEaClub].score ?? 0);
+  }
+
+  if (homeEaScore === null || awayEaScore === null) {
+    const clubKeys = Object.keys(clubs);
+    if (clubKeys.length === 2) {
+      homeEaScore = Number(clubs[clubKeys[0]]?.goals ?? clubs[clubKeys[0]]?.score ?? 0);
+      awayEaScore = Number(clubs[clubKeys[1]]?.goals ?? clubs[clubKeys[1]]?.score ?? 0);
+    }
+  }
+
+  return {
+    homeScore: homeEaScore,
+    awayScore: awayEaScore,
+    eaMatchId: rawEa.ea_match_id || m.ea_match_id
+  };
+}
 
 export function MatchesManager({ initialMatches, seasons, leagues }: any) {
   const router = useRouter();
@@ -90,13 +127,22 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
     }
 
     const hasWarnings = warningDetails.length > 0;
-    const message = hasWarnings
-      ? `Bu maçı ONAYLAMAK istediğinize emin misiniz? Aşağıdaki durumlar tespit edildi:\n\n• ` + warningDetails.join('\n• ') + `\n\nBu şekilde onaylarsanız puan durumu güncellenecek, ancak eşleşmemiş oyuncuların istatistikleri hiçbir profile yazılmayacaktır.`
-      : 'Maçı ' + status + ' olarak işaretlemek istediğinize emin misiniz? Bu işlem puan durumu ve istatistik hesaplamalarını doğrudan etkileyecektir.';
+    let message = '';
+    if (status === 'APPROVED') {
+      message = (hasWarnings ? 'AŞAĞIDAKİ DURUMLAR TESPİT EDİLDİ:\n• ' + warningDetails.join('\n• ') + '\n\n' : '') +
+        'ONAY İŞLEMİ VE ETKİLERİ:\n' +
+        '1. Veritabanı tetikleyicisi (trg_recalculate_on_match) otomatik olarak "recalculate_season_stats" fonksiyonunu çalıştıracaktır.\n' +
+        '2. Lig puan durumu (galibiyet, beraberlik, averaj, puanlar) baştan sona yeniden hesaplanacaktır.\n' +
+        '3. Oyuncu istatistikleri (gol, asist vb.) yalnızca profili eşleşmiş lisanslı oyuncuların profillerine kaydedilecektir (eşleşmemiş oyuncular hariç tutulur).\n' +
+        '4. Bağlı fikstür kaydının durumu "COMPLETED" (Tamamlandı) olarak güncellenecektir.\n\n' +
+        'Bu maçı onaylamak istediğinize emin misiniz?';
+    } else {
+      message = 'Maçı ' + status + ' olarak işaretlemek istediğinize emin misiniz? Bu işlem puan durumu ve istatistik hesaplamalarını doğrudan etkileyecektir.';
+    }
 
     setConfirmModal({
       isOpen: true,
-      title: hasWarnings ? 'Uyarılarla Maçı Onayla' : 'Maç Durumunu Değiştir',
+      title: status === 'APPROVED' ? (hasWarnings ? 'Uyarılarla Maçı Onayla' : 'Maçı Onayla ve İstatistikleri İşle') : 'Maç Durumunu Değiştir',
       message,
       type: status === 'REJECTED' || status === 'CANCELLED' ? 'danger' : hasWarnings ? 'warning' : 'success',
       action: async () => {
@@ -218,6 +264,42 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
         </div>
       )}
 
+      {/* Pending Review Queue Banner */}
+      {pending > 0 && (
+        <div className='p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg shadow-amber-950/20'>
+          <div className='flex items-center gap-3.5'>
+            <div className='w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0'>
+              <AlertTriangle className='w-5 h-5 animate-pulse' />
+            </div>
+            <div>
+              <div className='flex items-center gap-2'>
+                <h3 className='text-sm font-black text-amber-300 tracking-wider uppercase'>
+                  Onay Bekleyen {pending} Karşılaşma Bulunuyor
+                </h3>
+                <span className='px-2 py-0.5 rounded text-[10px] font-black bg-amber-500 text-black'>
+                  İNCELEME KUYRUĞU
+                </span>
+              </div>
+              <p className='text-xs text-zinc-300 mt-0.5'>
+                Maçlar onaylanana kadar puan durumu güncellenmez ve bireysel oyuncu istatistikleri işlenmez.
+              </p>
+            </div>
+          </div>
+          <div className='flex items-center gap-2 shrink-0 w-full sm:w-auto'>
+            <button
+              onClick={() => setFilterStatus(filterStatus === 'PENDING_REVIEW' ? 'ALL' : 'PENDING_REVIEW')}
+              className={`w-full sm:w-auto px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                filterStatus === 'PENDING_REVIEW'
+                  ? 'bg-amber-500 text-black font-black'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              {filterStatus === 'PENDING_REVIEW' ? 'Tüm Maçları Göster' : 'Yalnızca Bekleyenleri Listele'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Summary Cards */}
       <div className='grid grid-cols-2 md:grid-cols-4 gap-4'>
         <div className='card-surface p-4 rounded-xl border border-white/5'>
@@ -236,6 +318,52 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
           <p className='text-xs text-red-400 font-medium mb-1'>İPTAL / GEÇERSİZ</p>
           <p className='text-2xl font-black text-white'>{rejected}</p>
         </div>
+      </div>
+
+      {/* Quick Filter Tabs */}
+      <div className='flex items-center gap-2 border-b border-white/5 pb-2 overflow-x-auto'>
+        <button
+          onClick={() => setFilterStatus('ALL')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+            filterStatus === 'ALL'
+              ? 'bg-cyan-500 text-black font-black'
+              : 'bg-white/5 hover:bg-white/10 text-zinc-300'
+          }`}
+        >
+          Tüm Maçlar ({total})
+        </button>
+        <button
+          onClick={() => setFilterStatus('PENDING_REVIEW')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+            filterStatus === 'PENDING_REVIEW'
+              ? 'bg-amber-500 text-black font-black'
+              : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20'
+          }`}
+        >
+          <AlertTriangle className='w-3.5 h-3.5' />
+          Onay Bekleyenler ({pending})
+        </button>
+        <button
+          onClick={() => setFilterStatus('APPROVED')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+            filterStatus === 'APPROVED'
+              ? 'bg-emerald-500 text-black font-black'
+              : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20'
+          }`}
+        >
+          <CheckCircle2 className='w-3.5 h-3.5' />
+          Onaylananlar ({approved})
+        </button>
+        <button
+          onClick={() => setFilterStatus('REJECTED')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+            filterStatus === 'REJECTED'
+              ? 'bg-red-500 text-white font-black'
+              : 'bg-white/5 hover:bg-white/10 text-zinc-400'
+          }`}
+        >
+          İptal / Red ({rejected})
+        </button>
       </div>
 
       {/* Filters */}
@@ -272,51 +400,79 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
               <th className='px-4 py-4'>Hafta / Tarih</th>
               <th className='px-4 py-4'>Lig</th>
               <th className='px-4 py-4'>Ev Sahibi</th>
-              <th className='px-4 py-4 text-center'>Skor</th>
+              <th className='px-4 py-4 text-center'>Skor / Kaynak</th>
               <th className='px-4 py-4 text-right'>Deplasman</th>
               <th className='px-4 py-4'>Durum</th>
               <th className='px-4 py-4 text-right'>İşlemler</th>
             </tr>
           </thead>
           <tbody className='divide-y divide-white/5'>
-            {filteredMatches.map((m: any) => (
-              <tr key={m.id} className='hover:bg-white/5 transition-colors group cursor-pointer' onClick={(e) => { if ((e.target as any).tagName !== 'BUTTON') setDetailModal(m); }}>
-                <td className='px-4 py-3'>
-                  <div className='font-bold text-white'>Hafta {m.fixtures?.week_number || '?'}</div>
-                  <div className='text-[10px] text-zinc-500'>{new Date(m.played_at).toLocaleString('tr-TR')}</div>
-                </td>
-                <td className='px-4 py-3 text-xs'>{m.leagues?.name}</td>
-                <td className='px-4 py-3'>
-                  <div className='flex items-center gap-2'>
-                    <TeamLogo src={m.home?.logo_url} name={m.home?.name} size="sm" />
-                    <span className='font-bold text-white'>{m.home?.name || 'Unknown'}</span>
-                  </div>
-                </td>
-                <td className='px-4 py-3 text-center'>
-                  {m.home_score !== null && m.away_score !== null ? (
-                    <span className='font-black text-white bg-[#060d18] px-2 py-1 border border-white/10 rounded'>
-                      {m.home_score} - {m.away_score}
-                    </span>
-                  ) : (
-                    <span className='text-[10px] text-zinc-500'>-</span>
-                  )}
-                </td>
-                <td className='px-4 py-3'>
-                  <div className='flex items-center justify-end gap-2'>
-                    <span className='font-bold text-white'>{m.away?.name || 'Unknown'}</span>
-                    <TeamLogo src={m.away?.logo_url} name={m.away?.name} size="sm" />
-                  </div>
-                </td>
-                <td className='px-4 py-3'>
-                  <StatusBadge status={m.status} />
-                </td>
-                <td className='px-4 py-3 text-right'>
-                  <button onClick={(e) => { e.stopPropagation(); setDetailModal(m); }} className='px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white text-[10px] font-bold rounded transition-colors'>
-                    DETAY
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {filteredMatches.map((m: any) => {
+              const eaInfo = getMatchEaData(m);
+              const isScoreEdited = eaInfo && eaInfo.homeScore !== null && eaInfo.awayScore !== null &&
+                (eaInfo.homeScore !== m.home_score || eaInfo.awayScore !== m.away_score);
+
+              return (
+                <tr
+                  key={m.id}
+                  className={`hover:bg-white/5 transition-colors group cursor-pointer ${
+                    m.status === 'PENDING_REVIEW' ? 'bg-amber-500/[0.02] border-l-2 border-l-amber-500/60' : ''
+                  }`}
+                  onClick={(e) => { if ((e.target as any).tagName !== 'BUTTON') setDetailModal(m); }}
+                >
+                  <td className='px-4 py-3'>
+                    <div className='font-bold text-white'>Hafta {m.fixtures?.week_number || '?'}</div>
+                    <div className='text-[10px] text-zinc-500'>{new Date(m.played_at).toLocaleString('tr-TR')}</div>
+                  </td>
+                  <td className='px-4 py-3 text-xs'>{m.leagues?.name}</td>
+                  <td className='px-4 py-3'>
+                    <div className='flex items-center gap-2'>
+                      <TeamLogo src={m.home?.logo_url} name={m.home?.name} size="sm" />
+                      <span className='font-bold text-white'>{m.home?.name || 'Unknown'}</span>
+                    </div>
+                  </td>
+                  <td className='px-4 py-3 text-center'>
+                    {m.home_score !== null && m.away_score !== null ? (
+                      <div className='inline-flex flex-col items-center gap-1'>
+                        <span className='font-black text-white bg-[#060d18] px-2.5 py-1 border border-white/10 rounded text-sm'>
+                          {m.home_score} - {m.away_score}
+                        </span>
+                        {m.ea_match_id ? (
+                          <span className={`inline-flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.2 rounded border ${
+                            isScoreEdited
+                              ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                              : 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                          }`}>
+                            EA #{m.ea_match_id.substring(0, 6)}
+                            {isScoreEdited && ' (Düzeltildi)'}
+                          </span>
+                        ) : (
+                          <span className='text-[9px] text-zinc-500 font-mono'>
+                            {m.source || 'MANUAL'}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className='text-[10px] text-zinc-500'>-</span>
+                    )}
+                  </td>
+                  <td className='px-4 py-3'>
+                    <div className='flex items-center justify-end gap-2'>
+                      <span className='font-bold text-white'>{m.away?.name || 'Unknown'}</span>
+                      <TeamLogo src={m.away?.logo_url} name={m.away?.name} size="sm" />
+                    </div>
+                  </td>
+                  <td className='px-4 py-3'>
+                    <StatusBadge status={m.status} />
+                  </td>
+                  <td className='px-4 py-3 text-right'>
+                    <button onClick={(e) => { e.stopPropagation(); setDetailModal(m); }} className='px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white text-[10px] font-bold rounded transition-colors'>
+                      DETAY
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
             {filteredMatches.length === 0 && (
               <tr>
                 <td colSpan={7} className='px-4 py-12 text-center text-zinc-500'>Bu filtrelerle eşleşen maç bulunamadı.</td>
@@ -340,6 +496,14 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
               <div className='flex flex-col items-center justify-center gap-4 bg-[#060d18] p-6 rounded-xl border border-white/5'>
                 <div className='text-xs font-bold text-zinc-400 uppercase tracking-widest text-center'>
                   {detailModal.seasons?.name} • {detailModal.leagues?.name} • Hafta {detailModal.fixtures?.week_number || '?'}
+                  {detailModal.fixtures?.id && (
+                    <Link
+                      href='/admin/fixtures'
+                      className='ml-2 text-cyan-400 hover:text-cyan-300 underline font-normal text-[11px]'
+                    >
+                      (Fikstür #{detailModal.fixtures.id.substring(0, 8)})
+                    </Link>
+                  )}
                   <br/>
                   <span className='text-[10px]'>{new Date(detailModal.played_at).toLocaleString('tr-TR')}</span>
                 </div>
@@ -360,7 +524,14 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                     ) : (
                       <span className='text-sm text-zinc-500 italic'>Skor Yok</span>
                     )}
-                    <StatusBadge status={detailModal.status} />
+                    <div className='flex items-center gap-2 mt-1'>
+                      <StatusBadge status={detailModal.status} />
+                      {detailModal.ea_match_id && (
+                        <span className='px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20 font-mono'>
+                          EA #{detailModal.ea_match_id}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className='flex flex-col items-center gap-2 w-32'>
@@ -368,29 +539,95 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                     <span className='font-bold text-white text-center'>{detailModal.away?.name || 'Unknown'}</span>
                   </div>
                 </div>
+
+                {/* EA Raw Score vs Current Match Score Comparison Card */}
+                {(() => {
+                  const eaInfo = getMatchEaData(detailModal);
+                  if (!eaInfo && !detailModal.ea_match_id) return null;
+
+                  const hasEaScores = eaInfo && eaInfo.homeScore !== null && eaInfo.awayScore !== null;
+                  const isScoreEdited = hasEaScores && (eaInfo.homeScore !== detailModal.home_score || eaInfo.awayScore !== detailModal.away_score);
+
+                  return (
+                    <div className={`w-full mt-2 p-3.5 rounded-xl border text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+                      isScoreEdited
+                        ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                        : 'bg-[#0a1628] border-white/10 text-zinc-300'
+                    }`}>
+                      <div className='flex items-center gap-2.5'>
+                        {isScoreEdited ? (
+                          <AlertTriangle className='w-4 h-4 text-amber-400 shrink-0' />
+                        ) : (
+                          <CheckCircle2 className='w-4 h-4 text-emerald-400 shrink-0' />
+                        )}
+                        <div>
+                          <div className='flex items-center gap-2'>
+                            <span className='font-bold text-white'>EA Maç Kaydı:</span>
+                            {hasEaScores ? (
+                              <span className='font-mono font-bold bg-[#060d18] px-2 py-0.5 rounded border border-white/10'>
+                                {eaInfo.homeScore} - {eaInfo.awayScore}
+                              </span>
+                            ) : (
+                              <span className='font-mono text-zinc-400'>Skor EA API'den çekilemedi</span>
+                            )}
+                            {isScoreEdited && (
+                              <span className='text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30'>
+                                Skor Yönetici Tarafından Düzeltildi
+                              </span>
+                            )}
+                            {!isScoreEdited && hasEaScores && (
+                              <span className='text-[10px] font-bold text-emerald-400'>
+                                ✓ EA API skoru ile birebir uyumlu
+                              </span>
+                            )}
+                          </div>
+                          {isScoreEdited && (
+                            <p className='text-[11px] text-zinc-400 mt-1'>
+                              Onaylandığında puan durumuna ve kayıtlara <strong>{detailModal.home_score} - {detailModal.away_score}</strong> skoru işlenecektir.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {detailModal.ea_match_id && (
+                        <span className='text-[10px] font-mono text-zinc-400 shrink-0'>
+                          EA ID #{detailModal.ea_match_id}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Actions */}
-              <div className='flex flex-wrap gap-3 justify-center'>
-                <Link href={'/mac/' + detailModal.id} target='_blank' className='px-4 py-2 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 rounded-lg text-xs font-bold transition-colors'>
-                  Public Sayfayı Aç
-                </Link>
-                <button onClick={() => setEditScoreModal(detailModal)} className='px-4 py-2 bg-zinc-500/10 text-zinc-300 hover:bg-zinc-500/20 rounded-lg text-xs font-bold transition-colors flex items-center gap-2'>
-                  <Edit2 className='w-4 h-4' /> Skoru Düzenle
-                </button>
-                {detailModal.status !== 'APPROVED' && (
-                  <button onClick={() => handleStatus(detailModal, 'APPROVED')} className='px-4 py-2 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-lg text-xs font-bold transition-colors flex items-center gap-2'>
-                    <CheckCircle2 className='w-4 h-4' /> Maçı Onayla
+              <div className='flex flex-col gap-3'>
+                <div className='flex flex-wrap gap-3 justify-center'>
+                  <Link href={'/mac/' + detailModal.id} target='_blank' className='px-4 py-2 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5'>
+                    <ExternalLink className='w-3.5 h-3.5' /> Public Sayfayı Aç
+                  </Link>
+                  <button onClick={() => setEditScoreModal(detailModal)} className='px-4 py-2 bg-zinc-500/10 text-zinc-300 hover:bg-zinc-500/20 rounded-lg text-xs font-bold transition-colors flex items-center gap-2'>
+                    <Edit2 className='w-4 h-4' /> Skoru Düzenle
                   </button>
-                )}
-                {detailModal.status !== 'REJECTED' && (
-                  <button onClick={() => handleStatus(detailModal, 'REJECTED')} className='px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-xs font-bold transition-colors flex items-center gap-2'>
-                    <XCircle className='w-4 h-4' /> Reddet / Geçersiz Kıl
+                  {detailModal.status !== 'APPROVED' && (
+                    <button
+                      onClick={() => handleStatus(detailModal, 'APPROVED')}
+                      className='px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-black transition-colors flex items-center gap-2 shadow-lg shadow-emerald-950/40'
+                    >
+                      <CheckCircle2 className='w-4 h-4' /> Maçı Onayla (Puan Durumu & İstatistikleri Güncelle)
+                    </button>
+                  )}
+                  {detailModal.status !== 'REJECTED' && (
+                    <button onClick={() => handleStatus(detailModal, 'REJECTED')} className='px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-xs font-bold transition-colors flex items-center gap-2'>
+                      <XCircle className='w-4 h-4' /> Reddet / Geçersiz Kıl
+                    </button>
+                  )}
+                  <button onClick={() => handleDelete(detailModal)} className='px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-xs font-bold transition-colors flex items-center gap-2 ml-auto border border-red-500/30'>
+                    <Trash2 className='w-4 h-4' /> Maçı Sil
                   </button>
-                )}
-                <button onClick={() => handleDelete(detailModal)} className='px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-xs font-bold transition-colors flex items-center gap-2 ml-auto border border-red-500/30'>
-                  <Trash2 className='w-4 h-4' /> Maçı Sil
-                </button>
+                </div>
+                <div className='text-center text-[11px] text-zinc-500 flex items-center justify-center gap-1.5'>
+                  <RefreshCw className='w-3 h-3 text-emerald-500' />
+                  Onaylama işlemi veritabanı tetikleyicisiyle lig puan tablosunu ve liderlik sıralamasını otomatik hesaplar.
+                </div>
               </div>
 
               {/* Evidence Screenshot & Notes */}
@@ -457,7 +694,53 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
 
               {/* Player Stats */}
               <div>
-                <h3 className='text-xs font-black text-cyan-400 tracking-widest uppercase mb-4 border-b border-white/5 pb-2'>Oyuncu İstatistikleri</h3>
+                <div className='flex items-center justify-between mb-4 border-b border-white/5 pb-2'>
+                  <h3 className='text-xs font-black text-cyan-400 tracking-widest uppercase flex items-center gap-2'>
+                    <Shield className='w-3.5 h-3.5' /> Oyuncu İstatistikleri ({detailModal.stats?.length || 0} Oyuncu)
+                  </h3>
+                  {detailModal.stats && detailModal.stats.length > 0 && (
+                    <span className='text-[10px] text-zinc-500 font-mono'>
+                      Yalnızca eşleşmiş lisanslı oyuncuların verileri profil liderlik tablolarına işlenir
+                    </span>
+                  )}
+                </div>
+
+                {/* Player Warning Alert Banner */}
+                {(() => {
+                  if (!detailModal.stats || detailModal.stats.length === 0) return null;
+                  const unmatched = detailModal.stats.filter((s: any) => !s.player_id).length;
+                  const mismatch = detailModal.stats.filter((s: any) => s.extra_stats?.roster_status === 'ROSTER_MISMATCH').length;
+                  const unlicensed = detailModal.stats.filter((s: any) => s.extra_stats?.roster_status === 'UNLICENSED').length;
+
+                  if (unmatched === 0 && mismatch === 0 && unlicensed === 0) return null;
+
+                  return (
+                    <div className='p-3.5 mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs text-amber-300 flex items-start gap-3'>
+                      <AlertTriangle className='w-4 h-4 text-amber-400 mt-0.5 shrink-0' />
+                      <div className='space-y-1 flex-1'>
+                        <p className='font-bold text-white'>Kadro ve Lisans Uyuşmazlığı Uyarıları:</p>
+                        <ul className='list-disc list-inside space-y-0.5 text-zinc-300 text-[11px]'>
+                          {unmatched > 0 && (
+                            <li>
+                              <strong className='text-amber-400'>{unmatched} oyuncunun profili eşleşmedi.</strong> Bu oyuncuların gol/asist verileri genel liderlik tablosuna dahil edilmeyecektir. "Profil Ata" butonunu kullanarak eşleştirebilirsiniz.
+                            </li>
+                          )}
+                          {mismatch > 0 && (
+                            <li>
+                              <strong className='text-red-400'>{mismatch} oyuncu</strong> bu ligde başka bir takımda lisanslı görünüyor (kadro uyuşmazlığı).
+                            </li>
+                          )}
+                          {unlicensed > 0 && (
+                            <li>
+                              <strong className='text-amber-400'>{unlicensed} oyuncu</strong> için geçerli takım lisansı bulunamadı.
+                            </li>
+                          )}
+                        </ul>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {detailModal.stats && detailModal.stats.length > 0 ? (
                   <div className='overflow-x-auto rounded-lg border border-white/5'>
                     <table className='w-full text-left text-sm text-zinc-400'>
@@ -511,17 +794,22 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                                   <span className='text-zinc-300 font-semibold'>{matchTeamName}</span>
                                   {rosterStatus === 'ROSTER_MISMATCH' && (
                                     <span className='inline-flex items-center gap-1 text-[9px] font-black text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20 w-fit'>
-                                      <ShieldAlert className='w-2.5 h-2.5' /> Kayıtlı: {registeredName || 'Başka Takım'}
+                                      <ShieldAlert className='w-2.5 h-2.5' /> Kadro Uyuşmazlığı ({registeredName || 'Başka Takım'})
                                     </span>
                                   )}
                                   {rosterStatus === 'UNLICENSED' && (
                                     <span className='inline-flex items-center gap-1 text-[9px] font-black text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 w-fit'>
-                                      <AlertCircle className='w-2.5 h-2.5' /> Lisanssız
+                                      <AlertCircle className='w-2.5 h-2.5' /> Lisanssız Oyuncu
                                     </span>
                                   )}
                                   {rosterStatus === 'VALID' && (
-                                    <span className='text-[9px] font-bold text-emerald-400'>
-                                      ✓ Lisanslı
+                                    <span className='inline-flex items-center gap-1 text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 w-fit'>
+                                      <Check className='w-2.5 h-2.5' /> Lisanslı
+                                    </span>
+                                  )}
+                                  {(!s.player_id || rosterStatus === 'UNMATCHED') && (
+                                    <span className='inline-flex items-center gap-1 text-[9px] font-bold text-amber-300/80 bg-white/5 px-1.5 py-0.5 rounded border border-white/10 w-fit'>
+                                      <UserX className='w-2.5 h-2.5' /> Profil Yok
                                     </span>
                                   )}
                                 </div>

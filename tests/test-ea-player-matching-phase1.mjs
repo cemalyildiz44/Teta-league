@@ -8,6 +8,12 @@ import {
 } from '../lib/ea/roster-validator.ts';
 import { matchFixture } from '../lib/ea/matcher.ts';
 import { normalizeMatch } from '../lib/ea/normalizer.ts';
+import {
+  generateRoundRobin,
+  computeFixturePreview,
+  validateFixtureUpdate,
+  validateAndDetermineScoreStatus
+} from '../lib/fixture-generator.ts';
 
 console.log('================================================================');
 console.log('TETA LEAGUE — EA OYUNCU EŞLEŞTİRME VE KADRO DOĞRULAMA (FAZ 1)');
@@ -747,6 +753,155 @@ assert.equal(runSeason2.playerGoals['p-1'], 4, '14n Player goals in Season 2 iso
 console.log('  [PASS] İstatistik hesaplamasının idempotency, skor güncelleme/silme ve player_id=NULL izolasyonu başarıyla doğrulandı.\n');
 
 
+// -----------------------------------------------------------------------------
+// Test 15: Round-Robin Fikstür Oluşturma, Hafta Dağılımı ve Önizleme Çakışma Doğrulaması
+// -----------------------------------------------------------------------------
+console.log('TEST 15: Round-Robin Fikstür Oluşturma, Hafta Dağılımı ve Önizleme Çakışma Doğrulaması...');
+
+// 15a: 4 Takım (Çift Devre - 12 Karşılaşma, 6 Hafta)
+const teams4 = [
+  { id: 'team-1', name: 'Takım 1' },
+  { id: 'team-2', name: 'Takım 2' },
+  { id: 'team-3', name: 'Takım 3' },
+  { id: 'team-4', name: 'Takım 4' }
+];
+
+const fixtures4 = generateRoundRobin(teams4, true);
+assert.equal(fixtures4.length, 12, '15a 4 takım çift devrede tam 12 maç üretmeli (N * (N-1))');
+
+const weeks4 = new Set(fixtures4.map(f => f.week));
+assert.equal(weeks4.size, 6, '15b 4 takım çift devrede tam 6 haftaya yayılmalı');
+
+// Her hafta her takım tam 1 maç yapmalı (Haftada 2 maç)
+for (let w = 1; w <= 6; w++) {
+  const weekMatches = fixtures4.filter(f => f.week === w);
+  assert.equal(weekMatches.length, 2, `15c Hafta ${w}'de tam 2 maç olmalı`);
+  const playingTeams = new Set();
+  for (const m of weekMatches) {
+    assert.notEqual(m.home.id, m.away.id, '15d Ev sahibi ve deplasman farklı olmalı');
+    playingTeams.add(m.home.id);
+    playingTeams.add(m.away.id);
+  }
+  assert.equal(playingTeams.size, 4, `15e Hafta ${w}'de tüm 4 takım oynamalı`);
+}
+
+// 15f: Tek Sayıda Takım (5 Takım - BYE Bay Koruması)
+const teams5 = [
+  { id: 't-1', name: 'Takım 1' },
+  { id: 't-2', name: 'Takım 2' },
+  { id: 't-3', name: 'Takım 3' },
+  { id: 't-4', name: 'Takım 4' },
+  { id: 't-5', name: 'Takım 5' }
+];
+
+const fixtures5 = generateRoundRobin(teams5, true);
+assert.equal(fixtures5.length, 20, '15f 5 takım çift devrede tam 20 maç üretmeli (5 * 4)');
+// Hiçbir maçta BYE takımı yer almamalı
+assert.ok(!fixtures5.some(f => f.home.id === 'BYE' || f.away.id === 'BYE'), '15g BYE maçları temizlenmiş olmalı');
+
+// 15h: computeFixturePreview - Çakışma / Mükerrer Tespiti
+const existingFixturesInDb = [
+  { home_team_id: 'team-1', away_team_id: 'team-2', week_number: 1 },
+  { home_team_id: 'team-3', away_team_id: 'team-4', week_number: 1 }
+];
+
+const previewResult = computeFixturePreview(
+  teams4,
+  existingFixturesInDb,
+  '2026-10-19T20:00:00Z',
+  true
+);
+
+assert.equal(previewResult.totalMatches, 12, '15h Toplam 12 maç önizlenmeli');
+assert.equal(previewResult.duplicateMatchesCount, 2, '15i DB ile çakışan 2 mükerrer maç tespit edilmeli');
+assert.equal(previewResult.newMatchesCount, 10, '15j 10 yeni maç belirlenmeli');
+assert.equal(previewResult.weeksCount, 6, '15k 6 hafta hesaplanmalı');
+
+// İlk haftadaki maçlar is_duplicate=true olmalı
+const dupMatch = previewResult.preview.find(p => p.home_team_id === 'team-1' && p.away_team_id === 'team-2');
+assert.ok(dupMatch, '15l team-1 vs team-2 önizlemede bulunmalı');
+assert.equal(dupMatch.is_duplicate, true, '15m Mükerrer maç is_duplicate=true bayrağı almalı');
+
+// Tarih aralığı 7 gün artmalı
+const week1Date = new Date(previewResult.preview.find(p => p.week === 1).scheduled_at);
+const week2Date = new Date(previewResult.preview.find(p => p.week === 2).scheduled_at);
+const diffDays = Math.round((week2Date - week1Date) / (1000 * 60 * 60 * 24));
+assert.equal(diffDays, 7, '15n Haftalar arası tam 7 gün olmalı');
+
+console.log('  [PASS] Round-robin simülasyonu, hafta dağılımı ve mükerrer önizleme tespiti doğrulandı.\n');
+
+
+// -----------------------------------------------------------------------------
+// Test 16: Fikstür Güncelleme Doğrulaması ve Skor Girişi Onay İzolasyonu
+// -----------------------------------------------------------------------------
+console.log('TEST 16: Fikstür Güncelleme Doğrulaması ve Skor Girişi Onay İzolasyonu (Decoupled Score vs Approval)...');
+
+const mockFixture = {
+  home_team_id: 'home-1',
+  away_team_id: 'away-1',
+  week_number: 1,
+  status: 'SCHEDULED'
+};
+
+// 16a: Hafta < 1 veya kesirli hafta reddi
+assert.ok(validateFixtureUpdate(mockFixture, { week_number: 0 }, false).error, '16a Hafta 0 reddedilmeli');
+assert.ok(validateFixtureUpdate(mockFixture, { week_number: -2 }, false).error, '16b Negatif hafta reddedilmeli');
+assert.ok(validateFixtureUpdate(mockFixture, { week_number: 1.5 }, false).error, '16c Kesirli hafta reddedilmeli');
+assert.equal(validateFixtureUpdate(mockFixture, { week_number: 2 }, false).success, true, '16d Hafta 2 kabul edilmeli');
+
+// 16b: Aynı takım eşleşmesi reddi
+assert.ok(
+  validateFixtureUpdate(mockFixture, { home_team_id: 'team-x', away_team_id: 'team-x' }, false).error,
+  '16e Ev sahibi ve deplasman aynı takım olamaz'
+);
+
+// 16c: Bağlı maç varken takım değiştirme yasağı (Composite FK koruması)
+const updateWithLinkedMatch = validateFixtureUpdate(
+  mockFixture,
+  { home_team_id: 'new-home-id' },
+  true // hasLinkedMatch = true
+);
+assert.ok(updateWithLinkedMatch.error, '16f Bağlı maç varken takımlar değiştirilemez');
+assert.ok(
+  updateWithLinkedMatch.error.includes('bağlı oynanmış/kaydedilmiş bir maç kaydı bulunmaktadır'),
+  '16g Doğru açıklayıcı hata mesajı dönmeli'
+);
+
+// 16d: Bağlı maç yokken takım değişikliği geçerli
+const updateWithoutLinkedMatch = validateFixtureUpdate(
+  mockFixture,
+  { home_team_id: 'new-home-id' },
+  false // hasLinkedMatch = false
+);
+assert.equal(updateWithoutLinkedMatch.success, true, '16h Bağlı maç yokken takım değişikliği geçerli');
+
+// 16e: Geçersiz durum dizesi reddi
+assert.ok(validateFixtureUpdate(mockFixture, { status: 'INVALID_STATUS' }, false).error, '16i Geçersiz durum reddedilmeli');
+assert.equal(validateFixtureUpdate(mockFixture, { status: 'POSTPONED' }, false).success, true, '16j POSTPONED kabul edilmeli');
+
+// 16f: Skor Girişi Onay İzolasyonu (Decoupled Score Entry)
+// Yeni maç oluşturulduğunda skor girilse bile KESİNLİKLE PENDING_REVIEW olmalı, ASLA APPROVED olmamalı!
+const newMatchScore = validateAndDetermineScoreStatus(3, 1, null);
+assert.equal(newMatchScore.success, true, '16k Geçerli skor 3-1 kabul edilmeli');
+assert.equal(newMatchScore.targetStatus, 'PENDING_REVIEW', '16l Yeni maç skoru ASLA otomatik APPROVED olamaz, PENDING_REVIEW kalmalı');
+
+// Mevcut PENDING_REVIEW maçı skoru güncellendiğinde PENDING_REVIEW kalmalı
+const existingPending = { id: 'm-pending', status: 'PENDING_REVIEW' };
+const updatePendingScore = validateAndDetermineScoreStatus(2, 2, existingPending);
+assert.equal(updatePendingScore.targetStatus, 'PENDING_REVIEW', '16m Mevcut PENDING_REVIEW maçın skoru güncellendiğinde APPROVED olamaz');
+
+// Mevcut APPROVED maçı skoru düzeltildiğinde durum korunmalı
+const existingApproved = { id: 'm-approved', status: 'APPROVED' };
+const updateApprovedScore = validateAndDetermineScoreStatus(4, 0, existingApproved);
+assert.equal(updateApprovedScore.targetStatus, 'APPROVED', '16n Mevcut APPROVED maçın skoru düzeltildiğinde durum korunur');
+
+// Negatif ve kesirli skorlar reddedilmeli
+assert.ok(validateAndDetermineScoreStatus(-1, 2, null).error, '16o Negatif skor reddedilmeli');
+assert.ok(validateAndDetermineScoreStatus(2.5, 1, null).error, '16p Kesirli skor reddedilmeli');
+
+console.log('  [PASS] Fikstür güncelleme kısıtları ve skor girişi onay izolasyonu başarıyla doğrulandı.\n');
+
+
 console.log('================================================================');
-console.log('TÜM TEST SENARYOLARI (TEST 1 - TEST 14) %100 BAŞARIYLA GEÇTİ!');
+console.log('TÜM TEST SENARYOLARI (TEST 1 - TEST 16) %100 BAŞARIYLA GEÇTİ!');
 console.log('================================================================');
