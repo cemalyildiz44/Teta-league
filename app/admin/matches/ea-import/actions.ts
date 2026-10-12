@@ -2,6 +2,8 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
+import { revalidatePath } from 'next/cache';
+import { logAdminAudit } from '@/lib/audit';
 import { fetchClubMatches } from '@/lib/ea/client';
 import { normalizeMatch } from '@/lib/ea/normalizer';
 import { matchFixture, FixtureCandidate } from '@/lib/ea/matcher';
@@ -153,8 +155,16 @@ export async function importEaMatchAction(matchData: EAPreviewMatch, seasonId: s
     return { error: 'Yetkisiz erişim.' };
   }
 
+  if (!seasonId || !leagueId) {
+    return { error: 'Sezon ve Lig ID parametreleri zorunludur.' };
+  }
+
   if (matchData.match_status !== 'READY') {
     return { error: 'Maç READY statüsünde değil.' };
+  }
+
+  if (!matchData.fixture_id) {
+    return { error: 'Fikstür kimliği bulunamadı.' };
   }
 
   if (!matchData.home_team_id || !matchData.away_team_id) {
@@ -180,7 +190,13 @@ export async function importEaMatchAction(matchData: EAPreviewMatch, seasonId: s
     submitted_by: user.id
   }).select('id').single();
 
-  if (matchErr || !newMatch) return { error: 'Maç kaydedilemedi: ' + matchErr?.message };
+  if (matchErr || !newMatch) {
+    if (matchErr?.message?.includes('uq_ea_match_id') || matchErr?.message?.includes('uq_match_fixture') || matchErr?.code === '23505') {
+      return { error: 'Bu EA maçı veya fikstürü sisteme zaten içe aktarılmış.' };
+    }
+    console.error('[importEaMatchAction] Match insert error:', matchErr);
+    return { error: 'Maç kaydedilemedi. Lütfen fikstür ve takım bilgilerini kontrol edin.' };
+  }
 
   // 2. Insert Raw Data
   await supabase.from('match_raw_ea_data').insert({
@@ -294,8 +310,28 @@ export async function importEaMatchAction(matchData: EAPreviewMatch, seasonId: s
   if (statsErr) {
     // Basic rollback attempt (not a true transaction but helps)
     await supabase.from('matches').delete().eq('id', newMatch.id);
-    return { error: 'Oyuncu statları kaydedilemedi: ' + statsErr.message };
+    console.error('[importEaMatchAction] Player stats insert error:', statsErr);
+    return { error: 'Oyuncu istatistikleri kaydedilemedi. Maç kaydı geri alındı.' };
   }
 
+  await logAdminAudit({
+    action: 'IMPORT_EA_MATCH',
+    entity_type: 'matches',
+    entity_id: newMatch.id,
+    entity_label: `EA Maç #${matchData.ea_match_id}`,
+    new_data: {
+      fixture_id: matchData.fixture_id,
+      season_id: seasonId,
+      league_id: leagueId,
+      ea_match_id: matchData.ea_match_id,
+      home_score: matchData.is_reversed ? matchData.away_team.score : matchData.home_team.score,
+      away_score: matchData.is_reversed ? matchData.home_team.score : matchData.away_team.score,
+      player_stats_count: statsToInsert.length
+    },
+    description: `EA Maçı (#${matchData.ea_match_id}) başarıyla sisteme aktarıldı (${statsToInsert.length} oyuncu istatistiği).`,
+    actor_id: user.id
+  });
+
+  revalidatePath('/admin/matches');
   return { success: true };
 }

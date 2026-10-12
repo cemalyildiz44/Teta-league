@@ -177,3 +177,26 @@ export function validateRosterMembership({
     roster_warning: null
   };
 }
+
+/**
+ * Sanitizes user search query to prevent PostgREST .or() filter injection, syntax errors, and broad wildcard enumeration.
+ */
+export function sanitizeProfileSearchQuery(query: unknown): string {
+  if (!query || typeof query !== 'string') return '';
+  return query
+    .replace(/,/g, ' ')
+    .replace(/[()"\\]/g, '')
+    .replace(/[%*]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Builds a safe PostgREST .or() filter string for player profile lookup across username, full_name, and current_ea_player_id.
+ * Returns null if the sanitized query is shorter than 2 characters (preventing unnecessary DB queries).
+ */
+export function buildProfilesOrFilter(query: unknown): string | null {
+  const clean = sanitizeProfileSearchQuery(query);
+  if (clean.length < 2) return null;
+  return `username.ilike.%${clean}%,full_name.ilike.%${clean}%,current_ea_player_id.ilike.%${clean}%`;
+}

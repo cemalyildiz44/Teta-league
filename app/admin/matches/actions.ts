@@ -6,6 +6,7 @@ import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { slugify } from '@/app/lig/utils';
 import { logAdminAudit } from '@/lib/audit';
+import { buildProfilesOrFilter } from '@/lib/ea/roster-validator';
 
 async function checkAdmin(supabase: any, user: any) {
   if (!user) return false;
@@ -90,6 +91,18 @@ export async function deleteMatchAction(matchId: string) {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!(await checkAdmin(supabase, user)) || !user) return { error: 'Yetkisiz erişim.' };
+  if (!matchId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(matchId)) {
+    return { error: 'Geçersiz maç kimliği.' };
+  }
+
+  // Fetch match details to know if public caches need revalidation
+  const { data: existingMatch } = await supabase
+    .from('matches')
+    .select('id, status, season_id, league_id, seasons(slug), leagues(name)')
+    .eq('id', matchId)
+    .maybeSingle();
+
+  if (!existingMatch) return { error: 'Maç bulunamadı.' };
 
   // First delete player stats if any exist to respect FK (no cascade)
   const { error: statsError } = await supabase.from('match_player_stats').delete().eq('match_id', matchId);
@@ -103,11 +116,29 @@ export async function deleteMatchAction(matchId: string) {
     entity_type: 'matches',
     entity_id: matchId,
     entity_label: `Maç #${matchId.substring(0, 8)}`,
+    old_data: { status: existingMatch.status },
     description: `Maç (#${matchId.substring(0, 8)}) ve ilişkili istatistikleri silindi.`,
     actor_id: user.id
   });
 
   revalidatePath('/admin/matches');
+
+  if (existingMatch.status === 'APPROVED') {
+    revalidatePath('/');
+    revalidatePath('/ligler');
+    revalidatePath('/oyuncular');
+    revalidatePath(`/mac/${matchId}`);
+
+    const seasonSlug = (existingMatch.seasons as any)?.slug;
+    const leagueName = (existingMatch.leagues as any)?.name;
+    if (seasonSlug && leagueName) {
+      const leagueSlug = slugify(leagueName);
+      revalidatePath(`/lig/${seasonSlug}/${leagueSlug}`);
+      revalidatePath(`/lig/${seasonSlug}/${leagueSlug}/istatistikler`);
+      revalidatePath(`/lig/${seasonSlug}/${leagueSlug}/fikstur`);
+    }
+  }
+
   return { success: 'Maç başarıyla silindi.' };
 }
 
@@ -118,6 +149,30 @@ export async function updateMatchScoreAction(matchId: string, home_score: number
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!(await checkAdmin(supabase, user)) || !user) return { error: 'Yetkisiz erişim.' };
+
+  if (!matchId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(matchId)) {
+    return { error: 'Geçersiz maç kimliği.' };
+  }
+
+  if (
+    typeof home_score !== 'number' ||
+    typeof away_score !== 'number' ||
+    !Number.isInteger(home_score) ||
+    !Number.isInteger(away_score) ||
+    home_score < 0 ||
+    away_score < 0
+  ) {
+    return { error: 'Geçersiz skor: Skorlar negatif olamaz ve tam sayı olmalıdır.' };
+  }
+
+  // Fetch match details to inspect current state
+  const { data: existingMatch } = await supabase
+    .from('matches')
+    .select('id, status, season_id, league_id, home_score, away_score, seasons(slug), leagues(name)')
+    .eq('id', matchId)
+    .maybeSingle();
+
+  if (!existingMatch) return { error: 'Maç bulunamadı.' };
 
   const { error } = await supabase.from('matches').update({
     home_score,
@@ -132,12 +187,30 @@ export async function updateMatchScoreAction(matchId: string, home_score: number
     entity_type: 'matches',
     entity_id: matchId,
     entity_label: `Maç #${matchId.substring(0, 8)}`,
+    old_data: { home_score: existingMatch.home_score, away_score: existingMatch.away_score },
     new_data: { home_score, away_score },
     description: `Maç (#${matchId.substring(0, 8)}) skoru ${home_score} - ${away_score} olarak güncellendi.`,
     actor_id: user.id
   });
 
   revalidatePath('/admin/matches');
+
+  if (existingMatch.status === 'APPROVED') {
+    revalidatePath('/');
+    revalidatePath('/ligler');
+    revalidatePath('/oyuncular');
+    revalidatePath(`/mac/${matchId}`);
+
+    const seasonSlug = (existingMatch.seasons as any)?.slug;
+    const leagueName = (existingMatch.leagues as any)?.name;
+    if (seasonSlug && leagueName) {
+      const leagueSlug = slugify(leagueName);
+      revalidatePath(`/lig/${seasonSlug}/${leagueSlug}`);
+      revalidatePath(`/lig/${seasonSlug}/${leagueSlug}/istatistikler`);
+      revalidatePath(`/lig/${seasonSlug}/${leagueSlug}/fikstur`);
+    }
+  }
+
   return { success: 'Skor başarıyla güncellendi.' };
 }
 
@@ -151,6 +224,10 @@ export async function assignPlayerStatsProfileAction(
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!(await checkAdmin(supabase, user)) || !user) return { error: 'Yetkisiz erişim.' };
+
+  if (!statsId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(statsId)) {
+    return { error: 'Geçersiz istatistik kaydı kimliği.' };
+  }
 
   // 1. Fetch current player stats and associated match details
   const { data: stat, error: statErr } = await supabase
@@ -174,6 +251,10 @@ export async function assignPlayerStatsProfileAction(
 
   // 2. Validate target profile if assigning
   if (playerId) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(playerId)) {
+      return { error: 'Geçersiz profil kimliği.' };
+    }
+
     const { data: targetProfile, error: profErr } = await supabase
       .from('profiles')
       .select('id, username, full_name, current_ea_player_id')
@@ -286,6 +367,7 @@ export async function assignPlayerStatsProfileAction(
   if ((stat.matches as any)?.status === 'APPROVED') {
     revalidatePath(`/mac/${matchId}`);
     revalidatePath('/istatistikler');
+    revalidatePath('/oyuncular');
   }
 
   return {
@@ -301,6 +383,7 @@ export async function getTeamRosterCandidatesAction(teamId: string, seasonId: st
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!(await checkAdmin(supabase, user)) || !user) return { error: 'Yetkisiz erişim.' };
+  if (!teamId || !seasonId) return { data: [] };
 
   const { data: memberships, error } = await supabase
     .from('team_memberships')
@@ -323,14 +406,17 @@ export async function searchProfilesAction(query: string) {
   const supabase = createClient(cookieStore);
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!(await checkAdmin(supabase, user)) || !user) return { error: 'Yetkisiz erişim.' };
-  if (!query || query.trim().length < 2) return { data: [] };
+  if (!user || !(await checkAdmin(supabase, user))) return { error: 'Yetkisiz erişim.' };
 
-  const cleanQuery = query.trim();
+  // SSOT: Use shared builder that sanitizes query, neutralizes filter injection/wildcards,
+  // and short-circuits with null if query is empty or <2 chars (preventing any DB query)
+  const orFilter = buildProfilesOrFilter(query);
+  if (!orFilter) return { data: [] };
+
   const { data, error } = await supabase
     .from('profiles')
     .select('id, username, full_name, current_ea_player_id')
-    .or(`username.ilike.%${cleanQuery}%,full_name.ilike.%${cleanQuery}%,current_ea_player_id.ilike.%${cleanQuery}%`)
+    .or(orFilter)
     .limit(20);
 
   if (error) return { error: error.message };

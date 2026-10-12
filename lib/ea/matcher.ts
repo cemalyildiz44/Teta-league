@@ -1,4 +1,4 @@
-import { NormalizedMatch } from './types';
+import type { NormalizedMatch } from './types';
 
 export interface FixtureCandidate {
   id: string;
@@ -24,6 +24,9 @@ export interface MatchResult {
 function getMatchNightWindow(scheduledAt: string): { start: number; end: number } {
   // Fix date string to avoid timezone parsing issues if not strictly ISO
   const d = new Date(scheduledAt);
+  if (isNaN(d.getTime())) {
+    return { start: 0, end: 0 };
+  }
   
   const year = d.getUTCFullYear();
   const month = d.getUTCMonth();

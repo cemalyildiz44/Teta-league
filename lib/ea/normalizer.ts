@@ -1,4 +1,4 @@
-import { EAMatchPayload, NormalizedMatch, NormalizedTeam, NormalizedPlayerStat } from './types';
+import type { EAMatchPayload, NormalizedMatch, NormalizedTeam, NormalizedPlayerStat } from './types';
 
 function parseNumber(val: string | undefined): number {
   if (!val) return 0;
