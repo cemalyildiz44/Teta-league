@@ -5,6 +5,7 @@ import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { Calendar } from 'lucide-react';
 import TeamLogo from '@/components/TeamLogo';
+import { getMondaySessionDetails } from '@/lib/fixture-generator';
 
 export default async function LeagueFixturesPage({
   params,
@@ -72,44 +73,71 @@ export default async function LeagueFixturesPage({
 
       {weeks.length > 0 ? (
         <div className="space-y-8">
-          {weeks.map((week) => (
-            <div key={week} className="client-glass border border-white/5 rounded-2xl overflow-hidden">
-              {/* Week Header */}
-              <div className="bg-black/60 backdrop-blur-xl border-b border-white/5 px-6 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-[#00e5ff] shadow-[0_0_8px_rgba(0,229,255,0.8)]" />
-                  <h3 className="text-[#00E5FF] text-[18px] md:text-[20px] font-[900] drop-shadow-[0_0_8px_rgba(0,229,255,0.4)] tracking-widest uppercase">
-                    {week}. HAFTA
-                  </h3>
-                </div>
-                <span className="text-[11px] font-[800] text-gray-500 uppercase tracking-widest">
-                  {groupedByWeek[week].length} Karşılaşma
-                </span>
-              </div>
+          {weeks.map((week) => {
+            const slot = getMondaySessionDetails(week);
+            return (
+              <div key={week} className="space-y-8">
+                {/* Devre Arası (Mid-Season Break) Banner before Week 13 */}
+                {week === 13 && (
+                  <div className="client-glass border border-amber-500/30 bg-gradient-to-r from-amber-500/15 via-[#00e5ff]/5 to-transparent rounded-2xl p-5 md:p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_0_20px_rgba(245,158,11,0.15)]">
+                    <div className="flex items-center gap-3.5">
+                      <span className="w-3.5 h-3.5 rounded-full bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.8)] animate-pulse" />
+                      <div>
+                        <h4 className="text-amber-400 text-sm md:text-base font-[900] tracking-wider uppercase">
+                          DEVRE ARASI & RESMİ TRANSFER DÖNEMİ
+                        </h4>
+                        <p className="text-xs text-gray-300 mt-1">
+                          1. Devre (1-12. Haftalar) tamamlandı. Takvim gereği 1 Pazartesi gecesi boş geçilir (Maç oynanmaz; transfer penceresi açıktır).
+                        </p>
+                      </div>
+                    </div>
+                    <span className="px-3.5 py-1.5 rounded-full bg-amber-500/20 text-amber-300 text-[11px] font-[900] uppercase tracking-widest border border-amber-500/30 shrink-0">
+                      1 HAFTA ARA
+                    </span>
+                  </div>
+                )}
 
-              {/* Match Rows in this Week */}
-              <div className="divide-y divide-white/5">
-                {groupedByWeek[week].map((fixture: any) => {
-                  const homeTeam = teamMap.get(fixture.home_team_id);
-                  const awayTeam = teamMap.get(fixture.away_team_id);
+                <div className="client-glass border border-white/5 rounded-2xl overflow-hidden">
+                  {/* Week Header */}
+                  <div className="bg-black/60 backdrop-blur-xl border-b border-white/5 px-6 py-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="w-2.5 h-2.5 rounded-sm bg-[#00e5ff] shadow-[0_0_8px_rgba(0,229,255,0.8)]" />
+                      <h3 className="text-[#00E5FF] text-[18px] md:text-[20px] font-[900] drop-shadow-[0_0_8px_rgba(0,229,255,0.4)] tracking-widest uppercase">
+                        {week}. HAFTA
+                      </h3>
+                      <span className="text-[11px] md:text-[12px] font-[800] text-[#00e5ff]/90 bg-[#00e5ff]/10 border border-[#00e5ff]/20 px-2.5 py-0.5 rounded-md uppercase tracking-wider">
+                        {slot.session}. Pazartesi Oturumu • {slot.timeTRT} TRT
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-[800] text-gray-500 uppercase tracking-widest">
+                      {groupedByWeek[week].length} Karşılaşma
+                    </span>
+                  </div>
 
-                  // Extract matches
-                  const matchesList = Array.isArray(fixture.matches)
-                    ? fixture.matches
-                    : fixture.matches
-                    ? [fixture.matches]
-                    : [];
-                  const approvedMatch = matchesList.find((m: any) => m.status === 'APPROVED');
-                  const pendingMatch = matchesList.find((m: any) => m.status === 'PENDING_REVIEW');
-                  const hasResult = !!approvedMatch;
+                  {/* Match Rows in this Week */}
+                  <div className="divide-y divide-white/5">
+                    {groupedByWeek[week].map((fixture: any) => {
+                      const homeTeam = teamMap.get(fixture.home_team_id);
+                      const awayTeam = teamMap.get(fixture.away_team_id);
 
-                  const formattedDate = fixture.scheduled_at
-                    ? new Intl.DateTimeFormat('tr-TR', {
-                        timeZone: 'Europe/Istanbul',
-                        day: 'numeric',
-                        month: 'short',
-                      }).format(new Date(fixture.scheduled_at))
-                    : 'Tarih Yok';
+                      // Extract matches
+                      const matchesList = Array.isArray(fixture.matches)
+                        ? fixture.matches
+                        : fixture.matches
+                        ? [fixture.matches]
+                        : [];
+                      const approvedMatch = matchesList.find((m: any) => m.status === 'APPROVED');
+                      const pendingMatch = matchesList.find((m: any) => m.status === 'PENDING_REVIEW');
+                      const hasResult = !!approvedMatch;
+
+                      const formattedDate = fixture.scheduled_at
+                        ? new Intl.DateTimeFormat('tr-TR', {
+                            timeZone: 'Europe/Istanbul',
+                            weekday: 'short',
+                            day: 'numeric',
+                            month: 'short',
+                          }).format(new Date(fixture.scheduled_at))
+                        : 'Tarih Yok';
 
                   const formattedTime = fixture.scheduled_at
                     ? new Intl.DateTimeFormat('tr-TR', {
@@ -228,8 +256,10 @@ export default async function LeagueFixturesPage({
                 })}
               </div>
             </div>
-          ))}
-        </div>
+          </div>
+        );
+      })}
+    </div>
       ) : (
         <div className="client-glass rounded-2xl border border-white/5 p-16 text-center">
           <Calendar className="w-16 h-16 text-gray-600 mx-auto mb-4 opacity-50" />

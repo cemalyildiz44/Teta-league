@@ -9,6 +9,163 @@ export interface MatchPair {
   week: number;
 }
 
+export interface MondaySessionSlot {
+  week: number;
+  sessionNumber: number;
+  mondayOffsetWeeks: number;
+  timeTRT: string;
+  utcHour: number;
+  utcMinute: number;
+}
+
+/**
+ * Official TETA League Monday Match Night Schedule Configuration:
+ * 12 teams, 22 match weeks, played across 8 Monday sessions.
+ * Sessions 1-4: Weeks 1-12 (3 matches per Monday: 22:00, 22:30, 23:00 TRT).
+ * Devre Arası (Mid-Season Break): Offset 4 weeks (1 full Monday skipped, no fixtures).
+ * Sessions 5-6: Weeks 13-18 (3 matches per Monday: 22:00, 22:30, 23:00 TRT).
+ * Sessions 7-8: Weeks 19-22 (2 matches per Monday: 22:00, 22:30 TRT).
+ *
+ * TRT is UTC+3 (permanently, no DST):
+ * - 22:00 TRT = 19:00 UTC
+ * - 22:30 TRT = 19:30 UTC
+ * - 23:00 TRT = 20:00 UTC
+ */
+export const MONDAY_SESSIONS_CONFIG: Record<
+  number,
+  { session: number; offsetWeeks: number; timeTRT: string; utcHour: number; utcMinute: number }
+> = {
+  1:  { session: 1, offsetWeeks: 0, timeTRT: '22:00', utcHour: 19, utcMinute: 0 },
+  2:  { session: 1, offsetWeeks: 0, timeTRT: '22:30', utcHour: 19, utcMinute: 30 },
+  3:  { session: 1, offsetWeeks: 0, timeTRT: '23:00', utcHour: 20, utcMinute: 0 },
+
+  4:  { session: 2, offsetWeeks: 1, timeTRT: '22:00', utcHour: 19, utcMinute: 0 },
+  5:  { session: 2, offsetWeeks: 1, timeTRT: '22:30', utcHour: 19, utcMinute: 30 },
+  6:  { session: 2, offsetWeeks: 1, timeTRT: '23:00', utcHour: 20, utcMinute: 0 },
+
+  7:  { session: 3, offsetWeeks: 2, timeTRT: '22:00', utcHour: 19, utcMinute: 0 },
+  8:  { session: 3, offsetWeeks: 2, timeTRT: '22:30', utcHour: 19, utcMinute: 30 },
+  9:  { session: 3, offsetWeeks: 2, timeTRT: '23:00', utcHour: 20, utcMinute: 0 },
+
+  10: { session: 4, offsetWeeks: 3, timeTRT: '22:00', utcHour: 19, utcMinute: 0 },
+  11: { session: 4, offsetWeeks: 3, timeTRT: '22:30', utcHour: 19, utcMinute: 30 },
+  12: { session: 4, offsetWeeks: 3, timeTRT: '23:00', utcHour: 20, utcMinute: 0 },
+
+  // Offset 4 weeks (Day 28) = DEVRE ARASI / Mid-Season Break (Skipped Monday, no fixtures)
+
+  13: { session: 5, offsetWeeks: 5, timeTRT: '22:00', utcHour: 19, utcMinute: 0 },
+  14: { session: 5, offsetWeeks: 5, timeTRT: '22:30', utcHour: 19, utcMinute: 30 },
+  15: { session: 5, offsetWeeks: 5, timeTRT: '23:00', utcHour: 20, utcMinute: 0 },
+
+  16: { session: 6, offsetWeeks: 6, timeTRT: '22:00', utcHour: 19, utcMinute: 0 },
+  17: { session: 6, offsetWeeks: 6, timeTRT: '22:30', utcHour: 19, utcMinute: 30 },
+  18: { session: 6, offsetWeeks: 6, timeTRT: '23:00', utcHour: 20, utcMinute: 0 },
+
+  19: { session: 7, offsetWeeks: 7, timeTRT: '22:00', utcHour: 19, utcMinute: 0 },
+  20: { session: 7, offsetWeeks: 7, timeTRT: '22:30', utcHour: 19, utcMinute: 30 },
+
+  21: { session: 8, offsetWeeks: 8, timeTRT: '22:00', utcHour: 19, utcMinute: 0 },
+  22: { session: 8, offsetWeeks: 8, timeTRT: '22:30', utcHour: 19, utcMinute: 30 },
+};
+
+/**
+ * Returns session number, week offset from base Monday, TRT kick-off string, and UTC hours/minutes.
+ */
+export function getMondaySessionDetails(weekNumber: number): {
+  session: number;
+  offsetWeeks: number;
+  timeTRT: string;
+  utcHour: number;
+  utcMinute: number;
+} {
+  if (MONDAY_SESSIONS_CONFIG[weekNumber]) {
+    return MONDAY_SESSIONS_CONFIG[weekNumber];
+  }
+  // Graceful handling for extra weeks beyond 22
+  const extraWeeks = weekNumber - 22;
+  const extraSessions = Math.floor((extraWeeks - 1) / 2) + 1;
+  const session = 8 + extraSessions;
+  const offsetWeeks = 8 + extraSessions;
+  const slotInSession = (extraWeeks - 1) % 2;
+  const timeTRT = slotInSession === 0 ? '22:00' : '22:30';
+  const utcHour = 19;
+  const utcMinute = slotInSession === 0 ? 0 : 30;
+  return { session, offsetWeeks, timeTRT, utcHour, utcMinute };
+}
+
+/**
+ * Resolves the initial Monday date anchor from a given start date string.
+ * If the provided date is not a Monday, rolls forward to the nearest upcoming Monday.
+ * If the provided date is already a Monday, anchors to it directly.
+ */
+export function getFirstMondayDate(startDateStr: string): Date {
+  const cleanStr = startDateStr.split('T')[0].split(' ')[0];
+  const parts = cleanStr.split('-');
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1;
+  const day = parseInt(parts[2], 10);
+
+  const d = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+  const dayOfWeek = d.getUTCDay(); // 0: Sunday, 1: Monday, ...
+  const daysToAdd = (1 - dayOfWeek + 7) % 7;
+  if (daysToAdd > 0) {
+    d.setUTCDate(d.getUTCDate() + daysToAdd);
+  }
+  return d;
+}
+
+/**
+ * Calculates the exact scheduled ISO timestamp and metadata for a given week.
+ */
+export function calculateWeekScheduledAt(
+  startDateStr: string,
+  weekNumber: number
+): {
+  scheduledAt: string;
+  sessionNumber: number;
+  timeTRT: string;
+  mondayDateStr: string;
+  isMidSeasonBreakBefore: boolean;
+} {
+  const baseMonday = getFirstMondayDate(startDateStr);
+  const slot = getMondaySessionDetails(weekNumber);
+
+  const matchDate = new Date(baseMonday.getTime());
+  matchDate.setUTCDate(matchDate.getUTCDate() + slot.offsetWeeks * 7);
+
+  const mondayDateStr = matchDate.toISOString().split('T')[0];
+  matchDate.setUTCHours(slot.utcHour, slot.utcMinute, 0, 0);
+
+  return {
+    scheduledAt: matchDate.toISOString(),
+    sessionNumber: slot.session,
+    timeTRT: slot.timeTRT,
+    mondayDateStr,
+    isMidSeasonBreakBefore: weekNumber === 13
+  };
+}
+
+/**
+ * Returns metadata about the mid-season break (Devre Arası).
+ */
+export function getMidSeasonBreakInfo(startDateStr: string): {
+  breakMondayDate: string;
+  weekBefore: number;
+  weekAfter: number;
+  description: string;
+} {
+  const baseMonday = getFirstMondayDate(startDateStr);
+  const breakMonday = new Date(baseMonday.getTime());
+  // Devre arası is offset 4 weeks from base Monday
+  breakMonday.setUTCDate(breakMonday.getUTCDate() + 4 * 7);
+  return {
+    breakMondayDate: breakMonday.toISOString().split('T')[0],
+    weekBefore: 12,
+    weekAfter: 13,
+    description: 'Devre Arası & Transfer Dönemi (Maç Oynanmaz)'
+  };
+}
+
 export interface FixturePreviewItem {
   week: number;
   home_team_id: string;
@@ -17,6 +174,8 @@ export interface FixturePreviewItem {
   away_team_name: string;
   scheduled_at: string;
   is_duplicate: boolean;
+  session_number?: number;
+  time_trt?: string;
 }
 
 export interface FixturePreviewResult {
@@ -24,6 +183,12 @@ export interface FixturePreviewResult {
   newMatchesCount: number;
   duplicateMatchesCount: number;
   weeksCount: number;
+  breakInfo?: {
+    breakMondayDate: string;
+    weekBefore: number;
+    weekAfter: number;
+    description: string;
+  };
   preview: FixturePreviewItem[];
 }
 
@@ -84,7 +249,7 @@ export function generateRoundRobin(teams: TeamRef[], doubleRound: boolean = true
 }
 
 /**
- * Computes fixture preview, calculates dates, and detects collision/duplicates
+ * Computes fixture preview, calculates Monday Session dates & slots, and detects collision/duplicates
  * against already scheduled fixtures without writing to the database.
  */
 export function computeFixturePreview(
@@ -108,13 +273,10 @@ export function computeFixturePreview(
     existingFixtures.map(f => `${f.home_team_id}:${f.away_team_id}`)
   );
 
-  const startDate = new Date(startDateStr);
   let duplicateCount = 0;
 
   const preview: FixturePreviewItem[] = matchPairs.map(mp => {
-    const scheduledAt = new Date(startDate.getTime());
-    // 7 days between each week
-    scheduledAt.setDate(startDate.getDate() + (mp.week - 1) * 7);
+    const { scheduledAt, sessionNumber, timeTRT } = calculateWeekScheduledAt(startDateStr, mp.week);
 
     const isDuplicate = existingPairs.has(`${mp.home.id}:${mp.away.id}`);
     if (isDuplicate) duplicateCount++;
@@ -125,18 +287,22 @@ export function computeFixturePreview(
       home_team_name: mp.home.name || 'Ev Sahibi',
       away_team_id: mp.away.id,
       away_team_name: mp.away.name || 'Deplasman',
-      scheduled_at: scheduledAt.toISOString(),
-      is_duplicate: isDuplicate
+      scheduled_at: scheduledAt,
+      is_duplicate: isDuplicate,
+      session_number: sessionNumber,
+      time_trt: timeTRT
     };
   });
 
   const weeksCount = Math.max(...matchPairs.map(m => m.week), 0);
+  const breakInfo = getMidSeasonBreakInfo(startDateStr);
 
   return {
     totalMatches: preview.length,
     newMatchesCount: preview.length - duplicateCount,
     duplicateMatchesCount: duplicateCount,
     weeksCount,
+    breakInfo,
     preview
   };
 }

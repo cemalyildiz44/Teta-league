@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   Search, Plus, Calendar, Shield, X, AlertTriangle, CheckCircle2, Loader2,
   Trash2, Edit2, Play, Eye, Filter, ArrowRight, Clock, Check, XCircle,
-  HelpCircle, ChevronRight, Layers, FileText
+  HelpCircle, ChevronRight, Layers, FileText, PauseCircle
 } from 'lucide-react';
 import {
   previewLeagueFixturesAction, generateLeagueFixturesAction,
@@ -14,6 +14,7 @@ import {
   deleteFixtureAction, updateFixtureScoreAction, getFixtureDetailAction,
   FixturePreviewItem
 } from './actions';
+import { getMondaySessionDetails, getMidSeasonBreakInfo } from '@/lib/fixture-generator';
 import TeamLogo from '@/components/TeamLogo';
 
 export function FixturesManager({ initialFixtures, seasons, leagues, leagueTeams, teams }: any) {
@@ -435,21 +436,47 @@ export function FixturesManager({ initialFixtures, seasons, leagues, leagueTeams
         <div className='space-y-6'>
           {weeks.map(weekNum => {
             const weekFixtures = filteredFixtures.filter((f: any) => f.week_number === weekNum);
+            const sessionSlot = getMondaySessionDetails(weekNum);
             return (
-              <div key={weekNum} className='bg-[#0e1726]/80 rounded-xl border border-white/5 overflow-hidden'>
-                <div className='bg-[#121c2d] px-4 py-3 border-b border-white/5 flex items-center justify-between'>
-                  <div className='flex items-center gap-2'>
-                    <span className='px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 font-black text-xs border border-cyan-500/20'>
-                      {weekNum}. HAFTA
-                    </span>
-                    <span className='text-xs text-zinc-400'>
-                      ({weekFixtures.length} Karşılaşma)
+              <div key={weekNum} className='space-y-6'>
+                {/* Devre Arası (Mid-Season Break) Banner before Week 13 */}
+                {weekNum === 13 && (
+                  <div className='p-4 rounded-xl bg-gradient-to-r from-amber-500/15 via-purple-500/10 to-cyan-500/10 border border-amber-500/30 flex items-center justify-between'>
+                    <div className='flex items-center gap-3'>
+                      <div className='w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.6)] animate-pulse' />
+                      <div>
+                        <span className='font-black text-amber-400 text-xs uppercase tracking-wider block'>
+                          DEVRE ARASI & RESMİ TRANSFER DÖNEMİ
+                        </span>
+                        <span className='text-[11px] text-zinc-300'>
+                          1. Devre (1-12. Haftalar) tamamlandı. 1 Pazartesi gecesi boş geçilir (Maç oynanmaz; transfer dönemi). 13. Hafta bir sonraki Pazartesi başlar.
+                        </span>
+                      </div>
+                    </div>
+                    <span className='px-2.5 py-1 rounded bg-amber-500/20 text-amber-300 font-black text-[10px] uppercase tracking-wider border border-amber-500/30 shrink-0 ml-3'>
+                      1 Hafta Ara
                     </span>
                   </div>
-                </div>
+                )}
 
-                <div className='divide-y divide-white/5'>
-                  {weekFixtures.map((f: any) => renderFixtureRow(f))}
+                <div className='bg-[#0e1726]/80 rounded-xl border border-white/5 overflow-hidden'>
+                  <div className='bg-[#121c2d] px-4 py-3 border-b border-white/5 flex flex-wrap items-center justify-between gap-2'>
+                    <div className='flex items-center gap-2'>
+                      <span className='px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 font-black text-xs border border-cyan-500/20'>
+                        {weekNum}. HAFTA
+                      </span>
+                      <span className='px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-bold text-[10px] border border-blue-500/20'>
+                        {sessionSlot.session}. PAZARTESİ OTURUMU • {sessionSlot.timeTRT} TRT
+                      </span>
+                      <span className='text-xs text-zinc-400'>
+                        ({weekFixtures.length} Karşılaşma)
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className='divide-y divide-white/5'>
+                    {weekFixtures.map((f: any) => renderFixtureRow(f))}
+                  </div>
                 </div>
               </div>
             );
@@ -544,7 +571,7 @@ export function FixturesManager({ initialFixtures, seasons, leagues, leagueTeams
               {previewData && (
                 <div className='space-y-4'>
                   {/* Summary Bar */}
-                  <div className='grid grid-cols-4 gap-3'>
+                  <div className='grid grid-cols-2 sm:grid-cols-4 gap-3'>
                     <div className='bg-cyan-500/10 border border-cyan-500/20 p-3 rounded-lg text-center'>
                       <p className='text-[10px] text-cyan-400 font-bold uppercase'>Üretilen Maç</p>
                       <p className='text-xl font-black text-cyan-300 mt-0.5'>{previewData.totalMatches}</p>
@@ -558,10 +585,27 @@ export function FixturesManager({ initialFixtures, seasons, leagues, leagueTeams
                       <p className='text-xl font-black text-amber-300 mt-0.5'>{previewData.duplicateMatchesCount}</p>
                     </div>
                     <div className='bg-purple-500/10 border border-purple-500/20 p-3 rounded-lg text-center'>
-                      <p className='text-[10px] text-purple-400 font-bold uppercase'>Toplam Hafta</p>
-                      <p className='text-xl font-black text-purple-300 mt-0.5'>{previewData.weeksCount}</p>
+                      <p className='text-[10px] text-purple-400 font-bold uppercase'>Takvim Planı</p>
+                      <p className='text-sm font-black text-purple-300 mt-1.5'>
+                        {previewData.weeksCount} Hafta • 8 Oturum + 1 Ara
+                      </p>
                     </div>
                   </div>
+
+                  {/* Devre Arası Banner */}
+                  {previewData.breakInfo && (
+                    <div className='p-3 bg-gradient-to-r from-amber-500/15 to-transparent border border-amber-500/30 rounded-lg text-xs text-amber-300 flex items-center justify-between'>
+                      <div className='flex items-center gap-2'>
+                        <PauseCircle className='w-4 h-4 text-amber-400 flex-shrink-0' />
+                        <span>
+                          <strong>Devre Arası:</strong> 12. ve 13. Haftalar arasında 1 Pazartesi boş geçilecek (Maç oynanmaz, transfer penceresi açıktır).
+                        </span>
+                      </div>
+                      <span className='text-[10px] font-mono font-bold text-amber-400 shrink-0 ml-2'>
+                        {previewData.breakInfo.breakMondayDate}
+                      </span>
+                    </div>
+                  )}
 
                   {previewData.duplicateMatchesCount > 0 && (
                     <div className='p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-300 flex items-center gap-2'>
@@ -572,24 +616,47 @@ export function FixturesManager({ initialFixtures, seasons, leagues, leagueTeams
 
                   {/* Fixtures List */}
                   <div className='border border-white/5 rounded-xl overflow-hidden max-h-80 overflow-y-auto divide-y divide-white/5'>
-                    {previewData.items.map((item: FixturePreviewItem, idx: number) => (
-                      <div key={idx} className={`p-3 text-xs flex items-center justify-between ${item.is_duplicate ? 'bg-amber-500/5' : 'bg-[#121c2d]/40'}`}>
-                        <div className='flex items-center gap-3'>
-                          <span className='w-16 font-black text-zinc-400'>{item.week}. Hafta</span>
-                          <span className='font-bold text-white'>{item.home_team_name}</span>
-                          <span className='text-zinc-500 text-[10px]'>vs</span>
-                          <span className='font-bold text-white'>{item.away_team_name}</span>
-                        </div>
-                        <div className='flex items-center gap-3'>
-                          <span className='text-zinc-400 text-[11px]'>{new Date(item.scheduled_at).toLocaleDateString('tr-TR')}</span>
-                          {item.is_duplicate ? (
-                            <span className='px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20'>MEVCUT</span>
-                          ) : (
-                            <span className='px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'>YENİ</span>
+                    {previewData.items.map((item: FixturePreviewItem, idx: number) => {
+                      const prevItem = idx > 0 ? previewData.items[idx - 1] : null;
+                      const isFirstMatchOfWeek13 = item.week === 13 && (!prevItem || prevItem.week !== 13);
+
+                      return (
+                        <div key={idx}>
+                          {isFirstMatchOfWeek13 && (
+                            <div className='px-4 py-2 bg-gradient-to-r from-amber-500/20 to-purple-500/10 border-y border-amber-500/30 flex items-center justify-between text-[11px] font-bold text-amber-300'>
+                              <div className='flex items-center gap-2'>
+                                <PauseCircle className='w-3.5 h-3.5 text-amber-400' />
+                                <span>DEVRE ARASI & RESMİ TRANSFER DÖNEMİ (1 Pazartesi Gecesi Boş)</span>
+                              </div>
+                              <span className='text-[10px] font-mono'>1 Hafta Boş</span>
+                            </div>
                           )}
+                          <div className={`p-3 text-xs flex items-center justify-between ${item.is_duplicate ? 'bg-amber-500/5' : 'bg-[#121c2d]/40'}`}>
+                            <div className='flex items-center gap-3'>
+                              <div className='w-28 flex flex-col'>
+                                <span className='font-black text-white'>{item.week}. Hafta</span>
+                                {item.session_number && (
+                                  <span className='text-[10px] text-cyan-400 font-semibold'>
+                                    {item.session_number}. Oturum • {item.time_trt}
+                                  </span>
+                                )}
+                              </div>
+                              <span className='font-bold text-white'>{item.home_team_name}</span>
+                              <span className='text-zinc-500 text-[10px]'>vs</span>
+                              <span className='font-bold text-white'>{item.away_team_name}</span>
+                            </div>
+                            <div className='flex items-center gap-3'>
+                              <span className='text-zinc-400 text-[11px]'>{new Date(item.scheduled_at).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', weekday: 'short' })}</span>
+                              {item.is_duplicate ? (
+                                <span className='px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20'>MEVCUT</span>
+                              ) : (
+                                <span className='px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'>YENİ</span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -1006,7 +1073,14 @@ export function FixturesManager({ initialFixtures, seasons, leagues, leagueTeams
           <div className='text-left md:text-right flex flex-col justify-center'>
             <span className='text-[11px] font-semibold text-zinc-300 flex items-center md:justify-end gap-1'>
               <Clock className='w-3 h-3 text-zinc-500' />
-              {new Date(f.scheduled_at).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+              {f.scheduled_at ? new Intl.DateTimeFormat('tr-TR', {
+                timeZone: 'Europe/Istanbul',
+                weekday: 'short',
+                day: '2-digit',
+                month: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+              }).format(new Date(f.scheduled_at)) : 'Tarih Yok'}
             </span>
             <div className='mt-1 flex items-center md:justify-end gap-1.5'>
               <StatusBadge fixtureStatus={f.status} matchStatus={f.match?.status} />

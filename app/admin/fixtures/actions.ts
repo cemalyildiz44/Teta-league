@@ -28,7 +28,10 @@ import {
   FixturePreviewItem,
   generateRoundRobin,
   validateFixtureUpdate,
-  validateAndDetermineScoreStatus
+  validateAndDetermineScoreStatus,
+  calculateWeekScheduledAt,
+  getMidSeasonBreakInfo,
+  getMondaySessionDetails
 } from '@/lib/fixture-generator';
 
 export type { TeamRef, MatchPair, FixturePreviewItem };
@@ -88,13 +91,11 @@ export async function previewLeagueFixturesAction(
     (existingFixtures || []).map((f: any) => `${f.home_team_id}_${f.away_team_id}_${f.week_number}`)
   );
 
-  const startDate = new Date(startDateStr);
   const items: FixturePreviewItem[] = [];
   let duplicatesCount = 0;
 
   for (const mp of matchPairs) {
-    const scheduledAt = new Date(startDate.getTime());
-    scheduledAt.setDate(scheduledAt.getDate() + ((mp.week - 1) * 7));
+    const { scheduledAt, sessionNumber, timeTRT } = calculateWeekScheduledAt(startDateStr, mp.week);
 
     const key = `${mp.home.id}_${mp.away.id}_${mp.week}`;
     const isDuplicate = existingSet.has(key);
@@ -106,12 +107,15 @@ export async function previewLeagueFixturesAction(
       home_team_name: mp.home.name || 'Ev Sahibi',
       away_team_id: mp.away.id,
       away_team_name: mp.away.name || 'Deplasman',
-      scheduled_at: scheduledAt.toISOString(),
-      is_duplicate: isDuplicate
+      scheduled_at: scheduledAt,
+      is_duplicate: isDuplicate,
+      session_number: sessionNumber,
+      time_trt: timeTRT
     });
   }
 
   const weeksCount = Array.from(new Set(items.map(i => i.week))).length;
+  const breakInfo = getMidSeasonBreakInfo(startDateStr);
 
   return {
     data: {
@@ -119,6 +123,7 @@ export async function previewLeagueFixturesAction(
       newMatchesCount: items.length - duplicatesCount,
       duplicateMatchesCount: duplicatesCount,
       weeksCount,
+      breakInfo,
       items
     }
   };
@@ -180,10 +185,8 @@ export async function generateLeagueFixturesAction(
   }
 
   // 4. Save to DB
-  const startDate = new Date(startDateStr);
   const rowsToInsert = matchPairs.map(mp => {
-    const scheduledAt = new Date(startDate.getTime());
-    scheduledAt.setDate(scheduledAt.getDate() + ((mp.week - 1) * 7));
+    const { scheduledAt } = calculateWeekScheduledAt(startDateStr, mp.week);
 
     return {
       season_id: seasonId,
@@ -191,7 +194,7 @@ export async function generateLeagueFixturesAction(
       home_team_id: mp.home.id,
       away_team_id: mp.away.id,
       week_number: mp.week,
-      scheduled_at: scheduledAt.toISOString(),
+      scheduled_at: scheduledAt,
       status: 'SCHEDULED',
       created_by: user.id
     };
