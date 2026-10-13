@@ -595,7 +595,9 @@ export function CsvSeasonStatsModal({
   const [csvContent, setCsvContent] = useState<string>('');
   const [manualPlayerOverrides, setManualPlayerOverrides] = useState<Record<string, string>>({});
   const [manualTeamOverrides, setManualTeamOverrides] = useState<Record<string, ManualTeamResolution>>({});
-  const [savedTeamMappings, setSavedTeamMappings] = useState<PersistentTeamMapping[]>([]);
+  const [savedTeamMappings, setSavedTeamMappings] = useState<PersistentTeamMapping[]>(() =>
+    loadSavedTeamMappingsFromStorage()
+  );
 
   const [activeFilter, setActiveFilter] = useState<PreviewTabFilter>('ALL');
   const [skippedSubFilter, setSkippedSubFilter] = useState<SkippedSubFilter>('ALL_SKIPPED');
@@ -607,25 +609,28 @@ export function CsvSeasonStatsModal({
   const [importing, setImporting] = useState<boolean>(false);
   const [importResult, setImportResult] = useState<CsvImportBatchResponse | null>(null);
 
-  // Load saved team mappings on mount (localStorage + server DB)
+  // Load saved team mappings from server DB on mount
   useEffect(() => {
-    const localMappings = loadSavedTeamMappingsFromStorage();
-    if (localMappings.length > 0) {
-      setSavedTeamMappings(localMappings);
-    }
-
-    getPersistentCsvTeamMappingsAction().then(res => {
-      if (res.mappings && res.mappings.length > 0) {
-        setSavedTeamMappings(prev => {
-          const map = new Map<string, PersistentTeamMapping>();
-          for (const m of prev) map.set(foldCase(m.sourceTeamName), m);
-          for (const m of res.mappings) map.set(foldCase(m.sourceTeamName), m);
-          const merged = Array.from(map.values());
-          saveTeamMappingsToStorage(merged);
-          return merged;
-        });
-      }
-    });
+    getPersistentCsvTeamMappingsAction()
+      .then(res => {
+        if (res?.mappings && res.mappings.length > 0) {
+          setSavedTeamMappings(prev => {
+            const map = new Map<string, PersistentTeamMapping>();
+            for (const m of prev) {
+              if (m?.sourceTeamName) map.set(foldCase(m.sourceTeamName), m);
+            }
+            for (const m of res.mappings) {
+              if (m?.sourceTeamName) map.set(foldCase(m.sourceTeamName), m);
+            }
+            const merged = Array.from(map.values());
+            saveTeamMappingsToStorage(merged);
+            return merged;
+          });
+        }
+      })
+      .catch(err => {
+        console.warn('Sunucudan kalıcı takım eşleştirmeleri alınamadı (migration henüz uygulanmamış olabilir):', err);
+      });
   }, []);
 
   const rememberedTeamEvaluations = useMemo(
@@ -798,9 +803,10 @@ export function CsvSeasonStatsModal({
     ? preview.unmatchedOrAmbiguousPlayerGroups.filter(g => g.matchStatus === 'MANUAL_LINKED')
     : [];
 
-  const filteredPendingPlayerGroups = useMemo(() => {
-    return filterPendingPlayerGroups(pendingPlayerGroups, pendingPlayerSearch);
-  }, [pendingPlayerGroups, pendingPlayerSearch]);
+  const filteredPendingPlayerGroups = filterPendingPlayerGroups(
+    pendingPlayerGroups,
+    pendingPlayerSearch
+  );
 
   const pendingTeamGroups = preview
     ? preview.unrecognizedTeamGroups.filter(g => g.matchStatus === 'UNRECOGNIZED')
@@ -809,12 +815,10 @@ export function CsvSeasonStatsModal({
     ? preview.unrecognizedTeamGroups.filter(g => g.matchStatus !== 'UNRECOGNIZED')
     : [];
 
-  const validRememberedTeamCount = useMemo(() => {
-    return pendingTeamGroups.filter(tg => {
-      const rem = rememberedTeamEvaluations.get(tg.playedTeam);
-      return rem && rem.status === 'VALID' && rem.resolvedResolution !== null;
-    }).length;
-  }, [pendingTeamGroups, rememberedTeamEvaluations]);
+  const validRememberedTeamCount = pendingTeamGroups.filter(tg => {
+    const rem = rememberedTeamEvaluations.get(tg.playedTeam);
+    return rem && rem.status === 'VALID' && rem.resolvedResolution !== null;
+  }).length;
 
   const filteredRows = (() => {
     if (!preview) return [];
@@ -1443,7 +1447,7 @@ export function CsvSeasonStatsModal({
                                       onClick={() => handleSetManualTeam(tg.playedTeam, remembered.resolvedResolution)}
                                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#00e5ff]/10 hover:bg-[#00e5ff]/20 text-[#00e5ff] border border-[#00e5ff]/30 text-xs font-bold transition-colors shrink-0"
                                     >
-                                      Hatırlananı Uygula: {remembered.mapping.mode === 'EXISTING' ? (teams.find(t => t.id === remembered.mapping.targetTeamId)?.name || 'Sistem Takımı') : (remembered.mapping.targetCustomName || tg.playedTeam)}
+                                      Hatırlananı Uygula: {remembered.mapping.mode === 'EXISTING' ? (teams?.find(t => t.id === remembered.mapping.targetTeamId)?.name || 'Sistem Takımı') : (remembered.mapping.targetCustomName || tg.playedTeam)}
                                     </button>
                                   )}
 

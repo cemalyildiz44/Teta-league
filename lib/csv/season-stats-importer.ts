@@ -976,16 +976,21 @@ export function evaluateRememberedTeamMappings(
   teams: ImporterTeamRef[]
 ): Map<string, RememberedTeamEvaluation> {
   const result = new Map<string, RememberedTeamEvaluation>();
-  const teamById = new Map<string, ImporterTeamRef>(teams.map(t => [t.id, t]));
+  const safeTeams = Array.isArray(teams) ? teams : [];
+  const safeMappings = Array.isArray(mappings) ? mappings : [];
+
+  const teamById = new Map<string, ImporterTeamRef>(safeTeams.map(t => [t.id, t]));
   const teamsByFoldedName = new Map<string, ImporterTeamRef[]>();
-  for (const t of teams) {
+  for (const t of safeTeams) {
+    if (!t?.name) continue;
     const fn = foldCase(t.name);
     const list = teamsByFoldedName.get(fn) || [];
     list.push(t);
     teamsByFoldedName.set(fn, list);
   }
 
-  for (const mapping of mappings) {
+  for (const mapping of safeMappings) {
+    if (!mapping) continue;
     const rawSource = mapping.sourceTeamName?.trim();
     if (!rawSource) continue;
 
@@ -1089,12 +1094,14 @@ export function filterPendingPlayerGroups(
   groups: UnmatchedPlayerGroup[],
   searchQuery: string
 ): UnmatchedPlayerGroup[] {
+  const safeGroups = Array.isArray(groups) ? groups : [];
   const query = foldCase(searchQuery?.trim() || '');
-  if (!query) return groups;
+  if (!query) return safeGroups;
 
-  return groups.filter(g => {
-    if (foldCase(g.eaId).includes(query)) return true;
-    return g.playedTeams.some(team => foldCase(team).includes(query));
+  return safeGroups.filter(g => {
+    if (!g) return false;
+    if (g.eaId && foldCase(g.eaId).includes(query)) return true;
+    return Array.isArray(g.playedTeams) && g.playedTeams.some(team => team && foldCase(team).includes(query));
   });
 }
 

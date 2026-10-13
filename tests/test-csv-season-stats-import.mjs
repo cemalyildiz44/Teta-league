@@ -895,6 +895,40 @@ runTest('21. evaluateRememberedTeamMappings: VALID, CONFLICT ve INVALID durumlar
   assert.ok(evaluations.get('Gegi Esport CSV').conflictReason.includes('sistem takımı bulundu'));
 });
 
+// 22. React Rules of Hooks & Null/Undefined Robustness Tests
+runTest('22. Modal açılma güvenliği: React Hook kuralları ve null/undefined dayanıklılığı', () => {
+  // A: evaluateRememberedTeamMappings null/undefined guards
+  assert.equal(evaluateRememberedTeamMappings(null, null).size, 0);
+  assert.equal(evaluateRememberedTeamMappings(undefined, undefined).size, 0);
+  assert.equal(evaluateRememberedTeamMappings([], []).size, 0);
+  assert.equal(evaluateRememberedTeamMappings([{ sourceTeamName: 'Test' }], null).size, 0);
+  assert.equal(evaluateRememberedTeamMappings(null, [{ id: '1', name: 'Test' }]).size, 0);
+
+  // B: filterPendingPlayerGroups null/undefined guards
+  assert.equal(filterPendingPlayerGroups(null, 'query').length, 0);
+  assert.equal(filterPendingPlayerGroups(undefined, '').length, 0);
+  assert.equal(filterPendingPlayerGroups([{ eaId: null, playedTeams: null }], 'query').length, 0);
+
+  // C: CsvSeasonStatsModal.tsx statik hook denetimi: if (!isOpen) return null sonrasında HİÇBİR hook çağrısı olmamalı
+  const modalSource = fs.readFileSync('app/admin/players/CsvSeasonStatsModal.tsx', 'utf-8');
+  const returnNullIndex = modalSource.indexOf('if (!isOpen) return null;');
+  assert.ok(returnNullIndex > -1, 'Modal must contain "if (!isOpen) return null;"');
+
+  const afterEarlyReturn = modalSource.slice(returnNullIndex);
+  const hookRegex = /\b(useMemo|useEffect|useState|useRef|useCallback)\s*\(/g;
+  const prohibitedHooks = [];
+  let match;
+  while ((match = hookRegex.exec(afterEarlyReturn)) !== null) {
+    prohibitedHooks.push(match[1]);
+  }
+
+  assert.equal(
+    prohibitedHooks.length,
+    0,
+    `Erken dönüş (if (!isOpen) return null;) sonrasında hook bulunmamalıdır! Bulunanlar: ${prohibitedHooks.join(', ')}`
+  );
+});
+
 console.log(`\n================================================================`);
 console.log(`TOPLAM TEST: ${passed + failed} | BAŞARILI: ${passed} | BAŞARISIZ: ${failed}`);
 console.log(`================================================================`);
