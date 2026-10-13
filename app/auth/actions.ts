@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation';
 import { getSiteUrl, getAuthCallbackUrl } from '@/lib/site-url';
 
 export async function loginAction(prevState: any, formData: FormData) {
-  const email = formData.get('email') as string;
+  const email = (formData.get('email') as string)?.trim();
   const password = formData.get('password') as string;
 
   if (!email || !password) {
@@ -22,6 +22,15 @@ export async function loginAction(prevState: any, formData: FormData) {
   });
 
   if (error || !authData?.user) {
+    const isEmailNotConfirmed =
+      error?.message?.toLowerCase().includes('email not confirmed') ||
+      (error as any)?.code === 'email_not_confirmed';
+
+    if (isEmailNotConfirmed) {
+      const encodedEmail = Buffer.from(email).toString('base64');
+      redirect('/kayit/dogrulama?e=' + encodedEmail);
+    }
+
     return { error: 'E-posta veya şifre hatalı.' };
   }
 
@@ -43,8 +52,8 @@ export async function loginAction(prevState: any, formData: FormData) {
 }
 
 export async function registerAction(prevState: any, formData: FormData) {
-  const email = formData.get('email') as string;
-  const username = formData.get('username') as string;
+  const email = (formData.get('email') as string)?.trim();
+  const username = (formData.get('username') as string)?.trim();
   const password = formData.get('password') as string;
   const confirmPassword = formData.get('confirmPassword') as string;
   const legalAccept = formData.get('legalAccept');
@@ -58,6 +67,12 @@ export async function registerAction(prevState: any, formData: FormData) {
     return { error: 'Lütfen tüm alanları doldurun.' };
   }
 
+  // Username format check (3-30 chars, alphanumeric + _ . -)
+  const usernameRegex = /^[a-zA-Z0-9_.-]{3,30}$/;
+  if (!usernameRegex.test(username)) {
+    return { error: 'Kullanıcı adı 3-30 karakter arasında olmalı ve yalnızca harf, rakam, alt çizgi, nokta ve tire içerebilir.' };
+  }
+
   if (password.length < 8) {
     return { error: 'Şifre en az 8 karakter olmalıdır.' };
   }
@@ -68,6 +83,23 @@ export async function registerAction(prevState: any, formData: FormData) {
 
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
+
+  // Check if username is already taken (case-insensitive check with escaped wildcards)
+  const escapedUsername = username.replace(/[_%]/g, '\\$&');
+  const { data: existingProfile, error: checkError } = await supabase
+    .from('profiles')
+    .select('id')
+    .ilike('username', escapedUsername)
+    .maybeSingle();
+
+  if (checkError) {
+    console.error('Username availability check error:', checkError);
+    return { error: 'Kullanıcı adı kontrol edilirken bir hata oluştu. Lütfen tekrar deneyin.' };
+  }
+
+  if (existingProfile) {
+    return { error: 'Bu kullanıcı adı zaten kullanılıyor. Lütfen başka bir kullanıcı adı seçin.' };
+  }
 
   const siteUrl = getSiteUrl();
   
@@ -89,6 +121,14 @@ export async function registerAction(prevState: any, formData: FormData) {
   });
 
   if (error) {
+    const errorMsg = error.message || '';
+    if (
+      errorMsg.toLowerCase().includes('database error saving new user') ||
+      errorMsg.toLowerCase().includes('unique constraint') ||
+      (error.status === 500 && errorMsg.includes('Database error'))
+    ) {
+      return { error: 'Kayıt oluşturulamadı. Seçtiğiniz kullanıcı adı veya e-posta adresi kullanımda olabilir. Lütfen bilgilerinizi kontrol edip tekrar deneyin.' };
+    }
     return { error: error.message || 'Kayıt olurken bir hata oluştu.' };
   }
 

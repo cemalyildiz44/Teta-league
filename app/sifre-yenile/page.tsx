@@ -60,40 +60,68 @@ function ResetPasswordContent() {
     // 3. Verify active recovery / auth session with Supabase client
     const supabase = createClient();
     let isSubscribed = true;
+    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (!isSubscribed) return;
-      if (event === 'PASSWORD_RECOVERY' || session?.user) {
+      if (
+        event === 'PASSWORD_RECOVERY' ||
+        event === 'SIGNED_IN' ||
+        session?.user
+      ) {
         setStatus('ready');
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!isSubscribed) return;
-      if (session?.user) {
-        setStatus('ready');
-      } else {
-        // Wait briefly in case the client is still parsing the hash / cookie
-        const timer = setTimeout(() => {
-          if (!isSubscribed) return;
-          supabase.auth.getSession().then(({ data: { session: recheckSession } }) => {
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (!isSubscribed) return;
+        if (session?.user) {
+          setStatus('ready');
+          return;
+        }
+
+        // If there is an access_token in the URL hash (implicit flow fallback),
+        // allow GoTrue client a brief window to parse the fragment:
+        const hasHashToken =
+          typeof window !== 'undefined' &&
+          window.location.hash &&
+          window.location.hash.includes('access_token');
+
+        if (hasHashToken) {
+          fallbackTimer = setTimeout(() => {
             if (!isSubscribed) return;
-            if (recheckSession?.user) {
-              setStatus('ready');
-            } else {
-              setStatus('no_session');
-            }
-          });
-        }, 600);
+            supabase.auth.getSession().then(({ data: { session: hashSession } }) => {
+              if (!isSubscribed) return;
+              setStatus((prev) => {
+                if (prev === 'ready' || prev === 'expired') return prev;
+                return hashSession?.user ? 'ready' : 'no_session';
+              });
+            });
+          }, 1500);
+          return;
+        }
 
-        return () => clearTimeout(timer);
-      }
-    });
+        // No hash token and no session cookie:
+        setStatus((prev) => {
+          if (prev === 'ready' || prev === 'expired') return prev;
+          return 'no_session';
+        });
+      })
+      .catch(() => {
+        if (!isSubscribed) return;
+        setStatus((prev) => {
+          if (prev === 'ready' || prev === 'expired') return prev;
+          return 'no_session';
+        });
+      });
 
     return () => {
       isSubscribed = false;
+      if (fallbackTimer) clearTimeout(fallbackTimer);
       subscription.unsubscribe();
     };
   }, [searchParams]);
