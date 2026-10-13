@@ -15,7 +15,7 @@ function LoginForm() {
   const errorParam = searchParams.get('error');
   const redirectTo = searchParams.get('redirectTo') || searchParams.get('next') || '';
   let urlError = '';
-  if (errorParam === 'invalid_link') urlError = 'Şifre sıfırlama bağlantısı geçersiz veya süresi dolmuş.';
+  if (errorParam === 'invalid_link' || errorParam === 'expired_link') urlError = 'Şifre sıfırlama bağlantısı geçersiz veya süresi dolmuş.';
   if (errorParam === 'invalid_verification') urlError = 'E-posta doğrulama bağlantısı geçersiz, kullanılmış veya süresi dolmuş.';
 
   return (

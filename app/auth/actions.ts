@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { getSiteUrl, getAuthCallbackUrl } from '@/lib/site-url';
 
 export async function loginAction(prevState: any, formData: FormData) {
   const email = formData.get('email') as string;
@@ -68,7 +69,7 @@ export async function registerAction(prevState: any, formData: FormData) {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://127.0.0.1:3000';
+  const siteUrl = getSiteUrl();
   
   // NOTE: Storing terms_accepted_at in user_meta_data is useful for basic application logic
   // but it is not an immutable, tamper-proof legal record system (like a dedicated audit log table would be).
@@ -112,8 +113,7 @@ export async function forgotPasswordAction(prevState: any, formData: FormData) {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
   
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-  const redirectUrl = `${siteUrl}/auth/callback?next=/sifre-yenile`;
+  const redirectUrl = getAuthCallbackUrl('/sifre-yenile');
 
   // Do not expose whether the email exists or not (User Enumeration protection)
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -181,7 +181,7 @@ export async function resendVerificationAction(prevState: any, formData: FormDat
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
   
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://127.0.0.1:3000';
+  const siteUrl = getSiteUrl();
   
   const { error } = await supabase.auth.resend({
     type: 'signup',

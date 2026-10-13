@@ -1,39 +1,51 @@
-import { type EmailOtpType } from '@supabase/supabase-js'
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { type EmailOtpType } from '@supabase/supabase-js';
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/utils/supabase/server';
+import { cookies } from 'next/headers';
+import { getSiteUrl, sanitizeNextUrl } from '@/lib/site-url';
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const token_hash = searchParams.get('token_hash')
-  const type = searchParams.get('type') as EmailOtpType | null
-  let next = searchParams.get('next') ?? '/'
-  try {
-    const url = new URL(next)
-    next = url.pathname + url.search
-  } catch (e) {
-    // next is already a relative path
+  const { searchParams } = new URL(request.url);
+  const token_hash = searchParams.get('token_hash');
+  const type = searchParams.get('type') as EmailOtpType | null;
+  const error = searchParams.get('error');
+  const errorCode = searchParams.get('error_code');
+
+  const safeNext = sanitizeNextUrl(searchParams.get('next'));
+  const siteUrl = getSiteUrl();
+  const redirectTo = `${siteUrl}${safeNext}`;
+  const isRecoveryFlow = type === 'recovery' || safeNext.startsWith('/sifre-yenile');
+
+  // Handle explicit errors from Supabase
+  if (error || errorCode) {
+    if (isRecoveryFlow) {
+      return NextResponse.redirect(`${siteUrl}/sifremi-unuttum?error=expired_link`);
+    }
+    return NextResponse.redirect(`${siteUrl}/giris?error=invalid_verification`);
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://127.0.0.1:3000'
-  const safeNext = next.startsWith('/') ? next : '/' + next
-  const redirectTo = siteUrl + safeNext
-
   if (token_hash && type) {
-    const cookieStore = await cookies()
-    const supabase = createClient(cookieStore)
+    const cookieStore = await cookies();
+    const supabase = createClient(cookieStore);
 
-    const { error } = await supabase.auth.verifyOtp({
+    const { error: verifyError } = await supabase.auth.verifyOtp({
       type,
       token_hash,
-    })
+    });
     
-    if (!error) {
-      return NextResponse.redirect(redirectTo)
+    if (!verifyError) {
+      return NextResponse.redirect(redirectTo);
+    }
+
+    console.error('Auth verifyOtp error:', verifyError);
+    if (isRecoveryFlow) {
+      return NextResponse.redirect(`${siteUrl}/sifremi-unuttum?error=expired_link`);
     }
   }
 
-  // return the user to an error page with some instructions
-  return NextResponse.redirect(siteUrl + '/giris?error=invalid_verification')
+  // Return the user to an error page with instructions
+  if (isRecoveryFlow) {
+    return NextResponse.redirect(`${siteUrl}/sifremi-unuttum?error=expired_link`);
+  }
+  return NextResponse.redirect(`${siteUrl}/giris?error=invalid_verification`);
 }
-

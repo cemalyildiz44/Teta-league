@@ -1,34 +1,50 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@/utils/supabase/server';
+import { getSiteUrl, sanitizeNextUrl } from '@/lib/site-url';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
-  let next = searchParams.get('next') ?? '/';
-  try {
-    const url = new URL(next);
-    next = url.pathname + url.search;
-  } catch (e) {
-    // relative path
-  }
+  const error = searchParams.get('error');
+  const errorCode = searchParams.get('error_code');
   
-  // Güvenlik ve origin uyumluluğu için .env'den URL alınıyor
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://127.0.0.1:3000';
-  const safeNext = next.startsWith('/') ? next : `/${next}`;
+  const safeNext = sanitizeNextUrl(searchParams.get('next'));
+  const siteUrl = getSiteUrl();
+  const isRecoveryFlow = safeNext.startsWith('/sifre-yenile');
+
+  // Handle explicit errors from Supabase auth (e.g. otp_expired, access_denied)
+  if (error || errorCode) {
+    if (isRecoveryFlow) {
+      return NextResponse.redirect(`${siteUrl}/sifremi-unuttum?error=expired_link`);
+    }
+    if (errorCode === 'otp_expired') {
+      return NextResponse.redirect(`${siteUrl}/giris?error=invalid_verification`);
+    }
+    return NextResponse.redirect(`${siteUrl}/giris?error=invalid_link`);
+  }
 
   if (code) {
     const cookieStore = await cookies();
     const supabase = createClient(cookieStore);
     
     // Exchange the code for a session
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
     
-    if (!error) {
+    if (!exchangeError) {
       return NextResponse.redirect(`${siteUrl}${safeNext}`);
     }
+
+    console.error('Auth code exchange error:', exchangeError);
+    if (isRecoveryFlow) {
+      return NextResponse.redirect(`${siteUrl}/sifremi-unuttum?error=expired_link`);
+    }
+    return NextResponse.redirect(`${siteUrl}/giris?error=invalid_link`);
   }
 
-  // Fallback to error page with instructions if no code or exchange fails
+  // Fallback if no code or error provided
+  if (isRecoveryFlow) {
+    return NextResponse.redirect(`${siteUrl}/sifremi-unuttum?error=expired_link`);
+  }
   return NextResponse.redirect(`${siteUrl}/giris?error=invalid_link`);
 }
