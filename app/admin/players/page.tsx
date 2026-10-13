@@ -34,7 +34,9 @@ export default async function AdminPlayersPage() {
     { data: memberships, error: membershipsErr },
     { data: achievements, error: achievementsErr },
     { data: allTeams, error: teamsErr },
-    { data: legacyStats, error: legacyStatsErr }
+    { data: legacyStats, error: legacyStatsErr },
+    { data: allSeasons },
+    { data: leagueTeamsData }
   ] = await Promise.all([
     supabase
       .from('profiles')
@@ -56,7 +58,14 @@ export default async function AdminPlayersPage() {
       .from('player_legacy_career_stats')
       .select('*')
       .is('deleted_at', null)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('seasons')
+      .select('id, name, slug, status')
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('league_teams')
+      .select('season_id, league_id, team_id, leagues(name)')
   ]);
 
   if (profilesErr) {
@@ -130,5 +139,29 @@ export default async function AdminPlayersPage() {
     legacy_stats: legacyStatsMap.get(p.id) || []
   }));
 
-  return <PlayersManager players={serializedPlayers} teams={allTeams || []} />;
+  const serializedSeasons = (allSeasons || []).map((s: any) => ({
+    id: s.id,
+    name: s.name,
+    slug: s.slug,
+    status: s.status || 'COMPLETED'
+  }));
+
+  const serializedLeagueTeams = (leagueTeamsData || []).map((lt: any) => {
+    const lg = Array.isArray(lt.leagues) ? lt.leagues[0] : lt.leagues;
+    return {
+      season_id: lt.season_id,
+      league_id: lt.league_id,
+      team_id: lt.team_id,
+      league_name: lg?.name || ''
+    };
+  });
+
+  return (
+    <PlayersManager
+      players={serializedPlayers}
+      teams={allTeams || []}
+      seasons={serializedSeasons}
+      leagueTeams={serializedLeagueTeams}
+    />
+  );
 }

@@ -4,6 +4,11 @@ import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { logAdminAudit } from '@/lib/audit';
+import {
+  foldCase,
+  isEquivalentSeasonName,
+  validateAndPrepareCsvImportBatch
+} from '@/lib/csv/season-stats-importer';
 
 async function checkAdmin(supabase: any, user: any) {
   const { data: roleData } = await supabase
@@ -762,5 +767,245 @@ export async function updatePlayerAccountAdminAction(formData: FormData) {
   } catch (err: any) {
     console.error('Unexpected error in updatePlayerAccountAdminAction:', err);
     return { error: err.message || 'Beklenmeyen bir hata oluştu.' };
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// BULK CSV SEASON STATS IMPORT (TEAM-BASED GRANULAR CAREER STATS)
+// ════════════════════════════════════════════════════════════════
+
+export interface CsvImportRecordInput {
+  lineNumber: number;
+  eaId: string;
+  player_id: string;
+  team_id: string | null;
+  team_name: string;
+  league_name: string;
+  matches_played: number;
+  goals: number;
+  assists: number;
+  rating_avg: number;
+}
+
+export interface CsvImportBatchRequest {
+  seasonId: string | null;
+  seasonName: string;
+  defaultLeagueName: string;
+  records: CsvImportRecordInput[];
+}
+
+export interface CsvImportRowIssue {
+  lineNumber: number;
+  eaId: string;
+  teamName: string;
+  reason: string;
+}
+
+export interface CsvImportBatchResponse {
+  success?: string;
+  error?: string;
+  insertedCount: number;
+  skippedExistingCount: number;
+  failedCount: number;
+  rowErrors: CsvImportRowIssue[];
+  skippedRows: CsvImportRowIssue[];
+}
+
+export async function importPlayerSeasonStatsCsvAction(
+  request: CsvImportBatchRequest
+): Promise<CsvImportBatchResponse> {
+  const emptyResponse = (error: string): CsvImportBatchResponse => ({
+    error,
+    insertedCount: 0,
+    skippedExistingCount: 0,
+    failedCount: 0,
+    rowErrors: [],
+    skippedRows: []
+  });
+
+  try {
+    const cookieStore = await cookies();
+    const supabase = createClient(cookieStore);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return emptyResponse('Yetkisiz erişim. Lütfen giriş yapın.');
+    }
+
+    const isAdmin = await checkAdmin(supabase, user);
+    if (!isAdmin) {
+      return emptyResponse('Bu işlemi yapmaya yetkiniz yok. Yalnızca ADMIN ve SUPER_ADMIN toplu CSV içe aktarma yapabilir.');
+    }
+
+    if (!request || !Array.isArray(request.records) || request.records.length === 0) {
+      return emptyResponse('İçe aktarılacak geçerli kayıt bulunamadı.');
+    }
+
+    if (request.records.length > 2500) {
+      return emptyResponse('Tek seferde en fazla 2500 kayıt içe aktarılabilir.');
+    }
+
+    // Validate seasonId from seasons table if provided
+    let resolvedSeasonRecord: { id: string; name: string; slug: string } | null = null;
+    if (request.seasonId) {
+      if (!UUID_REGEX.test(request.seasonId)) {
+        return emptyResponse('Geçersiz sezon kimliği (UUID).');
+      }
+      const { data: seasonRow, error: seasonErr } = await supabase
+        .from('seasons')
+        .select('id, name, slug')
+        .eq('id', request.seasonId)
+        .maybeSingle();
+
+      if (seasonErr || !seasonRow) {
+        return emptyResponse('Seçilen sezon veritabanında bulunamadı.');
+      }
+      resolvedSeasonRecord = seasonRow;
+    }
+
+    const seasonName = (request.seasonName || resolvedSeasonRecord?.name || '').trim();
+    if (!seasonName || seasonName.length > 100) {
+      return emptyResponse('Geçerli bir sezon adı belirtilmelidir (1-100 karakter).');
+    }
+
+    const defaultLeagueName = (request.defaultLeagueName || 'TETA Süper Lig').trim();
+    if (!defaultLeagueName || defaultLeagueName.length > 100) {
+      return emptyResponse('Geçerli bir varsayılan lig adı belirtilmelidir (1-100 karakter).');
+    }
+
+    // Collect unique player_ids and team_ids for bulk verification (no N+1)
+    const candidatePlayerIds = Array.from(
+      new Set(request.records.map(r => r.player_id).filter(id => typeof id === 'string' && UUID_REGEX.test(id)))
+    );
+    const candidateTeamIds = Array.from(
+      new Set(request.records.map(r => r.team_id).filter((id): id is string => typeof id === 'string' && UUID_REGEX.test(id)))
+    );
+
+    const [
+      { data: dbProfiles, error: profilesErr },
+      { data: dbTeams, error: teamsErr },
+      { data: dbExistingStats, error: existingStatsErr }
+    ] = await Promise.all([
+      candidatePlayerIds.length > 0
+        ? supabase.from('profiles').select('id, username, current_ea_player_id').in('id', candidatePlayerIds)
+        : Promise.resolve({ data: [], error: null }),
+      candidateTeamIds.length > 0
+        ? supabase.from('teams').select('id, name').in('id', candidateTeamIds)
+        : Promise.resolve({ data: [], error: null }),
+      candidatePlayerIds.length > 0
+        ? supabase
+            .from('player_legacy_career_stats')
+            .select('id, player_id, season_name, team_id, team_name')
+            .in('player_id', candidatePlayerIds)
+            .is('deleted_at', null)
+        : Promise.resolve({ data: [], error: null })
+    ]);
+
+    if (profilesErr) {
+      return emptyResponse(`Oyuncu profilleri doğrulanırken hata oluştu: ${profilesErr.message}`);
+    }
+    if (teamsErr) {
+      return emptyResponse(`Takımlar doğrulanırken hata oluştu: ${teamsErr.message}`);
+    }
+    if (existingStatsErr) {
+      return emptyResponse(`Mevcut kariyer kayıtları kontrol edilirken hata oluştu: ${existingStatsErr.message}`);
+    }
+
+    // Strict all-or-nothing server-side batch validation
+    const batchValidation = validateAndPrepareCsvImportBatch({
+      records: request.records,
+      seasonName,
+      defaultLeagueName,
+      validProfiles: (dbProfiles || []) as Array<{ id: string; username: string }>,
+      validTeams: (dbTeams || []) as Array<{ id: string; name: string }>,
+      existingStats: (dbExistingStats || []) as Array<{
+        id: string;
+        player_id: string;
+        season_name: string;
+        team_id: string | null;
+        team_name: string;
+      }>,
+      actorUserId: user.id
+    });
+
+    const { abortedDueToValidationError, insertPayloads, rowErrors, skippedRows } = batchValidation;
+
+    // STRICT ALL-OR-NOTHING: If even a single row failed server-side validation, abort without writing any rows
+    if (abortedDueToValidationError || rowErrors.length > 0) {
+      return {
+        error: `Doğrulama hatası nedeniyle işlem tamamen durduruldu (${rowErrors.length} hatalı satır). Veritabanına hiçbir yeni kayıt yazılmadı.`,
+        insertedCount: 0,
+        skippedExistingCount: skippedRows.length,
+        failedCount: rowErrors.length,
+        rowErrors,
+        skippedRows
+      };
+    }
+
+    if (insertPayloads.length === 0) {
+      return {
+        error:
+          skippedRows.length > 0
+            ? 'Seçilen tüm kayıtlar veritabanında zaten mevcut olduğu için yeni kayıt eklenmedi.'
+            : 'Doğrulama sonrasında eklenecek geçerli kayıt kalmadı.',
+        insertedCount: 0,
+        skippedExistingCount: skippedRows.length,
+        failedCount: 0,
+        rowErrors: [],
+        skippedRows
+      };
+    }
+
+    // Single multi-row INSERT statement: atomic at PostgreSQL transaction level
+    const { error: insertErr } = await supabase
+      .from('player_legacy_career_stats')
+      .insert(insertPayloads);
+
+    if (insertErr) {
+      console.error('Bulk CSV legacy stats insert error:', insertErr);
+      return {
+        error: `Toplu veritabanı kaydı sırasında hata oluştu (hiçbir kayıt yazılmadı, işlem atomik olarak geri alındı): ${insertErr.message}`,
+        insertedCount: 0,
+        skippedExistingCount: skippedRows.length,
+        failedCount: insertPayloads.length,
+        rowErrors,
+        skippedRows
+      };
+    }
+
+    const uniquePlayersInserted = new Set(insertPayloads.map(p => p.player_id)).size;
+
+    await logAdminAudit({
+      action: 'BULK_IMPORT_LEGACY_CAREER_CSV',
+      entity_type: 'player_legacy_career_stats',
+      entity_id: resolvedSeasonRecord?.id || user.id,
+      entity_label: `${seasonName} (${insertPayloads.length} takım kaydı)`,
+      new_data: {
+        season_id: resolvedSeasonRecord?.id || null,
+        season_name: seasonName,
+        default_league_name: defaultLeagueName,
+        inserted_records_count: insertPayloads.length,
+        unique_players_count: uniquePlayersInserted,
+        skipped_existing_count: skippedRows.length,
+        validation_failed_count: 0
+      },
+      description: `CSV ile ${seasonName} için ${uniquePlayersInserted} oyuncuya ait ${insertPayloads.length} takım bazlı sezon istatistiği içe aktarıldı.`,
+      actor_id: user.id
+    });
+
+    revalidatePath('/admin/players');
+    revalidatePath('/oyuncular');
+
+    return {
+      success: `${uniquePlayersInserted} oyuncuya ait toplam ${insertPayloads.length} takım bazlı sezon istatistiği başarıyla içe aktarıldı.`,
+      insertedCount: insertPayloads.length,
+      skippedExistingCount: skippedRows.length,
+      failedCount: 0,
+      rowErrors: [],
+      skippedRows
+    };
+  } catch (err: any) {
+    console.error('Unexpected error in importPlayerSeasonStatsCsvAction:', err);
+    return emptyResponse(err.message || 'Beklenmeyen bir sunucu hatası oluştu.');
   }
 }

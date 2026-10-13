@@ -55,6 +55,7 @@ next-env.d.ts
 !supabase/seed.sql
 test*.js
 test*.mjs
+!tests/test-csv-season-stats-import.mjs
 check*.js
 write*.js
 fix*.js

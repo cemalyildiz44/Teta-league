@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   Search, User, Trophy, ShieldAlert, CheckCircle2, X, Loader2,
   ExternalLink, Award, FileText, Save,
-  Plus, Edit2, Trash2, Calendar, Shield, AlertTriangle
+  Plus, Edit2, Trash2, Calendar, Shield, AlertTriangle, FileSpreadsheet
 } from 'lucide-react';
 import {
   addPlayerLegacyCareerAction,
@@ -16,6 +16,8 @@ import {
   PlayerAccountStatus
 } from './actions';
 import TeamLogo from '@/components/TeamLogo';
+import { CsvSeasonStatsModal, SeasonOption } from './CsvSeasonStatsModal';
+import { ImporterLeagueTeamRef } from '@/lib/csv/season-stats-importer';
 
 export interface TeamOption {
   id: string;
@@ -53,9 +55,11 @@ interface PlayerRecord {
 interface PlayersManagerProps {
   players: PlayerRecord[];
   teams: TeamOption[];
+  seasons?: SeasonOption[];
+  leagueTeams?: ImporterLeagueTeamRef[];
 }
 
-export function PlayersManager({ players, teams }: PlayersManagerProps) {
+export function PlayersManager({ players, teams, seasons = [], leagueTeams = [] }: PlayersManagerProps) {
   const router = useRouter();
 
   const [search, setSearch] = useState('');
@@ -65,6 +69,7 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
 
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerRecord | null>(null);
   const [feedback, setFeedback] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [csvModalOpen, setCsvModalOpen] = useState(false);
 
   // Synchronize selectedPlayer with updated players prop when router.refresh triggers
   useEffect(() => {
@@ -309,7 +314,15 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setCsvModalOpen(true)}
+            className="px-4 py-2.5 bg-[#00e5ff]/10 hover:bg-[#00e5ff]/20 text-[#00e5ff] border border-[#00e5ff]/30 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all shadow-lg shadow-[#00e5ff]/5"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            CSV İSTATİSTİK İÇE AKTAR
+          </button>
           <div className="px-3 py-2 bg-[#060d18] border border-white/5 rounded-xl text-center">
             <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Beta Kaydı Olan</div>
             <div className="text-base font-black text-emerald-400">
@@ -1238,6 +1251,24 @@ export function PlayersManager({ players, teams }: PlayersManagerProps) {
           </div>
         </div>
       )}
+
+      {/* CSV Season Stats Bulk Import Modal */}
+      <CsvSeasonStatsModal
+        isOpen={csvModalOpen}
+        onClose={() => setCsvModalOpen(false)}
+        onSuccessRefresh={() => router.refresh()}
+        profiles={players.map(p => ({
+          id: p.id,
+          username: p.username,
+          full_name: p.full_name,
+          current_ea_player_id: p.current_ea_player_id,
+          status: p.status
+        }))}
+        teams={teams}
+        seasons={seasons}
+        leagueTeams={leagueTeams}
+        existingLegacyStats={players.flatMap(p => p.legacy_stats || [])}
+      />
     </div>
   );
 }
