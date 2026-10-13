@@ -28,10 +28,15 @@ import {
   ImporterLeagueTeamRef,
   ImporterExistingLegacyStatRef,
   ManualTeamResolution,
-  CsvRowImportStatus
+  CsvRowImportStatus,
+  PersistentTeamMapping,
+  evaluateRememberedTeamMappings,
+  filterPendingPlayerGroups
 } from '@/lib/csv/season-stats-importer';
 import {
   importPlayerSeasonStatsCsvAction,
+  getPersistentCsvTeamMappingsAction,
+  savePersistentCsvTeamMappingsAction,
   CsvImportBatchResponse
 } from './actions';
 
@@ -539,6 +544,30 @@ function SystemTeamCombobox({
   );
 }
 
+const SAVED_TEAM_MAPPINGS_STORAGE_KEY = 'teta_csv_saved_team_mappings_v1';
+
+function loadSavedTeamMappingsFromStorage(): PersistentTeamMapping[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(SAVED_TEAM_MAPPINGS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed;
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+function saveTeamMappingsToStorage(mappings: PersistentTeamMapping[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(SAVED_TEAM_MAPPINGS_STORAGE_KEY, JSON.stringify(mappings));
+  } catch (err) {
+    console.error('Failed to save team mappings to localStorage', err);
+  }
+}
+
 export function CsvSeasonStatsModal({
   isOpen,
   onClose,
@@ -566,15 +595,43 @@ export function CsvSeasonStatsModal({
   const [csvContent, setCsvContent] = useState<string>('');
   const [manualPlayerOverrides, setManualPlayerOverrides] = useState<Record<string, string>>({});
   const [manualTeamOverrides, setManualTeamOverrides] = useState<Record<string, ManualTeamResolution>>({});
+  const [savedTeamMappings, setSavedTeamMappings] = useState<PersistentTeamMapping[]>([]);
 
   const [activeFilter, setActiveFilter] = useState<PreviewTabFilter>('ALL');
   const [skippedSubFilter, setSkippedSubFilter] = useState<SkippedSubFilter>('ALL_SKIPPED');
   const [rowSearch, setRowSearch] = useState<string>('');
+  const [pendingPlayerSearch, setPendingPlayerSearch] = useState<string>('');
   const [showAllPendingPlayers, setShowAllPendingPlayers] = useState<boolean>(false);
   const [showAllPendingTeams, setShowAllPendingTeams] = useState<boolean>(false);
 
   const [importing, setImporting] = useState<boolean>(false);
   const [importResult, setImportResult] = useState<CsvImportBatchResponse | null>(null);
+
+  // Load saved team mappings on mount (localStorage + server DB)
+  useEffect(() => {
+    const localMappings = loadSavedTeamMappingsFromStorage();
+    if (localMappings.length > 0) {
+      setSavedTeamMappings(localMappings);
+    }
+
+    getPersistentCsvTeamMappingsAction().then(res => {
+      if (res.mappings && res.mappings.length > 0) {
+        setSavedTeamMappings(prev => {
+          const map = new Map<string, PersistentTeamMapping>();
+          for (const m of prev) map.set(foldCase(m.sourceTeamName), m);
+          for (const m of res.mappings) map.set(foldCase(m.sourceTeamName), m);
+          const merged = Array.from(map.values());
+          saveTeamMappingsToStorage(merged);
+          return merged;
+        });
+      }
+    });
+  }, []);
+
+  const rememberedTeamEvaluations = useMemo(
+    () => evaluateRememberedTeamMappings(savedTeamMappings, teams),
+    [savedTeamMappings, teams]
+  );
 
   const preview = useMemo(() => {
     if (!csvContent) return null;
@@ -612,12 +669,26 @@ export function CsvSeasonStatsModal({
     setFileName(file.name);
     setImportResult(null);
     setManualPlayerOverrides({});
-    setManualTeamOverrides({});
+    setPendingPlayerSearch('');
     setActiveFilter('ALL');
     setSkippedSubFilter('ALL_SKIPPED');
 
     const text = await file.text();
     setCsvContent(text);
+
+    // Auto-apply only VALID, non-conflicting remembered team mappings
+    if (savedTeamMappings.length > 0) {
+      const evaluations = evaluateRememberedTeamMappings(savedTeamMappings, teams);
+      const initialOverrides: Record<string, ManualTeamResolution> = {};
+      for (const [sourceTeam, ev] of evaluations.entries()) {
+        if (ev.status === 'VALID' && ev.resolvedResolution) {
+          initialOverrides[sourceTeam] = ev.resolvedResolution;
+        }
+      }
+      setManualTeamOverrides(initialOverrides);
+    } else {
+      setManualTeamOverrides({});
+    }
   };
 
   const handleSeasonSelectChange = (newSeasonId: string) => {
@@ -649,6 +720,29 @@ export function CsvSeasonStatsModal({
       }
       return next;
     });
+
+    if (resolution) {
+      const targetName =
+        resolution.mode === 'EXISTING'
+          ? teams.find(t => t.id === resolution.teamId)?.name || playedTeam
+          : resolution.customName || playedTeam;
+
+      const newMapping: PersistentTeamMapping = {
+        sourceTeamName: playedTeam,
+        mode: resolution.mode,
+        targetTeamId: resolution.mode === 'EXISTING' ? resolution.teamId : null,
+        targetTeamName: targetName,
+        updatedAt: new Date().toISOString()
+      };
+
+      setSavedTeamMappings(prev => {
+        const filtered = prev.filter(m => foldCase(m.sourceTeamName) !== foldCase(playedTeam));
+        const updated = [...filtered, newMapping];
+        saveTeamMappingsToStorage(updated);
+        savePersistentCsvTeamMappingsAction([newMapping]).catch(() => {});
+        return updated;
+      });
+    }
   };
 
   const handleConfirmImport = async () => {
@@ -704,12 +798,23 @@ export function CsvSeasonStatsModal({
     ? preview.unmatchedOrAmbiguousPlayerGroups.filter(g => g.matchStatus === 'MANUAL_LINKED')
     : [];
 
+  const filteredPendingPlayerGroups = useMemo(() => {
+    return filterPendingPlayerGroups(pendingPlayerGroups, pendingPlayerSearch);
+  }, [pendingPlayerGroups, pendingPlayerSearch]);
+
   const pendingTeamGroups = preview
     ? preview.unrecognizedTeamGroups.filter(g => g.matchStatus === 'UNRECOGNIZED')
     : [];
   const completedTeamGroups = preview
     ? preview.unrecognizedTeamGroups.filter(g => g.matchStatus !== 'UNRECOGNIZED')
     : [];
+
+  const validRememberedTeamCount = useMemo(() => {
+    return pendingTeamGroups.filter(tg => {
+      const rem = rememberedTeamEvaluations.get(tg.playedTeam);
+      return rem && rem.status === 'VALID' && rem.resolvedResolution !== null;
+    }).length;
+  }, [pendingTeamGroups, rememberedTeamEvaluations]);
 
   const filteredRows = (() => {
     if (!preview) return [];
@@ -1022,86 +1127,157 @@ export function CsvSeasonStatsModal({
                         )}
                       </div>
 
+                      {/* Search Filter for Pending EA IDs */}
+                      {pendingPlayerGroups.length > 0 && (
+                        <div className="bg-[#060d18] p-2.5 rounded-xl border border-white/5 space-y-1.5">
+                          <div className="relative flex items-center">
+                            <Search className="w-4 h-4 text-[#00e5ff] absolute left-3 pointer-events-none" />
+                            <input
+                              type="text"
+                              value={pendingPlayerSearch}
+                              onChange={e => setPendingPlayerSearch(e.target.value)}
+                              placeholder="Bekleyen EA ID veya Takım Adı Filtrele (örn: dorukzinboi, kadddoo, Gegi Esport)..."
+                              className="w-full pl-9 pr-9 py-2 bg-[#0a1628] border border-white/10 rounded-lg text-xs font-medium text-white placeholder-zinc-500 focus:outline-none focus:border-[#00e5ff] transition-colors"
+                            />
+                            {pendingPlayerSearch && (
+                              <button
+                                type="button"
+                                onClick={() => setPendingPlayerSearch('')}
+                                className="absolute right-2.5 p-1 text-zinc-400 hover:text-white rounded hover:bg-white/10 transition-colors"
+                                title="Aramayı Temizle"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                          {pendingPlayerSearch.trim() && (
+                            <div className="flex items-center justify-between text-[11px] px-1 text-zinc-400">
+                              <span>
+                                Filtrelenen:{' '}
+                                <span className="font-bold text-[#00e5ff]">{filteredPendingPlayerGroups.length}</span>{' '}
+                                / {pendingPlayerGroups.length} bekleyen EA ID
+                              </span>
+                              {filteredPendingPlayerGroups.length === 0 ? (
+                                <span className="text-amber-400 font-bold">Sonuç bulunamadı</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setPendingPlayerSearch('')}
+                                  className="text-zinc-400 hover:text-white underline text-[10px]"
+                                >
+                                  Filtreyi Temizle
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {/* Pending Player Matches First */}
                       {pendingPlayerGroups.length > 0 && (
                         <div className="space-y-2">
-                          {(showAllPendingPlayers
-                            ? pendingPlayerGroups
-                            : pendingPlayerGroups.slice(0, 10)
-                          ).map(group => {
-                            const usedByOtherEaIdMap = new Map<string, string>();
-                            for (const [otherEa, profId] of Object.entries(manualPlayerOverrides)) {
-                              if (otherEa !== group.eaId && profId) {
-                                usedByOtherEaIdMap.set(profId, otherEa);
-                              }
-                            }
-
-                            return (
-                              <div
-                                key={group.eaId}
-                                className="p-3 rounded-xl bg-[#060d18] border border-white/5 flex flex-col lg:flex-row lg:items-center justify-between gap-3"
-                              >
-                                <div className="space-y-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-xs font-black font-mono text-white">
-                                      {group.eaId}
-                                    </span>
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-zinc-300">
-                                      {group.rowCount} kayıt ({group.playedTeams.join(', ')})
-                                    </span>
-                                    {group.matchStatus === 'AMBIGUOUS' ? (
-                                      <span className="text-[10px] font-black px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                                        Belirsiz / Harf Farkı Onayı Gerekli
-                                      </span>
-                                    ) : (
-                                      <span className="text-[10px] font-black px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-white/10">
-                                        Eşleşen Profil Bulunamadı
-                                      </span>
-                                    )}
-                                  </div>
-                                  {group.ambiguityReason && (
-                                    <p className="text-[11px] text-amber-300/90">{group.ambiguityReason}</p>
-                                  )}
-                                </div>
-
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-2 shrink-0">
-                                  {/* Quick one-click candidate confirmation if AMBIGUOUS */}
-                                  {group.candidateProfiles.map(cand => (
-                                    <button
-                                      key={cand.id}
-                                      type="button"
-                                      onClick={() => handleSetManualPlayer(group.eaId, cand.id)}
-                                      className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[#00e5ff]/10 hover:bg-[#00e5ff]/20 text-[#00e5ff] border border-[#00e5ff]/30 transition-colors shrink-0"
-                                    >
-                                      Hızlı Onayla: @{cand.username} ({cand.current_ea_player_id})
-                                    </button>
-                                  ))}
-
-                                  <PlayerProfileCombobox
-                                    eaId={group.eaId}
-                                    profiles={profiles}
-                                    candidateProfiles={group.candidateProfiles}
-                                    selectedProfileId={manualPlayerOverrides[group.eaId] || null}
-                                    usedByOtherEaIdMap={usedByOtherEaIdMap}
-                                    onSelect={profId => handleSetManualPlayer(group.eaId, profId)}
-                                  />
-                                </div>
-                              </div>
-                            );
-                          })}
-
-                          {pendingPlayerGroups.length > 10 && (
-                            <div className="pt-1 text-center">
+                          {pendingPlayerSearch.trim() && filteredPendingPlayerGroups.length === 0 ? (
+                            <div className="p-6 rounded-xl bg-[#060d18] border border-white/5 text-center space-y-2">
+                              <Search className="w-6 h-6 text-zinc-500 mx-auto" />
+                              <div className="text-xs font-bold text-white">Sonuç Bulunamadı</div>
+                              <p className="text-[11px] text-zinc-400 max-w-md mx-auto">
+                                &ldquo;<span className="text-amber-400 font-semibold">{pendingPlayerSearch}</span>&rdquo; ile eşleşen bekleyen EA ID veya takım kaydı bulunamadı.
+                              </p>
                               <button
                                 type="button"
-                                onClick={() => setShowAllPendingPlayers(prev => !prev)}
-                                className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-zinc-300 transition-colors"
+                                onClick={() => setPendingPlayerSearch('')}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-bold text-zinc-200 border border-white/10 transition-colors"
                               >
-                                {showAllPendingPlayers
-                                  ? 'Daha Az Göster (İlk 10)'
-                                  : `Tüm Bekleyen EA ID'leri Göster (${pendingPlayerGroups.length})`}
+                                <RotateCcw className="w-3 h-3" />
+                                Aramayı Temizle ({pendingPlayerGroups.length} Bekleyen Kaydı Göster)
                               </button>
                             </div>
+                          ) : (
+                            <>
+                              {(pendingPlayerSearch.trim()
+                                ? (showAllPendingPlayers ? filteredPendingPlayerGroups : filteredPendingPlayerGroups.slice(0, 20))
+                                : (showAllPendingPlayers ? pendingPlayerGroups : pendingPlayerGroups.slice(0, 10))
+                              ).map(group => {
+                                const usedByOtherEaIdMap = new Map<string, string>();
+                                for (const [otherEa, profId] of Object.entries(manualPlayerOverrides)) {
+                                  if (otherEa !== group.eaId && profId) {
+                                    usedByOtherEaIdMap.set(profId, otherEa);
+                                  }
+                                }
+
+                                return (
+                                  <div
+                                    key={group.eaId}
+                                    className="p-3 rounded-xl bg-[#060d18] border border-white/5 flex flex-col lg:flex-row lg:items-center justify-between gap-3"
+                                  >
+                                    <div className="space-y-1 min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-xs font-black font-mono text-white">
+                                          {group.eaId}
+                                        </span>
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-zinc-300">
+                                          {group.rowCount} kayıt ({group.playedTeams.join(', ')})
+                                        </span>
+                                        {group.matchStatus === 'AMBIGUOUS' ? (
+                                          <span className="text-[10px] font-black px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                            Belirsiz / Harf Farkı Onayı Gerekli
+                                          </span>
+                                        ) : (
+                                          <span className="text-[10px] font-black px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-white/10">
+                                            Eşleşen Profil Bulunamadı
+                                          </span>
+                                        )}
+                                      </div>
+                                      {group.ambiguityReason && (
+                                        <p className="text-[11px] text-amber-300/90">{group.ambiguityReason}</p>
+                                      )}
+                                    </div>
+
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 shrink-0">
+                                      {/* Quick one-click candidate confirmation if AMBIGUOUS */}
+                                      {group.candidateProfiles.map(cand => (
+                                        <button
+                                          key={cand.id}
+                                          type="button"
+                                          onClick={() => handleSetManualPlayer(group.eaId, cand.id)}
+                                          className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[#00e5ff]/10 hover:bg-[#00e5ff]/20 text-[#00e5ff] border border-[#00e5ff]/30 transition-colors shrink-0"
+                                        >
+                                          Hızlı Onayla: @{cand.username} ({cand.current_ea_player_id})
+                                        </button>
+                                      ))}
+
+                                      <PlayerProfileCombobox
+                                        eaId={group.eaId}
+                                        profiles={profiles}
+                                        candidateProfiles={group.candidateProfiles}
+                                        selectedProfileId={manualPlayerOverrides[group.eaId] || null}
+                                        usedByOtherEaIdMap={usedByOtherEaIdMap}
+                                        onSelect={profId => handleSetManualPlayer(group.eaId, profId)}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+
+                              {((pendingPlayerSearch.trim() ? filteredPendingPlayerGroups.length : pendingPlayerGroups.length) >
+                                (pendingPlayerSearch.trim() ? 20 : 10)) && (
+                                <div className="pt-1 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowAllPendingPlayers(prev => !prev)}
+                                    className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-zinc-300 transition-colors"
+                                  >
+                                    {showAllPendingPlayers
+                                      ? 'Daha Az Göster'
+                                      : `Tüm ${pendingPlayerSearch.trim() ? 'Filtrelenen' : 'Bekleyen'} EA ID'leri Göster (${
+                                          pendingPlayerSearch.trim()
+                                            ? filteredPendingPlayerGroups.length
+                                            : pendingPlayerGroups.length
+                                        })`}
+                                  </button>
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                       )}
@@ -1155,30 +1331,71 @@ export function CsvSeasonStatsModal({
                             )
                           </h4>
                           <p className="text-[11px] text-zinc-400 mt-0.5">
-                            Sistemde bulunmayan takım adlarını mevcut bir sistem takımına bağlayabilir veya doğrudan tarihsel/özel takım adı olarak kaydedebilirsiniz.
+                            Sistemde bulunmayan takım adlarını mevcut bir sistem takımına bağlayabilir veya doğrudan tarihsel/özel takım adı olarak kaydedebilirsiniz. Eşleştirmeler sonraki yüklemeler için otomatik hatırlanır.
                           </p>
                         </div>
 
-                        {pendingTeamGroups.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const next: Record<string, ManualTeamResolution> = {
-                                ...manualTeamOverrides
-                              };
-                              for (const tg of pendingTeamGroups) {
-                                next[tg.playedTeam] = {
-                                  mode: 'CUSTOM',
-                                  customName: tg.playedTeam
+                        <div className="flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-auto">
+                          {validRememberedTeamCount > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next: Record<string, ManualTeamResolution> = {
+                                  ...manualTeamOverrides
                                 };
-                              }
-                              setManualTeamOverrides(next);
-                            }}
-                            className="px-3 py-1.5 rounded-lg bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 border border-orange-500/30 text-[11px] font-black uppercase tracking-wider shrink-0 self-start sm:self-auto"
-                          >
-                            Bekleyenlerin Tümünü Tarihsel Takım Olarak Kaydet
-                          </button>
-                        )}
+                                for (const tg of pendingTeamGroups) {
+                                  const rem = rememberedTeamEvaluations.get(tg.playedTeam);
+                                  if (rem && rem.status === 'VALID' && rem.resolvedResolution) {
+                                    next[tg.playedTeam] = rem.resolvedResolution;
+                                  }
+                                }
+                                setManualTeamOverrides(next);
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-[#00e5ff]/15 hover:bg-[#00e5ff]/25 text-[#00e5ff] border border-[#00e5ff]/30 text-[11px] font-black uppercase tracking-wider transition-colors"
+                            >
+                              💾 Hatırlanan Eşleştirmeleri Uygula ({validRememberedTeamCount} Takım)
+                            </button>
+                          )}
+
+                          {pendingTeamGroups.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next: Record<string, ManualTeamResolution> = {
+                                  ...manualTeamOverrides
+                                };
+                                const newMappings: PersistentTeamMapping[] = [];
+                                for (const tg of pendingTeamGroups) {
+                                  next[tg.playedTeam] = {
+                                    mode: 'CUSTOM',
+                                    customName: tg.playedTeam
+                                  };
+                                  newMappings.push({
+                                    sourceTeamName: tg.playedTeam,
+                                    mode: 'CUSTOM',
+                                    targetTeamId: null,
+                                    targetTeamName: tg.playedTeam,
+                                    updatedAt: new Date().toISOString()
+                                  });
+                                }
+                                setManualTeamOverrides(next);
+
+                                setSavedTeamMappings(prev => {
+                                  const map = new Map<string, PersistentTeamMapping>();
+                                  for (const m of prev) map.set(foldCase(m.sourceTeamName), m);
+                                  for (const m of newMappings) map.set(foldCase(m.sourceTeamName), m);
+                                  const merged = Array.from(map.values());
+                                  saveTeamMappingsToStorage(merged);
+                                  savePersistentCsvTeamMappingsAction(newMappings).catch(() => {});
+                                  return merged;
+                                });
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 border border-orange-500/30 text-[11px] font-black uppercase tracking-wider transition-colors"
+                            >
+                              Bekleyenlerin Tümünü Tarihsel Takım Olarak Kaydet
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {/* Pending Team Groups First */}
@@ -1189,21 +1406,47 @@ export function CsvSeasonStatsModal({
                             : pendingTeamGroups.slice(0, 10)
                           ).map(tg => {
                             const currentOverride = manualTeamOverrides[tg.playedTeam];
+                            const remembered = rememberedTeamEvaluations.get(tg.playedTeam);
+
                             return (
                               <div
                                 key={tg.playedTeam}
                                 className="p-3 rounded-xl bg-[#060d18] border border-white/5 flex flex-col lg:flex-row lg:items-center justify-between gap-3"
                               >
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-xs font-black text-white">
-                                    {tg.playedTeam}
-                                  </span>
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-zinc-400">
-                                    {tg.rowCount} oyuncu kaydı
-                                  </span>
+                                <div className="space-y-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-xs font-black text-white">
+                                      {tg.playedTeam}
+                                    </span>
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-zinc-400">
+                                      {tg.rowCount} oyuncu kaydı
+                                    </span>
+                                    {remembered?.status === 'VALID' && (
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/30">
+                                        💾 Önceki Yüklemeden Hatırlandı
+                                      </span>
+                                    )}
+                                  </div>
+                                  {remembered && remembered.status !== 'VALID' && (
+                                    <div className="flex items-center gap-1.5 text-[11px] text-amber-400 font-medium">
+                                      <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+                                      <span>⚠️ {remembered.conflictReason}</span>
+                                    </div>
+                                  )}
                                 </div>
 
                                 <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 shrink-0">
+                                  {/* Quick Apply Remembered Mapping */}
+                                  {remembered?.status === 'VALID' && remembered.resolvedResolution && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSetManualTeam(tg.playedTeam, remembered.resolvedResolution)}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#00e5ff]/10 hover:bg-[#00e5ff]/20 text-[#00e5ff] border border-[#00e5ff]/30 text-xs font-bold transition-colors shrink-0"
+                                    >
+                                      Hatırlananı Uygula: {remembered.mapping.mode === 'EXISTING' ? (teams.find(t => t.id === remembered.mapping.targetTeamId)?.name || 'Sistem Takımı') : (remembered.mapping.targetCustomName || tg.playedTeam)}
+                                    </button>
+                                  )}
+
                                   {/* Option 1: Searchable System Team Combobox */}
                                   <SystemTeamCombobox
                                     playedTeam={tg.playedTeam}
@@ -1269,13 +1512,28 @@ export function CsvSeasonStatsModal({
                             <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400">
                               Tamamlanan Takım Eşleştirmeleri ({completedTeamGroups.length})
                             </span>
-                            <button
-                              type="button"
-                              onClick={() => setManualTeamOverrides({})}
-                              className="text-[10px] font-bold text-zinc-400 hover:text-white underline"
-                            >
-                              Tüm Takım Seçimlerini Sıfırla
-                            </button>
+                            <div className="flex items-center gap-3">
+                              {savedTeamMappings.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSavedTeamMappings([]);
+                                    saveTeamMappingsToStorage([]);
+                                  }}
+                                  title="Tarayıcıda kayıtlı takım eşleştirmelerini temizler"
+                                  className="text-[10px] font-bold text-zinc-400 hover:text-amber-400 underline"
+                                >
+                                  Kayıtlı Eşleştirmeleri Temizle ({savedTeamMappings.length})
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setManualTeamOverrides({})}
+                                className="text-[10px] font-bold text-zinc-400 hover:text-white underline"
+                              >
+                                Tüm Takım Seçimlerini Sıfırla
+                              </button>
+                            </div>
                           </div>
                           <div className="flex flex-wrap gap-2">
                             {completedTeamGroups.map(tg => (

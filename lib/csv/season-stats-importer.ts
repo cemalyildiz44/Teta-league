@@ -63,6 +63,25 @@ export type ManualTeamResolution =
   | { mode: 'EXISTING'; teamId: string }
   | { mode: 'CUSTOM'; customName?: string };
 
+export interface PersistentTeamMapping {
+  sourceTeamName: string;
+  mode: 'EXISTING' | 'CUSTOM';
+  targetTeamId?: string | null;
+  targetTeamName?: string | null;
+  targetCustomName?: string | null;
+  updatedAt?: string;
+}
+
+export type RememberedTeamStatus = 'VALID' | 'CONFLICT' | 'INVALID';
+
+export interface RememberedTeamEvaluation {
+  sourceTeamName: string;
+  mapping: PersistentTeamMapping;
+  status: RememberedTeamStatus;
+  conflictReason: string | null;
+  resolvedResolution: ManualTeamResolution | null;
+}
+
 export interface EvaluatedCsvStatRow {
   lineNumber: number;
   eaId: string;
@@ -947,9 +966,141 @@ export function evaluateSeasonStatsCsv(options: EvaluateCsvOptions): CsvSeasonSt
   };
 }
 
+/**
+ * Evaluates persistent/remembered team mappings against currently active teams.
+ * Identifies valid mappings, missing teams (INVALID), and conflicts (CONFLICT).
+ * Guarantees that invalid or conflicting mappings are NEVER auto-used.
+ */
+export function evaluateRememberedTeamMappings(
+  mappings: PersistentTeamMapping[],
+  teams: ImporterTeamRef[]
+): Map<string, RememberedTeamEvaluation> {
+  const result = new Map<string, RememberedTeamEvaluation>();
+  const teamById = new Map<string, ImporterTeamRef>(teams.map(t => [t.id, t]));
+  const teamsByFoldedName = new Map<string, ImporterTeamRef[]>();
+  for (const t of teams) {
+    const fn = foldCase(t.name);
+    const list = teamsByFoldedName.get(fn) || [];
+    list.push(t);
+    teamsByFoldedName.set(fn, list);
+  }
+
+  for (const mapping of mappings) {
+    const rawSource = mapping.sourceTeamName?.trim();
+    if (!rawSource) continue;
+
+    if (mapping.mode === 'EXISTING') {
+      if (!mapping.targetTeamId) {
+        result.set(rawSource, {
+          sourceTeamName: rawSource,
+          mapping,
+          status: 'INVALID',
+          conflictReason: 'Kayıtlı sistem takımı ID bilgisi eksik.',
+          resolvedResolution: null
+        });
+        continue;
+      }
+
+      const foundTeam = teamById.get(mapping.targetTeamId);
+      if (!foundTeam) {
+        result.set(rawSource, {
+          sourceTeamName: rawSource,
+          mapping,
+          status: 'INVALID',
+          conflictReason: 'Kayıtlı sistem takımı artık veritabanında mevcut değil (silinmiş olabilir). Admin onayı gereklidir.',
+          resolvedResolution: null
+        });
+        continue;
+      }
+
+      if (foundTeam.is_active === false) {
+        result.set(rawSource, {
+          sourceTeamName: rawSource,
+          mapping,
+          status: 'CONFLICT',
+          conflictReason: `Kayıtlı sistem takımı ("${foundTeam.name}") aktif durumda değil. Admin onayı gereklidir.`,
+          resolvedResolution: null
+        });
+        continue;
+      }
+
+      if (mapping.targetTeamName && foundTeam.name.trim() !== mapping.targetTeamName.trim()) {
+        result.set(rawSource, {
+          sourceTeamName: rawSource,
+          mapping,
+          status: 'CONFLICT',
+          conflictReason: `Sistem takımının adı değişmiş (Kayıtlı: "${mapping.targetTeamName}" -> Güncel: "${foundTeam.name}"). Admin onayı gereklidir.`,
+          resolvedResolution: null
+        });
+        continue;
+      }
+
+      result.set(rawSource, {
+        sourceTeamName: rawSource,
+        mapping,
+        status: 'VALID',
+        conflictReason: null,
+        resolvedResolution: { mode: 'EXISTING', teamId: foundTeam.id }
+      });
+    } else if (mapping.mode === 'CUSTOM') {
+      const customName = (mapping.targetCustomName || mapping.targetTeamName || rawSource).trim();
+      if (!customName) {
+        result.set(rawSource, {
+          sourceTeamName: rawSource,
+          mapping,
+          status: 'INVALID',
+          conflictReason: 'Tarihsel takım adı boş olamaz.',
+          resolvedResolution: null
+        });
+        continue;
+      }
+
+      const existingSystemCandidates = teamsByFoldedName.get(foldCase(customName)) || [];
+      const activeSystemTeam = existingSystemCandidates.find(t => t.is_active !== false);
+      if (activeSystemTeam) {
+        result.set(rawSource, {
+          sourceTeamName: rawSource,
+          mapping,
+          status: 'CONFLICT',
+          conflictReason: `Veritabanında bu isimle aynı ("${activeSystemTeam.name}") bir sistem takımı bulundu. Tarihsel olarak mı yoksa sistem takımı olarak mı bağlanacağı onaylanmalıdır.`,
+          resolvedResolution: null
+        });
+        continue;
+      }
+
+      result.set(rawSource, {
+        sourceTeamName: rawSource,
+        mapping,
+        status: 'VALID',
+        conflictReason: null,
+        resolvedResolution: { mode: 'CUSTOM', customName }
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Filters pending unmatched or ambiguous player groups by EA ID or played team name (case-insensitive).
+ * Pure function for client-side search.
+ */
+export function filterPendingPlayerGroups(
+  groups: UnmatchedPlayerGroup[],
+  searchQuery: string
+): UnmatchedPlayerGroup[] {
+  const query = foldCase(searchQuery?.trim() || '');
+  if (!query) return groups;
+
+  return groups.filter(g => {
+    if (foldCase(g.eaId).includes(query)) return true;
+    return g.playedTeams.some(team => foldCase(team).includes(query));
+  });
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // STRICT ALL-OR-NOTHING SERVER-SIDE BATCH VALIDATOR
-// ════════════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════════════════════════════════════
 
 export interface ServerCsvImportRecordInput {
   lineNumber: number;

@@ -9,7 +9,9 @@ import {
   evaluateSeasonStatsCsv,
   isEquivalentSeasonName,
   validateAndPrepareCsvImportBatch,
-  normalizeEaIdCase
+  normalizeEaIdCase,
+  filterPendingPlayerGroups,
+  evaluateRememberedTeamMappings
 } from '../lib/csv/season-stats-importer.ts';
 
 console.log('================================================================');
@@ -787,6 +789,110 @@ runTest('19. normalizeEaIdCase saf fonksiyon testleri: boşluk temizleme, küç�
   assert.equal(normalizeEaIdCase(''), '');
   assert.equal(normalizeEaIdCase(null), '');
   assert.equal(normalizeEaIdCase(undefined), '');
+});
+
+// 20. filterPendingPlayerGroups Client-Side Search Tests
+runTest('20. filterPendingPlayerGroups: EA ID ve Oynadığı Takım bazlı büyük/küçük harf duyarsız arama filtreleme', () => {
+  const sampleGroups = [
+    { eaId: 'dorukzini', playedTeams: ['Gegi Esport', 'Bolton VFC'] },
+    { eaId: 'kadddoo', playedTeams: ['Raptors FC'] },
+    { eaId: 'Zini_Pro', playedTeams: ['Gegi Esport'] },
+    { eaId: 'AlphaStriker', playedTeams: ['Anadolu Yıldızları'] }
+  ];
+
+  // A: Empty query returns full array
+  assert.equal(filterPendingPlayerGroups(sampleGroups, '').length, 4);
+  assert.equal(filterPendingPlayerGroups(sampleGroups, '   ').length, 4);
+
+  // B: Match by EA ID (case-insensitive)
+  const byEaId1 = filterPendingPlayerGroups(sampleGroups, 'DORUK');
+  assert.equal(byEaId1.length, 1);
+  assert.equal(byEaId1[0].eaId, 'dorukzini');
+
+  const byEaId2 = filterPendingPlayerGroups(sampleGroups, 'zini');
+  assert.equal(byEaId2.length, 2); // dorukzini and Zini_Pro
+
+  // C: Match by played team name
+  const byTeam1 = filterPendingPlayerGroups(sampleGroups, 'Raptors');
+  assert.equal(byTeam1.length, 1);
+  assert.equal(byTeam1[0].eaId, 'kadddoo');
+
+  const byTeam2 = filterPendingPlayerGroups(sampleGroups, 'gegi esport');
+  assert.equal(byTeam2.length, 2);
+
+  // D: Non-matching query returns empty array
+  const noMatch = filterPendingPlayerGroups(sampleGroups, 'Galatasaray');
+  assert.equal(noMatch.length, 0);
+});
+
+// 21. evaluateRememberedTeamMappings Validation and Conflict Detection Tests
+runTest('21. evaluateRememberedTeamMappings: VALID, CONFLICT ve INVALID durumlarının tespiti', () => {
+  const currentTeams = [
+    { id: 'team-1', name: 'Gegi Esport', is_active: true },
+    { id: 'team-2', name: 'Bolton VFC', is_active: false }, // inactive
+    { id: 'team-3', name: 'Renamed FC New', is_active: true } // was 'Renamed FC Old'
+  ];
+
+  const rememberedMappings = [
+    // 1. Clean valid system team mapping
+    {
+      sourceTeamName: 'Gegi Esport',
+      mode: 'EXISTING',
+      targetTeamId: 'team-1',
+      targetTeamName: 'Gegi Esport'
+    },
+    // 2. Inactive team -> CONFLICT
+    {
+      sourceTeamName: 'Bolton VFC',
+      mode: 'EXISTING',
+      targetTeamId: 'team-2',
+      targetTeamName: 'Bolton VFC'
+    },
+    // 3. Renamed team -> CONFLICT
+    {
+      sourceTeamName: 'Renamed FC',
+      mode: 'EXISTING',
+      targetTeamId: 'team-3',
+      targetTeamName: 'Renamed FC Old'
+    },
+    // 4. Deleted / missing team -> INVALID
+    {
+      sourceTeamName: 'Ghost Team',
+      mode: 'EXISTING',
+      targetTeamId: 'team-deleted-999',
+      targetTeamName: 'Ghost Team'
+    },
+    // 5. Clean custom historical team mapping -> VALID
+    {
+      sourceTeamName: 'Eski Takım 2024',
+      mode: 'CUSTOM',
+      targetCustomName: 'Eski Takım 2024'
+    },
+    // 6. Custom historical mapping conflicts with newly created real system team -> CONFLICT
+    {
+      sourceTeamName: 'Gegi Esport CSV',
+      mode: 'CUSTOM',
+      targetCustomName: 'Gegi Esport' // exactly matches active team-1
+    }
+  ];
+
+  const evaluations = evaluateRememberedTeamMappings(rememberedMappings, currentTeams);
+
+  assert.equal(evaluations.get('Gegi Esport').status, 'VALID');
+
+  assert.equal(evaluations.get('Bolton VFC').status, 'CONFLICT');
+  assert.ok(evaluations.get('Bolton VFC').conflictReason.includes('aktif'));
+
+  assert.equal(evaluations.get('Renamed FC').status, 'CONFLICT');
+  assert.ok(evaluations.get('Renamed FC').conflictReason.includes('adı değişmiş'));
+
+  assert.equal(evaluations.get('Ghost Team').status, 'INVALID');
+  assert.ok(evaluations.get('Ghost Team').conflictReason.includes('mevcut değil'));
+
+  assert.equal(evaluations.get('Eski Takım 2024').status, 'VALID');
+
+  assert.equal(evaluations.get('Gegi Esport CSV').status, 'CONFLICT');
+  assert.ok(evaluations.get('Gegi Esport CSV').conflictReason.includes('sistem takımı bulundu'));
 });
 
 console.log(`\n================================================================`);

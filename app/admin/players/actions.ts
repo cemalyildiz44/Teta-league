@@ -7,7 +7,8 @@ import { logAdminAudit } from '@/lib/audit';
 import {
   foldCase,
   isEquivalentSeasonName,
-  validateAndPrepareCsvImportBatch
+  validateAndPrepareCsvImportBatch,
+  type PersistentTeamMapping
 } from '@/lib/csv/season-stats-importer';
 
 async function checkAdmin(supabase: any, user: any) {
@@ -1007,5 +1008,101 @@ export async function importPlayerSeasonStatsCsvAction(
   } catch (err: any) {
     console.error('Unexpected error in importPlayerSeasonStatsCsvAction:', err);
     return emptyResponse(err.message || 'Beklenmeyen bir sunucu hatası oluştu.');
+  }
+}
+
+export async function getPersistentCsvTeamMappingsAction(): Promise<{
+  mappings: PersistentTeamMapping[];
+  error?: string;
+}> {
+  try {
+    const cookieStore = await cookies();
+    const supabase = createClient(cookieStore);
+
+    const {
+      data: { user }
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return { mappings: [] };
+    }
+
+    const isAdmin = await checkAdmin(supabase, user);
+    if (!isAdmin) {
+      return { mappings: [] };
+    }
+
+    const { data, error } = await supabase
+      .from('csv_team_mappings')
+      .select('source_team_name, mapping_type, target_team_id, target_custom_name, updated_at')
+      .order('source_team_name', { ascending: true });
+
+    if (error) {
+      // Graceful fallback if table does not exist yet (code 42P01)
+      return { mappings: [] };
+    }
+
+    const mappings: PersistentTeamMapping[] = (data || []).map((row: any) => ({
+      sourceTeamName: row.source_team_name,
+      mode: row.mapping_type === 'EXISTING_TEAM' ? 'EXISTING' : 'CUSTOM',
+      targetTeamId: row.target_team_id,
+      targetTeamName: row.target_custom_name,
+      updatedAt: row.updated_at
+    }));
+
+    return { mappings };
+  } catch {
+    return { mappings: [] };
+  }
+}
+
+export async function savePersistentCsvTeamMappingsAction(
+  mappings: Array<{
+    sourceTeamName: string;
+    mode: 'EXISTING' | 'CUSTOM';
+    targetTeamId?: string | null;
+    targetTeamName?: string | null;
+  }>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const cookieStore = await cookies();
+    const supabase = createClient(cookieStore);
+
+    const {
+      data: { user }
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: 'Yetkisiz erişim.' };
+    }
+
+    const isAdmin = await checkAdmin(supabase, user);
+    if (!isAdmin) {
+      return { success: false, error: 'Yetkisiz işlem.' };
+    }
+
+    if (!Array.isArray(mappings) || mappings.length === 0) {
+      return { success: true };
+    }
+
+    const rows = mappings.map(m => ({
+      source_team_name: m.sourceTeamName.trim(),
+      mapping_type: m.mode === 'EXISTING' ? 'EXISTING_TEAM' : 'CUSTOM_HISTORICAL',
+      target_team_id: m.targetTeamId || null,
+      target_custom_name: m.targetTeamName ? m.targetTeamName.trim() : null,
+      created_by: user.id,
+      updated_at: new Date().toISOString()
+    }));
+
+    const { error } = await supabase
+      .from('csv_team_mappings')
+      .upsert(rows, { onConflict: 'source_team_name' });
+
+    if (error) {
+      // Graceful fallback if table does not exist yet
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
   }
 }
