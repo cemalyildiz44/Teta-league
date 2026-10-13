@@ -194,6 +194,16 @@ export function foldCase(value: string): string {
     .toLowerCase();
 }
 
+/**
+ * Normalizes an EA player ID for case-insensitive matching.
+ * Trims leading/trailing whitespace and lowercases the string using standard lowercase.
+ * Preserves underscores, hyphens, dots, numbers, and does not alter non-casing characters.
+ */
+export function normalizeEaIdCase(val: string | null | undefined): string {
+  if (!val) return '';
+  return val.trim().toLowerCase();
+}
+
 export function normalizeHeaderName(header: string): string {
   return foldCase(stripUtf8Bom(header).replace(/\s+/g, ' '));
 }
@@ -434,18 +444,18 @@ export function evaluateSeasonStatsCsv(options: EvaluateCsvOptions): CsvSeasonSt
     };
   }
 
-  // 1. Index profiles by exact EA ID and case-folded EA ID
+  // 1. Index profiles by exact EA ID and case-insensitive normalized EA ID
   const profileById = new Map<string, ImporterProfileRef>();
-  const profilesByFoldedEaId = new Map<string, ImporterProfileRef[]>();
+  const profilesByNormEaId = new Map<string, ImporterProfileRef[]>();
 
   for (const p of options.profiles) {
     profileById.set(p.id, p);
     const ea = p.current_ea_player_id?.trim();
     if (ea) {
-      const folded = foldCase(ea);
-      const list = profilesByFoldedEaId.get(folded) || [];
+      const normEa = normalizeEaIdCase(ea);
+      const list = profilesByNormEaId.get(normEa) || [];
       list.push(p);
-      profilesByFoldedEaId.set(folded, list);
+      profilesByNormEaId.set(normEa, list);
     }
   }
 
@@ -473,19 +483,12 @@ export function evaluateSeasonStatsCsv(options: EvaluateCsvOptions): CsvSeasonSt
   // 4. Analyze unique EA IDs across all rows and within target season scope
   const allEaIdsSet = new Set<string>();
   const inScopeEaIdsSet = new Set<string>();
-  const inScopeCaseVariantsByFoldedEa = new Map<string, Set<string>>();
   const inScopeTeamsByEaId = new Map<string, Set<string>>();
 
   for (const r of parsed.rawRows) {
     if (r.eaId) allEaIdsSet.add(r.eaId);
     if (r.season === targetCsvSeason && r.eaId) {
       inScopeEaIdsSet.add(r.eaId);
-      const folded = foldCase(r.eaId);
-      if (!inScopeCaseVariantsByFoldedEa.has(folded)) {
-        inScopeCaseVariantsByFoldedEa.set(folded, new Set());
-      }
-      inScopeCaseVariantsByFoldedEa.get(folded)!.add(r.eaId);
-
       if (!inScopeTeamsByEaId.has(r.eaId)) {
         inScopeTeamsByEaId.set(r.eaId, new Set());
       }
@@ -503,12 +506,13 @@ export function evaluateSeasonStatsCsv(options: EvaluateCsvOptions): CsvSeasonSt
     ambiguityReason: string | null;
   }
 
+  const isProfileActive = (p: ImporterProfileRef) => !p.status || p.status === 'ACTIVE';
+
   const eaResolutionMap = new Map<string, ResolvedEaPlayerInfo>();
   for (const eaId of inScopeEaIdsSet) {
-    const folded = foldCase(eaId);
-    const candidates = profilesByFoldedEaId.get(folded) || [];
-    const csvCaseVariants = inScopeCaseVariantsByFoldedEa.get(folded);
-    const hasCsvCaseAmbiguity = (csvCaseVariants?.size || 0) > 1;
+    const normEa = normalizeEaIdCase(eaId);
+    const allCandidates = profilesByNormEaId.get(normEa) || [];
+    const activeCandidates = allCandidates.filter(isProfileActive);
 
     // Check manual override first
     const manualProfileId = manualPlayerOverrides[eaId];
@@ -517,59 +521,40 @@ export function evaluateSeasonStatsCsv(options: EvaluateCsvOptions): CsvSeasonSt
       eaResolutionMap.set(eaId, {
         status: 'MANUAL_LINKED',
         profile: mp,
-        candidates,
+        candidates: allCandidates,
         ambiguityReason: null
       });
       continue;
     }
 
-    if (hasCsvCaseAmbiguity) {
-      eaResolutionMap.set(eaId, {
-        status: 'AMBIGUOUS',
-        profile: null,
-        candidates,
-        ambiguityReason: `CSV içinde aynı EA ID farklı büyük/küçük harflerle birden fazla kez geçiyor (${Array.from(csvCaseVariants!).join(', ')}). Admin onayı gereklidir.`
-      });
-      continue;
-    }
-
-    if (candidates.length === 0) {
+    if (activeCandidates.length === 0) {
       eaResolutionMap.set(eaId, {
         status: 'UNMATCHED',
         profile: null,
-        candidates: [],
-        ambiguityReason: null
+        candidates: allCandidates,
+        ambiguityReason: allCandidates.length > 0
+          ? `Bu EA ID ile eşleşen profil aktif değil (${allCandidates.map(c => c.username).join(', ')}). Admin seçimi gereklidir.`
+          : null
       });
-    } else if (candidates.length > 1) {
+    } else if (activeCandidates.length > 1) {
       eaResolutionMap.set(eaId, {
         status: 'AMBIGUOUS',
         profile: null,
-        candidates,
-        ambiguityReason: `Bu EA ID ile eşleşen birden fazla (${candidates.length}) oyuncu profili bulundu. Admin seçimi gereklidir.`
+        candidates: activeCandidates,
+        ambiguityReason: `Bu EA ID ile büyük/küçük harf duyarsız eşleşen birden fazla (${activeCandidates.length}) aktif oyuncu profili bulundu. Admin seçimi gereklidir.`
       });
     } else {
-      const single = candidates[0];
-      const exactMatch = single.current_ea_player_id?.trim() === eaId;
-      if (exactMatch) {
-        eaResolutionMap.set(eaId, {
-          status: 'EXACT',
-          profile: single,
-          candidates,
-          ambiguityReason: null
-        });
-      } else {
-        // Rule 4.7: Case differences must not be silently guessed; require admin confirmation
-        eaResolutionMap.set(eaId, {
-          status: 'AMBIGUOUS',
-          profile: null,
-          candidates,
-          ambiguityReason: `Büyük/küçük harf farkı tespit edildi: CSV "${eaId}" iken profilde "${single.current_ea_player_id}". Otomatik tahmin yapılmadı, admin onayı bekleniyor.`
-        });
-      }
+      const single = activeCandidates[0];
+      eaResolutionMap.set(eaId, {
+        status: 'EXACT',
+        profile: single,
+        candidates: [single],
+        ambiguityReason: null
+      });
     }
   }
 
-  // Guard: Prevent linking two distinct EA IDs (different folded names) to the same profile in the same import
+  // Guard: Prevent linking two distinct EA IDs (different normalized names) to the same profile in the same import
   const eaIdsByResolvedProfileId = new Map<string, string[]>();
   for (const [eaId, res] of eaResolutionMap.entries()) {
     if (res.profile) {
@@ -579,8 +564,8 @@ export function evaluateSeasonStatsCsv(options: EvaluateCsvOptions): CsvSeasonSt
     }
   }
   for (const [, eaList] of eaIdsByResolvedProfileId.entries()) {
-    const distinctFolded = new Set(eaList.map(foldCase));
-    if (distinctFolded.size > 1) {
+    const distinctNorm = new Set(eaList.map(normalizeEaIdCase));
+    if (distinctNorm.size > 1) {
       for (const eaId of eaList) {
         const current = eaResolutionMap.get(eaId)!;
         const uname = current.profile?.username || '';
@@ -742,7 +727,7 @@ export function evaluateSeasonStatsCsv(options: EvaluateCsvOptions): CsvSeasonSt
       (teamRes.teamId && leagueNameByTeamId.get(teamRes.teamId)) || defaultLeagueName;
 
     // Duplicate check within CSV (by raw EA ID + season + playedTeam)
-    const rawComboKey = `${foldCase(raw.eaId)}||${foldCase(raw.season)}||${foldCase(raw.playedTeam)}`;
+    const rawComboKey = `${normalizeEaIdCase(raw.eaId)}||${foldCase(raw.season)}||${foldCase(raw.playedTeam)}`;
     let duplicateOfLine: number | null = null;
     if (raw.eaId && raw.playedTeam) {
       if (seenCsvComboLine.has(rawComboKey)) {
@@ -1063,7 +1048,7 @@ export function validateAndPrepareCsvImportBatch(
       if (!eaIdsByPlayerId.has(rec.player_id)) {
         eaIdsByPlayerId.set(rec.player_id, new Set());
       }
-      eaIdsByPlayerId.get(rec.player_id)!.add(foldCase(rec.eaId));
+      eaIdsByPlayerId.get(rec.player_id)!.add(normalizeEaIdCase(rec.eaId));
     }
   }
 

@@ -8,7 +8,8 @@ import {
   parseSeasonStatsCsv,
   evaluateSeasonStatsCsv,
   isEquivalentSeasonName,
-  validateAndPrepareCsvImportBatch
+  validateAndPrepareCsvImportBatch,
+  normalizeEaIdCase
 } from '../lib/csv/season-stats-importer.ts';
 
 console.log('================================================================');
@@ -32,12 +33,13 @@ function runTest(name, fn) {
 }
 
 const mockProfiles = [
-  { id: '11111111-1111-4111-8111-111111111101', username: 'dorukzinboi', current_ea_player_id: 'dorukzinboi' },
-  { id: '11111111-1111-4111-8111-111111111102', username: 'peaksu', current_ea_player_id: 'Peaksu_' },
-  { id: '11111111-1111-4111-8111-111111111103', username: 'notfound5181', current_ea_player_id: 'Notfound5181' },
-  { id: '11111111-1111-4111-8111-111111111104', username: 'yusuf73', current_ea_player_id: 'Yusuf_73DE' }, // Case difference vs yusuf_73DE
-  { id: '11111111-1111-4111-8111-111111111105', username: 'kreasom_user', current_ea_player_id: 'Kreasom' },
-  { id: '11111111-1111-4111-8111-111111111106', username: 'manual_target_player', current_ea_player_id: null }
+  { id: '11111111-1111-4111-8111-111111111101', username: 'dorukzinboi', current_ea_player_id: 'dorukzinboi', status: 'ACTIVE' },
+  { id: '11111111-1111-4111-8111-111111111102', username: 'peaksu', current_ea_player_id: 'Peaksu_', status: 'ACTIVE' },
+  { id: '11111111-1111-4111-8111-111111111103', username: 'notfound5181', current_ea_player_id: 'Notfound5181', status: 'ACTIVE' },
+  { id: '11111111-1111-4111-8111-111111111104', username: 'yusuf73', current_ea_player_id: 'Yusuf_73DE', status: 'ACTIVE' }, // Case difference vs yusuf_73DE
+  { id: '11111111-1111-4111-8111-111111111105', username: 'kreasom_user', current_ea_player_id: 'Kreasom', status: 'ACTIVE' },
+  { id: '11111111-1111-4111-8111-111111111106', username: 'manual_target_player', current_ea_player_id: null, status: 'ACTIVE' },
+  { id: '11111111-1111-4111-8111-111111111107', username: 'stefan_eymen_user', current_ea_player_id: 'Stefan_Eymen', status: 'ACTIVE' }
 ];
 
 const mockTeams = [
@@ -169,16 +171,20 @@ runTest('4. Sezon filtresi: yalnızca "TETA League 5. Sezon" kapsam içi alını
   assert.equal(result.excludedReasonsBreakdown['Farklı veya tanınmayan sezon ("TETA League 4. Sezon")'], 1);
 });
 
-// 5. Case Mismatch & Unmatched EA IDs & Manual Linking
-runTest('5. EA ID büyük/küçük harf farkı otomatik tahmin edilmez (AMBIGUOUS), eşleşmeyen EA ID manuel olarak profile bağlanabilir', () => {
+// 5. Case-Insensitive EA ID Auto-Matching & Unmatched EA IDs & Manual Linking
+runTest('5. EA ID büyük/küçük harf duyarsız otomatik eşleşir (EXACT), eşleşmeyen EA ID manuel olarak profile bağlanabilir', () => {
   const csv = [
     'EA ID;Güncel Takım;Sezon;Oynadığı Takım;Maç;Gol;Asist;Ort. Rating',
     'yusuf_73DE;Gegi Esport;TETA League 5. Sezon;Real Sosyete;3;0;0;6.83',
+    'Stefan_eymen;Bolton VFC;TETA League 5. Sezon;Bolton VFC;4;1;2;7.85',
     'unknown_ea_99;Bolton VFC;TETA League 5. Sezon;Bolton VFC;5;1;0;7.10',
     'unknown_ea_99;Bolton VFC;TETA League 5. Sezon;Gegi Esport;2;0;1;7.40'
   ].join('\n');
 
-  // Without manual override: both yusuf_73DE (case diff vs Yusuf_73DE) and unknown_ea_99 are blocked
+  // Without manual override:
+  // - yusuf_73DE matches Yusuf_73DE case-insensitively -> EXACT, status READY
+  // - Stefan_eymen matches Stefan_Eymen case-insensitively -> EXACT, status READY
+  // - unknown_ea_99 is not in DB -> UNMATCHED, 2 rows blocked
   const resBefore = evaluateSeasonStatsCsv({
     csvContent: csv,
     profiles: mockProfiles,
@@ -186,24 +192,32 @@ runTest('5. EA ID büyük/küçük harf farkı otomatik tahmin edilmez (AMBIGUOU
     existingLegacyStats: []
   });
 
-  assert.equal(resBefore.readyToImportCount, 0);
-  assert.equal(resBefore.ambiguousPlayersCount, 1); // yusuf_73DE
+  assert.equal(resBefore.readyToImportCount, 2);
+  assert.equal(resBefore.ambiguousPlayersCount, 0);
   assert.equal(resBefore.unmatchedPlayersCount, 1); // unknown_ea_99
+  assert.equal(resBefore.rows[0].status, 'READY');
+  assert.equal(resBefore.rows[0].resolvedPlayerId, '11111111-1111-4111-8111-111111111104');
+  assert.equal(resBefore.rows[1].status, 'READY');
+  assert.equal(resBefore.rows[1].resolvedPlayerId, '11111111-1111-4111-8111-111111111107');
+  assert.equal(resBefore.rows[2].status, 'NEEDS_PLAYER_MATCH');
+  assert.equal(resBefore.rows[2].playerMatchStatus, 'UNMATCHED');
+  assert.equal(resBefore.rows[3].status, 'NEEDS_PLAYER_MATCH');
+  assert.equal(resBefore.rows[3].playerMatchStatus, 'UNMATCHED');
 
-  // With admin manual confirmation/linking:
+  // With admin manual confirmation/linking for unknown_ea_99:
   const resAfter = evaluateSeasonStatsCsv({
     csvContent: csv,
     profiles: mockProfiles,
     teams: mockTeams,
     existingLegacyStats: [],
     manualPlayerOverrides: {
-      yusuf_73DE: '11111111-1111-4111-8111-111111111104',
       unknown_ea_99: '11111111-1111-4111-8111-111111111106'
     }
   });
 
-  assert.equal(resAfter.readyToImportCount, 3);
-  assert.equal(resAfter.manuallyLinkedPlayersCount, 2);
+  assert.equal(resAfter.readyToImportCount, 4);
+  assert.equal(resAfter.manuallyLinkedPlayersCount, 1);
+  assert.equal(resAfter.unmatchedPlayersCount, 0);
 });
 
 // 6. Duplicate (player + season + team) within CSV & Existing DB Collisions
@@ -310,6 +324,17 @@ runTest('8. Gerçek oyuncu_istatistikleri_takim_sezon.csv veri kaynağı doğrul
   assert.equal(dorukRows[1].assists, 1);
   assert.equal(dorukRows[1].ratingAvg, 8.37);
   assert.equal(dorukRows[1].status, 'READY');
+
+  // Verify yusuf_73DE in real CSV (case diff: CSV has 'yusuf_73DE', DB mock has 'Yusuf_73DE')
+  const yusufRows = result.rows.filter(r => r.eaId === 'yusuf_73DE');
+  assert.equal(yusufRows.length, 1);
+  assert.equal(yusufRows[0].playedTeam, 'Real Sosyete');
+  assert.equal(yusufRows[0].matchesPlayed, 3);
+  assert.equal(yusufRows[0].goals, 0);
+  assert.equal(yusufRows[0].assists, 0);
+  assert.equal(yusufRows[0].ratingAvg, 6.83);
+  assert.equal(yusufRows[0].status, 'READY');
+  assert.equal(yusufRows[0].resolvedPlayerId, '11111111-1111-4111-8111-111111111104');
 });
 
 // 9. Server Action Security & Isolation Verification
@@ -594,6 +619,174 @@ runTest('15. Sunucu doğrulaması mevcut kayıtların üzerine yazmaz; mevcut ka
   assert.equal(batchRes.skippedRows[0].lineNumber, 16);
   assert.equal(batchRes.insertPayloads.length, 1);
   assert.equal(batchRes.insertPayloads[0].team_name, 'Gegi Esport');
+});
+
+// 16. Non-casing Character Differences Kept Strictly UNMATCHED
+runTest('16. Harf büyüklüğü dışındaki karakter farklılıkları (alt çizgi, tire, nokta, rakam, eksik/fazla karakter) ASLA eşleşmez (UNMATCHED)', () => {
+  const csv = [
+    'EA ID;Güncel Takım;Sezon;Oynadığı Takım;Maç;Gol;Asist;Ort. Rating',
+    'yusuf-73DE;Bolton VFC;TETA League 5. Sezon;Bolton VFC;5;1;0;7.10', // '-' instead of '_'
+    'Stefaneymen;Bolton VFC;TETA League 5. Sezon;Bolton VFC;3;0;0;6.50', // missing '_'
+    'Stefan_eymen1;Bolton VFC;TETA League 5. Sezon;Bolton VFC;4;1;1;7.20', // extra '1'
+    'dorukzinboi_;Bolton VFC;TETA League 5. Sezon;Bolton VFC;2;0;0;7.00', // extra '_'
+    'yusıf_73de;Bolton VFC;TETA League 5. Sezon;Bolton VFC;1;0;0;6.00' // 'ı' dotless instead of 'u'
+  ].join('\n');
+
+  const result = evaluateSeasonStatsCsv({
+    csvContent: csv,
+    profiles: mockProfiles,
+    teams: mockTeams,
+    existingLegacyStats: []
+  });
+
+  assert.equal(result.readyToImportCount, 0);
+  assert.equal(result.unmatchedPlayersCount, 5);
+  assert.equal(result.ambiguousPlayersCount, 0);
+  for (const row of result.rows) {
+    assert.equal(row.status, 'NEEDS_PLAYER_MATCH');
+    assert.equal(row.playerMatchStatus, 'UNMATCHED');
+    assert.equal(row.resolvedPlayerId, null);
+  }
+});
+
+// 17. Ambiguous when multiple active profiles have same normalized EA ID
+runTest('17. Veritabanında aynı normalize EA ID ile eşleşen birden fazla aktif profil varsa AMBIGUOUS olarak işaretlenir ve otomatik atanmaz', () => {
+  const testProfiles = [
+    { id: '11111111-1111-4111-8111-111111111191', username: 'ambig_one', current_ea_player_id: 'DUP_PLAYER', status: 'ACTIVE' },
+    { id: '11111111-1111-4111-8111-111111111192', username: 'ambig_two', current_ea_player_id: 'dup_player', status: 'ACTIVE' }
+  ];
+
+  const csv = [
+    'EA ID;Güncel Takım;Sezon;Oynadığı Takım;Maç;Gol;Asist;Ort. Rating',
+    'dup_player;Bolton VFC;TETA League 5. Sezon;Bolton VFC;5;1;0;7.10'
+  ].join('\n');
+
+  const result = evaluateSeasonStatsCsv({
+    csvContent: csv,
+    profiles: testProfiles,
+    teams: mockTeams,
+    existingLegacyStats: []
+  });
+
+  assert.equal(result.readyToImportCount, 0);
+  assert.equal(result.ambiguousPlayersCount, 1);
+  assert.equal(result.rows[0].status, 'NEEDS_PLAYER_MATCH');
+  assert.equal(result.rows[0].playerMatchStatus, 'AMBIGUOUS');
+  assert.equal(result.rows[0].resolvedPlayerId, null);
+  assert.ok(result.rows[0].statusReasons[0].includes('birden fazla'));
+
+  // If one of the profiles is INACTIVE and only one is ACTIVE, it should match the single active profile
+  const testProfilesWithInactive = [
+    { id: '11111111-1111-4111-8111-111111111191', username: 'ambig_one', current_ea_player_id: 'DUP_PLAYER', status: 'INACTIVE' },
+    { id: '11111111-1111-4111-8111-111111111192', username: 'ambig_two', current_ea_player_id: 'dup_player', status: 'ACTIVE' }
+  ];
+
+  const resultActiveOnly = evaluateSeasonStatsCsv({
+    csvContent: csv,
+    profiles: testProfilesWithInactive,
+    teams: mockTeams,
+    existingLegacyStats: []
+  });
+
+  assert.equal(resultActiveOnly.readyToImportCount, 1);
+  assert.equal(resultActiveOnly.ambiguousPlayersCount, 0);
+  assert.equal(resultActiveOnly.rows[0].status, 'READY');
+  assert.equal(resultActiveOnly.rows[0].resolvedPlayerId, '11111111-1111-4111-8111-111111111192');
+});
+
+// 18. Distinct EA IDs vs Casing Variants in Batch Validation
+runTest('18. Sunucu toplu doğrulamasında aynı EA ID\'nin büyük/küçük harf varyantları kabul edilirken, farklı EA ID\'lerin aynı profile atanması engellenir', () => {
+  // Scenario A: Same player with casing variants of the same EA ID -> ACCEPTED
+  const resSamePlayerCasing = validateAndPrepareCsvImportBatch({
+    seasonName: 'TETA League 5. Sezon',
+    defaultLeagueName: 'TETA Süper Lig',
+    validProfiles: mockProfiles,
+    validTeams: mockTeams,
+    existingStats: [],
+    actorUserId: '99999999-9999-4999-8999-999999999900',
+    records: [
+      {
+        lineNumber: 10,
+        eaId: 'yusuf_73DE',
+        player_id: '11111111-1111-4111-8111-111111111104',
+        team_id: '22222222-2222-4222-8222-222222222201',
+        team_name: 'Bolton VFC',
+        league_name: 'TETA Süper Lig',
+        matches_played: 5,
+        goals: 1,
+        assists: 0,
+        rating_avg: 7.10
+      },
+      {
+        lineNumber: 11,
+        eaId: 'Yusuf_73DE', // Same normalized EA ID
+        player_id: '11111111-1111-4111-8111-111111111104',
+        team_id: '22222222-2222-4222-8222-222222222202',
+        team_name: 'Gegi Esport',
+        league_name: 'TETA Süper Lig',
+        matches_played: 2,
+        goals: 0,
+        assists: 1,
+        rating_avg: 7.40
+      }
+    ]
+  });
+
+  assert.equal(resSamePlayerCasing.abortedDueToValidationError, false);
+  assert.equal(resSamePlayerCasing.insertPayloads.length, 2);
+
+  // Scenario B: Two truly distinct EA IDs assigned to same player -> REJECTED
+  const resDifferentEaSamePlayer = validateAndPrepareCsvImportBatch({
+    seasonName: 'TETA League 5. Sezon',
+    defaultLeagueName: 'TETA Süper Lig',
+    validProfiles: mockProfiles,
+    validTeams: mockTeams,
+    existingStats: [],
+    actorUserId: '99999999-9999-4999-8999-999999999900',
+    records: [
+      {
+        lineNumber: 20,
+        eaId: 'distinct_alpha',
+        player_id: '11111111-1111-4111-8111-111111111104',
+        team_id: '22222222-2222-4222-8222-222222222201',
+        team_name: 'Bolton VFC',
+        league_name: 'TETA Süper Lig',
+        matches_played: 5,
+        goals: 1,
+        assists: 0,
+        rating_avg: 7.10
+      },
+      {
+        lineNumber: 21,
+        eaId: 'distinct_beta',
+        player_id: '11111111-1111-4111-8111-111111111104',
+        team_id: '22222222-2222-4222-8222-222222222202',
+        team_name: 'Gegi Esport',
+        league_name: 'TETA Süper Lig',
+        matches_played: 2,
+        goals: 0,
+        assists: 1,
+        rating_avg: 7.40
+      }
+    ]
+  });
+
+  assert.equal(resDifferentEaSamePlayer.abortedDueToValidationError, true);
+  assert.equal(resDifferentEaSamePlayer.insertPayloads.length, 0);
+  assert.ok(resDifferentEaSamePlayer.rowErrors.some(e => e.reason.includes('birden fazla farklı EA ID')));
+});
+
+// 19. normalizeEaIdCase Pure Unit Tests
+runTest('19. normalizeEaIdCase saf fonksiyon testleri: boşluk temizleme, küçük harfe dönüştürme, özel karakter ve rakam koruması', () => {
+  assert.equal(normalizeEaIdCase('  Yusuf_73DE  '), 'yusuf_73de');
+  assert.equal(normalizeEaIdCase('Stefan_Eymen'), 'stefan_eymen');
+  assert.equal(normalizeEaIdCase('XDeadlyKekz'), 'xdeadlykekz');
+  assert.equal(normalizeEaIdCase('Player-1.0_v2'), 'player-1.0_v2');
+  assert.equal(normalizeEaIdCase('Aspectas'), 'aspectas');
+  assert.equal(normalizeEaIdCase('Cloose35'), 'cloose35');
+  assert.equal(normalizeEaIdCase(''), '');
+  assert.equal(normalizeEaIdCase(null), '');
+  assert.equal(normalizeEaIdCase(undefined), '');
 });
 
 console.log(`\n================================================================`);
