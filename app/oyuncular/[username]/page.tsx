@@ -35,7 +35,11 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   }
 
   // ── 1. Profile ─────────────────────────────────────────────────────
-  const { data: profile } = await supabase.from("profiles").select("*").ilike("username", paramVal).maybeSingle();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, username, full_name, avatar_url, bio, primary_position, alternative_positions, platform, current_ea_player_id, discord_url, instagram_url, status, is_active, social_links")
+    .ilike("username", paramVal)
+    .maybeSingle();
   if (!profile) notFound();
 
   // Handle BANNED player account
@@ -66,7 +70,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   if (profile.current_ea_player_id) {
     const { data: statsWithMatches } = await supabase
       .from("match_player_stats")
-      .select("*, matches!inner(id, home_team_id, away_team_id, home_score, away_score, season_id, league_id, played_at, status, fixtures(week_number))")
+      .select("match_id, team_id, position, rating, goals, assists, shots, passes_made, pass_attempts, tackles_made, tackle_attempts, saves, goals_conceded, is_mom, red_cards, cleansheets_gk, cleansheets_def, matches!inner(id, home_team_id, away_team_id, home_score, away_score, season_id, league_id, played_at, status, fixtures(week_number))")
       .eq("ea_player_id", profile.current_ea_player_id)
       .eq("matches.status", "APPROVED");
       
@@ -83,11 +87,11 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     { data: playerAchievementsData },
     { data: legacyStatsData }
   ] = await Promise.all([
-    supabase.from("team_memberships").select("*").eq("player_id", profile.id).order("joined_at", { ascending: false }),
+    supabase.from("team_memberships").select("team_id, league_id, season_id, joined_at, left_at").eq("player_id", profile.id).order("joined_at", { ascending: false }),
     supabase.from("seasons").select("id, name, slug"),
     supabase.from("leagues").select("id, name, season_id"),
     supabase.from('player_achievements').select('achievement_type, season_id, season_name, seasons(name, slug)').eq('player_id', profile.id),
-    supabase.from('player_legacy_career_stats').select('*').eq('player_id', profile.id).is('deleted_at', null).order('season_name', { ascending: false })
+    supabase.from('player_legacy_career_stats').select('team_id, team_name, season_name, league_name, matches_played, goals, assists, wins, draws, losses, clean_sheets, red_cards, rating_avg, market_value, notes').eq('player_id', profile.id).is('deleted_at', null).order('season_name', { ascending: false })
   ]);
 
   const legacyStats = legacyStatsData || [];

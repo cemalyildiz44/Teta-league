@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Calendar, ChevronRight } from 'lucide-react';
 import TeamRosterCarousel from '../TeamRosterCarousel';
 import TeamLogo from '@/components/TeamLogo';
+import { calculateMarketValue } from '@/app/utils/marketValueCalculator';
 
 import { getTeamBySlug, getAllTeams } from '@/lib/fetchers';
 
@@ -133,7 +134,7 @@ export default async function TeamPage({ params }: Props) {
         .order('joined_at', { ascending: true }),
       supabase
         .from('team_season_stats')
-        .select('*')
+        .select('matches_played, wins, draws, losses, points, goals_for, goals_against, goal_difference')
         .eq('team_id', team.id)
         .eq('season_id', activeSeason.id)
         .maybeSingle(),
@@ -311,10 +312,6 @@ export default async function TeamPage({ params }: Props) {
         statsByEaId.get(s.ea_player_id).push(s);
       });
     }
-
-    // Dynamic import to use the calculator without importing at the top if it causes issues, but we can just import it.
-    // Wait, let's just do it directly or use require if it's simpler. I'll import it at the top later.
-    const { calculateMarketValue } = await import("@/app/utils/marketValueCalculator");
 
     roster.forEach(r => {
       let tM=0, tW=0, tD=0, tL=0, tG=0, tA=0, tCGK=0, tCDEF=0, tRC=0;
