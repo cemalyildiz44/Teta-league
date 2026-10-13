@@ -1,15 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/middleware";
 import { getSiteUrl, sanitizeNextUrl } from "@/lib/site-url";
+import { hasSupabaseAuthCookie } from "@/lib/auth-cookies";
 
 // Next.js 16: "middleware" file convention is deprecated, use "proxy" instead.
 // Export must be named "proxy" (not "middleware").
 export async function proxy(request: NextRequest) {
-  const { supabase, supabaseResponse } = createClient(request);
-  
-  // This triggers the session refresh if needed
-  await supabase.auth.getUser();
-
   const { pathname, searchParams } = request.nextUrl;
   const baseUrl = process.env.NODE_ENV === "production" ? getSiteUrl() : request.nextUrl.origin;
 
@@ -50,6 +46,18 @@ export async function proxy(request: NextRequest) {
       callbackUrl.searchParams.set("next", sanitizeNextUrl(pathname));
     }
     return NextResponse.redirect(callbackUrl);
+  }
+
+  const { supabase, supabaseResponse } = createClient(request);
+
+  // Check if any active Supabase SSR session cookies are present (standard or chunked).
+  // PKCE verifiers alone or unrelated cookies will not trigger an unnecessary session refresh.
+  const hasAuthCookie = hasSupabaseAuthCookie(request.cookies.getAll());
+
+  // Only trigger session refresh if Supabase auth cookies are present.
+  // For anonymous visitors, skip getUser() to avoid unnecessary CPU and Supabase Auth calls.
+  if (hasAuthCookie) {
+    await supabase.auth.getUser();
   }
 
   return supabaseResponse;
