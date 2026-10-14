@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Shield, ChevronRight } from "lucide-react";
 import TeamLogo from "@/components/TeamLogo";
+import { slugify } from "@/app/lig/utils";
 
 import { getMatchById, getTeamById } from "@/lib/fetchers";
 
@@ -38,7 +39,7 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
 
   // Parallel fetches for relations (homeTeam & awayTeam are memoized from generateMetadata)
   const [{ data: leagueData }, { data: seasonData }, homeTeam, awayTeam, { data: statsData }] = await Promise.all([
-    match.league_id ? supabase.from("leagues").select("id, name, slug").eq("id", match.league_id).maybeSingle() : Promise.resolve({ data: null }),
+    match.league_id ? supabase.from("leagues").select("id, name").eq("id", match.league_id).maybeSingle() : Promise.resolve({ data: null }),
     match.season_id ? supabase.from("seasons").select("id, name, slug").eq("id", match.season_id).maybeSingle() : Promise.resolve({ data: null }),
     getTeamById(match.home_team_id),
     getTeamById(match.away_team_id),
@@ -168,7 +169,7 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
           <ChevronRight className="w-3 h-3 text-gray-700" />
           {leagueData && (
             <>
-              <Link href={`/lig/${seasonData?.slug}/${leagueData.slug}`} className="hover:text-[#00e5ff] transition-colors">{leagueData.name}</Link>
+              <Link href={`/lig/${seasonData?.slug}/${slugify(leagueData.name)}`} className="hover:text-[#00e5ff] transition-colors">{leagueData.name}</Link>
               <ChevronRight className="w-3 h-3 text-gray-700" />
             </>
           )}

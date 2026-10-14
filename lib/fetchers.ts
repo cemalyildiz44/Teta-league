@@ -68,7 +68,7 @@ export const getActiveLeagues = cache(async (seasonId: string) => {
 
   const { data: leagues } = await supabase
     .from('leagues')
-    .select('id, name, slug, level, status, season_id')
+    .select('id, name, level, status, season_id')
     .eq('season_id', seasonId)
     .order('level', { ascending: true });
 
