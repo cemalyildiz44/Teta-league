@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { PlayerStatsForm } from './PlayerStatsForm';
 import { MatchEditForm } from './MatchEditForm';
 import { MatchAuditHistory } from './MatchAuditHistory';
+import { getCachedUser } from '@/lib/fetchers';
 
 export default async function MatchDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = await params;
@@ -13,7 +14,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) redirect('/giris');
 
   // Verify Captain

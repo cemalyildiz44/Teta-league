@@ -7,6 +7,7 @@ import type { Metadata } from 'next';
 import NewsImage from '@/components/NewsImage';
 import NewsContent from '@/components/NewsContent';
 import { extractMentionCandidates, getValidMentionUsernames } from '@/utils/mentions';
+import { getCachedUser } from '@/lib/fetchers';
 
 interface NewsDetailPageProps {
   params: Promise<{ slug: string }>;
@@ -59,7 +60,7 @@ export default async function NewsDetailPage({ params }: NewsDetailPageProps) {
 
   // If not published, verify if current user is admin
   if (!news.is_published) {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
     if (!user) notFound();
 
     const { data: adminRole } = await supabase

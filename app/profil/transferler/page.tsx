@@ -4,12 +4,13 @@ import { redirect } from 'next/navigation';
 import { TransferInbox } from './TransferInbox';
 import { LeaveTeamButton } from './LeaveTeamButton';
 import TeamLogo from '@/components/TeamLogo';
+import { getCachedUser } from '@/lib/fetchers';
 
 export default async function PlayerTransfersPage() {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) redirect('/giris');
 
   // Active Season

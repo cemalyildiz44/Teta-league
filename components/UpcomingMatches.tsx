@@ -25,7 +25,7 @@ function formatTime(dateStr: string): string {
   }).format(date);
 }
 
-import { getActiveSeason } from '@/lib/fetchers';
+import { getActiveSeason, getActiveLeagues } from '@/lib/fetchers';
 
 export default async function UpcomingMatches() {
   const activeSeason = await getActiveSeason();
@@ -41,18 +41,9 @@ export default async function UpcomingMatches() {
     );
   }
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
-
-  // 2. Aktif sezondaki ACTIVE ligleri bul (level 1 = en üst)
-  const { data: activeLeague } = await supabase
-    .from('leagues')
-    .select('id, name')
-    .eq('season_id', activeSeason.id)
-    .eq('status', 'ACTIVE')
-    .order('level', { ascending: true })
-    .limit(1)
-    .single();
+  // 2. Aktif sezondaki ligleri al (memoized - Standings ile paylaşılır)
+  const leagues = await getActiveLeagues(activeSeason.id);
+  const activeLeague = leagues.find((l) => l.status === 'ACTIVE') || leagues[0];
 
   if (!activeLeague) {
     return (
@@ -68,6 +59,9 @@ export default async function UpcomingMatches() {
   // 3. Yaklaşan fikstürleri çek
   //    fixtures -> league_teams ilişkisi home/away için iki ayrı FK kullanıyor
   //    Ambiguity önlemek için explicit FK isimleri zorunlu
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+
   const { data: fixtures } = await supabase
     .from('fixtures')
     .select(`

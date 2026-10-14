@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { PlayersManager } from './PlayersManager';
+import { getCachedUser } from '@/lib/fetchers';
 
 export const metadata = {
   title: 'Oyuncu Yönetimi | TETA League Admin',
@@ -13,7 +14,7 @@ export default async function AdminPlayersPage() {
   const supabase = createClient(cookieStore);
 
   // Admin authentication & authorization check
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) redirect('/giris');
 
   const { data: adminRole } = await supabase

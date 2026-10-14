@@ -2,13 +2,14 @@ import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import PenaltiesManager from './PenaltiesManager';
+import { getCachedUser } from '@/lib/fetchers';
 
 export default async function AdminPenaltiesPage() {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
   // Admin guard
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) redirect('/giris');
 
   const { data: adminRole } = await supabase

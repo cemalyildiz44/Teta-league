@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { SubmitMatchForm } from './SubmitMatchForm';
+import { getCachedUser } from '@/lib/fetchers';
 
 export default async function NewMatchPage({ searchParams }: { searchParams: Promise<{ fixture: string }> }) {
   const resolvedParams = await searchParams;
@@ -11,7 +12,7 @@ export default async function NewMatchPage({ searchParams }: { searchParams: Pro
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) redirect('/giris');
 
   // Verify Captain

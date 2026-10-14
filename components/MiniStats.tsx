@@ -18,7 +18,11 @@ export default async function MiniStats() {
 
     // Fetch stats and teams concurrently (teams is memoized)
     const [ { data: stats }, teams ] = await Promise.all([
-      supabase.from('player_team_season_stats').select('goals, assists, cleansheets_gk, cleansheets_def, rating_sum, rating_count, matches_played, player_id, team_id, profiles(username)').eq('season_id', activeSeason.id),
+      supabase
+        .from('player_team_season_stats')
+        .select('goals, assists, cleansheets_gk, cleansheets_def, rating_sum, rating_count, matches_played, player_id, team_id, profiles(username)')
+        .eq('season_id', activeSeason.id)
+        .gt('matches_played', 0),
       getAllTeams()
     ]);
     const teamMap = new Map((teams || []).map((t: any) => [t.id, t]));

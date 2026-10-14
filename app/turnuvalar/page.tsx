@@ -3,6 +3,7 @@ import { Metadata } from 'next';
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import TournamentTabs from './TournamentTabs';
+import { getCachedUser } from '@/lib/fetchers';
 
 export const metadata: Metadata = {
   title: 'Turnuvalar | TETA League',
@@ -14,7 +15,7 @@ export const revalidate = 0;
 export default async function TurnuvalarPage() {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCachedUser();
 
   const [
     { data: tournamentsData },

@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import AchievementsClient from './AchievementsClient';
+import { getCachedUser } from '@/lib/fetchers';
 
 export const metadata = {
   title: 'Kupa ve Başarı Yönetimi | TETA League Admin',
@@ -10,7 +11,7 @@ export default async function AchievementsPage() {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) return <div className="p-8 text-red-400 font-bold">Yetkisiz erişim.</div>;
 
   const { data: roleData } = await supabase

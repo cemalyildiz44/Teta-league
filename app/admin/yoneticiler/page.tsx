@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import ManagersClient from './ManagersClient';
 import { ManagedUser } from './actions';
+import { getCachedUser } from '@/lib/fetchers';
 
 export const metadata = {
   title: 'Yönetici Yönetimi | TETA League Admin',
@@ -14,9 +15,7 @@ export default async function AdminYoneticilerPage() {
   const supabase = createClient(cookieStore);
 
   // 1. Auth check
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCachedUser();
 
   if (!user) {
     redirect('/giris');

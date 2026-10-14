@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { slugify, compareTeamStats } from '@/app/lig/utils';
 import StandingsClient, { StandingsLeagueInfo, StandingsTeamRow } from './StandingsClient';
 
-import { getActiveSeason, getAllTeams } from '@/lib/fetchers';
+import { getActiveSeason, getAllTeams, getActiveLeagues } from '@/lib/fetchers';
 
 interface StandingsProps {
   compact?: boolean;
@@ -29,21 +29,14 @@ export default async function Standings({ compact = false }: StandingsProps) {
     );
   }
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
-
   const seasonId = currentSeason.id;
   const seasonSlug = currentSeason.slug || 'sezon-1';
   const seasonName = currentSeason.name || 'Sezon 1';
 
-  // 2. Aktif sezondaki ligleri çek
-  const { data: leagues, error: leaguesError } = await supabase
-    .from('leagues')
-    .select('*')
-    .eq('season_id', seasonId)
-    .order('level', { ascending: true });
+  // 2. Aktif sezondaki ligleri çek (memoized - UpcomingMatches ile paylaşılır)
+  const leagues = await getActiveLeagues(seasonId);
 
-  if (leaguesError || !leagues || leagues.length === 0) {
+  if (!leagues || leagues.length === 0) {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
@@ -69,34 +62,38 @@ export default async function Standings({ compact = false }: StandingsProps) {
     (l) => l.level === 2 || l.name.toLowerCase().includes('ecl')
   ) || leagues.find((l) => l.id !== superLigLeague?.id) || null;
 
-  // 4. Tüm takımları tek sorguda çek (memoized)
-  const allTeams = await getAllTeams();
-  const teamMap = new Map((allTeams || []).map((t: any) => [t.id, t]));
+  const targetLeagues = [superLigLeague, eclLeague].filter(Boolean) as any[];
+  const targetLeagueIds = targetLeagues.map((l) => l.id);
 
-  // 5. Lig bazında puan durumu hesaplama yardımcısı
-  async function fetchLeagueStandings(league: any): Promise<StandingsLeagueInfo> {
-    const leagueSlug = (league as any).slug || slugify(league.name);
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
 
-    // Aktif takım eşleşmelerini çek
-    const { data: ltData } = await supabase
+  // 4. Tüm takımları, aktif takım eşleşmelerini ve istatistikleri paralel ve tek seferde çek
+  const [allTeams, { data: allLeagueTeams }, { data: allStats }] = await Promise.all([
+    getAllTeams(),
+    supabase
       .from('league_teams')
-      .select('team_id')
-      .eq('league_id', league.id)
+      .select('league_id, team_id')
+      .in('league_id', targetLeagueIds)
       .eq('season_id', seasonId)
-      .eq('is_active', true);
-
-    const leagueTeams = ltData || [];
-
-    // İlgili sezon ve lige ait istatistikleri çek
-    const { data: statsData } = await supabase
+      .eq('is_active', true),
+    supabase
       .from('team_season_stats')
-      .select('*')
-      .eq('league_id', league.id)
-      .eq('season_id', seasonId);
+      .select('league_id, team_id, matches_played, wins, draws, losses, goals_for, goals_against, points')
+      .in('league_id', targetLeagueIds)
+      .eq('season_id', seasonId),
+  ]);
 
-    const stats = statsData || [];
+  const teamMap = new Map((allTeams || []).map((t: any) => [t.id, t]));
+  const leagueTeamsData = allLeagueTeams || [];
+  const statsData = allStats || [];
 
-    // league_teams'teki ancak henüz istatistiği oluşmamış takımlar için 0 varsayılanı
+  // 5. Bellekte lig bazında puan durumu hesaplama
+  function formatLeagueStandings(league: any): StandingsLeagueInfo {
+    const leagueSlug = (league as any).slug || slugify(league.name);
+    const leagueTeams = leagueTeamsData.filter((lt) => lt.league_id === league.id);
+    const stats = statsData.filter((s) => s.league_id === league.id);
+
     const combinedStats = leagueTeams.map((lt) => {
       const team = teamMap.get(lt.team_id);
       const teamName = team?.name || '';
@@ -117,7 +114,6 @@ export default async function Standings({ compact = false }: StandingsProps) {
       };
     });
 
-    // Ortak tiebreaker comparator ile birebir sırala
     const sortedStats = [...combinedStats].sort(compareTeamStats);
 
     const formattedTeams: StandingsTeamRow[] = sortedStats.map((s) => {
@@ -149,11 +145,8 @@ export default async function Standings({ compact = false }: StandingsProps) {
     };
   }
 
-  // 6. Her iki ligi paralel çek
-  const [superLigData, eclData] = await Promise.all([
-    superLigLeague ? fetchLeagueStandings(superLigLeague) : Promise.resolve(null),
-    eclLeague ? fetchLeagueStandings(eclLeague) : Promise.resolve(null),
-  ]);
+  const superLigData = superLigLeague ? formatLeagueStandings(superLigLeague) : null;
+  const eclData = eclLeague ? formatLeagueStandings(eclLeague) : null;
 
   return (
     <StandingsClient

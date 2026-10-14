@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { SocialFeed } from './SocialFeed';
 import { fetchSocialFeedAction } from './actions';
+import { getCachedUser } from '@/lib/fetchers';
 
 export const revalidate = 0;
 
@@ -10,7 +11,7 @@ export default async function SocialPage() {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   
   const [
     { data: currentUserProfile },

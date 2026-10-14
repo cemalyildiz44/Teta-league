@@ -1,13 +1,11 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 
-export const revalidate = 60; // SSR with revalidation
-
 export default async function PopularPosts() {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  // Popular by most likes
+  // Popular by most likes (limited to recent 50 posts to prevent unbounded queries)
   const { data: posts } = await supabase
     .from('posts')
     .select(`
@@ -16,7 +14,8 @@ export default async function PopularPosts() {
       likes ( id )
     `)
     .eq('is_deleted', false)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(50);
 
   let popular: any[] = [];
   if (posts) {

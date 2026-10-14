@@ -8,17 +8,27 @@ import { createClient } from '@/utils/supabase/server';
  * Does NOT persist across different requests or users.
  */
 
+export const getCachedUserProfile = cache(async (userId: string) => {
+  if (!userId) return null;
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, username, avatar_url, status')
+    .eq('id', userId)
+    .maybeSingle();
+
+  return profile;
+});
+
 export const getCachedUser = cache(async () => {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) return null;
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('status')
-    .eq('id', user.id)
-    .maybeSingle();
+  const profile = await getCachedUserProfile(user.id);
 
   if (profile?.status === 'BANNED') {
     await supabase.auth.signOut();
@@ -27,6 +37,7 @@ export const getCachedUser = cache(async () => {
 
   return user;
 });
+
 
 export const getActiveSeason = cache(async () => {
   const cookieStore = await cookies();
@@ -48,6 +59,20 @@ export const getActiveSeason = cache(async () => {
     .maybeSingle();
 
   return latestSeason || null;
+});
+
+export const getActiveLeagues = cache(async (seasonId: string) => {
+  if (!seasonId) return [];
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+
+  const { data: leagues } = await supabase
+    .from('leagues')
+    .select('id, name, slug, level, status, season_id')
+    .eq('season_id', seasonId)
+    .order('level', { ascending: true });
+
+  return leagues || [];
 });
 
 export const getAllTeams = cache(async () => {
@@ -87,6 +112,74 @@ export const getTeamById = cache(async (id: string) => {
     .maybeSingle();
 
   return team;
+});
+
+export interface HeaderData {
+  userProfile: {
+    id: string;
+    username: string;
+    avatar_url: string | null;
+  } | null;
+  activeTeam: {
+    id: string;
+    name: string;
+    slug: string;
+    logo_url: string | null;
+    is_active: boolean;
+  } | null;
+  unreadCount: number;
+}
+
+export const getCachedHeaderData = cache(async (userId: string): Promise<HeaderData> => {
+  if (!userId) {
+    return {
+      userProfile: null,
+      activeTeam: null,
+      unreadCount: 0,
+    };
+  }
+
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+
+  const [
+    profile,
+    { data: membership },
+    { count }
+  ] = await Promise.all([
+    getCachedUserProfile(userId),
+    supabase
+      .from('team_memberships')
+      .select('team_id')
+      .eq('player_id', userId)
+      .is('left_at', null)
+      .order('joined_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_read', false),
+  ]);
+
+  let activeTeam = null;
+  if (profile) {
+    if (membership?.team_id) {
+      const teamData = await getTeamById(membership.team_id);
+      if (teamData) {
+        activeTeam = teamData;
+      }
+    }
+  }
+
+  return {
+    userProfile: profile
+      ? { id: profile.id, username: profile.username, avatar_url: profile.avatar_url }
+      : null,
+    activeTeam,
+    unreadCount: profile ? (count || 0) : 0,
+  };
 });
 
 export const getMatchById = cache(async (matchId: string) => {

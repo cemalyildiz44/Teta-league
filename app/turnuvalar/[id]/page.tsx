@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { createClient } from '@/utils/supabase/server';
 import TournamentDetailClient from './TournamentDetailClient';
+import { getCachedUser, getCachedUserProfile } from '@/lib/fetchers';
 
 export const revalidate = 0;
 
@@ -45,7 +46,7 @@ export default async function TournamentDetailPage({
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCachedUser();
 
   // 1. Fetch tournament
   const { data: tournamentData, error: tourError } = await supabase
@@ -127,11 +128,7 @@ export default async function TournamentDetailPage({
   // 5. Fetch current user profile if logged in
   let currentUserProfile: any = null;
   if (user) {
-    const { data: prof } = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url')
-      .eq('id', user.id)
-      .maybeSingle();
+    const prof = await getCachedUserProfile(user.id);
     currentUserProfile = prof || { id: user.id, email: user.email };
   }
 

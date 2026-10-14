@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { NewsManager } from './NewsManager';
 import { NewsArticle } from '@/types/news';
+import { getCachedUser } from '@/lib/fetchers';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +11,7 @@ export default async function AdminNewsPage() {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) redirect('/giris');
 
   // Check ADMIN or SUPER_ADMIN

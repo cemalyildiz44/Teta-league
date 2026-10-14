@@ -2,8 +2,6 @@ import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 
-export const revalidate = 60; // SSR with revalidation
-
 export default async function SocialFeed() {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
