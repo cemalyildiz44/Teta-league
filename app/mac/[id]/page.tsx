@@ -94,7 +94,7 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
     const uname = (s.profiles as any)?.username || s.ea_player_name || "Bilinmiyor";
     const avatar = (s.profiles as any)?.avatar_url;
     return (
-      <Link key={s.id} href={(s.profiles as any)?.username ? `/oyuncular/${(s.profiles as any).username}` : "#"} className="flex items-center gap-4 bg-white/[0.02] border border-white/5 p-4 rounded-xl hover:bg-white/[0.04] transition-colors group">
+      <Link key={s.id} href={(s.profiles as any)?.username ? `/oyuncular/${(s.profiles as any).username}` : "#"} prefetch={false} className="flex items-center gap-4 bg-white/[0.02] border border-white/5 p-4 rounded-xl hover:bg-white/[0.04] transition-colors group">
         <div className="w-10 h-10 rounded-lg bg-black/40 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center">
           {avatar ? <img src={avatar} className="w-full h-full object-cover" /> : <span className="text-[14px] font-[900] text-[#00e5ff] uppercase">{uname.substring(0, 2)}</span>}
         </div>
@@ -132,7 +132,7 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
             return (
               <tr key={s.id} className="hover:bg-white/[0.02] transition-colors group">
                 <td className="px-4 py-3">
-                  <Link href={(s.profiles as any)?.username ? `/oyuncular/${(s.profiles as any).username}` : "#"} className="flex flex-col">
+                  <Link href={(s.profiles as any)?.username ? `/oyuncular/${(s.profiles as any).username}` : "#"} prefetch={false} className="flex flex-col">
                     <span className="font-[800] text-[13px] text-white group-hover:text-[#00e5ff] transition-colors uppercase">{uname}</span>
                     <span className="text-[10px] font-[700] text-gray-600 uppercase mt-0.5">{s.position}</span>
                   </Link>
@@ -281,7 +281,7 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
                               return Array.from({ length: s.goals }).map((_, i) => (
                                 <div key={`${s.id}-g-${i}`} className="flex items-center gap-3 text-[14px]">
                                   <span className="text-emerald-400">⚽</span>
-                                  <Link href={(s.profiles as any)?.username ? `/oyuncular/${(s.profiles as any).username}` : "#"} className="font-[800] text-white hover:text-[#00e5ff] uppercase">{uname}</Link>
+                                  <Link href={(s.profiles as any)?.username ? `/oyuncular/${(s.profiles as any).username}` : "#"} prefetch={false} className="font-[800] text-white hover:text-[#00e5ff] uppercase">{uname}</Link>
                                 </div>
                               ))
                             })}
@@ -298,7 +298,7 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
                               return Array.from({ length: s.assists }).map((_, i) => (
                                 <div key={`${s.id}-a-${i}`} className="flex items-center gap-3 text-[14px]">
                                   <span className="text-gray-500">👟</span>
-                                  <Link href={(s.profiles as any)?.username ? `/oyuncular/${(s.profiles as any).username}` : "#"} className="font-[800] text-gray-300 hover:text-[#00e5ff] uppercase">{uname}</Link>
+                                  <Link href={(s.profiles as any)?.username ? `/oyuncular/${(s.profiles as any).username}` : "#"} prefetch={false} className="font-[800] text-gray-300 hover:text-[#00e5ff] uppercase">{uname}</Link>
                                 </div>
                               ))
                             })}
@@ -329,7 +329,7 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
                               return Array.from({ length: s.goals }).map((_, i) => (
                                 <div key={`${s.id}-g-${i}`} className="flex items-center gap-3 text-[14px]">
                                   <span className="text-emerald-400">⚽</span>
-                                  <Link href={(s.profiles as any)?.username ? `/oyuncular/${(s.profiles as any).username}` : "#"} className="font-[800] text-white hover:text-[#00e5ff] uppercase">{uname}</Link>
+                                  <Link href={(s.profiles as any)?.username ? `/oyuncular/${(s.profiles as any).username}` : "#"} prefetch={false} className="font-[800] text-white hover:text-[#00e5ff] uppercase">{uname}</Link>
                                 </div>
                               ))
                             })}
@@ -346,7 +346,7 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
                               return Array.from({ length: s.assists }).map((_, i) => (
                                 <div key={`${s.id}-a-${i}`} className="flex items-center gap-3 text-[14px]">
                                   <span className="text-gray-500">👟</span>
-                                  <Link href={(s.profiles as any)?.username ? `/oyuncular/${(s.profiles as any).username}` : "#"} className="font-[800] text-gray-300 hover:text-[#00e5ff] uppercase">{uname}</Link>
+                                  <Link href={(s.profiles as any)?.username ? `/oyuncular/${(s.profiles as any).username}` : "#"} prefetch={false} className="font-[800] text-gray-300 hover:text-[#00e5ff] uppercase">{uname}</Link>
                                 </div>
                               ))
                             })}
@@ -374,7 +374,7 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
                         const uname = (m.profiles as any)?.username || m.ea_player_name || "Bilinmiyor";
                         const team = m.team_id === match.home_team_id ? homeTeam : awayTeam;
                         return (
-                          <Link key={m.id} href={(m.profiles as any)?.username ? `/oyuncular/${(m.profiles as any).username}` : "#"} className="text-[20px] font-[900] text-white hover:text-amber-400 transition-colors uppercase">
+                          <Link key={m.id} href={(m.profiles as any)?.username ? `/oyuncular/${(m.profiles as any).username}` : "#"} prefetch={false} className="text-[20px] font-[900] text-white hover:text-amber-400 transition-colors uppercase">
                             {uname} <span className="text-[12px] text-gray-500 tracking-widest ml-2 border-l border-white/10 pl-2">{team?.name}</span>
                           </Link>
                         )

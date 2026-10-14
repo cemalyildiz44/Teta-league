@@ -97,6 +97,7 @@ export default async function RecentTransfers() {
                 <div className="min-w-0 flex-1">
                   <Link
                     href={`/oyuncular/${transfer.playerName}`}
+                    prefetch={false}
                     className="text-[14px] font-[900] text-white hover:text-[#00e5ff] transition-colors truncate block tracking-wide"
                     title={transfer.playerName}
                   >

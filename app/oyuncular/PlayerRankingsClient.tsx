@@ -384,6 +384,7 @@ export default function PlayerRankingsClient({ rankings }: { rankings: PlayerRan
                       <td className="py-4 px-6">
                         <Link 
                           href={`/oyuncular/${player.username}`}
+                          prefetch={false}
                           className="flex items-center gap-4 group-hover:drop-shadow-[0_0_10px_rgba(0,229,255,0.3)] transition-all"
                         >
                           <div className="w-10 h-10 shrink-0 rounded-full bg-black border border-white/10 p-[2px] flex items-center justify-center overflow-hidden relative">

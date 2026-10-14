@@ -109,6 +109,7 @@ export default function Header({ user, userProfile, activeTeam, unreadCount = 0 
           {user ? (
             <Link
               href={userProfile?.username ? `/oyuncular/${userProfile.username}` : '/profil'}
+              prefetch={false}
               className={`relative text-[14px] font-[800] uppercase tracking-[0.1em] transition-all duration-300 ${pathname === (userProfile?.username ? `/oyuncular/${userProfile.username}` : '/profil') ? 'text-[#00E5FF] drop-shadow-[0_0_8px_rgba(0,229,255,0.5)]' : 'text-gray-300 hover:text-[#00E5FF]'}`}
             >
               OYUNCUM
@@ -252,6 +253,7 @@ export default function Header({ user, userProfile, activeTeam, unreadCount = 0 
                 </Link>
                 <Link
                   href={userProfile?.username ? `/oyuncular/${userProfile.username}` : '/profil'}
+                  prefetch={false}
                   onClick={() => setMobileOpen(false)}
                   className={`text-[16px] font-[800] uppercase tracking-widest ${pathname === (userProfile?.username ? `/oyuncular/${userProfile.username}` : '/profil') ? 'text-[#00E5FF] drop-shadow-[0_0_8px_rgba(0,229,255,0.5)]' : 'text-gray-300 hover:text-[#00E5FF]'}`}
                 >
