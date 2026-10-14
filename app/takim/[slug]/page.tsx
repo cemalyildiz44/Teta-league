@@ -42,7 +42,8 @@ export default async function TeamPage({ params }: Props) {
     { data: leagueTeamData },
     { data: roles },
     { data: allTimeMatches },
-    allTeamsData
+    allTeamsData,
+    { data: teamTrophiesData }
   ] = await Promise.all([
     supabase
       .from('league_teams')
@@ -70,9 +71,28 @@ export default async function TeamPage({ params }: Props) {
       .select('id, home_team_id, away_team_id, home_score, away_score')
       .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
       .eq('status', 'APPROVED'),
-    getAllTeams()
+    getAllTeams(),
+    supabase
+      .from('trophy_winners')
+      .select(`
+        id,
+        awarded_at,
+        notes,
+        trophy:trophies (
+          id,
+          title,
+          description,
+          image_url,
+          category,
+          season_name,
+          season:seasons ( name )
+        )
+      `)
+      .eq('team_id', team.id)
+      .order('awarded_at', { ascending: false })
   ]);
 
+  const teamTrophies = ((teamTrophiesData || []) as any[]).filter((t: any) => t && t.trophy);
   const activeLeague: any = Array.isArray(leagueTeamData?.leagues) ? leagueTeamData.leagues[0] : leagueTeamData?.leagues;
   const activeSeason: any = Array.isArray(activeLeague?.seasons) ? activeLeague.seasons[0] : activeLeague?.seasons;
   const captainRolesList = Array.isArray(roles) ? roles : roles ? [roles] : [];
@@ -317,11 +337,11 @@ export default async function TeamPage({ params }: Props) {
       let tM=0, tW=0, tD=0, tL=0, tG=0, tA=0, tCGK=0, tCDEF=0, tRC=0;
       const sMap = new Map();
       const pStatsList = r.current_ea_player_id ? statsByEaId.get(r.current_ea_player_id) || [] : [];
-      
+
       pStatsList.forEach((s: any) => {
         tM++; tG += s.goals || 0; tA += s.assists || 0; tRC += s.red_cards || 0;
         tCGK += s.cleansheets_gk || 0; tCDEF += s.cleansheets_def || 0;
-        
+
         const m = s.matches;
         const isHome = s.team_id === m.home_team_id;
         const my = isHome ? m.home_score : m.away_score;
@@ -341,7 +361,7 @@ export default async function TeamPage({ params }: Props) {
         seasonStats: Array.from(sMap.values()),
         achievements: achByProfile.get(r.id) || []
       };
-      
+
       const res = calculateMarketValue(mvInput);
       r.marketValue = res.totalValue;
       totalTeamValue += res.totalValue;
@@ -352,20 +372,20 @@ export default async function TeamPage({ params }: Props) {
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 lg:px-6 py-12 md:py-16">
-      
+
       {/* HERO SECTION */}
       <div className="client-glass rounded-2xl p-6 lg:p-10 relative overflow-hidden mb-8 border border-[#00e5ff]/20 bg-[#01060b]">
         {/* Subtle Background Elements */}
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#00e5ff] rounded-full blur-[150px] opacity-[0.07] pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-[#00e5ff] rounded-full blur-[120px] opacity-[0.03] pointer-events-none" />
-        
+
         <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start gap-8">
           {/* Logo */}
           <TeamLogo src={team.logo_url} name={team.name} size="hero" />
 
           {/* Info */}
           <div className="flex-1 text-center md:text-left flex flex-col justify-center pt-2">
-            
+
             <div className="flex flex-col md:flex-row md:items-center gap-4 mb-3">
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-[900] text-white tracking-tight uppercase drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
                 {team.name}
@@ -379,7 +399,7 @@ export default async function TeamPage({ params }: Props) {
                 </span>
               )}
             </div>
-            
+
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mb-6">
               <p className="text-[#00e5ff] text-[14px] font-[700] tracking-[0.2em] uppercase">
                 EA CLUB ID: <span className="text-white">{team.ea_club_id || "BİLİNMİYOR"}</span>
@@ -468,6 +488,16 @@ export default async function TeamPage({ params }: Props) {
                   <span className="text-red-400">{allTimeLosses} <span className="text-[10px] text-gray-400 font-bold">M</span></span>
                 </div>
               </div>
+
+              {/* KUPA VİTRİNİ ROZETİ */}
+              {teamTrophies.length > 0 && (
+                <div className="px-5 py-3 bg-gradient-to-br from-amber-500/10 to-transparent backdrop-blur-md border border-amber-500/30 rounded-xl flex flex-col shadow-[0_0_15px_rgba(245,158,11,0.1)]">
+                  <span className="text-[10px] text-amber-400 font-[900] uppercase tracking-[0.2em] mb-1">KUPA VİTRİNİ</span>
+                  <span className="text-[14px] text-white font-[900] tracking-wider uppercase font-mono flex items-center gap-1.5">
+                    🏆 {teamTrophies.length} KUPA
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -513,8 +543,90 @@ export default async function TeamPage({ params }: Props) {
           </h2>
           <div className="flex-1 h-px bg-gradient-to-r from-white/10 to-transparent" />
         </div>
-        
+
         <TeamRosterCarousel players={roster} />
+      </div>
+
+      {/* KUPA VİTRİNİ SECTION */}
+      <div className="mb-16">
+        <div className="flex items-center gap-4 mb-8">
+          <h2 className="text-2xl md:text-3xl font-[900] text-white tracking-widest uppercase flex items-center gap-3">
+            <span className="w-2 h-8 bg-amber-400 rounded-full inline-block shadow-[0_0_12px_rgba(245,158,11,0.5)]" />
+            KUPA VİTRİNİ
+          </h2>
+          <div className="flex-1 h-px bg-gradient-to-r from-amber-500/20 via-white/10 to-transparent" />
+          {teamTrophies.length > 0 && (
+            <span className="text-xs font-black px-3 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider font-mono">
+              {teamTrophies.length} Kupa
+            </span>
+          )}
+        </div>
+
+        {teamTrophies.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {teamTrophies.map((tw: any) => {
+              const tr = tw.trophy;
+              const seasonDisplay = tr.season?.name || tr.season_name;
+              return (
+                <div
+                  key={tw.id}
+                  className="group relative bg-[#03070c] border border-white/5 hover:border-amber-400/40 rounded-2xl p-6 text-center transition-all duration-300 hover:shadow-[0_0_25px_rgba(245,158,11,0.2)] hover:-translate-y-0.5 flex flex-col items-center justify-between overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-b from-amber-500/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                  {/* Category Badge */}
+                  {tr.category && (
+                    <span className="text-[9px] font-black tracking-widest uppercase px-2.5 py-0.5 rounded-full bg-white/5 text-gray-400 border border-white/5 mb-3 group-hover:border-amber-400/30 group-hover:text-amber-300 transition-colors">
+                      {tr.category}
+                    </span>
+                  )}
+
+                  {/* Trophy Image */}
+                  <div className="w-20 h-20 my-2 flex items-center justify-center relative">
+                    {tr.image_url ? (
+                      <img
+                        src={tr.image_url}
+                        alt={tr.title}
+                        className="max-h-full max-w-full object-contain filter drop-shadow-[0_4px_12px_rgba(0,0,0,0.7)] group-hover:scale-105 transition-transform duration-300 select-none"
+                      />
+                    ) : (
+                      <span className="text-4xl select-none">🏆</span>
+                    )}
+                  </div>
+
+                  {/* Title & Season */}
+                  <div className="mt-2 w-full">
+                    <h4 className="text-[13px] font-[900] text-white tracking-wide uppercase line-clamp-2 group-hover:text-amber-300 transition-colors">
+                      {tr.title}
+                    </h4>
+                    {seasonDisplay && (
+                      <span className="inline-block mt-1.5 px-2.5 py-0.5 rounded bg-black/60 border border-white/10 text-[10px] font-black text-amber-300 uppercase tracking-wider">
+                        {seasonDisplay}
+                      </span>
+                    )}
+                    {tw.notes && (
+                      <p className="text-[11px] font-medium text-gray-400 mt-2 line-clamp-2 italic">
+                        "{tw.notes}"
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="bg-[#03070c] border border-white/5 rounded-2xl p-10 text-center flex flex-col items-center justify-center">
+            <div className="w-14 h-14 rounded-2xl bg-white/[0.02] border border-white/10 flex items-center justify-center text-2xl mb-3 text-gray-600">
+              🏆
+            </div>
+            <h3 className="text-sm font-[900] text-white uppercase tracking-wide mb-1">
+              Henüz Kazanılmış Kupa Yok
+            </h3>
+            <p className="text-xs text-gray-500 font-medium max-w-sm">
+              Bu takıma ait henüz vitrinde sergilenecek resmi bir kupa bulunmuyor.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* MATCHES SECTION */}

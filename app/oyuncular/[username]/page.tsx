@@ -22,7 +22,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   const paramVal = decodeURIComponent(resolvedParams.username);
   const resolvedSearchParams = await searchParams;
   const activeTab = resolvedSearchParams.tab || 'genel';
-  
+
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
@@ -73,7 +73,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
       .select("match_id, team_id, position, rating, goals, assists, shots, passes_made, pass_attempts, tackles_made, tackle_attempts, saves, goals_conceded, is_mom, red_cards, cleansheets_gk, cleansheets_def, matches!inner(id, home_team_id, away_team_id, home_score, away_score, season_id, league_id, played_at, status, fixtures(week_number))")
       .eq("ea_player_id", profile.current_ea_player_id)
       .eq("matches.status", "APPROVED");
-      
+
     if (statsWithMatches) {
       playerStats = statsWithMatches;
       approvedMatches = statsWithMatches.map((s: any) => s.matches);
@@ -85,14 +85,18 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     { data: allSeasonsData },
     { data: allLeaguesData },
     { data: playerAchievementsData },
-    { data: legacyStatsData }
+    { data: legacyStatsData },
+    { data: dynamicTrophiesData }
   ] = await Promise.all([
     supabase.from("team_memberships").select("team_id, league_id, season_id, joined_at, left_at").eq("player_id", profile.id).order("joined_at", { ascending: false }),
     supabase.from("seasons").select("id, name, slug"),
     supabase.from("leagues").select("id, name, season_id"),
     supabase.from('player_achievements').select('achievement_type, season_id, season_name, seasons(name, slug)').eq('player_id', profile.id),
-    supabase.from('player_legacy_career_stats').select('team_id, team_name, season_name, league_name, matches_played, goals, assists, wins, draws, losses, clean_sheets, red_cards, rating_avg, market_value, notes').eq('player_id', profile.id).is('deleted_at', null).order('season_name', { ascending: false })
+    supabase.from('player_legacy_career_stats').select('team_id, team_name, season_name, league_name, matches_played, goals, assists, wins, draws, losses, clean_sheets, red_cards, rating_avg, market_value, notes').eq('player_id', profile.id).is('deleted_at', null).order('season_name', { ascending: false }),
+    supabase.from('trophy_winners').select('id, awarded_at, notes, trophy:trophies(id, title, description, image_url, category, season_name, season:seasons(name))').eq('player_id', profile.id).order('awarded_at', { ascending: false })
   ]);
+
+  const dynamicTrophies = (dynamicTrophiesData || []) as any[];
 
   const legacyStats = legacyStatsData || [];
   const memberships = membershipsData || [];
@@ -130,8 +134,8 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     const my = isHome ? m.home_score : m.away_score;
     const opp = isHome ? m.away_score : m.home_score;
     let res: "W" | "D" | "L" = "D";
-    if (my > opp) { res = "W"; tW++; } 
-    else if (my < opp) { res = "L"; tL++; } 
+    if (my > opp) { res = "W"; tW++; }
+    else if (my < opp) { res = "L"; tL++; }
     else { res = "D"; tD++; }
 
     matchLevel.push({
@@ -354,35 +358,9 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
 
   const currentLeague = (activeTeam && activeMembership) ? leaguesMap.get(activeMembership.league_id) : null;
 
-  // Achievements
-  const [
-    { data: tournamentsData },
-    { data: ncData }
-  ] = await Promise.all([
-    supabase
-      .from('tournament_winners')
-      .select('id, placement, tournaments(name, type, image_url, seasons(name)), tournament_applications(team_name)')
-      .eq('profile_id', profile.id)
-      .order('created_at', { ascending: false }),
-      
-    supabase
-      .from('tournament_application_players')
-      .select('application_id, tournament_applications(team_name, tournament_winners(id, placement, tournaments(name, type, image_url, seasons(name))))')
-      .eq('profile_id', profile.id)
-  ]);
+  // Valid dynamic personal trophies
+  const validDynamicTrophies = dynamicTrophies.filter((dt: any) => dt && dt.trophy);
 
-  const directTournaments = tournamentsData || [];
-  const ncWins = (ncData || [])
-    .filter((a: any) => a.tournament_applications?.tournament_winners?.length > 0)
-    .map((a: any) => ({
-      id: a.tournament_applications.tournament_winners[0].id,
-      placement: a.tournament_applications.tournament_winners[0].placement,
-      tournaments: a.tournament_applications.tournament_winners[0].tournaments,
-      tournament_applications: { team_name: a.tournament_applications.team_name }
-    }));
-    
-  const allTrophies = [...directTournaments, ...ncWins];
-  
   const achievementCounts = {
     BALLON_DOR: 0,
     POTS: 0,
@@ -394,7 +372,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     '1V1_WINNER': 0,
     NIGHT_CUP_WINNER: 0
   };
-  
+
   if (playerAchievementsData) {
     playerAchievementsData.forEach((a: any) => {
       if (achievementCounts[a.achievement_type as keyof typeof achievementCounts] !== undefined) {
@@ -439,10 +417,33 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
 
   const earnedTrophies: PlayerTrophyBadge[] = [];
 
-  // 1. Ballon d'Or
-  if (ballonDorWins.length > 0) {
+  // 1. Dinamik Bireysel Kupalar (trophy_winners)
+  const dynamicBadgeMap = new Map<string, PlayerTrophyBadge>();
+  for (const dt of validDynamicTrophies) {
+    const trophy = dt.trophy;
+    if (!trophy) continue;
+    const existing = dynamicBadgeMap.get(trophy.id);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      dynamicBadgeMap.set(trophy.id, {
+        id: `trophy_${trophy.id}`,
+        label: trophy.title,
+        icon: '🏆',
+        imageUrl: trophy.image_url || undefined,
+        count: 1,
+        highlight: 'gold',
+      });
+    }
+  }
+  dynamicBadgeMap.forEach((badge) => {
+    earnedTrophies.push(badge);
+  });
+
+  // 2. Geriye Dönük Uyumluluk (Legacy Ballon d'Or / POTS / TOTS)
+  if (ballonDorWins.length > 0 && !Array.from(dynamicBadgeMap.values()).some(b => b.label.toLowerCase().includes("ballon d'or"))) {
     earnedTrophies.push({
-      id: 'ballon_dor',
+      id: 'legacy_ballon_dor',
       label: "Ballon d'Or",
       icon: '🏆',
       imageUrl: '/assets/achievements/ballon-dor.png',
@@ -451,10 +452,9 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     });
   }
 
-  // 2. Sezonun Oyuncusu (POTS)
-  if (achievementCounts.POTS > 0) {
+  if (achievementCounts.POTS > 0 && !Array.from(dynamicBadgeMap.values()).some(b => b.label.toUpperCase().includes("POTS"))) {
     earnedTrophies.push({
-      id: 'pots',
+      id: 'legacy_pots',
       label: 'Sezonun Oyuncusu',
       icon: '👑',
       count: achievementCounts.POTS,
@@ -462,10 +462,9 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     });
   }
 
-  // 3. Sezonun Takımı (TOTS)
-  if (achievementCounts.TOTS > 0) {
+  if (achievementCounts.TOTS > 0 && !Array.from(dynamicBadgeMap.values()).some(b => b.label.toUpperCase().includes("TOTS"))) {
     earnedTrophies.push({
-      id: 'tots',
+      id: 'legacy_tots',
       label: 'TOTS — Team of the Season',
       icon: '🛡️',
       count: achievementCounts.TOTS,
@@ -473,66 +472,9 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     });
   }
 
-  // 3. Turnuva Şampiyonlukları (tournament_winners / allTrophies)
-  if (allTrophies.length > 0) {
-    const tourCounts: Record<string, { label: string; icon: string; count: number }> = {};
-    for (const t of allTrophies) {
-      const type = t.tournaments?.type || 'TURNUVA';
-      const key = `tour_${type}`;
-      if (!tourCounts[key]) {
-        const label = type === 'KARMA' ? 'Karma Şampiyonluğu' :
-                      type === '1V1' ? '1v1 Şampiyonluğu' :
-                      type === 'NIGHT_CUP' ? 'Night Cup Şampiyonluğu' :
-                      `${t.tournaments?.name || 'Turnuva'} Şampiyonluğu`;
-        const icon = type === '1V1' ? '🎯' : type === 'NIGHT_CUP' ? '🌙' : '🏆';
-        tourCounts[key] = { label, icon, count: 0 };
-      }
-      tourCounts[key].count++;
-    }
-    for (const [key, val] of Object.entries(tourCounts)) {
-      earnedTrophies.push({
-        id: key,
-        label: val.label,
-        icon: val.icon,
-        count: val.count,
-        highlight: 'gold',
-      });
-    }
-  }
-
-  // 4. Turnuva Başarımları (player_achievements tablosundan)
-  if (achievementCounts.KARMA_WINNER > 0) {
-    earnedTrophies.push({
-      id: 'karma_winner',
-      label: 'Karma Şampiyonu',
-      icon: '⚔️',
-      count: achievementCounts.KARMA_WINNER,
-      highlight: 'emerald',
-    });
-  }
-  if (achievementCounts['1V1_WINNER'] > 0) {
-    earnedTrophies.push({
-      id: '1v1_winner',
-      label: '1v1 Şampiyonu',
-      icon: '🎯',
-      count: achievementCounts['1V1_WINNER'],
-      highlight: 'cyan',
-    });
-  }
-  if (achievementCounts.NIGHT_CUP_WINNER > 0) {
-    earnedTrophies.push({
-      id: 'night_cup_winner',
-      label: 'Night Cup Şampiyonu',
-      icon: '🌙',
-      count: achievementCounts.NIGHT_CUP_WINNER,
-      highlight: 'purple',
-    });
-  }
-
-  // 5. Ayın Oyuncusu (MONTH_POTM)
   if (achievementCounts.MONTH_POTM > 0) {
     earnedTrophies.push({
-      id: 'month_potm',
+      id: 'legacy_month_potm',
       label: 'Ayın Oyuncusu',
       icon: '⚡',
       count: achievementCounts.MONTH_POTM,
@@ -540,10 +482,9 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     });
   }
 
-  // 6. Haftanın Takımı (TOTW)
   if (achievementCounts.TOTW > 0) {
     earnedTrophies.push({
-      id: 'totw',
+      id: 'legacy_totw',
       label: 'Haftanın Takımı',
       icon: '🌟',
       count: achievementCounts.TOTW,
@@ -551,10 +492,9 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     });
   }
 
-  // 7. Maçın Oyuncusu (MATCH_POTM)
   if (achievementCounts.MATCH_POTM > 0) {
     earnedTrophies.push({
-      id: 'match_potm',
+      id: 'legacy_match_potm',
       label: 'Maçın Oyuncusu',
       icon: '🔥',
       count: achievementCounts.MATCH_POTM,
@@ -578,7 +518,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
         {/* HEADER — 3 Bölge: Sol (Bilgi), Orta (Kariyer), Sağ (Görsel) */}
         {/* ════════════════════════════════════════════════════════════ */}
         <section className="mb-6 grid grid-cols-1 md:grid-cols-[1fr_250px] lg:grid-cols-[1fr_220px_280px] xl:grid-cols-[1fr_260px_320px] gap-4 md:gap-6 items-stretch">
-          
+
           {/* SOL: Oyuncu Bilgileri */}
           <div className="bg-[#03070c] border border-white/5 rounded-2xl p-6 lg:p-8 flex flex-col justify-center">
             <div className="flex gap-4 md:gap-6 items-start">
@@ -753,7 +693,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
             { l: "ASİST", v: combinedTotalAssists, c: "text-white" },
             { l: "GALİBİYET", v: combinedTotalWins, c: "text-emerald-400" },
             { l: "ORT. RATING", v: combinedAvgRating, c: "text-[#00e5ff]" },
-            { l: "KAZANILAN KUPA", v: allTrophies.length, c: "text-amber-400" },
+            { l: "KAZANILAN KUPA", v: validDynamicTrophies.length, c: "text-amber-400" },
           ].map((s, i) => (
             <div key={i} className="flex-1 min-w-[120px] px-4 py-6 flex flex-col items-center justify-center hover:bg-white/[0.02] transition-colors">
               <span className={`text-[28px] md:text-[32px] font-[900] leading-none mb-2 ${s.c} ${s.c.includes("00e5ff") ? "drop-shadow-[0_0_12px_rgba(0,229,255,0.4)]" : ""}`}>{s.v}</span>
@@ -770,9 +710,9 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
             {tabs.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
-                <Link 
+                <Link
                   key={tab.id}
-                  href={`?tab=${tab.id}`} 
+                  href={`?tab=${tab.id}`}
                   scroll={false}
                   className={`px-4 py-4 text-[11px] font-[900] tracking-widest uppercase whitespace-nowrap transition-all border-b-2 ${
                     isActive
@@ -791,7 +731,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
         {/* TAB CONTENTS                                                 */}
         {/* ════════════════════════════════════════════════════════════ */}
         <div className="animate-in fade-in duration-500">
-          
+
           {/* GENEL TAB */}
           {activeTab === 'genel' && (
             <div className="space-y-6">
@@ -1096,397 +1036,108 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
 
           {/* BASARILAR TAB */}
           {activeTab === 'basarilar' && (
-            <div className="space-y-4">
-              <h2 className="text-[14px] font-[900] text-gray-500 tracking-widest uppercase mb-3">KİŞİSEL BAŞARILAR</h2>
-              <div className="bg-[#03070c] border border-white/5 rounded-2xl p-6 lg:p-10 mb-8">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {/* BALLON D'OR */}
-                  <div
-                    className={`p-5 rounded-2xl border flex flex-col items-center justify-between text-center transition-all ${
-                      achievementCounts.BALLON_DOR > 0
-                        ? 'bg-gradient-to-b from-amber-500/20 via-amber-950/20 to-[#03070c] border-amber-400/50 shadow-[0_0_25px_rgba(245,158,11,0.2)] hover:border-amber-400'
-                        : 'bg-white/[0.02] border-white/5 opacity-60'
-                    }`}
-                  >
-                    <div
-                      className={`text-[12px] font-[900] tracking-wider uppercase mb-1.5 ${
-                        achievementCounts.BALLON_DOR > 0
-                          ? 'text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-400'
-                          : 'text-gray-500'
-                      }`}
-                    >
-                      BALLON D'OR
-                    </div>
-
-                    {achievementCounts.BALLON_DOR > 0 ? (
-                      <div className="my-1.5 flex items-center justify-center">
-                        <img
-                          src="/assets/achievements/ballon-dor.png"
-                          alt="Ballon d'Or TETA League"
-                          className="h-[88px] md:h-[112px] w-auto object-contain transition-transform duration-300 hover:scale-105 select-none"
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-14 h-14 my-3 rounded-2xl flex items-center justify-center bg-black/40 border border-white/10 text-xl text-gray-500">
-                        🔒
-                      </div>
-                    )}
-
-                    {achievementCounts.BALLON_DOR > 0 ? (
-                      <div className="flex flex-col items-center">
-                        <div className="flex flex-wrap items-center justify-center gap-1 my-1 min-h-[22px]">
-                          {ballonDorWins.map((w: any, idx: number) => (
-                            <span
-                              key={idx}
-                              className="px-2 py-0.5 rounded bg-black/70 border border-amber-400/40 text-[10px] font-black text-amber-300 uppercase tracking-wider"
-                            >
-                              {w.seasonName}
-                            </span>
-                          ))}
-                        </div>
-                        <div className="text-[14px] font-black text-amber-400 font-mono tracking-tight mt-1">
-                          {ballonDorWins.length} ÖDÜL
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-[14px] font-black text-gray-700 tracking-wider mt-2">
-                        KİLİTLİ
-                      </div>
-                    )}
-                  </div>
-
-                  {/* SEZONUN OYUNCUSU (POTS) */}
-                  <div
-                    className={`p-5 rounded-2xl border flex flex-col items-center justify-between text-center transition-all ${
-                      achievementCounts.POTS > 0
-                        ? 'bg-gradient-to-br from-yellow-500/15 via-yellow-950/20 to-[#03070c] border-yellow-500/40 shadow-[0_0_20px_rgba(234,179,8,0.15)] hover:border-yellow-500/60'
-                        : 'bg-white/[0.02] border-white/5 opacity-60'
-                    }`}
-                  >
-                    <div
-                      className={`w-12 h-12 mb-2 rounded-full flex items-center justify-center text-xl ${
-                        achievementCounts.POTS > 0
-                          ? 'bg-yellow-500/20 border border-yellow-500/40 shadow-[0_0_10px_rgba(234,179,8,0.2)]'
-                          : 'bg-black/40 border border-white/10 text-gray-500'
-                      }`}
-                    >
-                      {achievementCounts.POTS > 0 ? '👑' : '🔒'}
-                    </div>
-                    <div
-                      className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${
-                        achievementCounts.POTS > 0 ? 'text-white' : 'text-gray-500'
-                      }`}
-                    >
-                      SEZONUN OYUNCUSU
-                    </div>
-                    {achievementCounts.POTS > 0 ? (
-                      <>
-                        {potsWins.length > 0 && (
-                          <div className="flex flex-wrap items-center justify-center gap-1 my-1">
-                            {potsWins.map((sn: string, idx: number) => (
-                              <span
-                                key={idx}
-                                className="px-2 py-0.5 rounded bg-black/70 border border-yellow-500/30 text-[10px] font-black text-yellow-300 uppercase tracking-wider"
-                              >
-                                {sn}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        <div className="text-[14px] font-black text-yellow-400 font-mono tracking-tight mt-1">
-                          {achievementCounts.POTS}x
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-[14px] font-black text-gray-700 tracking-wider mt-2">
-                        KİLİTLİ
-                      </div>
-                    )}
-                  </div>
-
-                  {/* SEZONUN TAKIMI (TOTS) */}
-                  <div
-                    className={`p-5 rounded-2xl border flex flex-col items-center justify-between text-center transition-all ${
-                      achievementCounts.TOTS > 0
-                        ? 'bg-gradient-to-br from-cyan-500/15 via-sky-950/20 to-[#03070c] border-cyan-400/40 shadow-[0_0_20px_rgba(6,182,212,0.18)] hover:border-cyan-400/70'
-                        : 'bg-white/[0.02] border-white/5 opacity-60'
-                    }`}
-                  >
-                    <div
-                      className={`w-12 h-12 mb-2 rounded-full flex items-center justify-center text-xl ${
-                        achievementCounts.TOTS > 0
-                          ? 'bg-cyan-500/20 border border-cyan-400/40 shadow-[0_0_10px_rgba(6,182,212,0.25)]'
-                          : 'bg-black/40 border border-white/10 text-gray-500'
-                      }`}
-                    >
-                      {/* Gelecekte gerçek TOTS asset'i eklendiğinde img olarak kullanılabilir */}
-                      {achievementCounts.TOTS > 0 ? '🛡️' : '🔒'}
-                    </div>
-                    <div
-                      className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${
-                        achievementCounts.TOTS > 0 ? 'text-white' : 'text-gray-500'
-                      }`}
-                    >
-                      TOTS
-                    </div>
-                    {achievementCounts.TOTS > 0 ? (
-                      <>
-                        {totsWins.length > 0 && (
-                          <div className="flex flex-wrap items-center justify-center gap-1 my-1">
-                            {totsWins.map((w: any, idx: number) => (
-                              <span
-                                key={idx}
-                                className="px-2 py-0.5 rounded bg-black/70 border border-cyan-400/30 text-[10px] font-black text-cyan-300 uppercase tracking-wider"
-                              >
-                                {w.seasonName}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        <div className="text-[14px] font-black text-cyan-400 font-mono tracking-tight mt-1">
-                          {achievementCounts.TOTS}x
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-[14px] font-black text-gray-700 tracking-wider mt-2">
-                        KİLİTLİ
-                      </div>
-                    )}
-                  </div>
-
-                  {/* AYIN OYUNCUSU (MONTH_POTM) */}
-                  <div
-                    className={`p-5 rounded-2xl border flex flex-col items-center justify-between text-center transition-all ${
-                      achievementCounts.MONTH_POTM > 0
-                        ? 'bg-gradient-to-br from-purple-500/15 via-purple-950/20 to-[#03070c] border-purple-500/40 shadow-[0_0_20px_rgba(168,85,247,0.15)] hover:border-purple-500/60'
-                        : 'bg-white/[0.02] border-white/5 opacity-60'
-                    }`}
-                  >
-                    <div
-                      className={`w-12 h-12 mb-2 rounded-full flex items-center justify-center text-xl ${
-                        achievementCounts.MONTH_POTM > 0
-                          ? 'bg-purple-500/20 border border-purple-500/40 shadow-[0_0_10px_rgba(168,85,247,0.2)]'
-                          : 'bg-black/40 border border-white/10 text-gray-500'
-                      }`}
-                    >
-                      {achievementCounts.MONTH_POTM > 0 ? '⚡' : '🔒'}
-                    </div>
-                    <div
-                      className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${
-                        achievementCounts.MONTH_POTM > 0 ? 'text-white' : 'text-gray-500'
-                      }`}
-                    >
-                      AYIN OYUNCUSU
-                    </div>
-                    <div
-                      className={`text-[20px] font-black mt-1 ${
-                        achievementCounts.MONTH_POTM > 0 ? 'text-purple-400' : 'text-gray-700'
-                      }`}
-                    >
-                      {achievementCounts.MONTH_POTM > 0 ? `${achievementCounts.MONTH_POTM}x` : 'KİLİTLİ'}
-                    </div>
-                  </div>
-
-                  {/* HAFTANIN TAKIMI (TOTW) */}
-                  <div
-                    className={`p-5 rounded-2xl border flex flex-col items-center justify-between text-center transition-all ${
-                      achievementCounts.TOTW > 0
-                        ? 'bg-gradient-to-br from-[#00e5ff]/15 via-[#00e5ff]/5 to-[#03070c] border-[#00e5ff]/40 shadow-[0_0_20px_rgba(0,229,255,0.15)] hover:border-[#00e5ff]/60'
-                        : 'bg-white/[0.02] border-white/5 opacity-60'
-                    }`}
-                  >
-                    <div
-                      className={`w-12 h-12 mb-2 rounded-full flex items-center justify-center text-xl ${
-                        achievementCounts.TOTW > 0
-                          ? 'bg-[#00e5ff]/20 border border-[#00e5ff]/40 shadow-[0_0_10px_rgba(0,229,255,0.2)]'
-                          : 'bg-black/40 border border-white/10 text-gray-500'
-                      }`}
-                    >
-                      {achievementCounts.TOTW > 0 ? '🌟' : '🔒'}
-                    </div>
-                    <div
-                      className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${
-                        achievementCounts.TOTW > 0 ? 'text-white' : 'text-gray-500'
-                      }`}
-                    >
-                      HAFTANIN TAKIMI
-                    </div>
-                    <div
-                      className={`text-[20px] font-black mt-1 ${
-                        achievementCounts.TOTW > 0 ? 'text-[#00e5ff]' : 'text-gray-700'
-                      }`}
-                    >
-                      {achievementCounts.TOTW > 0 ? `${achievementCounts.TOTW}x` : 'KİLİTLİ'}
-                    </div>
-                  </div>
-
-                  {/* MAÇIN OYUNCUSU (MATCH_POTM) */}
-                  <div
-                    className={`p-5 rounded-2xl border flex flex-col items-center justify-between text-center transition-all ${
-                      achievementCounts.MATCH_POTM > 0
-                        ? 'bg-gradient-to-br from-cyan-500/15 via-orange-950/20 to-[#03070c] border-cyan-500/40 shadow-[0_0_20px_rgba(6,182,212,0.15)] hover:border-cyan-500/60'
-                        : 'bg-white/[0.02] border-white/5 opacity-60'
-                    }`}
-                  >
-                    <div
-                      className={`w-12 h-12 mb-2 rounded-full flex items-center justify-center text-xl ${
-                        achievementCounts.MATCH_POTM > 0
-                          ? 'bg-orange-500/20 border border-orange-500/40 shadow-[0_0_10px_rgba(249,115,22,0.2)]'
-                          : 'bg-black/40 border border-white/10 text-gray-500'
-                      }`}
-                    >
-                      {achievementCounts.MATCH_POTM > 0 ? '🔥' : '🔒'}
-                    </div>
-                    <div
-                      className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${
-                        achievementCounts.MATCH_POTM > 0 ? 'text-white' : 'text-gray-500'
-                      }`}
-                    >
-                      MAÇIN OYUNCUSU
-                    </div>
-                    <div
-                      className={`text-[20px] font-black mt-1 ${
-                        achievementCounts.MATCH_POTM > 0 ? 'text-[#00e5ff]' : 'text-gray-700'
-                      }`}
-                    >
-                      {achievementCounts.MATCH_POTM > 0 ? `${achievementCounts.MATCH_POTM}x` : 'KİLİTLİ'}
-                    </div>
-                  </div>
-
-                  {/* KARMA WINNER */}
-                  <div
-                    className={`p-5 rounded-2xl border flex flex-col items-center justify-between text-center transition-all ${
-                      achievementCounts.KARMA_WINNER > 0
-                        ? 'bg-gradient-to-br from-emerald-500/15 via-emerald-950/20 to-[#03070c] border-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.15)] hover:border-emerald-500/60'
-                        : 'bg-white/[0.02] border-white/5 opacity-60'
-                    }`}
-                  >
-                    <div
-                      className={`w-12 h-12 mb-2 rounded-full flex items-center justify-center text-xl ${
-                        achievementCounts.KARMA_WINNER > 0
-                          ? 'bg-emerald-500/20 border border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
-                          : 'bg-black/40 border border-white/10 text-gray-500'
-                      }`}
-                    >
-                      {achievementCounts.KARMA_WINNER > 0 ? '⚔️' : '🔒'}
-                    </div>
-                    <div
-                      className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${
-                        achievementCounts.KARMA_WINNER > 0 ? 'text-white' : 'text-gray-500'
-                      }`}
-                    >
-                      KARMA ŞAMPİYONU
-                    </div>
-                    <div
-                      className={`text-[20px] font-black mt-1 ${
-                        achievementCounts.KARMA_WINNER > 0 ? 'text-emerald-400' : 'text-gray-700'
-                      }`}
-                    >
-                      {achievementCounts.KARMA_WINNER > 0 ? `${achievementCounts.KARMA_WINNER}x` : 'KİLİTLİ'}
-                    </div>
-                  </div>
-
-                  {/* 1V1 WINNER */}
-                  <div
-                    className={`p-5 rounded-2xl border flex flex-col items-center justify-between text-center transition-all ${
-                      achievementCounts['1V1_WINNER'] > 0
-                        ? 'bg-gradient-to-br from-cyan-500/15 via-cyan-950/20 to-[#03070c] border-cyan-500/40 shadow-[0_0_20px_rgba(6,182,212,0.15)] hover:border-cyan-500/60'
-                        : 'bg-white/[0.02] border-white/5 opacity-60'
-                    }`}
-                  >
-                    <div
-                      className={`w-12 h-12 mb-2 rounded-full flex items-center justify-center text-xl ${
-                        achievementCounts['1V1_WINNER'] > 0
-                          ? 'bg-cyan-500/20 border border-cyan-500/40 shadow-[0_0_10px_rgba(6,182,212,0.2)]'
-                          : 'bg-black/40 border border-white/10 text-gray-500'
-                      }`}
-                    >
-                      {achievementCounts['1V1_WINNER'] > 0 ? '🎯' : '🔒'}
-                    </div>
-                    <div
-                      className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${
-                        achievementCounts['1V1_WINNER'] > 0 ? 'text-white' : 'text-gray-500'
-                      }`}
-                    >
-                      1V1 ŞAMPİYONU
-                    </div>
-                    <div
-                      className={`text-[20px] font-black mt-1 ${
-                        achievementCounts['1V1_WINNER'] > 0 ? 'text-cyan-400' : 'text-gray-700'
-                      }`}
-                    >
-                      {achievementCounts['1V1_WINNER'] > 0 ? `${achievementCounts['1V1_WINNER']}x` : 'KİLİTLİ'}
-                    </div>
-                  </div>
-
-                  {/* NIGHT CUP WINNER */}
-                  <div
-                    className={`p-5 rounded-2xl border flex flex-col items-center justify-between text-center transition-all ${
-                      achievementCounts.NIGHT_CUP_WINNER > 0
-                        ? 'bg-gradient-to-br from-indigo-500/15 via-indigo-950/20 to-[#03070c] border-indigo-500/40 shadow-[0_0_20px_rgba(99,102,241,0.15)] hover:border-indigo-500/60'
-                        : 'bg-white/[0.02] border-white/5 opacity-60'
-                    }`}
-                  >
-                    <div
-                      className={`w-12 h-12 mb-2 rounded-full flex items-center justify-center text-xl ${
-                        achievementCounts.NIGHT_CUP_WINNER > 0
-                          ? 'bg-indigo-500/20 border border-indigo-500/40 shadow-[0_0_10px_rgba(99,102,241,0.2)]'
-                          : 'bg-black/40 border border-white/10 text-gray-500'
-                      }`}
-                    >
-                      {achievementCounts.NIGHT_CUP_WINNER > 0 ? '🌙' : '🔒'}
-                    </div>
-                    <div
-                      className={`text-[12px] font-[900] tracking-widest uppercase mb-1 ${
-                        achievementCounts.NIGHT_CUP_WINNER > 0 ? 'text-white' : 'text-gray-500'
-                      }`}
-                    >
-                      NIGHT CUP ŞAMPİYONU
-                    </div>
-                    <div
-                      className={`text-[20px] font-black mt-1 ${
-                        achievementCounts.NIGHT_CUP_WINNER > 0 ? 'text-indigo-400' : 'text-gray-700'
-                      }`}
-                    >
-                      {achievementCounts.NIGHT_CUP_WINNER > 0 ? `${achievementCounts.NIGHT_CUP_WINNER}x` : 'KİLİTLİ'}
-                    </div>
-                  </div>
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-[14px] font-[900] text-gray-400 tracking-widest uppercase flex items-center gap-2">
+                    <span className="w-1.5 h-4 bg-amber-400 rounded-full" />
+                    KİŞİSEL BAŞARILAR VE KUPALAR
+                  </h2>
+                  <p className="text-[12px] text-gray-500 font-medium mt-0.5">
+                    Bu oyuncuya özel olarak takdim edilen resmi lig kupaları ve bireysel başarılar
+                  </p>
                 </div>
-              </div>
-
-              <h2 className="text-[14px] font-[900] text-gray-500 tracking-widest uppercase mb-3">TAKIM KUPALARI</h2>
-              <div className="bg-[#03070c] border border-white/5 rounded-2xl p-8 lg:p-12">
-                {allTrophies.length > 0 ? (
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                    {allTrophies.map((t: any, i: number) => (
-                      <div key={i} className="bg-gradient-to-b from-yellow-500/10 to-transparent border border-yellow-500/20 rounded-2xl p-6 text-center transition-all hover:scale-105 hover:border-yellow-500/40 hover:shadow-[0_0_20px_rgba(234,179,8,0.2)]">
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-black/50 overflow-hidden flex items-center justify-center border border-white/5">
-                          {t.tournaments?.image_url ? (
-                            <img src={t.tournaments.image_url} alt="Trophy" className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-3xl">🏆</span>
-                          )}
-                        </div>
-                        <div className="text-[11px] font-[900] tracking-widest text-yellow-500 uppercase leading-snug mb-1">
-                          {t.tournaments?.type === 'KARMA' ? 'KARMA ŞAMPİYONU' : 
-                           t.tournaments?.type === '1V1' ? '1V1 ŞAMPİYONU' : 'NIGHT CUP ŞAMPİYONU'}
-                        </div>
-                        <div className="text-[13px] font-[900] text-white uppercase">{t.tournaments?.name}</div>
-                        {t.tournament_applications?.team_name && (
-                          <div className="text-[10px] font-bold text-gray-400 mt-2">{t.tournament_applications.team_name}</div>
-                        )}
-                        {t.tournaments?.seasons?.name && (
-                          <div className="text-[10px] font-bold text-gray-500 mt-1">{t.tournaments.seasons.name}</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center mt-10">
-                    <span className="text-[13px] text-gray-600 font-[700]">Henüz kazanılmış turnuva bulunmuyor.</span>
-                  </div>
+                {validDynamicTrophies.length > 0 && (
+                  <span className="self-start sm:self-auto px-3 py-1 rounded-full text-xs font-black bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider font-mono">
+                    {validDynamicTrophies.length} Ödül
+                  </span>
                 )}
               </div>
+
+              {validDynamicTrophies.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {validDynamicTrophies.map((dt: any) => {
+                    const tr = dt.trophy;
+                    const seasonDisplay = tr.season?.name || tr.season_name;
+                    const dateDisplay = dt.awarded_at
+                      ? new Intl.DateTimeFormat('tr-TR', {
+                          timeZone: 'Europe/Istanbul',
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        }).format(new Date(dt.awarded_at))
+                      : null;
+
+                    return (
+                      <div
+                        key={dt.id}
+                        className="group relative bg-[#03070c] border border-white/5 hover:border-amber-400/40 rounded-2xl p-6 flex flex-col items-center justify-between text-center transition-all duration-300 hover:shadow-[0_0_25px_rgba(245,158,11,0.15)] hover:-translate-y-0.5 overflow-hidden"
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-b from-amber-500/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                        {/* Category badge */}
+                        {tr.category && (
+                          <span className="text-[9px] font-black tracking-widest uppercase px-2.5 py-0.5 rounded-full bg-white/5 text-gray-400 border border-white/5 mb-3 group-hover:border-amber-400/30 group-hover:text-amber-300 transition-colors">
+                            {tr.category}
+                          </span>
+                        )}
+
+                        {/* Trophy visual */}
+                        <div className="w-24 h-24 my-2 flex items-center justify-center relative">
+                          {tr.image_url ? (
+                            <img
+                              src={tr.image_url}
+                              alt={tr.title}
+                              className="max-h-full max-w-full object-contain filter drop-shadow-[0_4px_16px_rgba(0,0,0,0.8)] group-hover:scale-105 transition-transform duration-300 select-none"
+                            />
+                          ) : (
+                            <span className="text-5xl select-none">🏆</span>
+                          )}
+                        </div>
+
+                        {/* Title, Season & Notes */}
+                        <div className="mt-2 w-full">
+                          <h3 className="text-[14px] font-[900] text-white tracking-wide uppercase line-clamp-2 group-hover:text-amber-300 transition-colors">
+                            {tr.title}
+                          </h3>
+                          {seasonDisplay && (
+                            <span className="inline-block mt-1.5 px-2.5 py-0.5 rounded bg-black/60 border border-white/10 text-[10px] font-black text-amber-300 uppercase tracking-wider">
+                              {seasonDisplay}
+                            </span>
+                          )}
+                          {tr.description && (
+                            <p className="text-[11px] text-gray-400 font-medium line-clamp-2 mt-2 leading-relaxed">
+                              {tr.description}
+                            </p>
+                          )}
+                          {dt.notes && (
+                            <div className="mt-3 pt-2.5 border-t border-white/5 text-[11px] font-semibold text-cyan-300/90 truncate">
+                              🎖️ {dt.notes}
+                            </div>
+                          )}
+                          {dateDisplay && (
+                            <div className="text-[10px] text-gray-600 font-mono mt-1.5">
+                              {dateDisplay}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="bg-[#03070c] border border-white/5 rounded-2xl p-12 text-center flex flex-col items-center justify-center">
+                  <div className="w-16 h-16 rounded-2xl bg-white/[0.02] border border-white/10 flex items-center justify-center text-3xl mb-4 text-gray-600">
+                    🏆
+                  </div>
+                  <h3 className="text-base font-[900] text-white uppercase tracking-wide mb-1">
+                    Henüz Kazanılmış Kupa Yok
+                  </h3>
+                  <p className="text-xs text-gray-500 font-medium max-w-sm">
+                    Henüz bu oyuncuya atanmış resmi bir bireysel kupa veya başarı bulunmuyor.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

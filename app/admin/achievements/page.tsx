@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import AchievementsClient from './AchievementsClient';
 
 export const metadata = {
-  title: 'Başarı Yönetimi | TETA League Admin',
+  title: 'Kupa ve Başarı Yönetimi | TETA League Admin',
 };
 
 export default async function AchievementsPage() {
@@ -11,7 +11,7 @@ export default async function AchievementsPage() {
   const supabase = createClient(cookieStore);
 
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return <div>Yetkisiz erişim.</div>;
+  if (!user) return <div className="p-8 text-red-400 font-bold">Yetkisiz erişim.</div>;
 
   const { data: roleData } = await supabase
     .from('user_roles')
@@ -21,15 +21,22 @@ export default async function AchievementsPage() {
     .eq('is_active', true)
     .single();
 
-  if (!roleData) return <div>Bu sayfayı görüntüleme yetkiniz yok.</div>;
+  if (!roleData) return <div className="p-8 text-red-400 font-bold">Bu sayfayı görüntüleme yetkiniz yok.</div>;
 
-  // Tüm oyuncuları getir
+  // 1. Tüm oyuncuları getir (Kazanan seçimi için)
   const { data: profilesData } = await supabase
     .from('profiles')
-    .select('id, username, full_name')
+    .select('id, username, full_name, avatar_url')
     .order('username', { ascending: true });
 
-  // Tarihsel sezonlar (Season 1–4 gerçek seasons tablosuna kayıt oluşturmadan başarı etiketi olarak kullanılır)
+  // 2. Tüm takımları getir (Kazanan seçimi için)
+  const { data: teamsData } = await supabase
+    .from('teams')
+    .select('id, name, logo_url')
+    .eq('is_active', true)
+    .order('name', { ascending: true });
+
+  // 3. Tarihsel sezonlar (Season 1–4)
   const HISTORICAL_SEASONS = [
     { id: 'HISTORICAL:TETA SEASON 1', name: 'TETA SEASON 1' },
     { id: 'HISTORICAL:TETA SEASON 2', name: 'TETA SEASON 2' },
@@ -37,13 +44,11 @@ export default async function AchievementsPage() {
     { id: 'HISTORICAL:TETA SEASON 4', name: 'TETA SEASON 4' },
   ];
 
-  // Sezonları getir (COMPLETED, ACTIVE vb. tüm durumlar dahil)
+  // 4. Gerçek sezonları getir
   const { data: seasonsData } = await supabase
     .from('seasons')
     .select('id, name');
 
-  // Tarihsel ve gerçek sezonları birleştirip mantıklı kronolojik sırada listele:
-  // Season 1 → Season 2 → Season 3 → Season 4 → Season 5 → Season 6 ...
   const combinedSeasons = [...HISTORICAL_SEASONS, ...(seasonsData || [])];
 
   const sortedSeasons = combinedSeasons.sort((a, b) => {
@@ -63,70 +68,53 @@ export default async function AchievementsPage() {
     return nameA.localeCompare(nameB, 'tr', { numeric: true, sensitivity: 'base' });
   });
 
-  // Maçları getir (opsiyonel, maçın oyuncusu için) - Sadece son 50 maçı alalım performans için
-  const { data: matchesData } = await supabase
-    .from('matches')
+  // 5. Dinamik Kupaları ve Kazananları Getir
+  const { data: trophiesData, error: trophiesError } = await supabase
+    .from('trophies')
     .select(`
       id,
-      played_at,
-      home_team:league_teams!matches_league_id_season_id_home_team_id_fkey(teams(name)),
-      away_team:league_teams!matches_league_id_season_id_away_team_id_fkey(teams(name))
-    `)
-    .order('played_at', { ascending: false })
-    .limit(50);
-
-  // Verilen başarıları listele (season_name dahil)
-  const { data: achievementsData } = await supabase
-    .from('player_achievements')
-    .select(`
-      id,
-      achievement_type,
-      week_number,
-      month_number,
-      awarded_at,
+      title,
+      description,
+      image_url,
+      category,
+      target_type,
+      season_id,
       season_name,
-      profile:player_id(username, full_name),
+      display_order,
+      created_at,
       season:season_id(name),
-      match:match_id(
+      winners:trophy_winners(
         id,
-        played_at,
-        home_team:league_teams!matches_league_id_season_id_home_team_id_fkey(teams(name)),
-        away_team:league_teams!matches_league_id_season_id_away_team_id_fkey(teams(name))
+        winner_type,
+        player_id,
+        team_id,
+        awarded_at,
+        notes,
+        profile:player_id(id, username, full_name, avatar_url),
+        team:team_id(id, name, logo_url)
       )
     `)
-    .order('awarded_at', { ascending: false })
-    .limit(100);
+    .order('display_order', { ascending: true })
+    .order('created_at', { ascending: false });
 
-  const formatTeam = (leagueTeam: any) => {
-    if (!leagueTeam) return null;
-    const teamObj = Array.isArray(leagueTeam.teams) ? leagueTeam.teams[0] : leagueTeam.teams;
-    return { name: teamObj?.name || leagueTeam.name || '' };
-  };
-
-  const formattedMatches = (matchesData || []).map((m: any) => ({
-    ...m,
-    home_team: formatTeam(m.home_team),
-    away_team: formatTeam(m.away_team),
-  }));
-
-  const formattedAchievements = (achievementsData || []).map((a: any) => ({
-    ...a,
-    match: a.match
-      ? {
-          ...a.match,
-          home_team: formatTeam(a.match.home_team),
-          away_team: formatTeam(a.match.away_team),
-        }
-      : null,
+  const formattedTrophies = ((trophiesData || []) as any[]).map((t: any) => ({
+    ...t,
+    season: Array.isArray(t.season) ? t.season[0] || null : t.season || null,
+    winners: (t.winners || []).map((w: any) => ({
+      ...w,
+      profile: Array.isArray(w.profile) ? w.profile[0] || null : w.profile || null,
+      team: Array.isArray(w.team) ? w.team[0] || null : w.team || null,
+    }))
   }));
 
   return (
     <div>
-      <AchievementsClient 
-        profiles={profilesData || []} 
-        seasons={sortedSeasons} 
-        matches={formattedMatches} 
-        achievements={formattedAchievements} 
+      <AchievementsClient
+        trophies={formattedTrophies as any}
+        profiles={profilesData || []}
+        teams={teamsData || []}
+        seasons={sortedSeasons}
+        isSchemaPending={Boolean(trophiesError)}
       />
     </div>
   );
