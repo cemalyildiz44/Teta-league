@@ -82,7 +82,7 @@ export default async function AchievementsPage() {
       season_name,
       display_order,
       created_at,
-      season:season_id(name),
+      season:seasons!season_id(name),
       winners:trophy_winners(
         id,
         winner_type,
@@ -90,8 +90,8 @@ export default async function AchievementsPage() {
         team_id,
         awarded_at,
         notes,
-        profile:player_id(id, username, full_name, avatar_url),
-        team:team_id(id, name, logo_url)
+        profile:profiles!player_id(id, username, full_name, avatar_url),
+        team:teams!team_id(id, name, logo_url)
       )
     `)
     .order('display_order', { ascending: true })

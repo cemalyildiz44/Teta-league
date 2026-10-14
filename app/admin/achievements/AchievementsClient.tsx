@@ -8,6 +8,7 @@ import {
   addTrophyWinnerAction,
   removeTrophyWinnerAction
 } from './actions';
+import { createClient } from '@/utils/supabase/client';
 import {
   Trophy,
   Plus,
@@ -94,8 +95,10 @@ export default function AchievementsClient({
   const [winnerNotes, setWinnerNotes] = useState('');
   const [entitySearch, setEntitySearch] = useState('');
 
-  // Trophy Form Preview
+  // Trophy Form Preview & Upload State
   const [previewImageUrl, setPreviewImageUrl] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   // ── Filtreleme ─────────────────────────────────────────────────────────────
   const filteredTrophies = trophies.filter((t) => {
@@ -121,6 +124,7 @@ export default function AchievementsClient({
   const openCreateModal = () => {
     setEditingTrophy(null);
     setPreviewImageUrl('');
+    setSelectedFile(null);
     setActionMsg(null);
     setIsTrophyModalOpen(true);
   };
@@ -128,6 +132,7 @@ export default function AchievementsClient({
   const openEditModal = (trophy: TrophyItem) => {
     setEditingTrophy(trophy);
     setPreviewImageUrl(trophy.image_url);
+    setSelectedFile(null);
     setActionMsg(null);
     setIsTrophyModalOpen(true);
   };
@@ -141,25 +146,130 @@ export default function AchievementsClient({
     setWinnerType(trophy.target_type === 'TEAM' ? 'TEAM' : 'PLAYER');
   };
 
+  // ── Dosya Seçim İşleyicisi ───────────────────────────────────────────────
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setSelectedFile(null);
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setActionMsg({ type: 'error', text: 'Görsel boyutu maksimum 5MB olabilir.' });
+      e.target.value = '';
+      setSelectedFile(null);
+      return;
+    }
+
+    const allowedMime = ['image/webp', 'image/png', 'image/jpeg', 'image/jpg'];
+    if (!allowedMime.includes(file.type)) {
+      setActionMsg({ type: 'error', text: 'Geçersiz görsel formatı. Sadece WebP, PNG veya JPEG yükleyebilirsiniz.' });
+      e.target.value = '';
+      setSelectedFile(null);
+      return;
+    }
+
+    setActionMsg(null);
+    setSelectedFile(file);
+    setPreviewImageUrl(URL.createObjectURL(file));
+  };
+
   // ── Kupa Formu Gönderme ───────────────────────────────────────────────────
-  const handleTrophyFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleTrophyFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setActionMsg(null);
-    const formData = new FormData(e.currentTarget);
+    const formEl = e.currentTarget;
+    const formData = new FormData(formEl);
+
+    const title = (formData.get('title') as string)?.trim();
+    if (!title) {
+      setActionMsg({ type: 'error', text: 'Kupa / başarı adı zorunludur.' });
+      return;
+    }
+
+    let finalImageUrl = (formData.get('image_url') as string)?.trim() || '';
+    let uploadedFilePath: string | null = null;
+
+    // 1. Yeni dosya seçildiyse doğrudan Supabase Storage trophies bucket'ına yükle
+    if (selectedFile) {
+      setIsUploading(true);
+      try {
+        const supabase = createClient();
+        const ext = selectedFile.name.split('.').pop()?.toLowerCase() || 'webp';
+        const fileName = `trophy_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+
+        const { error: uploadErr } = await supabase.storage.from('trophies').upload(fileName, selectedFile, {
+          contentType: selectedFile.type,
+          cacheControl: '31536000',
+          upsert: false
+        });
+
+        if (uploadErr) {
+          setIsUploading(false);
+          setActionMsg({ type: 'error', text: 'Görsel yüklenirken hata oluştu: ' + uploadErr.message });
+          return;
+        }
+
+        const { data: { publicUrl } } = supabase.storage.from('trophies').getPublicUrl(fileName);
+        finalImageUrl = publicUrl;
+        uploadedFilePath = fileName;
+      } catch (err: any) {
+        setIsUploading(false);
+        setActionMsg({ type: 'error', text: 'Görsel yüklenirken beklenmeyen hata: ' + (err.message || 'Bilinmeyen hata') });
+        return;
+      }
+    } else if (!finalImageUrl && editingTrophy) {
+      // Düzenleme modunda yeni dosya seçilmediyse mevcut kupa görselini koru
+      finalImageUrl = editingTrophy.image_url;
+    }
+
+    if (!finalImageUrl) {
+      setIsUploading(false);
+      setActionMsg({ type: 'error', text: 'Kupa görseli zorunludur. Lütfen bir görsel seçin veya geçerli bir URL girin.' });
+      return;
+    }
+
+    // 2. Server Action'a yalnızca temiz metin verilerini gönder (Dosya içermeyen FormData)
+    const actionData = new FormData();
+    actionData.set('title', title);
+    actionData.set('image_url', finalImageUrl);
+    actionData.set('category', (formData.get('category') as string)?.trim() || 'Özel Başarılar');
+    actionData.set('target_type', (formData.get('target_type') as string)?.trim() || 'PLAYER');
+    actionData.set('season_id', (formData.get('season_id') as string) || '');
+    actionData.set('description', (formData.get('description') as string)?.trim() || '');
+    actionData.set('display_order', (formData.get('display_order') as string) || '0');
 
     startTransition(async () => {
-      let res;
-      if (editingTrophy) {
-        res = await updateTrophyAction(editingTrophy.id, null, formData);
-      } else {
-        res = await createTrophyAction(null, formData);
-      }
+      try {
+        let res;
+        if (editingTrophy) {
+          res = await updateTrophyAction(editingTrophy.id, null, actionData);
+        } else {
+          res = await createTrophyAction(null, actionData);
+        }
 
-      if (res?.error) {
-        setActionMsg({ type: 'error', text: res.error });
-      } else {
-        setActionMsg({ type: 'success', text: res.success || 'İşlem başarılı.' });
-        setIsTrophyModalOpen(false);
+        if (res?.error) {
+          // Kupa kaydı başarısız olursa yeni yüklenmiş dosyanın sahipsiz kalmaması için temizle
+          if (uploadedFilePath) {
+            const supabase = createClient();
+            await supabase.storage.from('trophies').remove([uploadedFilePath]).catch(() => {});
+          }
+          setActionMsg({ type: 'error', text: res.error });
+        } else {
+          setActionMsg({ type: 'success', text: res.success || 'İşlem başarılı.' });
+          setIsTrophyModalOpen(false);
+          setSelectedFile(null);
+          setEditingTrophy(null);
+          setPreviewImageUrl('');
+        }
+      } catch (actionErr: any) {
+        if (uploadedFilePath) {
+          const supabase = createClient();
+          await supabase.storage.from('trophies').remove([uploadedFilePath]).catch(() => {});
+        }
+        setActionMsg({ type: 'error', text: 'İşlem hatası: ' + (actionErr.message || 'Sunucu hatası') });
+      } finally {
+        setIsUploading(false);
       }
     });
   };
@@ -484,14 +594,8 @@ export default function AchievementsClient({
                   <div className="flex-1 space-y-1.5">
                     <input
                       type="file"
-                      name="image_file"
                       accept="image/webp,image/png,image/jpeg"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          setPreviewImageUrl(URL.createObjectURL(file));
-                        }
-                      }}
+                      onChange={handleFileChange}
                       className="block w-full text-xs text-zinc-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-white/10 file:text-white hover:file:bg-[#00e5ff]/20 transition-all cursor-pointer"
                     />
                     <input
@@ -605,10 +709,10 @@ export default function AchievementsClient({
                 </button>
                 <button
                   type="submit"
-                  disabled={isPending}
+                  disabled={isPending || isUploading}
                   className="px-5 py-2.5 bg-[#00e5ff] hover:bg-[#00b8d4] text-black font-[900] text-xs uppercase tracking-wider rounded-xl transition-all shadow-[0_0_15px_rgba(0,229,255,0.25)] disabled:opacity-50"
                 >
-                  {isPending ? 'KAYDEDİLİYOR...' : editingTrophy ? 'GÜNCELLE' : 'OLUŞTUR'}
+                  {isUploading ? 'GÖRSEL YÜKLENİYOR...' : isPending ? 'KAYDEDİLİYOR...' : editingTrophy ? 'GÜNCELLE' : 'OLUŞTUR'}
                 </button>
               </div>
             </form>

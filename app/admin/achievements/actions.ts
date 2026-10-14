@@ -33,6 +33,103 @@ function parseSeasonInput(raw_season_value: string) {
   return { season_id: final_season_id, season_name: final_season_name };
 }
 
+function isValidTrophyImageUrl(url: string): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+
+  // 1. Yerel proje asset yolu (relative path): Yalnızca izin verilen güvenli uzantılar
+  if (/^\/assets\/achievements\/[a-zA-Z0-9_\-\.]+\.(png|webp|jpg|jpeg|svg)$/i.test(trimmed)) {
+    return true;
+  }
+
+  // 2. Supabase Storage 'trophies' bucket URL doğrulaması
+  try {
+    const parsed = new URL(trimmed);
+
+    // Yalnızca standart HTTP veya HTTPS protokolü (javascript:, data: engellenir)
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return false;
+    }
+
+    // Pathname kesinlikle /storage/v1/object/public/trophies/<dosya_adi> olmalı
+    const expectedPathPrefix = '/storage/v1/object/public/trophies/';
+    if (!parsed.pathname.startsWith(expectedPathPrefix)) {
+      return false;
+    }
+
+    // Dosya adının geçerli karakterler içerdiğini doğrula (path traversal / injection engelleme)
+    const filename = parsed.pathname.slice(expectedPathPrefix.length);
+    if (!filename || !/^[a-zA-Z0-9_\-\.]+$/i.test(filename)) {
+      return false;
+    }
+
+    // Host kontrolü: Projede yapılandırılmış Supabase hostu ile tam eşleşmeli
+    const configuredSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const incomingHost = parsed.hostname.toLowerCase();
+
+    if (configuredSupabaseUrl) {
+      try {
+        const configuredHost = new URL(configuredSupabaseUrl).hostname.toLowerCase();
+        if (incomingHost === configuredHost) {
+          return true;
+        }
+        // Yerel geliştirme / test desteği
+        if (incomingHost === 'localhost' || incomingHost === '127.0.0.1') {
+          return true;
+        }
+        return false;
+      } catch {
+        // Yapılandırma ayrıştırılamazsa fallback kontrolüne geç
+      }
+    }
+
+    // Yedek kontrol: host .supabase.co veya localhost olmalıdır
+    return incomingHost.endsWith('.supabase.co') || incomingHost === 'localhost' || incomingHost === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
+
+async function safelyRemoveOrphanedTrophyImage(
+  supabase: any,
+  imageUrl: string | null | undefined,
+  excludeTrophyId?: string
+) {
+  if (!imageUrl || typeof imageUrl !== 'string') return;
+  const trimmed = imageUrl.trim();
+  const expectedPathPrefix = '/storage/v1/object/public/trophies/';
+  if (!trimmed.includes(expectedPathPrefix)) return;
+
+  const parts = trimmed.split(expectedPathPrefix);
+  const filePath = parts[1]?.split('?')[0]; // Query string varsa temizle
+  if (!filePath) return;
+
+  try {
+    // 1. Başka bir kupa aynı görsel URL'sini kullanıyor mu kontrol et
+    let query = supabase.from('trophies').select('id').eq('image_url', trimmed);
+    if (excludeTrophyId) {
+      query = query.neq('id', excludeTrophyId);
+    }
+    const { data: otherUsingSameImage, error: checkError } = await query.limit(1);
+
+    if (checkError) {
+      console.error('[safelyRemoveOrphanedTrophyImage] Referans kontrolü hatası:', checkError.message);
+      return; // Kontrol sorgusu hata verirse veri kaybını önlemek için silme yapma
+    }
+
+    // 2. Eğer başka hiçbir kupa bu görseli kullanmıyorsa Storage'dan sil
+    if (!otherUsingSameImage || otherUsingSameImage.length === 0) {
+      const { error: removeError } = await supabase.storage.from('trophies').remove([filePath]);
+      if (removeError) {
+        console.error('[safelyRemoveOrphanedTrophyImage] Storage görsel silme hatası:', removeError.message);
+      }
+    }
+  } catch (err: any) {
+    console.error('[safelyRemoveOrphanedTrophyImage] Beklenmeyen hata:', err?.message);
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. DİNAMİK KUPA İŞLEMLERİ (CREATE, UPDATE, DELETE)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -55,6 +152,7 @@ export async function createTrophyAction(prevState: any, formData: FormData) {
     const target_type = (formData.get('target_type') as string)?.trim() || 'PLAYER';
     const raw_season_value = (formData.get('season_id') as string) || '';
     const display_order = parseInt((formData.get('display_order') as string) || '0', 10);
+    const imageUrl = (formData.get('image_url') as string)?.trim() || '';
 
     if (!title) {
       return { error: 'Kupa / başarı adı zorunludur.' };
@@ -64,35 +162,12 @@ export async function createTrophyAction(prevState: any, formData: FormData) {
       return { error: 'Geçersiz kazanan türü seçildi.' };
     }
 
-    let imageUrl = (formData.get('image_url') as string)?.trim() || '';
-    const imageFile = formData.get('image_file') as File | null;
-
-    if (imageFile && imageFile.size > 0 && typeof imageFile.name === 'string') {
-      if (imageFile.size > 5 * 1024 * 1024) {
-        return { error: 'Görsel boyutu maksimum 5MB olabilir.' };
-      }
-      const allowedMime = ['image/webp', 'image/png', 'image/jpeg', 'image/jpg'];
-      if (!allowedMime.includes(imageFile.type)) {
-        return { error: 'Geçersiz görsel formatı. Sadece WebP, PNG veya JPEG yükleyebilirsiniz.' };
-      }
-      const ext = imageFile.name.split('.').pop()?.toLowerCase() || 'webp';
-      const filePath = `trophy_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-      const buffer = Buffer.from(await imageFile.arrayBuffer());
-
-      const { error: uploadErr } = await supabase.storage.from('trophies').upload(filePath, buffer, {
-        contentType: imageFile.type,
-        cacheControl: '31536000',
-        upsert: false
-      });
-      if (uploadErr) {
-        return { error: 'Görsel yüklenirken hata oluştu: ' + uploadErr.message };
-      }
-      const { data: { publicUrl } } = supabase.storage.from('trophies').getPublicUrl(filePath);
-      imageUrl = publicUrl;
-    }
-
     if (!imageUrl) {
       return { error: 'Kupa görseli zorunludur. Lütfen bir görsel yükleyin veya görsel URL adresi girin.' };
+    }
+
+    if (!isValidTrophyImageUrl(imageUrl)) {
+      return { error: 'Geçersiz kupa görseli URL biçimi. Görsel Supabase "trophies" bucket\'ına ait olmalıdır.' };
     }
 
     const { season_id, season_name } = parseSeasonInput(raw_season_value);
@@ -156,40 +231,22 @@ export async function updateTrophyAction(id: string, prevState: any, formData: F
     const target_type = (formData.get('target_type') as string)?.trim() || 'PLAYER';
     const raw_season_value = (formData.get('season_id') as string) || '';
     const display_order = parseInt((formData.get('display_order') as string) || '0', 10);
+    const imageUrl = (formData.get('image_url') as string)?.trim() || '';
 
     if (!title) {
       return { error: 'Kupa / başarı adı zorunludur.' };
     }
 
-    let imageUrl = (formData.get('image_url') as string)?.trim() || '';
-    const imageFile = formData.get('image_file') as File | null;
-
-    if (imageFile && imageFile.size > 0 && typeof imageFile.name === 'string') {
-      if (imageFile.size > 5 * 1024 * 1024) {
-        return { error: 'Görsel boyutu maksimum 5MB olabilir.' };
-      }
-      const allowedMime = ['image/webp', 'image/png', 'image/jpeg', 'image/jpg'];
-      if (!allowedMime.includes(imageFile.type)) {
-        return { error: 'Geçersiz görsel formatı. Sadece WebP, PNG veya JPEG yükleyebilirsiniz.' };
-      }
-      const ext = imageFile.name.split('.').pop()?.toLowerCase() || 'webp';
-      const filePath = `trophy_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-      const buffer = Buffer.from(await imageFile.arrayBuffer());
-
-      const { error: uploadErr } = await supabase.storage.from('trophies').upload(filePath, buffer, {
-        contentType: imageFile.type,
-        cacheControl: '31536000',
-        upsert: false
-      });
-      if (uploadErr) {
-        return { error: 'Görsel yüklenirken hata oluştu: ' + uploadErr.message };
-      }
-      const { data: { publicUrl } } = supabase.storage.from('trophies').getPublicUrl(filePath);
-      imageUrl = publicUrl;
+    if (!['PLAYER', 'TEAM', 'BOTH'].includes(target_type)) {
+      return { error: 'Geçersiz kazanan türü seçildi.' };
     }
 
     if (!imageUrl) {
       return { error: 'Kupa görseli zorunludur.' };
+    }
+
+    if (!isValidTrophyImageUrl(imageUrl)) {
+      return { error: 'Geçersiz kupa görseli URL biçimi. Görsel Supabase "trophies" bucket\'ına ait olmalıdır.' };
     }
 
     const { season_id, season_name } = parseSeasonInput(raw_season_value);
@@ -206,6 +263,20 @@ export async function updateTrophyAction(id: string, prevState: any, formData: F
       updated_at: new Date().toISOString()
     };
 
+    // 1. Mevcut kupayı oku (eski görsel URL'sini tespit etmek için)
+    const { data: existingTrophy } = await supabase
+      .from('trophies')
+      .select('id, image_url')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (!existingTrophy) {
+      return { error: 'Güncellenecek kupa bulunamadı.' };
+    }
+
+    const oldImageUrl = existingTrophy.image_url;
+
+    // 2. Veritabanını güncelle
     const { error } = await supabase
       .from('trophies')
       .update(updateData)
@@ -215,6 +286,7 @@ export async function updateTrophyAction(id: string, prevState: any, formData: F
       return { error: 'Kupa güncellenirken hata oluştu: ' + error.message };
     }
 
+    // 3. Audit log kaydet
     await logAdminAudit({
       action: 'TROPHY_UPDATE',
       entity_type: 'trophies',
@@ -224,6 +296,11 @@ export async function updateTrophyAction(id: string, prevState: any, formData: F
       new_data: updateData,
       actor_id: user.id,
     });
+
+    // 4. Görsel değiştiyse ve eski görsel sahipsiz kalıyorsa Storage'dan temizle
+    if (oldImageUrl && oldImageUrl !== imageUrl) {
+      await safelyRemoveOrphanedTrophyImage(supabase, oldImageUrl, id);
+    }
 
     revalidatePath('/admin/achievements');
     revalidatePath('/oyuncular');
@@ -246,17 +323,24 @@ export async function deleteTrophyAction(id: string) {
       return { error: 'Bu işlemi yapmaya yetkiniz yok.' };
     }
 
+    // 1. Silinecek kupayı oku
     const { data: targetTrophy } = await supabase
       .from('trophies')
       .select('id, title, image_url')
       .eq('id', id)
       .maybeSingle();
 
+    if (!targetTrophy) {
+      return { error: 'Silinecek kupa bulunamadı.' };
+    }
+
+    // 2. Önce veritabanından kupayı sil (başarısız olursa görsel kesinlikle silinmez)
     const { error } = await supabase.from('trophies').delete().eq('id', id);
     if (error) {
       return { error: 'Kupa silinirken hata oluştu: ' + error.message };
     }
 
+    // 3. Audit log kaydet
     await logAdminAudit({
       action: 'TROPHY_DELETE',
       entity_type: 'trophies',
@@ -266,6 +350,11 @@ export async function deleteTrophyAction(id: string) {
       old_data: targetTrophy,
       actor_id: user.id,
     });
+
+    // 4. Görseli yalnızca başka hiçbir kupa kullanmıyorsa Storage'dan temizle
+    if (targetTrophy?.image_url) {
+      await safelyRemoveOrphanedTrophyImage(supabase, targetTrophy.image_url, id);
+    }
 
     revalidatePath('/admin/achievements');
     revalidatePath('/oyuncular');
