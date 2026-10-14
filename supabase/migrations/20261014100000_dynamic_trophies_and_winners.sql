@@ -14,8 +14,8 @@ CREATE TABLE IF NOT EXISTS public.trophies (
     season_name TEXT,
     display_order INTEGER NOT NULL DEFAULT 0,
     created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
-    updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- 2. Create trophy_winners table (Winner assignments)
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS public.trophy_winners (
     team_id UUID REFERENCES public.teams(id) ON DELETE CASCADE,
     notes TEXT,
     awarded_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-    awarded_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+    awarded_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     -- Bütünlük Kuralı: winner_type='PLAYER' ise player_id dolu, team_id null olmalı
     -- winner_type='TEAM' ise team_id dolu, player_id null olmalı
@@ -81,6 +81,7 @@ USING (
         WHERE ur.user_id = auth.uid()
         AND ur.role IN ('ADMIN', 'SUPER_ADMIN')
         AND ur.is_active = true
+        AND ur.revoked_at IS NULL
     )
 )
 WITH CHECK (
@@ -89,6 +90,7 @@ WITH CHECK (
         WHERE ur.user_id = auth.uid()
         AND ur.role IN ('ADMIN', 'SUPER_ADMIN')
         AND ur.is_active = true
+        AND ur.revoked_at IS NULL
     )
 );
 
@@ -104,6 +106,7 @@ USING (
         WHERE ur.user_id = auth.uid()
         AND ur.role IN ('ADMIN', 'SUPER_ADMIN')
         AND ur.is_active = true
+        AND ur.revoked_at IS NULL
     )
 )
 WITH CHECK (
@@ -112,6 +115,7 @@ WITH CHECK (
         WHERE ur.user_id = auth.uid()
         AND ur.role IN ('ADMIN', 'SUPER_ADMIN')
         AND ur.is_active = true
+        AND ur.revoked_at IS NULL
     )
 );
 
@@ -128,12 +132,12 @@ VALUES (
     'trophies',
     true,
     5242880,
-    ARRAY['image/webp', 'image/png', 'image/jpeg', 'image/jpg']
+    ARRAY['image/jpeg', 'image/png', 'image/webp']
 )
 ON CONFLICT (id) DO UPDATE SET
     public = true,
     file_size_limit = 5242880,
-    allowed_mime_types = ARRAY['image/webp', 'image/png', 'image/jpeg', 'image/jpg'];
+    allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp'];
 
 -- Storage RLS policies
 DROP POLICY IF EXISTS "Public read trophies bucket" ON storage.objects;
@@ -151,6 +155,7 @@ WITH CHECK (
         WHERE ur.user_id = auth.uid()
         AND ur.role IN ('ADMIN', 'SUPER_ADMIN')
         AND ur.is_active = true
+        AND ur.revoked_at IS NULL
     )
 );
 
@@ -164,6 +169,17 @@ USING (
         WHERE ur.user_id = auth.uid()
         AND ur.role IN ('ADMIN', 'SUPER_ADMIN')
         AND ur.is_active = true
+        AND ur.revoked_at IS NULL
+    )
+)
+WITH CHECK (
+    bucket_id = 'trophies' AND
+    EXISTS (
+        SELECT 1 FROM public.user_roles ur
+        WHERE ur.user_id = auth.uid()
+        AND ur.role IN ('ADMIN', 'SUPER_ADMIN')
+        AND ur.is_active = true
+        AND ur.revoked_at IS NULL
     )
 );
 
@@ -177,5 +193,6 @@ USING (
         WHERE ur.user_id = auth.uid()
         AND ur.role IN ('ADMIN', 'SUPER_ADMIN')
         AND ur.is_active = true
+        AND ur.revoked_at IS NULL
     )
 );
