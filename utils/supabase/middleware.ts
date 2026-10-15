@@ -20,7 +20,7 @@ export const createClient = (request: NextRequest) => {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet, headers) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
@@ -30,10 +30,16 @@ export const createClient = (request: NextRequest) => {
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           );
+          // Responses that set auth cookies must not be cached by a CDN/proxy.
+          Object.entries(headers ?? {}).forEach(([key, value]) =>
+            supabaseResponse.headers.set(key, value)
+          );
         },
       },
     }
   );
 
-  return { supabase, supabaseResponse };
+  // setAll may replace the response after this function returns, so expose a
+  // getter instead of the initial response object.
+  return { supabase, getResponse: () => supabaseResponse };
 };

@@ -48,7 +48,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(callbackUrl);
   }
 
-  const { supabase, supabaseResponse } = createClient(request);
+  const { supabase, getResponse } = createClient(request);
 
   // Check if any active Supabase SSR session cookies are present (standard or chunked).
   // PKCE verifiers alone or unrelated cookies will not trigger an unnecessary session refresh.
@@ -60,7 +60,7 @@ export async function proxy(request: NextRequest) {
     await supabase.auth.getUser();
   }
 
-  return supabaseResponse;
+  return getResponse();
 }
 
 export const config = {
