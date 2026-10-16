@@ -26,6 +26,11 @@ function formatTime(dateStr: string): string {
 }
 
 import { getActiveSeason, getActiveLeagues } from '@/lib/fetchers';
+import { pickUpcomingFixtures } from '@/lib/upcoming-fixtures';
+
+// Her ligden gösterilecek maç sayısı ve seçim için değerlendirilecek yaklaşan maç sayısı
+const MATCHES_PER_LEAGUE = 2;
+const CANDIDATES_PER_LEAGUE = 8;
 
 export default async function UpcomingMatches() {
   const activeSeason = await getActiveSeason();
@@ -43,9 +48,20 @@ export default async function UpcomingMatches() {
 
   // 2. Aktif sezondaki ligleri al (memoized - Standings ile paylaşılır)
   const leagues = await getActiveLeagues(activeSeason.id);
-  const activeLeague = leagues.find((l) => l.status === 'ACTIVE') || leagues[0];
 
-  if (!activeLeague) {
+  // Süperlig ve ECL ligleri: Standings.tsx ile aynı seviye/ad kuralı
+  const superLigLeague = leagues.find(
+    (l) => l.level === 1 || l.name.toLowerCase().includes('süper') || l.name.toLowerCase().includes('super')
+  ) || leagues[0];
+
+  const eclCandidate = leagues.find(
+    (l) => l.level === 2 || l.name.toLowerCase().includes('ecl')
+  ) || leagues.find((l) => l.id !== superLigLeague?.id) || null;
+  const eclLeague = eclCandidate && eclCandidate.id !== superLigLeague?.id ? eclCandidate : null;
+
+  const targetLeagues = [superLigLeague, eclLeague].filter(Boolean) as typeof leagues;
+
+  if (targetLeagues.length === 0) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -56,36 +72,47 @@ export default async function UpcomingMatches() {
     );
   }
 
-  // 3. Yaklaşan fikstürleri çek
+  // 3. Her lig için yaklaşan fikstürleri çek (lig başına tek sorgu, paralel).
   //    fixtures -> league_teams ilişkisi home/away için iki ayrı FK kullanıyor
   //    Ambiguity önlemek için explicit FK isimleri zorunlu
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
+  const nowIso = new Date().toISOString();
 
-  const { data: fixtures } = await supabase
-    .from('fixtures')
-    .select(`
-      id,
-      week_number,
-      scheduled_at,
-      status,
-      home:league_teams!fixtures_league_id_season_id_home_team_id_fkey (
-        teams ( name, slug, logo_url )
-      ),
-      away:league_teams!fixtures_league_id_season_id_away_team_id_fkey (
-        teams ( name, slug, logo_url )
-      )
-    `)
-    .eq('league_id', activeLeague.id)
-    .eq('season_id', activeSeason.id)
-    .eq('status', 'SCHEDULED')
-    .gte('scheduled_at', new Date().toISOString())
-    .order('scheduled_at', { ascending: true })
-    .limit(4);
+  const leagueMatches = await Promise.all(
+    targetLeagues.map(async (league) => {
+      const { data: fixtures } = await supabase
+        .from('fixtures')
+        .select(`
+          id,
+          week_number,
+          scheduled_at,
+          status,
+          home:league_teams!fixtures_league_id_season_id_home_team_id_fkey (
+            teams ( name, slug, logo_url )
+          ),
+          away:league_teams!fixtures_league_id_season_id_away_team_id_fkey (
+            teams ( name, slug, logo_url )
+          )
+        `)
+        .eq('league_id', league.id)
+        .eq('season_id', activeSeason.id)
+        .eq('status', 'SCHEDULED')
+        .gte('scheduled_at', nowIso)
+        // Aynı zamana sahip maçlarda sınır (limit) kararının sabit kalması için ikincil sıralama
+        .order('scheduled_at', { ascending: true })
+        .order('week_number', { ascending: true })
+        .order('id', { ascending: true })
+        .limit(CANDIDATES_PER_LEAGUE);
 
-  const matchList = fixtures || [];
+      // En yakın haftadan öncelikli, eksikse sonraki yaklaşan maçlarla tamamlanan deterministik seçim
+      return { league, matches: pickUpcomingFixtures(fixtures || [], MATCHES_PER_LEAGUE) };
+    })
+  );
 
-  if (matchList.length === 0) {
+  const groups = leagueMatches.filter((g) => g.matches.length > 0);
+
+  if (groups.length === 0) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -102,51 +129,56 @@ export default async function UpcomingMatches() {
         <h2 className="text-[28px] font-[800] tracking-wide text-white">HAFTANIN MAÇLARI</h2>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {matchList.map((fixture: any) => {
-          const homeTeam = fixture.home?.teams;
-          const awayTeam = fixture.away?.teams;
-          const homeName = homeTeam?.name || 'Bilinmeyen';
-          const awayName = awayTeam?.name || 'Bilinmeyen';
+      <div className="space-y-4">
+        {groups.map(({ league, matches }) => (
+          <div key={league.id} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {matches.map((fixture: any) => {
+              const homeTeam = fixture.home?.teams;
+              const awayTeam = fixture.away?.teams;
+              const homeName = homeTeam?.name || 'Bilinmeyen';
+              const awayName = awayTeam?.name || 'Bilinmeyen';
 
-          return (
-            <div key={fixture.id} className="card-surface rounded-xl p-5 hover:scale-[1.02] transition-transform relative overflow-hidden group">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-[10px] font-bold text-gray-400 tracking-widest uppercase">
-                  {activeLeague.name} - Hafta {fixture.week_number}
-                </span>
-                <span className="text-[10px] font-bold text-[#00e5ff] tracking-widest">
-                  {formatTime(fixture.scheduled_at)}
-                </span>
-              </div>
+              return (
+                <div key={fixture.id} className="card-surface rounded-xl p-5 hover:scale-[1.02] transition-transform relative overflow-hidden group">
+                  <div className="flex justify-between items-center mb-4 gap-3">
+                    <span className="text-[10px] font-bold tracking-widest uppercase min-w-0">
+                      <span className="text-[#00e5ff]">{league.name}</span>
+                      <span className="text-[#00e5ff]"> - Hafta {fixture.week_number}</span>
+                    </span>
+                    <span className="text-[10px] font-bold text-[#00e5ff] tracking-widest shrink-0">
+                      {formatTime(fixture.scheduled_at)}
+                    </span>
+                  </div>
 
-              <div className="flex items-center justify-between">
-                {/* Home */}
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <TeamLogo src={homeTeam?.logo_url} name={homeName} size="md" />
-                  <span className="text-[15px] font-[700] text-white whitespace-normal break-words min-w-0">{homeName}</span>
+                  <div className="flex items-center justify-between">
+                    {/* Home */}
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <TeamLogo src={homeTeam?.logo_url} name={homeName} size="md" />
+                      <span className="text-[15px] font-[700] text-white whitespace-normal break-words min-w-0">{homeName}</span>
+                    </div>
+
+                    {/* VS */}
+                    <div className="w-[20%] flex justify-center">
+                      <span className="text-xs font-black text-gray-500">VS</span>
+                    </div>
+
+                    {/* Away */}
+                    <div className="flex items-center gap-3 flex-1 min-w-0 justify-end text-right">
+                      <span className="text-[15px] font-[700] text-white whitespace-normal break-words min-w-0">{awayName}</span>
+                      <TeamLogo src={awayTeam?.logo_url} name={awayName} size="md" />
+                    </div>
+                  </div>
+
+                  <div className="mt-3 text-center">
+                    <span className="text-[10px] font-medium text-gray-500 tracking-wider">
+                      {formatDate(fixture.scheduled_at)}
+                    </span>
+                  </div>
                 </div>
-
-                {/* VS */}
-                <div className="w-[20%] flex justify-center">
-                  <span className="text-xs font-black text-gray-500">VS</span>
-                </div>
-
-                {/* Away */}
-                <div className="flex items-center gap-3 flex-1 min-w-0 justify-end text-right">
-                  <span className="text-[15px] font-[700] text-white whitespace-normal break-words min-w-0">{awayName}</span>
-                  <TeamLogo src={awayTeam?.logo_url} name={awayName} size="md" />
-                </div>
-              </div>
-
-              <div className="mt-3 text-center">
-                <span className="text-[10px] font-medium text-gray-500 tracking-wider">
-                  {formatDate(fixture.scheduled_at)}
-                </span>
-              </div>
-            </div>
-          );
-        })}
+              );
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );
