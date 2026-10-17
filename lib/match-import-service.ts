@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Supabase client and untrusted JSON are validated at runtime */
 import { requireAdmin } from './fixture-import-service.ts';
+import { canonicalJson, sha256 } from './fixture-weekly.ts';
 import { emptyRejected, planMatchImport } from './match-import-plan.ts';
 import type { LinkDecision, MatchFilePlan, MatchLiveContext } from './match-import-plan.ts';
 import { validateResultsDoc } from './match-results-weekly.ts';
-import type { ResultsDoc } from './match-results-weekly.ts';
+import type { ResultsDoc, ResultsMatch } from './match-results-weekly.ts';
 
 /**
  * Server-side orchestration for importing teta.weekly-matches v1 files.
@@ -16,6 +17,15 @@ type Supa = any;
 // Server actions accept ~1 MB bodies by default; realistic weekly result files are ~100 KB.
 export const MAX_MATCH_FILES = 10;
 export const MAX_MATCH_FILE_BYTES = 800 * 1024;
+
+/**
+ * Sending ONE match of a file: a derived sub-file with its own identity (so each match is applied and recorded once, and
+ * re-sending it is an ALREADY_APPLIED no-op). The original file was fully validated (checksum included) before this.
+ */
+export function subDocFor(doc: ResultsDoc, match: ResultsMatch): ResultsDoc {
+  const checksum = sha256(canonicalJson({ parentChecksum: doc.checksum, eaMatchId: match.eaMatchId }));
+  return { ...doc, checksum, exportId: 'twm_' + checksum.slice(0, 32), matches: [match] };
+}
 
 export interface UploadedFile {
   name: string;
@@ -42,7 +52,7 @@ async function loadContext(supabase: Supa, p: { seasonId: string; leagueId: stri
   const [t, mf, me, h, fi, pr, ms] = await Promise.all([
     teamIds.length ? supabase.from('teams').select('id, name, ea_club_id').in('id', teamIds) : Promise.resolve({ data: [], error: null }),
     p.fixtureIds.length ? supabase.from('matches').select('id, fixture_id, status').in('fixture_id', p.fixtureIds) : Promise.resolve({ data: [], error: null }),
-    p.eaMatchIds.length ? supabase.from('matches').select('id, fixture_id, ea_match_id').in('ea_match_id', p.eaMatchIds) : Promise.resolve({ data: [], error: null }),
+    p.eaMatchIds.length ? supabase.from('matches').select('id, fixture_id, ea_match_id, status').in('ea_match_id', p.eaMatchIds) : Promise.resolve({ data: [], error: null }),
     supabase.from('match_import_history').select('result, checksum, file_generated_at, season_id, league_id, week_number').eq('league_id', p.leagueId).limit(5000),
     supabase.from('fixture_import_history').select('result, checksum, week_number').eq('league_id', p.leagueId).limit(5000),
     supabase.from('profiles').select('id, username, full_name, current_ea_player_id').not('current_ea_player_id', 'is', null).limit(5000),
@@ -57,7 +67,7 @@ async function loadContext(supabase: Supa, p: { seasonId: string; leagueId: stri
   const matchesByFixture: MatchLiveContext['matchesByFixture'] = {};
   for (const m of mf.data ?? []) if (m.fixture_id) (matchesByFixture[m.fixture_id] ??= []).push({ id: m.id, status: m.status });
   const usedEaMatchIds: MatchLiveContext['usedEaMatchIds'] = {};
-  for (const m of me.data ?? []) usedEaMatchIds[m.ea_match_id] = { id: m.id, fixture_id: m.fixture_id };
+  for (const m of me.data ?? []) usedEaMatchIds[m.ea_match_id] = { id: m.id, fixture_id: m.fixture_id, status: m.status };
 
   return {
     live: {
@@ -77,7 +87,7 @@ async function loadContext(supabase: Supa, p: { seasonId: string; leagueId: stri
 
 export async function previewMatchImport(
   supabase: Supa,
-  p: { seasonId: string; leagueId: string; files: UploadedFile[]; acceptedOutOfWindow?: string[]; acceptedLinks?: LinkDecision[] }
+  p: { seasonId: string; leagueId: string; files: UploadedFile[]; acceptedOutOfWindow?: string[]; acceptedLinks?: LinkDecision[]; weekNumber?: number; onlyEaMatchId?: string }
 ): Promise<MatchPreview> {
   if (p.files.length === 0) return { plans: [], batchErrors: ['Dosya seçilmedi.'], canApply: false };
   if (p.files.length > MAX_MATCH_FILES) return { plans: [], batchErrors: [`En fazla ${MAX_MATCH_FILES} dosya yüklenebilir.`], canApply: false };
@@ -115,15 +125,24 @@ export async function previewMatchImport(
     if (dupSum) return emptyRejected(x.name, [`Aynı içerik bu yüklemede zaten var (${dupSum}).`], x.doc);
     if (dupScope) return emptyRejected(x.name, [`Aynı hafta için birden fazla dosya yüklendi (${dupScope}); hafta başına tek dosya olmalı.`], x.doc);
     if (dupEa) return emptyRejected(x.name, [`EA maçı ${dupEa.id} bu yüklemede başka bir dosyada da var (${dupEa.other}).`], x.doc);
-    const plan = planMatchImport({
-      fileName: x.name,
-      doc: x.doc,
-      selected: { seasonId: p.seasonId, leagueId: p.leagueId },
-      live,
-      acceptedOutOfWindow: p.acceptedOutOfWindow,
-      acceptedLinks: p.acceptedLinks,
-    });
+    if (p.weekNumber !== undefined && x.doc.target.weekNumber !== p.weekNumber) {
+      return emptyRejected(x.name, [`Dosyadaki hafta (${x.doc.target.weekNumber}) seçilen haftayla (${p.weekNumber}) uyuşmuyor.`], x.doc);
+    }
+    const args = { fileName: x.name, selected: { seasonId: p.seasonId, leagueId: p.leagueId }, live, acceptedOutOfWindow: p.acceptedOutOfWindow, acceptedLinks: p.acceptedLinks };
+    let doc = x.doc;
+    if (p.onlyEaMatchId) {
+      const one = doc.matches.find((m) => m.eaMatchId === p.onlyEaMatchId);
+      if (!one) return emptyRejected(x.name, [`EA maçı ${p.onlyEaMatchId} bu dosyada yok.`], doc);
+      doc = subDocFor(doc, one);
+    }
+    const plan = planMatchImport({ ...args, doc });
     plan.warnings.push(...x.warnings);
+    if (!p.onlyEaMatchId) {
+      // hash of sending each match on its own: the UI sends exactly what the admin saw
+      plan.matches.forEach((mp, i) => {
+        mp.sendHash = planMatchImport({ ...args, doc: subDocFor(x.doc, x.doc.matches[i]) }).planHash;
+      });
+    }
     return plan;
   });
 
@@ -150,6 +169,9 @@ export async function applyMatchImport(
     files: UploadedFile[];
     acceptedOutOfWindow?: string[];
     acceptedLinks?: LinkDecision[];
+    weekNumber?: number;
+    /** send only this match of the file (it must still be a draft) */
+    onlyEaMatchId?: string;
     /** planHash per file name, exactly as shown to the admin in the preview */
     expectedHashes: Record<string, string | null>;
   }
@@ -158,6 +180,9 @@ export async function applyMatchImport(
   if (!auth.ok) return { ok: false, error: auth.error };
 
   const preview = await previewMatchImport(supabase, p);
+  if (p.onlyEaMatchId && preview.plans.some((x) => x.status === 'NOOP' || x.matches.some((m) => m.delivery !== 'DRAFT'))) {
+    return { ok: false, error: 'Bu maç zaten onaya gönderilmiş veya incelenmiş; tekrar gönderilemez.' };
+  }
   if (!preview.canApply) return { ok: false, error: preview.batchErrors.join(' ') || 'Uygulanabilir maç yok.' };
   const ready = preview.plans.filter((x) => x.status === 'READY');
   for (const pl of ready) {

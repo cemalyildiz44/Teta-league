@@ -39,7 +39,7 @@ export interface MatchLiveContext {
   teams: { id: string; name: string; ea_club_id: number | string | null }[];
   matchesByFixture: Record<string, { id: string; status: string }[]>;
   /** matches that already carry one of the file's ea_match_id values */
-  usedEaMatchIds: Record<string, { id: string; fixture_id: string | null }>;
+  usedEaMatchIds: Record<string, { id: string; fixture_id: string | null; status?: string }>;
   history: MatchHistoryRow[];
   /** fixture_import_history rows of the league (informational: was the source fixtures file applied here?) */
   fixtureImports: { result: string; checksum: string; week_number: number }[];
@@ -69,7 +69,18 @@ export interface PlayerPlan {
   /** values exactly as in the file (shown in the preview so the admin sees what will be written) */
   stats: { position: string | null; goals: number; assists: number; rating: number | null; shots: number; passesMade: number; passAttempts: number; tacklesMade: number; tackleAttempts: number; saves: number; mom: boolean };
 }
+/** Where a match of the file stands, derived from the stored match record (never from browser state). */
+export type Delivery = 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED';
+export function deliveryOf(status: string | undefined | null): Delivery {
+  return status === 'APPROVED' ? 'APPROVED' : status === 'REJECTED' ? 'REJECTED' : 'SENT';
+}
 export interface MatchPlan {
+  /** DRAFT = no match record with this EA match id yet; SENT = PENDING_REVIEW in the admin queue; APPROVED / REJECTED = reviewed */
+  delivery: Delivery;
+  /** id of the stored match (when delivery is not DRAFT) */
+  recordId: string | null;
+  /** plan hash of sending just this match (set by the service) */
+  sendHash?: string | null;
   fixtureId: string;
   eaMatchId: string;
   homeName: string;
@@ -251,7 +262,10 @@ export function planMatchImport(args: {
       };
     });
 
+    const existing = live.usedEaMatchIds[m.eaMatchId];
     return {
+      delivery: existing ? deliveryOf(existing.status) : 'DRAFT',
+      recordId: existing?.id ?? null,
       fixtureId: m.fixtureId,
       eaMatchId: m.eaMatchId,
       homeName: homeLive?.name ?? '?',

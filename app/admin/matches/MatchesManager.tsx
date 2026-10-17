@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
@@ -11,9 +11,12 @@ import {
 } from 'lucide-react';
 import { 
   reviewMatchAction, deleteMatchAction, updateMatchScoreAction,
-  assignPlayerStatsProfileAction, getTeamRosterCandidatesAction, searchProfilesAction
+  assignPlayerStatsProfileAction, getTeamRosterCandidatesAction, searchProfilesAction, updatePlayerStatsAction
 } from './actions';
 import TeamLogo from '@/components/TeamLogo';
+
+type StatsRow = { id: string; ea_player_name?: string | null; ea_player_id?: string | null; profiles?: { username?: string | null } | null; rating?: number | null; is_mom?: boolean | null; [k: string]: unknown };
+type CheckStat = { team_id: string; player_id: string | null; goals?: number | null };
 
 function getMatchEaData(m: any) {
   if (!m) return null;
@@ -64,6 +67,13 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
   const [editScoreModal, setEditScoreModal] = useState<any>(null);
   const [confirmModal, setConfirmModal] = useState<any>({ isOpen: false });
   const [assignModal, setAssignModal] = useState<any>(null);
+  const [statsModal, setStatsModal] = useState<StatsRow | null>(null); // player stats row being edited
+
+  // After router.refresh() keep the open detail modal in sync with the refreshed match (edits, assignments, re-check)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing the modal snapshot with refreshed server data
+    setDetailModal((d: { id: string } | null) => (d ? (initialMatches as { id: string }[]).find((m) => m.id === d.id) ?? d : d));
+  }, [initialMatches]);
   const [rosterCandidates, setRosterCandidates] = useState<any[]>([]);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchProfileQuery, setSearchProfileQuery] = useState('');
@@ -154,6 +164,25 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
         closeConfirm();
       }
     });
+  };
+
+  const handleStatsSave = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!statsModal) return;
+    setLoading(true);
+    const fd = new FormData(e.currentTarget);
+    const num = (k: string) => Number(fd.get(k));
+    const ratingRaw = String(fd.get('rating') ?? '').trim();
+    const res = await updatePlayerStatsAction(statsModal.id, {
+      goals: num('goals'), assists: num('assists'), shots: num('shots'), passes_made: num('passes_made'), pass_attempts: num('pass_attempts'),
+      tackles_made: num('tackles_made'), tackle_attempts: num('tackle_attempts'), saves: num('saves'), goals_conceded: num('goals_conceded'),
+      cleansheets_gk: num('cleansheets_gk'), cleansheets_def: num('cleansheets_def'), red_cards: num('red_cards'),
+      rating: ratingRaw === '' ? null : Number(ratingRaw),
+      is_mom: fd.get('is_mom') === 'on',
+    });
+    if (res.error) showFeedback(res.error, 'error');
+    else { showFeedback((res.success || '') + ' Kontrol yenileniyor.', 'success'); setStatsModal(null); router.refresh(); }
+    setLoading(false);
   };
 
   const openAssignModal = async (stat: any) => {
@@ -250,7 +279,7 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
     const fd = new FormData(e.currentTarget);
     const res = await updateMatchScoreAction(editScoreModal.id, parseInt(fd.get('home_score') as string), parseInt(fd.get('away_score') as string));
     if (res.error) showFeedback(res.error, 'error');
-    else { showFeedback(res.success || '', 'success'); setEditScoreModal(null); setDetailModal(null); router.refresh(); }
+    else { showFeedback(res.success || '', 'success'); setEditScoreModal(null); router.refresh(); }
     setLoading(false);
   };
 
@@ -705,6 +734,33 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                   )}
                 </div>
 
+                {/* Re-check panel: 11 v 11, profile matches, goals vs score */}
+                {(() => {
+                  const stats = (detailModal.stats || []) as CheckStat[];
+                  const homeStats = stats.filter((s) => s.team_id === detailModal.home_team_id);
+                  const awayStats = stats.filter((s) => s.team_id === detailModal.away_team_id);
+                  const unmatched = stats.filter((s) => !s.player_id).length;
+                  const sum = (arr: CheckStat[]) => arr.reduce((a, s) => a + (s.goals || 0), 0);
+                  const items: { ok: boolean; text: string }[] = [
+                    { ok: homeStats.length === 11 && awayStats.length === 11, text: 'Oyuncu sayısı: ' + homeStats.length + ' / ' + awayStats.length + ' (ev / deplasman, beklenen 11 / 11)' },
+                    { ok: unmatched === 0, text: unmatched === 0 ? 'Tüm oyuncuların profili eşleşmiş' : unmatched + ' oyuncunun profili eşleşmedi' },
+                    { ok: sum(homeStats) === detailModal.home_score && sum(awayStats) === detailModal.away_score, text: 'Gol toplamları: ' + sum(homeStats) + ' - ' + sum(awayStats) + ' (skor ' + detailModal.home_score + ' - ' + detailModal.away_score + ')' },
+                  ];
+                  return (
+                    <div className='mb-4 rounded-xl border border-white/10 bg-[#0a1628] p-3.5 text-xs' data-testid='match-check'>
+                      <div className='mb-2 flex items-center justify-between'>
+                        <span className='font-black uppercase tracking-widest text-cyan-400'>Kontrol</span>
+                        <button type='button' onClick={() => router.refresh()} className='px-2 py-1 rounded border border-white/10 bg-white/5 text-[10px] font-bold text-zinc-300 hover:text-cyan-400'>Yeniden Kontrol Et</button>
+                      </div>
+                      <ul className='space-y-0.5'>
+                        {items.map((i, n) => (
+                          <li key={n} className={i.ok ? 'text-emerald-400' : 'text-amber-400'}>{i.ok ? '✓ ' : '⚠ '}{i.text}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })()}
+
                 {/* Player Warning Alert Banner */}
                 {(() => {
                   if (!detailModal.stats || detailModal.stats.length === 0) return null;
@@ -821,7 +877,16 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                               <td className='px-3 py-2 text-center'>{s.shots}</td>
                               <td className='px-3 py-2 text-center'>{s.passes_made}/{s.pass_attempts}</td>
                               <td className='px-3 py-2 text-center'>{s.is_mom ? <span className='text-amber-400'>⭐</span> : '-'}</td>
-                              <td className='px-3 py-2 text-right'>
+                              <td className='px-3 py-2 text-right whitespace-nowrap'>
+                                {detailModal.status !== 'APPROVED' && (
+                                  <button
+                                    type='button'
+                                    onClick={() => setStatsModal(s)}
+                                    className='mr-1 px-2 py-1 bg-white/5 hover:bg-cyan-500/10 text-zinc-300 hover:text-cyan-400 border border-white/10 rounded text-[10px] font-bold'
+                                  >
+                                    İstatistik Düzenle
+                                  </button>
+                                )}
                                 <button
                                   type='button'
                                   onClick={() => openAssignModal(s)}
@@ -903,6 +968,31 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
       )}
 
       {/* Assign Player Profile Modal */}
+      {statsModal && (
+        <div className='fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4'>
+          <form onSubmit={handleStatsSave} className='w-full max-w-lg rounded-2xl border border-white/10 bg-[#0a1628] p-6 space-y-4' data-testid='stats-modal'>
+            <h2 className='text-sm font-black tracking-widest text-cyan-400'>OYUNCU İSTATİSTİKLERİ — {statsModal.profiles?.username || statsModal.ea_player_name || statsModal.ea_player_id}</h2>
+            <div className='grid grid-cols-3 gap-3 text-xs'>
+              {([['goals', 'Gol'], ['assists', 'Asist'], ['shots', 'Şut'], ['passes_made', 'Başarılı pas'], ['pass_attempts', 'Pas denemesi'], ['tackles_made', 'Top çalma'], ['tackle_attempts', 'Top çalma den.'], ['saves', 'Kurtarış'], ['goals_conceded', 'Yenilen gol'], ['cleansheets_gk', 'Gol yemeden (K)'], ['cleansheets_def', 'Gol yemeden (D)'], ['red_cards', 'Kırmızı kart']] as [string, string][]).map(([k, label]) => (
+                <label key={k} className='block text-zinc-400'>{label}
+                  <input name={k} type='number' min='0' max='1000' required defaultValue={(statsModal[k] as number | undefined) ?? 0} className='mt-1 w-full rounded bg-[#060d18] border border-white/10 px-2 py-1.5 text-white' />
+                </label>
+              ))}
+              <label className='block text-zinc-400'>Rating (0-10)
+                <input name='rating' type='number' step='0.01' min='0' max='10' defaultValue={statsModal.rating ?? ''} className='mt-1 w-full rounded bg-[#060d18] border border-white/10 px-2 py-1.5 text-white' />
+              </label>
+              <label className='flex items-end gap-2 text-zinc-300 pb-1.5'>
+                <input name='is_mom' type='checkbox' defaultChecked={!!statsModal.is_mom} /> Maçın adamı
+              </label>
+            </div>
+            <div className='flex justify-end gap-2'>
+              <button type='button' onClick={() => setStatsModal(null)} className='px-4 py-2 text-zinc-400 hover:text-white text-xs font-bold'>Vazgeç</button>
+              <button type='submit' disabled={loading} className='px-5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-black disabled:opacity-50'>Kaydet ve Yeniden Kontrol Et</button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {assignModal && (
         <div className='fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm'>
           <div className='card-surface w-full max-w-lg rounded-2xl border border-white/10 overflow-hidden flex flex-col'>

@@ -458,4 +458,82 @@ const codes = (plan, i = 0) => plan.matches[i].errors.map((e) => e.code);
   assert.equal(planMatchImport({ fileName: 'x.json', doc, selected: SEL, live }).warnings.length, 0);
 }
 
+// ------------------------------------------------------------------ 13. JSON transfer screen: week check, per-match send, derived delivery state
+{
+  const doc2 = makeDoc({ matches: [mkMatch(1), mkMatch(2)] });
+  const E1 = doc2.matches[0].eaMatchId;
+  const E2 = doc2.matches[1].eaMatchId;
+
+  // selected week must match the file's target week
+  let db = makeDb();
+  let p = await preview(db, [upload(doc2)], { weekNumber: 2 });
+  assert.equal(first(p).status, 'REJECTED');
+  assert.match(first(p).rejections.join(), /Dosyadaki hafta \(1\) seçilen haftayla \(2\) uyuşmuyor/);
+  assert.equal((await preview(db, [upload(doc2)], { weekNumber: 1 })).canApply, true);
+
+  // every match is a draft with its own send hash; nothing is written by the preview
+  p = await preview(db, [upload(doc2)], { weekNumber: 1 });
+  assert.deepEqual(first(p).matches.map((m) => m.delivery), ['DRAFT', 'DRAFT']);
+  assert.ok(first(p).matches.every((m) => m.sendHash && m.sendHash !== first(p).planHash));
+  assert.notEqual(first(p).matches[0].sendHash, first(p).matches[1].sendHash);
+  assert.equal(db.rpcCalls.length, 0);
+
+  // send ONLY the second match: one match in the RPC payload, its own (derived) identity, the other stays a draft
+  const send = (d, eaId, hash, extra = {}) => applyMatchImport(d.client, { ...SEL, weekNumber: 1, files: [upload(doc2)], onlyEaMatchId: eaId, expectedHashes: { 'sonuc.json': hash }, ...extra });
+  const hash2 = first(p).matches[1].sendHash;
+  let out = await send(db, E2, hash2);
+  assert.equal(out.ok, true, out.error);
+  assert.equal(db.rpcCalls.length, 1);
+  const sent = db.rpcCalls[0].args.p_files[0];
+  assert.equal(sent.matches.length, 1);
+  assert.equal(sent.matches[0].ea_match_id, E2);
+  assert.notEqual(sent.checksum, doc2.checksum, 'a per-match identity, not the file checksum');
+  assert.match(sent.export_id, /^twm_[0-9a-f]{32}$/);
+  assert.ok(sent.matches[0].players.every((x) => x.player_id === null), 'still no automatic player link');
+
+  // after the RPC the stored records decide the state (simulate what the RPC writes)
+  db.matches.push({ id: U(900), fixture_id: FX[2], ea_match_id: E2, status: 'PENDING_REVIEW' });
+  db.match_import_history.push({ result: 'APPLIED', checksum: sent.checksum, file_generated_at: doc2.generatedAt, season_id: S, league_id: L, week_number: 1 });
+  p = await preview(db, [upload(doc2)], { weekNumber: 1 });
+  assert.deepEqual(first(p).matches.map((m) => m.delivery), ['DRAFT', 'SENT']);
+  assert.equal(first(p).matches[1].recordId, U(900));
+  // the older whole-file flow cannot re-apply a file that already has a match sent through the JSON flow (and vice versa nothing is duplicated)
+  const whole = await preview(db, [upload(doc2)]);
+  assert.equal(whole.canApply, false);
+  assert.ok(codes(first(whole), 1).includes('EA_MATCH_ALREADY_USED'));
+  assert.equal(first(whole).status, 'BLOCKED');
+  const wholeApply = await applyMatchImport(db.client, { ...SEL, files: [upload(doc2)], expectedHashes: { 'sonuc.json': first(whole).planHash } });
+  assert.equal(wholeApply.ok, false);
+  assert.equal(db.rpcCalls.length, 1, 'whole-file flow made no RPC call');
+  // re-uploading the same file cannot send it twice
+  out = await send(db, E2, hash2);
+  assert.equal(out.ok, false);
+  assert.match(out.error, /zaten onaya gönderilmiş/);
+  assert.equal(db.rpcCalls.length, 1, 'no second RPC call');
+  // the other match is still sendable on its own
+  out = await send(db, E1, first(p).matches[0].sendHash);
+  assert.equal(out.ok, true, out.error);
+  assert.equal(db.rpcCalls[1].args.p_files[0].matches[0].ea_match_id, E1);
+  assert.notEqual(db.rpcCalls[1].args.p_files[0].checksum, sent.checksum);
+
+  // reviewed states come from the stored match status
+  for (const [status, expected] of [['APPROVED', 'APPROVED'], ['REJECTED', 'REJECTED'], ['PENDING_REVIEW', 'SENT']]) {
+    const d = makeDb(); d.matches.push({ id: U(901), fixture_id: FX[1], ea_match_id: E1, status });
+    assert.equal(first(await preview(d, [upload(doc2)], { weekNumber: 1 })).matches[0].delivery, expected, status);
+  }
+  // an approved match cannot be re-sent
+  const dApproved = makeDb(); dApproved.matches.push({ id: U(902), fixture_id: FX[1], ea_match_id: E1, status: 'APPROVED' });
+  const again = await send(dApproved, E1, 'x');
+  assert.equal(again.ok, false);
+  assert.equal(dApproved.rpcCalls.length, 0);
+
+  // unknown match / stale hash / non-admin never reach the RPC
+  db = makeDb();
+  assert.equal((await send(db, '999', 'x')).ok, false);
+  assert.equal((await send(db, E1, 'f'.repeat(64))).ok, false);
+  const nonAdmin = makeDb({ user: { id: PLAYER_USER } });
+  assert.equal((await send(nonAdmin, E1, hash2)).ok, false);
+  assert.equal(db.rpcCalls.length + nonAdmin.rpcCalls.length, 0);
+}
+
 console.log('match-weekly-import tests passed');

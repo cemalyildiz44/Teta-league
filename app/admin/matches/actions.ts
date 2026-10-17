@@ -422,3 +422,61 @@ export async function searchProfilesAction(query: string) {
   if (error) return { error: error.message };
   return { data: data || [] };
 }
+
+const STAT_INT_FIELDS = ['goals', 'assists', 'shots', 'passes_made', 'pass_attempts', 'tackles_made', 'tackle_attempts', 'saves', 'goals_conceded', 'cleansheets_gk', 'cleansheets_def', 'red_cards'] as const;
+
+/**
+ * Edits one player's stats row of a match that is still in review (PENDING_REVIEW / REJECTED).
+ * Approved matches are not editable here: their season stats are already calculated, so the approval must be reverted first.
+ */
+export async function updatePlayerStatsAction(statsId: string, fields: Record<string, unknown>) {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!(await checkAdmin(supabase, user)) || !user) return { error: 'Yetkisiz erişim.' };
+  if (!statsId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(statsId)) {
+    return { error: 'Geçersiz istatistik kaydı kimliği.' };
+  }
+
+  const update: Record<string, number | boolean | null> = {};
+  for (const key of STAT_INT_FIELDS) {
+    const v = fields[key];
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > 1000) {
+      return { error: `Geçersiz değer: ${key} 0-1000 arası tam sayı olmalı.` };
+    }
+    update[key] = v;
+  }
+  const rating = fields.rating;
+  if (rating !== null && (typeof rating !== 'number' || !Number.isFinite(rating) || rating < 0 || rating > 10)) {
+    return { error: 'Geçersiz değer: rating boş veya 0-10 arası olmalı.' };
+  }
+  update.rating = rating === null ? null : Math.round(rating * 100) / 100;
+  update.is_mom = fields.is_mom === true;
+
+  const { data: stat } = await supabase
+    .from('match_player_stats')
+    .select('id, match_id, ea_player_name, ea_player_id, goals, assists, rating, matches(status)')
+    .eq('id', statsId)
+    .maybeSingle();
+  if (!stat) return { error: 'İlgili oyuncu istatistik kaydı bulunamadı.' };
+  const rel = (stat as unknown as { matches?: { status?: string } | { status?: string }[] | null }).matches;
+  const matchStatus = (Array.isArray(rel) ? rel[0] : rel)?.status;
+  if (matchStatus === 'APPROVED') return { error: 'Onaylanmış maçın istatistikleri düzenlenemez; önce onayı geri alın.' };
+
+  const { error } = await supabase.from('match_player_stats').update({ ...update, updated_at: new Date().toISOString() }).eq('id', statsId);
+  if (error) return { error: 'İstatistik güncellenemedi: ' + error.message };
+
+  await logAdminAudit({
+    action: 'UPDATE_PLAYER_STATS',
+    entity_type: 'match_player_stats',
+    entity_id: statsId,
+    entity_label: stat.ea_player_name || stat.ea_player_id || 'Oyuncu',
+    old_data: { goals: stat.goals, assists: stat.assists, rating: stat.rating },
+    new_data: update,
+    description: `Oyuncu istatistikleri düzenlendi (maç #${String(stat.match_id).substring(0, 8)}).`,
+    actor_id: user.id,
+  });
+  revalidatePath('/admin/matches');
+  return { success: 'İstatistikler güncellendi.' };
+}

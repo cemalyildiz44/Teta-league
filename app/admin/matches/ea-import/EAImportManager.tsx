@@ -1,308 +1,287 @@
-
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { 
-  Search, Shield, AlertTriangle, CheckCircle2, Loader2, ArrowRight,
-  Database, RefreshCw, XCircle, FileCheck2, Info
-} from 'lucide-react';
-import { fetchEaPreviewAction, importEaMatchAction, EAPreviewMatch } from './actions';
-import { useRouter } from 'next/navigation';
+import { Loader2, FileCheck2, AlertTriangle } from 'lucide-react';
+import { previewJsonMatchesAction, sendMatchToReviewAction } from './json-actions';
 
-export function EAImportManager({ seasons, leagues, recentImports }: any) {
-  const router = useRouter();
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
-  const [seasonId, setSeasonId] = useState(seasons.find((s:any)=>s.status==='ACTIVE')?.id || seasons[0]?.id || '');
+const input = 'bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500/50 outline-none';
+const btn = 'px-4 py-2 rounded-lg text-xs font-black transition-colors disabled:opacity-40';
+
+// Status of each match is derived from the stored match records on the server (never from browser state).
+const DELIVERY: Record<string, { label: string; cls: string }> = {
+  DRAFT: { label: 'Taslak', cls: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30' },
+  SENT: { label: 'Onaya Gönderildi', cls: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
+  APPROVED: { label: 'Onaylandı', cls: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
+  REJECTED: { label: 'Reddedildi', cls: 'bg-red-500/10 text-red-400 border-red-500/30' },
+};
+const SUGGESTION: Record<string, string> = { MATCHED: 'Öneri var', UNMATCHED: 'Eşleşme yok', AMBIGUOUS: 'Belirsiz' };
+
+function SideTable({ title, players, matchEa, onToggle }: { title: string; players: any[]; matchEa: string; onToggle: (eaPlayerId: string, profileId: string) => void }) {
+  const ok = players.length === 11;
+  return (
+    <div className='min-w-0 flex-1'>
+      <p className='mb-1 text-xs font-black uppercase tracking-wide text-cyan-400'>
+        {title}{' '}
+        <span className={`ml-1 normal-case font-bold ${ok ? 'text-zinc-400' : 'text-amber-400'}`} data-testid='player-count'>
+          {players.length} oyuncu{ok ? '' : ' (11 değil: eksik/fazla oyuncu)'}
+        </span>
+      </p>
+      <div className='overflow-x-auto'>
+        <table className='w-full min-w-[520px] text-[11px]'>
+          <thead>
+            <tr className='text-left text-zinc-500'>
+              <th className='pr-2'>Oyuncu</th>
+              <th className='pr-2'>EA kimliği</th>
+              <th className='pr-2'>Poz</th>
+              <th className='pr-1 text-right'>Puan</th>
+              <th className='pr-1 text-right'>G</th>
+              <th className='pr-1 text-right'>A</th>
+              <th className='pr-1 text-right'>Şut</th>
+              <th className='pr-2 text-right'>Pas</th>
+              <th>Eşleştirme</th>
+            </tr>
+          </thead>
+          <tbody>
+            {players.map((p) => (
+              <tr key={p.eaPlayerId} className='border-t border-white/5'>
+                <td className='max-w-[9rem] truncate pr-2 text-white'>{p.stats.mom ? '⭐ ' : ''}{p.eaPlayerName ?? '—'}</td>
+                <td className='pr-2 font-mono text-zinc-400'>{p.eaPlayerId}</td>
+                <td className='pr-2 text-zinc-400'>{p.stats.position ?? '–'}</td>
+                <td className='pr-1 text-right tabular-nums'>{p.stats.rating === null ? '–' : p.stats.rating.toFixed(1)}</td>
+                <td className='pr-1 text-right tabular-nums'>{p.stats.goals}</td>
+                <td className='pr-1 text-right tabular-nums'>{p.stats.assists}</td>
+                <td className='pr-1 text-right tabular-nums'>{p.stats.shots}</td>
+                <td className='pr-2 text-right tabular-nums'>{p.stats.passesMade}/{p.stats.passAttempts}</td>
+                <td title={p.suggestion.warning ?? ''}>
+                  <span className={p.suggestion.status === 'MATCHED' ? 'text-zinc-300' : 'font-bold text-amber-400'}>
+                    {p.linkedProfileId ? 'Bağlanacak' : SUGGESTION[p.suggestion.status]}
+                    {p.suggestion.username ? `: @${p.suggestion.username}` : ''}
+                  </span>
+                  {p.suggestion.status === 'MATCHED' && p.suggestion.profileId && (
+                    <label className='ml-2 inline-flex items-center gap-1'>
+                      <input type='checkbox' checked={!!p.linkedProfileId} onChange={() => onToggle(p.eaPlayerId, p.suggestion.profileId)} data-match={matchEa} />
+                      bağla
+                    </label>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+export function EAImportManager({ seasons, leagues, weeksByLeague }: { seasons: any[]; leagues: any[]; weeksByLeague: Record<string, number[]> }) {
+  const [seasonId, setSeasonId] = useState(seasons.find((s) => s.status === 'ACTIVE')?.id || seasons[0]?.id || '');
   const [leagueId, setLeagueId] = useState('');
-  const [week, setWeek] = useState<number>(1);
-  
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [previewMatches, setPreviewMatches] = useState<EAPreviewMatch[]>([]);
-  
-  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean, match?: EAPreviewMatch, loading: boolean, success: boolean }>({ isOpen: false, loading: false, success: false });
+  const [week, setWeek] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const [oow, setOow] = useState<Set<string>>(new Set());
+  const [links, setLinks] = useState<Map<string, { eaMatchId: string; eaPlayerId: string; profileId: string }>>(new Map());
+  const [hidden, setHidden] = useState<Set<string>>(new Set()); // deleted drafts (a draft is only the uploaded file; nothing is stored for it)
+  const [preview, setPreview] = useState<any>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
-  const availableLeagues = useMemo(() => leagues.filter((l:any) => l.season_id === seasonId), [leagues, seasonId]);
+  const availableLeagues = useMemo(() => leagues.filter((l) => l.season_id === seasonId), [leagues, seasonId]);
+  const weeks = weeksByLeague[leagueId] ?? [];
+  const plan = preview?.plans?.[0];
 
-  const handleFetch = async () => {
-    if (!leagueId) { setError('Lütfen lig seçin.'); return; }
-    setLoading(true);
-    setError('');
-    setPreviewMatches([]);
-
-    try {
-      const res = await fetchEaPreviewAction(leagueId, week);
-      if (res.error) {
-        setError(res.error);
-      } else if (res.data) {
-        setPreviewMatches(res.data);
-      }
-    } catch (e: any) {
-      setError('Sunucu ile iletişimde beklenmeyen bir hata oluştu: ' + e.message);
-    } finally {
-      setLoading(false);
-    }
+  const form = (o: Set<string>, l: Map<string, any>) => {
+    const fd = new FormData();
+    fd.set('seasonId', seasonId);
+    fd.set('leagueId', leagueId);
+    fd.set('week', week);
+    if (file) fd.set('file', file);
+    o.forEach((id) => fd.append('oow', id));
+    fd.set('links', JSON.stringify([...l.values()]));
+    return fd;
   };
 
-  const handleImport = async () => {
-    if (!confirmModal.match) return;
-    setConfirmModal(prev => ({ ...prev, loading: true }));
-    
-    // Update local state optimistic
-    const targetId = confirmModal.match.ea_match_id;
-    setPreviewMatches(prev => prev.map(p => p.ea_match_id === targetId ? { ...p, match_status: 'IMPORTING' as any } : p));
-    
-    const res = await importEaMatchAction(confirmModal.match, seasonId, leagueId);
-    
+  const run = async (o: Set<string> = oow, l: Map<string, any> = links, keepMsg = false) => {
+    setBusy('preview');
+    if (!keepMsg) setMsg(null);
+    const res: any = await previewJsonMatchesAction(form(o, l));
+    setBusy(null);
     if (res.error) {
-      setConfirmModal(prev => ({ ...prev, loading: false }));
-      setError(res.error);
-      setPreviewMatches(prev => prev.map(p => p.ea_match_id === targetId ? { ...p, match_status: 'READY' } : p));
-      setConfirmModal({ isOpen: false, loading: false, success: false });
-    } else {
-      setPreviewMatches(prev => prev.map(p => p.ea_match_id === targetId ? { ...p, match_status: 'IMPORTED' as any } : p));
-      setConfirmModal(prev => ({ ...prev, loading: false, success: true }));
-      router.refresh();
+      setPreview(null);
+      return setMsg({ type: 'err', text: res.error });
     }
+    setPreview(res.preview);
   };
 
-  const getStatusDisplay = (status: string) => {
-    switch (status) {
-      case 'READY': return <span className='px-2 py-1 bg-emerald-500/10 text-emerald-400 text-[10px] font-bold rounded ring-1 inset-ring ring-emerald-500/30 flex items-center gap-1 w-fit'><CheckCircle2 className='w-3 h-3'/> İÇE AKTARILABİLİR</span>;
-      case 'UNMATCHED': return <span className='px-2 py-1 bg-red-500/10 text-red-400 text-[10px] font-bold rounded ring-1 inset-ring ring-red-500/30 flex items-center gap-1 w-fit'><XCircle className='w-3 h-3'/> TAKIM EŞLEŞMEDİ</span>;
-      case 'AMBIGUOUS': return <span className='px-2 py-1 bg-amber-500/10 text-amber-400 text-[10px] font-bold rounded ring-1 inset-ring ring-amber-500/30 flex items-center gap-1 w-fit'><AlertTriangle className='w-3 h-3'/> BELİRSİZ EŞLEŞME</span>;
-      case 'DUPLICATE_EA_MATCH': return <span className='px-2 py-1 bg-zinc-500/10 text-zinc-400 text-[10px] font-bold rounded ring-1 inset-ring ring-zinc-500/30 flex items-center gap-1 w-fit'><FileCheck2 className='w-3 h-3'/> ÖNCEDEN EKLENMİŞ</span>;
-      case 'FIXTURE_ALREADY_HAS_MATCH': return <span className='px-2 py-1 bg-indigo-500/10 text-indigo-400 text-[10px] font-bold rounded ring-1 inset-ring ring-indigo-500/30 flex items-center gap-1 w-fit'><Database className='w-3 h-3'/> FİKSTÜR DOLU</span>;
-      case 'IMPORTED': return <span className='px-2 py-1 bg-cyan-500/10 text-cyan-400 text-[10px] font-bold rounded ring-1 inset-ring ring-cyan-500/30 flex items-center gap-1 w-fit'><CheckCircle2 className='w-3 h-3'/> BAŞARILI</span>;
-      case 'IMPORTING': return <span className='px-2 py-1 bg-amber-500/10 text-amber-400 text-[10px] font-bold rounded ring-1 inset-ring ring-amber-500/30 flex items-center gap-1 w-fit'><Loader2 className='w-3 h-3 animate-spin'/> İŞLENİYOR</span>;
-      default: return <span className='px-2 py-1 bg-zinc-500/10 text-zinc-400 text-[10px] font-bold rounded ring-1 inset-ring ring-zinc-500/30'>{status}</span>;
-    }
+  const reset = () => {
+    setPreview(null);
+    setOow(new Set());
+    setLinks(new Map());
+    setHidden(new Set());
+    setMsg(null);
   };
+  const toggleOow = (id: string) => {
+    const next = new Set(oow);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setOow(next);
+    void run(next, links);
+  };
+  const toggleLink = (eaMatchId: string, eaPlayerId: string, profileId: string) => {
+    const key = `${eaMatchId}:${eaPlayerId}`;
+    const next = new Map(links);
+    if (next.has(key)) next.delete(key);
+    else next.set(key, { eaMatchId, eaPlayerId, profileId });
+    setLinks(next);
+    void run(oow, next);
+  };
+
+  const send = async (m: any) => {
+    setBusy(m.eaMatchId);
+    const fd = form(oow, links);
+    fd.set('eaMatchId', m.eaMatchId);
+    fd.set('sendHash', m.sendHash ?? '');
+    const res: any = await sendMatchToReviewAction(fd);
+    setBusy(null);
+    if (res.error) {
+      setMsg({ type: 'err', text: res.error });
+      return run(oow, links, true);
+    }
+    setMsg({ type: 'ok', text: `EA maçı #${m.eaMatchId} onaya gönderildi (PENDING_REVIEW). Diğer maçlar taslak olarak kaldı.` });
+    await run(oow, links, true);
+  };
+
+  const visible = (plan?.matches ?? []).filter((m: any) => !hidden.has(m.eaMatchId));
 
   return (
-    <div className='flex flex-col lg:flex-row gap-6 items-start'>
-      
-      {/* LEFT & CENTER PANEL: Fetch & Preview */}
-      <div className='flex-1 space-y-6 w-full'>
-        
-        {/* Fetch Controls */}
-        <div className='card-surface p-6 rounded-xl border border-white/5'>
-          <h2 className='text-xs font-black text-cyan-400 tracking-widest uppercase mb-4'>VERİ GİRİŞİ (EA API)</h2>
-          <div className='flex flex-wrap gap-4 items-end'>
-            <div className='flex-1 min-w-[200px]'>
-              <label className='block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2'>SEZON</label>
-              <select value={seasonId} onChange={e => { setSeasonId(e.target.value); setLeagueId(''); }} className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500/50 focus:outline-none'>
-                {seasons.map((s:any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
-            <div className='flex-1 min-w-[200px]'>
-              <label className='block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2'>LİG</label>
-              <select value={leagueId} onChange={e => setLeagueId(e.target.value)} className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500/50 focus:outline-none'>
-                <option value=''>Lig Seçin...</option>
-                {availableLeagues.map((l:any) => <option key={l.id} value={l.id}>{l.name}</option>)}
-              </select>
-            </div>
-            <div className='w-24'>
-              <label className='block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2'>HAFTA</label>
-              <input type='number' min='1' max='38' value={week} onChange={e => setWeek(parseInt(e.target.value)||1)} className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500/50 focus:outline-none text-center' />
-            </div>
-            <button onClick={handleFetch} disabled={loading || !leagueId} className='px-6 py-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg text-sm font-black transition-colors disabled:opacity-50 flex items-center justify-center gap-2 h-9'>
-              {loading ? <Loader2 className='w-4 h-4 animate-spin' /> : <RefreshCw className='w-4 h-4' />} EA'DEN ÇEK
-            </button>
-          </div>
+    <div className='text-white space-y-6'>
+      <div className='rounded-xl border border-white/5 bg-[#0a1628] p-6'>
+        <h2 className='mb-4 text-xs font-black uppercase tracking-widest text-cyan-400'>Dosya ve hedef</h2>
+        <div className='flex flex-wrap items-end gap-4'>
+          <label className='block text-[10px] font-bold uppercase tracking-widest text-zinc-500'>
+            Sezon
+            <select aria-label='Sezon' className={`${input} mt-1 block`} value={seasonId} onChange={(e) => { setSeasonId(e.target.value); setLeagueId(''); setWeek(''); reset(); }}>
+              {seasons.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className='block text-[10px] font-bold uppercase tracking-widest text-zinc-500'>
+            Lig
+            <select aria-label='Lig' className={`${input} mt-1 block`} value={leagueId} onChange={(e) => { setLeagueId(e.target.value); setWeek(''); reset(); }}>
+              <option value=''>Lig seçin…</option>
+              {availableLeagues.map((l) => (
+                <option key={l.id} value={l.id}>{l.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className='block text-[10px] font-bold uppercase tracking-widest text-zinc-500'>
+            Hafta
+            <select aria-label='Hafta' className={`${input} mt-1 block`} value={week} onChange={(e) => { setWeek(e.target.value); reset(); }} disabled={!leagueId}>
+              <option value=''>Hafta seçin…</option>
+              {weeks.map((w) => (
+                <option key={w} value={w}>{w}. hafta</option>
+              ))}
+            </select>
+          </label>
+          <label className='block text-[10px] font-bold uppercase tracking-widest text-zinc-500'>
+            JSON dosyası
+            <input aria-label='JSON dosyası' type='file' accept='application/json,.json' className='mt-1 block text-sm text-zinc-300' onChange={(e) => { setFile(e.target.files?.[0] ?? null); reset(); }} />
+          </label>
+          <button type='button' className={`${btn} bg-cyan-500 text-black hover:bg-cyan-400`} disabled={busy !== null || !leagueId || !week || !file} onClick={() => { setHidden(new Set()); void run(); }}>
+            {busy === 'preview' ? <Loader2 className='inline h-4 w-4 animate-spin' /> : <FileCheck2 className='inline h-4 w-4' />} Doğrula ve Eşleştir
+          </button>
         </div>
-
-        {error && (
-          <div className='p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm font-bold flex items-center gap-3'>
-            <AlertTriangle className='w-5 h-5 shrink-0' /> {error}
-          </div>
+        <p className='mt-3 text-xs text-zinc-500'>
+          Dosyanın şeması, checksum&apos;ı ve kimliği sunucuda doğrulanır; hedef sezon/lig/hafta seçiminizle karşılaştırılır. Takım, EA kulüp kimliği, fikstür güncelliği ve maç zamanı canlı kayıtlarla denetlenir. Doğrulama hiçbir şey yazmaz.
+        </p>
+        {msg && (
+          <p role={msg.type === 'err' ? 'alert' : 'status'} className={`mt-3 rounded-lg px-3 py-2 text-sm ${msg.type === 'ok' ? 'bg-emerald-500/10 text-emerald-300' : 'bg-red-500/10 text-red-300'}`}>{msg.text}</p>
         )}
+      </div>
 
-        {/* Previews */}
-        {previewMatches.length > 0 && (
-          <div className='space-y-4'>
-            <h2 className='text-xs font-black text-white tracking-widest uppercase flex items-center gap-2'>
-              <Database className='w-4 h-4 text-cyan-500' /> BULUNAN MAÇLAR ({previewMatches.length})
-            </h2>
-            
-            <div className='grid grid-cols-1 gap-6'>
-              {previewMatches.map((m, idx) => {
-                const totalPlayers = m.home_team.players.length + m.away_team.players.length;
-                const unmatched = m.match_status !== 'READY';
+      {plan && (
+        <div className='space-y-4' data-testid='file-plan'>
+          {preview.batchErrors.map((e: string, i: number) => (
+            <p key={i} role='alert' className='rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300'>{e}</p>
+          ))}
+          {plan.rejections.map((r: string, i: number) => (
+            <p key={i} role='alert' className='rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300'>{r}</p>
+          ))}
+          {plan.warnings.map((w: string, i: number) => (
+            <p key={i} className='rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-300'>{w}</p>
+          ))}
+          {plan.scope && (
+            <p className='text-sm text-zinc-300' data-testid='plan-summary'>
+              {plan.fileName} · {plan.scope.leagueName} · {plan.scope.weekNumber}. hafta · {visible.length} maç
+            </p>
+          )}
 
-                return (
-                  <div key={idx} className={'card-surface rounded-xl border overflow-hidden ' + (unmatched ? 'border-red-500/20' : 'border-emerald-500/20')}>
-                    
-                    {/* Header */}
-                    <div className={'p-4 border-b flex flex-wrap items-center justify-between gap-4 ' + (unmatched ? 'bg-red-500/5 border-red-500/10' : 'bg-emerald-500/5 border-emerald-500/10')}>
-                      <div className='flex items-center gap-4'>
-                        {getStatusDisplay(m.match_status)}
-                        <span className='text-xs font-mono text-zinc-500'>ID: {m.ea_match_id}</span>
-                        <span className='text-xs font-mono text-zinc-400'>{new Date(m.played_at).toLocaleString('tr-TR')}</span>
-                      </div>
-                      
-                      {m.match_status === 'READY' && (
-                        <button onClick={() => setConfirmModal({ isOpen: true, match: m, loading: false, success: false })} className='px-4 py-1.5 bg-emerald-500 text-black text-xs font-black uppercase tracking-widest rounded hover:bg-emerald-400 transition-colors flex items-center gap-2'>
-                          İÇE AKTAR <ArrowRight className='w-3 h-3' />
+          {hidden.size > 0 && (
+            <p className='rounded-lg bg-white/5 px-3 py-2 text-xs text-zinc-400' data-testid='hidden-note'>
+              {hidden.size} taslak bu görünümden kaldırıldı. Taslaklar veritabanında kayıtlı değildir; &ldquo;Doğrula ve Eşleştir&rdquo; ile ya da dosyayı yeniden seçerek geri getirebilirsiniz.
+            </p>
+          )}
+
+          {visible.map((m: any) => {
+            const d = DELIVERY[m.delivery];
+            const home = m.players.filter((p: any) => p.side === 'home');
+            const away = m.players.filter((p: any) => p.side === 'away');
+            const undecided = m.outOfWindow && !m.outOfWindowAccepted;
+            const canSend = m.delivery === 'DRAFT' && m.errors.length === 0 && !undecided && !!m.sendHash;
+            const unclear = m.players.filter((p: any) => p.suggestion.status !== 'MATCHED' && !p.linkedProfileId).length;
+            return (
+              <article key={m.eaMatchId} className='rounded-xl border border-white/5 bg-[#0a1628] p-5' data-testid='match-card' data-delivery={m.delivery}>
+                <div className='flex flex-wrap items-center gap-x-4 gap-y-2'>
+                  <span className={`rounded border px-2 py-0.5 text-[10px] font-black ${d.cls}`} data-testid='delivery'>{d.label}</span>
+                  <strong className='text-base'>{m.homeName} {m.homeScore} – {m.awayScore} {m.awayName}</strong>
+                  <span className='text-xs text-zinc-400'>{plan.scope?.weekNumber}. hafta · {new Date(m.playedAt).toLocaleString('tr-TR')}</span>
+                  <code className='text-[11px] text-zinc-500'>EA {m.eaMatchId}</code>
+                  <span className='text-[11px] text-zinc-500'>fikstür {m.fixtureId.slice(0, 8)}…</span>
+                  <div className='ml-auto flex gap-2'>
+                    {m.delivery === 'DRAFT' ? (
+                      <>
+                        <button type='button' className={`${btn} bg-emerald-500 text-black hover:bg-emerald-400`} disabled={!canSend || busy !== null} onClick={() => send(m)}>
+                          {busy === m.eaMatchId ? <Loader2 className='inline h-3 w-3 animate-spin' /> : null} Onaya Gönder
                         </button>
-                      )}
-                    </div>
-
-                    {/* Match Info */}
-                    <div className='p-6 flex flex-col md:flex-row items-center gap-8 justify-center'>
-                      <div className='flex-1 flex flex-col items-center gap-2 text-center'>
-                        <span className='text-[10px] font-bold text-zinc-500 uppercase tracking-widest'>EV SAHİBİ</span>
-                        <span className='text-xl font-black text-white'>{m.home_team.ea_club_name}</span>
-                        <span className='text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded'>CLUB ID: {m.home_team.ea_club_id}</span>
-                      </div>
-                      <div className='flex flex-col items-center justify-center'>
-                        <div className='text-4xl font-black text-white px-6 py-2 bg-[#060d18] border border-white/5 rounded-xl shadow-inner flex items-center gap-4'>
-                          <span className={m.is_reversed ? 'text-amber-400' : ''}>{m.home_team.score}</span>
-                          <span className='text-zinc-600'>-</span>
-                          <span className={m.is_reversed ? 'text-amber-400' : ''}>{m.away_team.score}</span>
-                        </div>
-                        {m.is_reversed && <span className='text-[10px] text-amber-500 mt-2 font-bold'>TERSTEN EŞLEŞTİ</span>}
-                      </div>
-                      <div className='flex-1 flex flex-col items-center gap-2 text-center'>
-                        <span className='text-[10px] font-bold text-zinc-500 uppercase tracking-widest'>DEPLASMAN</span>
-                        <span className='text-xl font-black text-white'>{m.away_team.ea_club_name}</span>
-                        <span className='text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded'>CLUB ID: {m.away_team.ea_club_id}</span>
-                      </div>
-                    </div>
-
-                    {/* Stats Summary */}
-                    <div className='px-6 py-4 bg-[#060d18] border-t border-white/5 flex flex-wrap gap-6 items-center justify-between'>
-                      <div className='flex gap-6'>
-                        <div>
-                          <p className='text-[10px] font-bold text-zinc-500 uppercase tracking-widest'>Eşleşen Fikstür</p>
-                          <p className='text-xs font-bold text-white'>{m.fixture_id ? 'VAR (Hafta ' + week + ')' : 'YOK'}</p>
-                        </div>
-                        <div>
-                          <p className='text-[10px] font-bold text-zinc-500 uppercase tracking-widest'>Oyuncu Verisi</p>
-                          <p className='text-xs font-bold text-white'>{totalPlayers} Oyuncu işlenecek</p>
-                        </div>
-                      </div>
-                      
-                      {unmatched && m.match_status === 'DUPLICATE_EA_MATCH' && (
-                        <div className='text-[10px] font-bold text-zinc-400 flex items-center gap-1'>
-                          <Info className='w-3 h-3' /> Bu maç EA verisiyle sistemde zaten kayıtlı.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* RIGHT PANEL: System Status & Recent Imports */}
-      <div className='w-full lg:w-80 flex flex-col gap-6 shrink-0'>
-        <div className='card-surface p-4 rounded-xl border border-white/5'>
-          <h3 className='text-xs font-black text-white tracking-widest uppercase mb-4'>IMPORT DURUMU</h3>
-          <div className='space-y-3'>
-            <div className='flex items-center justify-between'>
-              <span className='text-xs text-zinc-400'>API Bağlantısı</span>
-              <span className='text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded ring-1 inset-ring ring-emerald-500/30'>AKTİF</span>
-            </div>
-            <div className='flex items-center justify-between'>
-              <span className='text-xs text-zinc-400'>Eşleştirme</span>
-              <span className='text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded ring-1 inset-ring ring-emerald-500/30'>AKTİF</span>
-            </div>
-            <div className='flex items-center justify-between'>
-              <span className='text-xs text-zinc-400'>Onay Akışı</span>
-              <span className='text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-1 rounded ring-1 inset-ring ring-amber-500/30'>PENDING_REVIEW</span>
-            </div>
-          </div>
-          <div className='mt-4 p-3 bg-cyan-500/5 rounded-lg border border-cyan-500/10 text-[10px] text-cyan-400 leading-relaxed'>
-            EA'den içeri aktarılan maçlar otomatik onaylanmaz. Puan durumuna yansıması için MAÇLAR sekmesinden onaylanmalıdır.
-          </div>
-        </div>
-
-        <div className='card-surface rounded-xl border border-white/5 overflow-hidden flex flex-col'>
-          <div className='p-4 border-b border-white/5 bg-[#0a1628] flex items-center justify-between'>
-            <h3 className='text-xs font-black text-white tracking-widest uppercase flex items-center gap-2'>
-              <Database className='w-4 h-4 text-emerald-500' /> SON İÇE AKTARILANLAR
-            </h3>
-          </div>
-          <div className='divide-y divide-white/5 p-0'>
-            {recentImports && recentImports.length > 0 ? (
-              recentImports.map((r:any) => (
-                <div key={r.id} className='p-4 hover:bg-white/5 transition-colors'>
-                  <div className='flex justify-between items-center mb-2'>
-                    <span className='text-[10px] font-bold text-zinc-500'>{new Date(r.played_at).toLocaleDateString('tr-TR')}</span>
-                    {r.status === 'APPROVED' ? <CheckCircle2 className='w-3 h-3 text-emerald-500'/> : <AlertTriangle className='w-3 h-3 text-amber-500'/>}
-                  </div>
-                  <div className='flex justify-between items-center text-xs font-bold text-white'>
-                    <span className='truncate max-w-[40%]'>{r.home?.name}</span>
-                    <span className='text-cyan-400 px-2 py-0.5 bg-[#060d18] rounded'>{r.home_score} - {r.away_score}</span>
-                    <span className='truncate max-w-[40%] text-right'>{r.away?.name}</span>
+                        <button type='button' className={`${btn} border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20`} disabled={busy !== null} title='Taslağı bu görünümden kaldırır; veritabanında kayıt olmadığından hiçbir kayıt silinmez' onClick={() => setHidden(new Set(hidden).add(m.eaMatchId))}>
+                          Sil
+                        </button>
+                      </>
+                    ) : (
+                      <Link href='/admin/matches' className={`${btn} border border-white/10 bg-white/5 text-zinc-200`}>Maç onay ekranında aç</Link>
+                    )}
                   </div>
                 </div>
-              ))
-            ) : (
-              <div className='p-6 text-center text-xs text-zinc-500'>Son işlem bulunmuyor.</div>
-            )}
-          </div>
-          <div className='p-4 border-t border-white/5 bg-[#060d18] text-center'>
-            <Link href='/admin/matches' className='text-xs font-black text-cyan-400 hover:underline tracking-widest'>MAÇLARI YÖNET</Link>
-          </div>
-        </div>
-      </div>
 
-      {/* CONFIRMATION / IMPORT PROGRESS MODAL */}
-      {confirmModal.isOpen && confirmModal.match && (
-        <div className='fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm'>
-          <div className='card-surface w-full max-w-md rounded-2xl border border-white/10 overflow-hidden flex flex-col'>
-            {confirmModal.success ? (
-              <div className='p-8 flex flex-col items-center justify-center text-center'>
-                <div className='w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mb-4'>
-                  <CheckCircle2 className='w-8 h-8' />
-                </div>
-                <h2 className='text-xl font-black text-white mb-2'>İÇE AKTARMA BAŞARILI</h2>
-                <p className='text-sm text-zinc-400 mb-8'>Maç kaydı ve oyuncu istatistikleri güvenli şekilde veritabanına eklendi.</p>
-                <div className='flex gap-3 w-full'>
-                  <button onClick={() => setConfirmModal({ isOpen: false, loading: false, success: false })} className='flex-1 py-2 bg-white/5 text-white text-xs font-bold rounded-lg'>KAPAT</button>
-                  <Link href='/admin/matches' className='flex-1 py-2 bg-cyan-500 text-black text-xs font-black rounded-lg flex items-center justify-center'>ONAYA GİT</Link>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className='p-4 border-b border-white/5 bg-[#0a1628]'>
-                  <h2 className='text-sm font-black text-white tracking-widest'>ONAY GEREKİYOR</h2>
-                </div>
-                <div className='p-6 space-y-6'>
-                  <div className='p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl'>
-                    <div className='flex items-center gap-3 mb-2 text-emerald-400 font-bold text-sm'>
-                      <CheckCircle2 className='w-5 h-5' /> Doğrulamalar Tamam
-                    </div>
-                    <ul className='text-xs text-emerald-400/80 space-y-1 list-disc list-inside'>
-                      <li>EA API verisi doğrulandı</li>
-                      <li>Club ID eşleşmeleri başarılı</li>
-                      <li>Hafta fikstürü eşleştirildi</li>
-                      <li>Duplicate kaydı tespit edilmedi</li>
-                    </ul>
-                  </div>
-                  
-                  <p className='text-sm text-zinc-300'>
-                    Bu işlem, seçili maçı ve <strong>{confirmModal.match.home_team.players.length + confirmModal.match.away_team.players.length} oyuncunun istatistiğini</strong> TETA League veritabanına PENDING_REVIEW statüsüyle ekleyecektir.
-                  </p>
+                {m.delivery === 'DRAFT' && m.errors.map((e: any, i: number) => (
+                  <p key={i} className='mt-2 flex items-start gap-1 text-xs text-red-300'><AlertTriangle className='mt-0.5 h-3 w-3 shrink-0' /><span><b>{e.code}</b> — {e.message}</span></p>
+                ))}
+                {m.delivery === 'DRAFT' && m.warnings.map((w: any, i: number) => (
+                  <p key={i} className='mt-1 text-xs text-amber-300'>{w.message}</p>
+                ))}
+                {m.delivery === 'DRAFT' && unclear > 0 && (
+                  <p className='mt-1 text-xs font-bold text-amber-400' data-testid='unclear-players'>{unclear} oyuncunun profili eşleşmedi/belirsiz: gönderildikten sonra Maç Onay ve İnceleme Merkezi&apos;nden elle atanmalı (profil sessizce seçilmez).</p>
+                )}
+                {m.delivery === 'DRAFT' && m.outOfWindow && (
+                  <label className='mt-2 flex items-center gap-2 text-xs'>
+                    <input type='checkbox' checked={m.outOfWindowAccepted} onChange={() => toggleOow(m.eaMatchId)} />
+                    Zaman aralığı dışında olduğunu biliyorum; yine de gönder
+                  </label>
+                )}
 
-                  <div className='flex gap-3 pt-2'>
-                    <button onClick={() => setConfirmModal({ isOpen: false, loading: false, success: false })} disabled={confirmModal.loading} className='flex-1 py-2 bg-white/5 text-white rounded-lg text-xs font-bold disabled:opacity-50'>VAZGEÇ</button>
-                    <button onClick={handleImport} disabled={confirmModal.loading} className='flex-1 py-2 bg-cyan-500 text-black rounded-lg text-xs font-black flex items-center justify-center gap-2 disabled:opacity-50'>
-                      {confirmModal.loading ? <Loader2 className='w-4 h-4 animate-spin' /> : 'MAÇI İÇE AKTAR'}
-                    </button>
-                  </div>
+                <div className='mt-4 flex flex-col gap-4 lg:flex-row'>
+                  <SideTable title={m.homeName} players={home} matchEa={m.eaMatchId} onToggle={(pid, prof) => toggleLink(m.eaMatchId, pid, prof)} />
+                  <SideTable title={m.awayName} players={away} matchEa={m.eaMatchId} onToggle={(pid, prof) => toggleLink(m.eaMatchId, pid, prof)} />
                 </div>
-              </>
-            )}
-          </div>
+              </article>
+            );
+          })}
+          {visible.length === 0 && plan.status !== 'REJECTED' && <p className='text-sm text-zinc-500'>Gösterilecek maç kalmadı.</p>}
         </div>
       )}
     </div>
   );
 }
-
