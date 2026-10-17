@@ -1,3 +1,8 @@
+-- Fresh-chain fix: the policies below read profiles.status, but that column is added by 20260909000006_player_account_status.sql,
+-- which sorts later. Add it here with the identical definition (IF NOT EXISTS: a no-op wherever the column already exists,
+-- and 20260909000006 stays idempotent afterwards).
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'ACTIVE';
+
 -- Create match-screenshots storage bucket
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (

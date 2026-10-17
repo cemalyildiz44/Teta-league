@@ -592,6 +592,8 @@ export async function getFixtureDetailAction(fixtureId: string) {
   return {
     data: {
       ...fixture,
+      // The UI reads a single match object. Without a unique key on matches.fixture_id PostgREST returns an array (one match at most: uq_match_fixture); accept both shapes.
+      matches: Array.isArray(fixture.matches) ? (fixture.matches[0] ?? null) : (fixture.matches ?? null),
       seasons: seasonRes.data ?? null,
       leagues: leagueRes.data ?? null,
       home_team: teamById.get(fixture.home_team_id) ?? null,
