@@ -21,7 +21,7 @@ export interface MatchResult {
 // Using pure UTC logic because TRT is UTC+3 permanently.
 // Wednesday 20:00 TRT = 17:00 UTC
 // Thursday 02:00 TRT = 23:00 UTC (same day in UTC!)
-function getMatchNightWindow(scheduledAt: string): { start: number; end: number } {
+export function getMatchNightWindow(scheduledAt: string): { start: number; end: number } {
   // Fix date string to avoid timezone parsing issues if not strictly ISO
   const d = new Date(scheduledAt);
   if (isNaN(d.getTime())) {

@@ -59,6 +59,12 @@ export default async function AdminMatchesPage() {
             <DownloadCloud className='w-4 h-4' />
             EA İçe Aktar
           </Link>
+          <Link
+            href='/admin/matches/import'
+            className='px-4 py-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-xs font-bold transition-colors flex items-center gap-2'
+          >
+            Haftalık Sonuç JSON Aktarımı
+          </Link>
         </div>
       </div>
 
