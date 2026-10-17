@@ -4,22 +4,41 @@ import { createClient } from '@/utils/supabase/server';
 import { probeFetch, probeHttps, type ProbeResult } from '@/lib/ea/diag-probe';
 
 /**
- * GEÇİCİ TEŞHİS (yalnızca Preview): EA 403 için fetch ile https.request karşılaştırması.
+ * GEÇİCİ TEŞHİS (Production + Preview): EA 403 için fetch ile https.request karşılaştırması.
  * Elle tetiklenir, tek kulüp, tek tetiklemede en fazla 2 EA isteği, otomatik tekrar yok.
- * Üretim EA içe aktarma akışına bağlı değildir. Test bitince bu dosya ve lib/ea/diag-probe.ts silinmelidir.
+ * Üretim EA içe aktarma akışına bağlı değildir; Supabase'e hiçbir şey yazmaz (yalnızca okur).
+ * Test bitince bu dosya ve lib/ea/diag-probe.ts silinmelidir.
+ *
+ * Erişim için TÜM koşullar gerekir (aksi halde 404 / 4xx):
+ *   VERCEL_ENV production|preview, EA_DIAG_ENABLED=1, EA_DIAG_EXPIRES_AT (epoch ms, gelecekte, en fazla 2 saat),
+ *   x-diag-confirm: yes, aktif ve iptal edilmemiş SUPER_ADMIN, bekleme süresi.
  */
 
 const DIAG_CLUB_ID = 87430;
 const EA_URL = `https://proclubs.ea.com/api/fc/clubs/matches?clubIds=${DIAG_CLUB_ID}&platform=common-gen5&matchType=friendlyMatch`;
 const COOLDOWN_MS = 60_000;
-const PAUSE_BETWEEN_MS = 1000;
+const PAUSE_BETWEEN_MS = 500;
+// Fonksiyon süre sınırı doğrulanamadığı için en kötü durum (2 x 3.5 sn + 0.5 sn) 10 sn altında tutulur.
+const PROBE_TIMEOUT_MS = 3500;
+const MAX_WINDOW_MS = 2 * 60 * 60 * 1000;
 
 // Bellek içi (en iyi çaba): aynı sunucu örneğinde art arda tetiklemeyi sınırlar.
 let lastRunAt = 0;
 
 const notFound = () => new NextResponse(null, { status: 404 });
 
-async function isAdmin(): Promise<'ok' | 'unauthenticated' | 'forbidden'> {
+/** Tüm kontrol sunucuda yapılır; eksik, bozuk, geçmiş ya da 2 saatten uzak değer kapıyı kapalı tutar. */
+function isDiagWindowOpen(now: number): boolean {
+  if (process.env.EA_DIAG_ENABLED !== '1') return false;
+  const env = process.env.VERCEL_ENV;
+  if (env !== 'production' && env !== 'preview') return false;
+  const raw = process.env.EA_DIAG_EXPIRES_AT?.trim();
+  if (!raw || !/^\d{1,16}$/.test(raw)) return false;
+  const until = Number(raw);
+  return Number.isSafeInteger(until) && until > now && until - now <= MAX_WINDOW_MS;
+}
+
+async function checkSuperAdmin(): Promise<'ok' | 'unauthenticated' | 'forbidden'> {
   const supabase = createClient(await cookies());
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return 'unauthenticated';
@@ -27,7 +46,7 @@ async function isAdmin(): Promise<'ok' | 'unauthenticated' | 'forbidden'> {
     .from('user_roles')
     .select('role')
     .eq('user_id', user.id)
-    .in('role', ['ADMIN', 'SUPER_ADMIN'])
+    .eq('role', 'SUPER_ADMIN')
     .eq('is_active', true)
     .is('revoked_at', null)
     .limit(1)
@@ -50,8 +69,8 @@ function logProbe(result: ProbeResult) {
 }
 
 export async function POST(request: Request) {
-  // 1. Yalnızca Preview + açık bayrak. Aksi halde route yokmuş gibi davranır.
-  if (process.env.VERCEL_ENV !== 'preview' || process.env.EA_DIAG_ENABLED !== '1') {
+  // 1. Production/Preview + açık bayrak + geçerli ve en fazla 2 saatlik süre penceresi. Aksi halde route yokmuş gibi davranır.
+  if (!isDiagWindowOpen(Date.now())) {
     return notFound();
   }
 
@@ -60,10 +79,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'x-diag-confirm: yes başlığı gerekli' }, { status: 400 });
   }
 
-  // 3. Admin doğrulaması (ea-import actions.ts ile aynı ölçüt)
-  const auth = await isAdmin();
+  // 3. Yalnızca aktif, iptal edilmemiş SUPER_ADMIN (normal ADMIN reddedilir)
+  const auth = await checkSuperAdmin();
   if (auth === 'unauthenticated') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (auth === 'forbidden') return NextResponse.json({ error: 'Unauthorized: Admins only' }, { status: 403 });
+  if (auth === 'forbidden') return NextResponse.json({ error: 'Forbidden: Super admins only' }, { status: 403 });
 
   // 4. Bekleme süresi (EA'ya istek göndermeden önce ayarlanır; hata olsa da sayılır)
   const now = Date.now();
@@ -74,10 +93,10 @@ export async function POST(request: Request) {
   lastRunAt = now;
 
   // 5. Tam olarak iki istek: önce fetch, sonra https.request (otomatik tekrar yok)
-  const fetchResult = await probeFetch(EA_URL);
+  const fetchResult = await probeFetch(EA_URL, PROBE_TIMEOUT_MS);
   logProbe(fetchResult);
   await new Promise((resolve) => setTimeout(resolve, PAUSE_BETWEEN_MS));
-  const httpsResult = await probeHttps(EA_URL);
+  const httpsResult = await probeHttps(EA_URL, PROBE_TIMEOUT_MS);
   logProbe(httpsResult);
 
   return NextResponse.json({
