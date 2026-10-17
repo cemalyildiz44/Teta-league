@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
+import Link from 'next/link';
 import { FixturesManager } from './FixturesManager';
 
 export default async function AdminFixturesPage() {
@@ -47,6 +48,9 @@ export default async function AdminFixturesPage() {
           <h1 className='text-2xl font-black text-white tracking-widest'>FİKSTÜR VE MAÇ YÖNETİM MERKEZİ</h1>
           <p className='text-sm text-zinc-400 mt-1'>Karşılaşma takvimlerini oluşturun, filtreleyin, skorları ve maç kayıtlarını düzenleyin.</p>
         </div>
+        <Link href='/admin/fixtures/import' className='px-4 py-2 rounded-lg text-sm font-bold bg-white/10 text-white hover:bg-white/20'>
+          Haftalık JSON Aktarımı
+        </Link>
       </div>
 
       <FixturesManager 
