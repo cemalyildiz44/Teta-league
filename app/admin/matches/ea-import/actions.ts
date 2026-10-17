@@ -9,6 +9,7 @@ import { normalizeMatch } from '@/lib/ea/normalizer';
 import { matchFixture, FixtureCandidate } from '@/lib/ea/matcher';
 import { NormalizedMatch } from '@/lib/ea/types';
 import { matchPlayerToProfile, validateRosterMembership } from '@/lib/ea/roster-validator';
+import { attachTeamNames } from '@/lib/admin-scope';
 
 async function checkAdmin(supabase: any, user: any) {
   if (!user) return false;
@@ -242,11 +243,12 @@ export async function importEaMatchAction(matchData: EAPreviewMatch, seasonId: s
   if (matchedPlayerIds.length > 0) {
     const { data: memData } = await supabase
       .from('team_memberships')
-      .select('id, player_id, team_id, season_id, left_at, teams:team_id(id, name)')
+      .select('id, player_id, team_id, season_id, left_at')
       .eq('season_id', seasonId)
       .is('left_at', null)
       .in('player_id', matchedPlayerIds);
-    memberships = memData || [];
+    // team_memberships has no direct relationship to teams: names are attached from an explicit lookup (roster validation unchanged)
+    memberships = await attachTeamNames(supabase, memData || []);
   }
 
   // 4. Insert Player Stats with extra_stats validation metadata

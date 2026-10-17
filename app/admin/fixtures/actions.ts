@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { slugify } from '@/app/lig/utils';
+import { getScopeNames } from '@/lib/admin-scope';
 import { logAdminAudit } from '@/lib/audit';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -258,7 +259,7 @@ export async function updateFixtureAction(
   // 1. Fetch current fixture and any linked match
   const { data: currentFixture, error: fetchErr } = await supabase
     .from('fixtures')
-    .select('*, leagues(name), seasons(slug)')
+    .select('*')
     .eq('id', fixtureId)
     .maybeSingle();
 
@@ -456,7 +457,7 @@ export async function updateFixtureScoreAction(
   // 1. Fetch fixture
   const { data: fixture, error: fixErr } = await supabase
     .from('fixtures')
-    .select('id, season_id, league_id, home_team_id, away_team_id, week_number, scheduled_at, seasons(slug), leagues(name)')
+    .select('id, season_id, league_id, home_team_id, away_team_id, week_number, scheduled_at')
     .eq('id', fixtureId)
     .maybeSingle();
 
@@ -499,8 +500,7 @@ export async function updateFixtureScoreAction(
       revalidatePath('/ligler');
       revalidatePath('/oyuncular');
       revalidatePath(`/mac/${existingMatch.id}`);
-      const seasonSlug = (fixture.seasons as any)?.slug;
-      const leagueName = (fixture.leagues as any)?.name;
+      const { seasonSlug, leagueName } = await getScopeNames(supabase, fixture);
       if (seasonSlug && leagueName) {
         const leagueSlug = slugify(leagueName);
         revalidatePath(`/lig/${seasonSlug}/${leagueSlug}`);
@@ -566,10 +566,6 @@ export async function getFixtureDetailAction(fixtureId: string) {
     .from('fixtures')
     .select(`
       *,
-      seasons(id, name, slug),
-      leagues(id, name),
-      home_team:home_team_id(id, name, logo_url, ea_club_id),
-      away_team:away_team_id(id, name, logo_url, ea_club_id),
       matches:matches(
         id, status, home_score, away_score, played_at, source, ea_match_id, is_stats_applied, updated_at,
         match_raw_ea_data(id, ea_match_id, raw_data, fetched_at),
@@ -586,5 +582,20 @@ export async function getFixtureDetailAction(fixtureId: string) {
 
   if (fixErr || !fixture) return { error: 'Fikstür bulunamadı.' };
 
-  return { data: fixture };
+  // fixtures has no direct relationships to seasons/leagues/teams (composite keys via league_teams): explicit lookups
+  const [seasonRes, leagueRes, teamsRes] = await Promise.all([
+    supabase.from('seasons').select('id, name, slug').eq('id', fixture.season_id).maybeSingle(),
+    supabase.from('leagues').select('id, name').eq('id', fixture.league_id).maybeSingle(),
+    supabase.from('teams').select('id, name, logo_url, ea_club_id').in('id', [fixture.home_team_id, fixture.away_team_id]),
+  ]);
+  const teamById = new Map((teamsRes.data ?? []).map((t: any) => [t.id, t]));
+  return {
+    data: {
+      ...fixture,
+      seasons: seasonRes.data ?? null,
+      leagues: leagueRes.data ?? null,
+      home_team: teamById.get(fixture.home_team_id) ?? null,
+      away_team: teamById.get(fixture.away_team_id) ?? null,
+    },
+  };
 }

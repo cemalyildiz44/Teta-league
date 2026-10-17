@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache';
 import { slugify } from '@/app/lig/utils';
 import { logAdminAudit } from '@/lib/audit';
 import { buildProfilesOrFilter } from '@/lib/ea/roster-validator';
+import { attachTeamNames, getScopeNames } from '@/lib/admin-scope';
 
 async function checkAdmin(supabase: any, user: any) {
   if (!user) return false;
@@ -32,7 +33,7 @@ export async function reviewMatchAction(matchId: string, status: 'APPROVED' | 'R
   // Fetch current match to guard against re-approval and collect route info for revalidation
   const { data: existingMatch } = await supabase
     .from('matches')
-    .select('id, status, season_id, league_id, seasons(slug), leagues(name)')
+    .select('id, status, season_id, league_id')
     .eq('id', matchId)
     .single();
 
@@ -72,8 +73,7 @@ export async function reviewMatchAction(matchId: string, status: 'APPROVED' | 'R
     revalidatePath('/oyuncular');
     revalidatePath(`/mac/${matchId}`);
 
-    const seasonSlug = (existingMatch.seasons as any)?.slug;
-    const leagueName = (existingMatch.leagues as any)?.name;
+    const { seasonSlug, leagueName } = await getScopeNames(supabase, existingMatch);
     if (seasonSlug && leagueName) {
       const leagueSlug = slugify(leagueName);
       revalidatePath(`/lig/${seasonSlug}/${leagueSlug}`);
@@ -98,7 +98,7 @@ export async function deleteMatchAction(matchId: string) {
   // Fetch match details to know if public caches need revalidation
   const { data: existingMatch } = await supabase
     .from('matches')
-    .select('id, status, season_id, league_id, seasons(slug), leagues(name)')
+    .select('id, status, season_id, league_id')
     .eq('id', matchId)
     .maybeSingle();
 
@@ -129,8 +129,7 @@ export async function deleteMatchAction(matchId: string) {
     revalidatePath('/oyuncular');
     revalidatePath(`/mac/${matchId}`);
 
-    const seasonSlug = (existingMatch.seasons as any)?.slug;
-    const leagueName = (existingMatch.leagues as any)?.name;
+    const { seasonSlug, leagueName } = await getScopeNames(supabase, existingMatch);
     if (seasonSlug && leagueName) {
       const leagueSlug = slugify(leagueName);
       revalidatePath(`/lig/${seasonSlug}/${leagueSlug}`);
@@ -168,7 +167,7 @@ export async function updateMatchScoreAction(matchId: string, home_score: number
   // Fetch match details to inspect current state
   const { data: existingMatch } = await supabase
     .from('matches')
-    .select('id, status, season_id, league_id, home_score, away_score, seasons(slug), leagues(name)')
+    .select('id, status, season_id, league_id, home_score, away_score')
     .eq('id', matchId)
     .maybeSingle();
 
@@ -201,8 +200,7 @@ export async function updateMatchScoreAction(matchId: string, home_score: number
     revalidatePath('/oyuncular');
     revalidatePath(`/mac/${matchId}`);
 
-    const seasonSlug = (existingMatch.seasons as any)?.slug;
-    const leagueName = (existingMatch.leagues as any)?.name;
+    const { seasonSlug, leagueName } = await getScopeNames(supabase, existingMatch);
     if (seasonSlug && leagueName) {
       const leagueSlug = slugify(leagueName);
       revalidatePath(`/lig/${seasonSlug}/${leagueSlug}`);
@@ -283,13 +281,15 @@ export async function assignPlayerStatsProfileAction(
 
     // Check active team membership for the match season
     if (seasonId) {
-      const { data: activeMembership } = await supabase
+      const { data: rawMembership } = await supabase
         .from('team_memberships')
-        .select('id, team_id, left_at, teams:team_id(id, name)')
+        .select('id, team_id, left_at')
         .eq('season_id', seasonId)
         .eq('player_id', playerId)
         .is('left_at', null)
         .maybeSingle();
+      // team_memberships has no direct relationship to teams (composite key via league_teams): look the name up explicitly
+      const activeMembership = rawMembership ? (await attachTeamNames(supabase, [rawMembership]))[0] : null;
 
       membership = activeMembership;
       if (activeMembership) {
