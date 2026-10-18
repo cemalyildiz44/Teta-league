@@ -55,7 +55,7 @@ async function loadContext(supabase: Supa, p: { seasonId: string; leagueId: stri
     p.eaMatchIds.length ? supabase.from('matches').select('id, fixture_id, ea_match_id, status').in('ea_match_id', p.eaMatchIds) : Promise.resolve({ data: [], error: null }),
     supabase.from('match_import_history').select('result, checksum, file_generated_at, season_id, league_id, week_number').eq('league_id', p.leagueId).limit(5000),
     supabase.from('fixture_import_history').select('result, checksum, week_number').eq('league_id', p.leagueId).limit(5000),
-    supabase.from('profiles').select('id, username, full_name, current_ea_player_id').not('current_ea_player_id', 'is', null).limit(5000),
+    supabase.from('profiles').select('id, username, full_name, current_ea_player_id, is_active, status').not('current_ea_player_id', 'is', null).limit(5000),
     // No embedded teams(...): team_memberships references league_teams (composite FK), so PostgREST has no direct relationship to teams.
     supabase.from('team_memberships').select('id, player_id, team_id, season_id, left_at').eq('season_id', p.seasonId).is('left_at', null).limit(5000),
   ]);
@@ -63,6 +63,19 @@ async function loadContext(supabase: Supa, p: { seasonId: string; leagueId: stri
   if (e2) return { error: 'Veri okunamadı: ' + e2.message };
   // match_import_history is required (migration must be applied); fixture history is informational only
   if (h.error) return { error: 'İçe aktarma geçmişi okunamadı (migration uygulanmış mı?): ' + h.error.message };
+
+  const profiles = [...(pr.data ?? [])];
+  const seenProfileIds = new Set(profiles.map((x: any) => x.id));
+  const missingMemberIds = [...new Set<string>((ms.data ?? []).map((x: any) => x.player_id).filter((id: string) => id && !seenProfileIds.has(id)))];
+  if (missingMemberIds.length > 0) {
+    const extraPr = await supabase
+      .from('profiles')
+      .select('id, username, full_name, current_ea_player_id, is_active, status')
+      .in('id', missingMemberIds)
+      .limit(5000);
+    if (extraPr.error) return { error: 'Veri okunamadı: ' + extraPr.error.message };
+    profiles.push(...(extraPr.data ?? []));
+  }
 
   const matchesByFixture: MatchLiveContext['matchesByFixture'] = {};
   for (const m of mf.data ?? []) if (m.fixture_id) (matchesByFixture[m.fixture_id] ??= []).push({ id: m.id, status: m.status });
@@ -79,7 +92,7 @@ async function loadContext(supabase: Supa, p: { seasonId: string; leagueId: stri
       usedEaMatchIds,
       history: h.data ?? [],
       fixtureImports: fi.error ? [] : fi.data ?? [],
-      profiles: pr.data ?? [],
+      profiles,
       memberships: ms.data ?? [],
     },
   };
@@ -219,4 +232,146 @@ export async function applyMatchImport(
     return { ok: false, error: 'İçe aktarma uygulanamadı, hiçbir maç yazılmadı: ' + error.message + note };
   }
   return { ok: true, applied: ready.map((pl) => ({ fileName: pl.fileName, exportId: pl.exportId, matches: pl.matches.length })) };
+}
+
+export async function loadReviewMatchWithRosters(supabase: Supa, matchId: string) {
+  const auth = await requireAdmin(supabase);
+  if (!auth.ok) return { error: auth.error };
+
+  const { data: match, error } = await supabase
+    .from('matches')
+    .select('id, status, season_id, league_id, home_score, away_score, home_team_id, away_team_id, played_at')
+    .eq('id', matchId)
+    .maybeSingle();
+  if (error || !match) return { error: 'Maç kaydı bulunamadı.' };
+
+  const [statsRes, memRes] = await Promise.all([
+    supabase
+      .from('match_player_stats')
+      .select(
+        'id, team_id, player_id, ea_player_name, position, goals, assists, shots, passes_made, pass_attempts, tackles_made, tackle_attempts, saves, goals_conceded, cleansheets_gk, cleansheets_def, red_cards, rating, is_mom, extra_stats, profiles!match_player_stats_player_id_fkey(id, username, full_name)'
+      )
+      .eq('match_id', matchId)
+      .order('ea_player_name'),
+    supabase
+      .from('team_memberships')
+      .select('id, player_id, team_id, season_id, left_at')
+      .eq('season_id', match.season_id)
+      .in('team_id', [match.home_team_id, match.away_team_id])
+      .is('left_at', null)
+      .limit(1000),
+  ]);
+  if (statsRes.error) return { error: 'Oyuncu istatistikleri okunamadı: ' + statsRes.error.message };
+  if (memRes.error) return { error: 'Takım kadroları okunamadı: ' + memRes.error.message };
+
+  const memberships = memRes.data ?? [];
+  const memberPlayerIds = [...new Set<string>(memberships.map((m: any) => m.player_id).filter(Boolean))];
+  const statPlayerIds = [...new Set<string>((statsRes.data ?? []).map((r: any) => r.player_id).filter(Boolean))];
+  const allProfileIds = [...new Set<string>([...memberPlayerIds, ...statPlayerIds])];
+
+  let profileRows: { id: string; username: string; full_name: string | null; is_active?: boolean; status?: string }[] = [];
+  if (allProfileIds.length > 0) {
+    const profRes = await supabase
+      .from('profiles')
+      .select('id, username, full_name, is_active, status')
+      .in('id', allProfileIds)
+      .limit(1000);
+    if (profRes.error) return { error: 'Oyuncu profilleri okunamadı: ' + profRes.error.message };
+    profileRows = profRes.data ?? [];
+  }
+  const profileById = new Map(profileRows.map((p) => [p.id, p]));
+
+  const buildRoster = (teamId: string) => {
+    const seen = new Set<string>();
+    const list: { id: string; username: string; fullName: string | null }[] = [];
+    for (const mem of memberships) {
+      if (mem.team_id !== teamId || mem.season_id !== match.season_id || mem.left_at) continue;
+      if (seen.has(mem.player_id)) continue;
+      const prof = profileById.get(mem.player_id);
+      if (!prof || prof.is_active === false || prof.status === 'BANNED') continue;
+      seen.add(mem.player_id);
+      list.push({ id: prof.id, username: prof.username, fullName: prof.full_name ?? null });
+    }
+    return list.sort((a, b) => a.username.localeCompare(b.username, 'tr'));
+  };
+
+  const players = (statsRes.data ?? []).map((r: any) => {
+    const { extra_stats: extra, profiles: prof, ...rest } = r;
+    delete (rest as Record<string, unknown>).ea_player_id;
+    const embedded = Array.isArray(prof) ? prof[0] ?? null : prof;
+    const fallbackProf = r.player_id ? profileById.get(r.player_id) ?? null : null;
+    return {
+      ...rest,
+      side: r.team_id === match.home_team_id ? ('home' as const) : ('away' as const),
+      username: embedded?.username ?? fallbackProf?.username ?? null,
+      fullName: embedded?.full_name ?? fallbackProf?.full_name ?? null,
+      identifierStatus: extra?.ea_identifier_status ?? null,
+    };
+  });
+
+  return {
+    match,
+    players,
+    homeRoster: buildRoster(match.home_team_id),
+    awayRoster: buildRoster(match.away_team_id),
+  };
+}
+
+export async function validateReviewRosterAssignment(supabase: Supa, p: { statsId: string; profileId: string }) {
+  const auth = await requireAdmin(supabase);
+  if (!auth.ok) return { ok: false as const, error: auth.error };
+
+  const { data: stat, error: statErr } = await supabase
+    .from('match_player_stats')
+    .select('id, match_id, team_id, player_id, ea_player_name, extra_stats')
+    .eq('id', p.statsId)
+    .maybeSingle();
+  if (statErr || !stat) return { ok: false as const, error: 'Oyuncu istatistik satırı bulunamadı.' };
+
+  const { data: match, error: matchErr } = await supabase
+    .from('matches')
+    .select('id, status, season_id, home_team_id, away_team_id')
+    .eq('id', stat.match_id)
+    .maybeSingle();
+  if (matchErr || !match) return { ok: false as const, error: 'İlgili maç kaydı bulunamadı.' };
+  if (match.status === 'APPROVED') {
+    return { ok: false as const, error: 'Onaylanmış (APPROVED) maçların oyuncu eşleşmeleri değiştirilemez.' };
+  }
+
+  const { data: profile, error: profErr } = await supabase
+    .from('profiles')
+    .select('id, username, full_name, is_active, status')
+    .eq('id', p.profileId)
+    .maybeSingle();
+  if (profErr || !profile || profile.is_active === false || profile.status === 'BANNED') {
+    return { ok: false as const, error: 'Seçilen oyuncu profili bulunamadı veya aktif değil.' };
+  }
+
+  const { data: memberships, error: memErr } = await supabase
+    .from('team_memberships')
+    .select('id, player_id, team_id, season_id, left_at')
+    .eq('player_id', p.profileId)
+    .eq('team_id', stat.team_id)
+    .eq('season_id', match.season_id)
+    .is('left_at', null);
+  if (memErr) return { ok: false as const, error: 'Takım üyeliği doğrulanamadı: ' + memErr.message };
+  if (!memberships || memberships.length === 0) {
+    return { ok: false as const, error: 'Seçilen oyuncu bu sezonda ilgili takımın aktif kadrosunda yer almıyor.' };
+  }
+
+  const { data: matchRows, error: dupErr } = await supabase
+    .from('match_player_stats')
+    .select('id, player_id, ea_player_name')
+    .eq('match_id', stat.match_id)
+    .eq('player_id', p.profileId);
+  if (dupErr) return { ok: false as const, error: 'Maç içi oyuncu kontrolü yapılamadı: ' + dupErr.message };
+  const duplicateRow = (matchRows ?? []).find((r: any) => r.id !== stat.id);
+  if (duplicateRow) {
+    return {
+      ok: false as const,
+      error: `Bu oyuncu profili (@${profile.username}) aynı maçta başka bir oyuncuya (${duplicateRow.ea_player_name || 'Kayıt'}) zaten atanmış.`,
+    };
+  }
+
+  return { ok: true as const, stat, match, profile, actorId: auth.userId };
 }

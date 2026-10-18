@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { canonicalJson, sha256 } from '../lib/fixture-weekly.ts';
 import { validateResultsDoc, computeResultsChecksum } from '../lib/match-results-weekly.ts';
 import { planMatchImport } from '../lib/match-import-plan.ts';
-import { applyMatchImport, previewMatchImport } from '../lib/match-import-service.ts';
+import { applyMatchImport, loadReviewMatchWithRosters, previewMatchImport, validateReviewRosterAssignment } from '../lib/match-import-service.ts';
 
 // Weekly match-results import tests: synthetic data and an in-memory fake Supabase (no network, no real database).
 const U = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -62,6 +62,7 @@ function makeDb(o = {}) {
     ],
     teams: [1, 2, 3, 4].map((n) => ({ id: T[n], name: `ZZ Takım ${n}`, ea_club_id: EA(n) })),
     matches: [],
+    match_player_stats: [],
     match_import_history: [],
     fixture_import_history: [{ result: 'APPLIED', checksum: 'a'.repeat(64), week_number: 1 }],
     profiles: [],
@@ -534,6 +535,143 @@ const codes = (plan, i = 0) => plan.matches[i].errors.map((e) => e.code);
   const nonAdmin = makeDb({ user: { id: PLAYER_USER } });
   assert.equal((await send(nonAdmin, E1, hash2)).ok, false);
   assert.equal(db.rpcCalls.length + nonAdmin.rpcCalls.length, 0);
+}
+
+// ------------------------------------------------------------------ 14. team roster dropdown filtering & server-side assignment validation (draft + stored review)
+{
+  const PR = (n) => U(700 + n);
+  const M_ID = U(950);
+  const ST = (n) => U(960 + n);
+  const doc = makeDoc();
+  const eaMatchId = doc.matches[0].eaMatchId;
+
+  const db = makeDb({
+    profiles: [
+      // Home team active member WITH current_ea_player_id
+      { id: PR(1), username: 'ev_aktif_1', full_name: 'Ev Aktif 1', current_ea_player_id: '326658010', is_active: true, status: 'ACTIVE' },
+      // Home team active member WITHOUT current_ea_player_id (must still appear in homeRoster!)
+      { id: PR(2), username: 'ev_aktif_2', full_name: 'Ev Aktif 2', current_ea_player_id: null, is_active: true, status: 'ACTIVE' },
+      // Home team former member (left_at is set -> must NOT appear in homeRoster or be assignable)
+      { id: PR(3), username: 'ev_ayrilmis', full_name: 'Ev Ayrılmış', current_ea_player_id: null, is_active: true, status: 'ACTIVE' },
+      // Away team active member
+      { id: PR(4), username: 'dep_aktif_1', full_name: 'Dep Aktif 1', current_ea_player_id: null, is_active: true, status: 'ACTIVE' },
+      // Other team (T[3]) active member
+      { id: PR(5), username: ' baska_takim', full_name: 'Başka Takım', current_ea_player_id: null, is_active: true, status: 'ACTIVE' },
+      // Banned member on Home team -> must NOT appear or be assignable
+      { id: PR(6), username: 'ev_banli', full_name: 'Ev Banlı', current_ea_player_id: null, is_active: true, status: 'BANNED' },
+    ],
+    team_memberships: [
+      { id: U(810), player_id: PR(1), team_id: T[1], season_id: S, left_at: null },
+      { id: U(811), player_id: PR(2), team_id: T[1], season_id: S, left_at: null },
+      { id: U(812), player_id: PR(3), team_id: T[1], season_id: S, left_at: '2030-01-05T00:00:00Z' },
+      { id: U(813), player_id: PR(4), team_id: T[2], season_id: S, left_at: null },
+      { id: U(814), player_id: PR(5), team_id: T[3], season_id: S, left_at: null },
+      { id: U(815), player_id: PR(6), team_id: T[1], season_id: S, left_at: null },
+    ],
+  });
+
+  // 14a. Draft preview: homeRoster only lists active, non-banned T[1] members; awayRoster only lists active T[2] members; no EA IDs exposed
+  let p = first(await preview(db, [upload(doc)]));
+  const m0 = p.matches[0];
+  assert.deepEqual(m0.homeRoster.map((r) => r.id), [PR(1), PR(2)]);
+  assert.deepEqual(m0.awayRoster.map((r) => r.id), [PR(4)]);
+  assert.ok(m0.homeRoster.every((r) => !('current_ea_player_id' in r) && !('eaPlayerId' in r)));
+
+  // 14b. Draft: assigning an UNMATCHED home player (326658011) to active home roster member PR(2) succeeds
+  p = first(await preview(db, [upload(doc)], {
+    acceptedLinks: [
+      { eaMatchId, eaPlayerId: '326658010', profileId: PR(1) },
+      { eaMatchId, eaPlayerId: '326658011', profileId: PR(2) },
+    ],
+  }));
+  assert.equal(p.status, 'READY');
+  assert.equal(p.matches[0].players[1].linkedProfileId, PR(2));
+  assert.equal(p.matches[0].players[1].linkedUsername, 'ev_aktif_2');
+  assert.equal(p.matches[0].players[1].rosterStatus, 'VALID');
+
+  // 14c. Draft: assigning a home player to an away team member PR(4) or former member PR(3) is rejected with LINK_NOT_VALID
+  for (const invalidProfileId of [PR(4), PR(3), PR(5), PR(6)]) {
+    const badPlan = first(await preview(db, [upload(doc)], {
+      acceptedLinks: [{ eaMatchId, eaPlayerId: '326658011', profileId: invalidProfileId }],
+    }));
+    assert.equal(badPlan.status, 'BLOCKED');
+    assert.ok(codes(badPlan).includes('LINK_NOT_VALID'));
+  }
+
+  // 14d. Draft: assigning the SAME profile PR(1) to two players in the same match is rejected with LINK_NOT_VALID
+  const dupPlan = first(await preview(db, [upload(doc)], {
+    acceptedLinks: [
+      { eaMatchId, eaPlayerId: '326658010', profileId: PR(1) },
+      { eaMatchId, eaPlayerId: '326658011', profileId: PR(1) },
+    ],
+  }));
+  assert.equal(dupPlan.status, 'BLOCKED');
+  assert.ok(codes(dupPlan).includes('LINK_NOT_VALID'));
+
+  // 14e. Stored match review: loadReviewMatchWithRosters & validateReviewRosterAssignment
+  db.matches.push({
+    id: M_ID,
+    status: 'PENDING_REVIEW',
+    season_id: S,
+    league_id: L,
+    home_team_id: T[1],
+    away_team_id: T[2],
+    home_score: 2,
+    away_score: 1,
+    played_at: '2030-01-07T19:20:05.000Z',
+  });
+  db.match_player_stats.push(
+    { id: ST(1), match_id: M_ID, team_id: T[1], player_id: PR(1), ea_player_id: '326658010', ea_player_name: 'ZZ Oyuncu 1', position: 'ST', goals: 2, assists: 0, shots: 3, rating: 8.5, is_mom: true, extra_stats: { ea_identifier_status: 'MATCHED' } },
+    { id: ST(2), match_id: M_ID, team_id: T[1], player_id: null, ea_player_id: '326658011', ea_player_name: 'ZZ Oyuncu 2', position: 'CM', goals: 0, assists: 1, shots: 1, rating: 7.2, is_mom: false, extra_stats: { ea_identifier_status: 'UNMATCHED' } },
+    { id: ST(3), match_id: M_ID, team_id: T[2], player_id: null, ea_player_id: '326658012', ea_player_name: 'ZZ Oyuncu 3', position: 'CB', goals: 1, assists: 0, shots: 1, rating: 7.0, is_mom: false, extra_stats: { ea_identifier_status: 'AMBIGUOUS' } },
+  );
+
+  const loaded = await loadReviewMatchWithRosters(db.client, M_ID);
+  assert.ok(!('error' in loaded), loaded.error);
+  assert.deepEqual(loaded.homeRoster.map((r) => r.id), [PR(1), PR(2)]);
+  assert.deepEqual(loaded.awayRoster.map((r) => r.id), [PR(4)]);
+  assert.ok(loaded.players.every((row) => !('ea_player_id' in row)), 'raw EA player ID must not be returned to the review UI');
+
+  // Valid assignment: unmatched home row ST(2) -> active home member PR(2)
+  const validHome = await validateReviewRosterAssignment(db.client, { statsId: ST(2), profileId: PR(2) });
+  assert.equal(validHome.ok, true);
+  assert.equal(validHome.profile.username, 'ev_aktif_2');
+
+  // Valid assignment: ambiguous away row ST(3) -> active away member PR(4)
+  const validAway = await validateReviewRosterAssignment(db.client, { statsId: ST(3), profileId: PR(4) });
+  assert.equal(validAway.ok, true);
+  assert.equal(validAway.profile.username, 'dep_aktif_1');
+
+  // Rejects assigning away player PR(4) to home row ST(2)
+  const wrongTeam = await validateReviewRosterAssignment(db.client, { statsId: ST(2), profileId: PR(4) });
+  assert.equal(wrongTeam.ok, false);
+  assert.match(wrongTeam.error, /aktif kadrosunda yer almıyor/);
+
+  // Rejects assigning former member PR(3) (left_at !== null) to home row ST(2)
+  const leftMember = await validateReviewRosterAssignment(db.client, { statsId: ST(2), profileId: PR(3) });
+  assert.equal(leftMember.ok, false);
+  assert.match(leftMember.error, /aktif kadrosunda yer almıyor/);
+
+  // Rejects assigning banned member PR(6)
+  const bannedMember = await validateReviewRosterAssignment(db.client, { statsId: ST(2), profileId: PR(6) });
+  assert.equal(bannedMember.ok, false);
+  assert.match(bannedMember.error, /aktif değil/);
+
+  // Rejects duplicate assignment in the same match: PR(1) is already assigned to ST(1)
+  const dupInMatch = await validateReviewRosterAssignment(db.client, { statsId: ST(2), profileId: PR(1) });
+  assert.equal(dupInMatch.ok, false);
+  assert.match(dupInMatch.error, /aynı maçta başka bir oyuncuya/);
+
+  // Rejects non-admin
+  const nonAdminDb = makeDb({ ...db, user: { id: PLAYER_USER } });
+  const nonAdminRes = await validateReviewRosterAssignment(nonAdminDb.client, { statsId: ST(2), profileId: PR(2) });
+  assert.equal(nonAdminRes.ok, false);
+
+  // Rejects when match is APPROVED
+  db.matches[0].status = 'APPROVED';
+  const approvedRes = await validateReviewRosterAssignment(db.client, { statsId: ST(2), profileId: PR(2) });
+  assert.equal(approvedRes.ok, false);
+  assert.match(approvedRes.error, /APPROVED/);
 }
 
 console.log('match-weekly-import tests passed');

@@ -2,215 +2,425 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Loader2, FileCheck2, AlertTriangle, ChevronDown, ChevronUp, Search, Check } from 'lucide-react';
-import { getReviewMatchAction, previewJsonMatchesAction, sendMatchToReviewAction } from './json-actions';
-import { assignPlayerStatsProfileAction, searchProfilesAction, updateMatchScoreAction, updatePlayerStatsAction } from '../actions';
+import { Loader2, FileCheck2, AlertTriangle, ChevronDown, ChevronUp, Check, Edit3, Users } from 'lucide-react';
+import { assignReviewMatchPlayerAction, getReviewMatchAction, previewJsonMatchesAction, sendMatchToReviewAction } from './json-actions';
+import { updateMatchScoreAction, updatePlayerStatsAction } from '../actions';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-const input = 'bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500/50 outline-none';
-const small = 'bg-[#060d18] border border-white/10 rounded px-1.5 py-1 text-white text-[11px] outline-none focus:border-cyan-500/50';
-const btn = 'px-4 py-2 rounded-lg text-xs font-black transition-colors disabled:opacity-40';
-const mini = 'px-2 py-1 rounded text-[10px] font-bold transition-colors disabled:opacity-40';
+const inputCls = 'bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500/50 outline-none';
+const smallInputCls = 'bg-[#060d18] border border-white/10 rounded-lg px-2.5 py-1.5 text-white text-xs outline-none focus:border-cyan-500/50';
+const btnCls = 'px-4 py-2 rounded-lg text-xs font-black transition-colors disabled:opacity-40';
+const miniBtnCls = 'px-3 py-1.5 rounded-lg text-xs font-bold transition-colors disabled:opacity-40';
 
 // Status of each match is derived from the stored match records on the server (never from browser state).
 const DELIVERY: Record<string, { label: string; cls: string }> = {
-  DRAFT: { label: 'Taslak', cls: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30' },
-  SENT: { label: 'Onaya Gönderildi', cls: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
-  APPROVED: { label: 'Onaylandı', cls: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
-  REJECTED: { label: 'Reddedildi', cls: 'bg-red-500/10 text-red-400 border-red-500/30' },
+  DRAFT: { label: 'Taslak', cls: 'bg-zinc-500/15 text-zinc-200 border-zinc-500/30' },
+  SENT: { label: 'Onay Kuyruğunda (PENDING_REVIEW)', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
+  APPROVED: { label: 'Onaylandı', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
+  REJECTED: { label: 'Reddedildi', cls: 'bg-red-500/15 text-red-300 border-red-500/30' },
 };
+
 type Feedback = { type: 'ok' | 'err'; text: string } | null;
 type StoredSummary = { status: string; homeScore: number | null; awayScore: number | null; players: number; linked: number };
+type RosterCandidate = { id: string; username: string; fullName: string | null };
 
 function Note({ fb }: { fb: Feedback }) {
   if (!fb) return null;
   return (
-    <p role={fb.type === 'err' ? 'alert' : 'status'} className={`rounded-lg px-3 py-2 text-xs ${fb.type === 'ok' ? 'bg-emerald-500/10 text-emerald-300' : 'bg-red-500/10 text-red-300'}`}>
+    <p
+      role={fb.type === 'err' ? 'alert' : 'status'}
+      className={`rounded-lg border px-3.5 py-2.5 text-xs font-medium ${
+        fb.type === 'ok'
+          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+          : 'border-red-500/30 bg-red-500/10 text-red-200'
+      }`}
+    >
       {fb.text}
     </p>
   );
 }
 
-function MatchBadge({ status, username, suggestion }: { status: 'LINKED' | 'TO_LINK' | 'MATCHED' | 'UNMATCHED' | 'AMBIGUOUS'; username?: string | null; suggestion?: string | null }) {
-  if (status === 'LINKED') return <span className='font-bold text-emerald-400' data-testid='match-state' data-state='LINKED'>✓ @{username}</span>;
-  if (status === 'TO_LINK') return <span className='font-bold text-emerald-400' data-testid='match-state' data-state='TO_LINK'>✓ Bağlanacak: @{suggestion}</span>;
-  if (status === 'MATCHED') return <span className='text-cyan-300' data-testid='match-state' data-state='MATCHED'>Öneri: @{suggestion}</span>;
-  if (status === 'AMBIGUOUS') return <span className='font-bold text-amber-400' data-testid='match-state' data-state='AMBIGUOUS'>⚠ Belirsiz</span>;
-  return <span className='font-bold text-amber-400' data-testid='match-state' data-state='UNMATCHED'>⚠ Eşleşmedi</span>;
-}
-
-const StatHead = () => (
-  <thead>
-    <tr className='text-left text-zinc-500'>
-      <th className='pr-2 font-bold'>Oyuncu</th>
-      <th className='pr-2 font-bold'>Poz</th>
-      <th className='pr-1 text-right font-bold'>Puan</th>
-      <th className='pr-1 text-right font-bold'>G</th>
-      <th className='pr-1 text-right font-bold'>A</th>
-      <th className='pr-2 text-right font-bold'>Şut</th>
-      <th className='font-bold'>Eşleşme</th>
-    </tr>
-  </thead>
-);
-
-function SideHeader({ title, count, side }: { title: string; count: number; side: 'home' | 'away' }) {
-  const ok = count === 11;
-  return (
-    <p className='mb-1 text-xs font-black uppercase tracking-wide text-cyan-400'>
-      {side === 'home' ? 'Ev sahibi · ' : 'Deplasman · '}
-      {title}{' '}
-      <span className={`ml-1 normal-case font-bold ${ok ? 'text-zinc-400' : 'text-amber-400'}`} data-testid='player-count'>
-        {count} oyuncu{ok ? '' : ' (11 değil: eksik/fazla oyuncu)'}
+/**
+ * Clear status badges:
+ * - Eşleşti: green badge
+ * - Eşleşmedi: orange badge
+ * - Belirsiz: yellow warning badge
+ */
+function MatchBadge({
+  status,
+  username,
+}: {
+  status: 'LINKED' | 'TO_LINK' | 'MATCHED' | 'UNMATCHED' | 'AMBIGUOUS';
+  username?: string | null;
+}) {
+  if (status === 'LINKED' || status === 'TO_LINK' || status === 'MATCHED') {
+    return (
+      <span
+        className='inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-300'
+        data-testid='match-state'
+        data-state={status}
+      >
+        <span>✓ Eşleşti</span>
+        {username && <span className='text-emerald-100'>· @{username}</span>}
       </span>
-    </p>
+    );
+  }
+  if (status === 'AMBIGUOUS') {
+    return (
+      <span
+        className='inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/15 px-2.5 py-1 text-xs font-bold text-amber-300'
+        data-testid='match-state'
+        data-state='AMBIGUOUS'
+      >
+        ⚠ Belirsiz
+      </span>
+    );
+  }
+  return (
+    <span
+      className='inline-flex items-center gap-1.5 rounded-full border border-orange-500/30 bg-orange-500/15 px-2.5 py-1 text-xs font-bold text-orange-300'
+      data-testid='match-state'
+      data-state='UNMATCHED'
+    >
+      Eşleşmedi
+    </span>
   );
 }
 
-// ---------------------------------------------------------------- draft (file content, nothing stored yet)
-function DraftPanel({ m, onToggleLink, onToggleOow, onSend, onDelete, busy }: { m: any; onToggleLink: (eaPlayerId: string, profileId: string) => void; onToggleOow: () => void; onSend: () => void; onDelete: () => void; busy: string | null }) {
+function SideHeader({ title, count, side, rosterCount }: { title: string; count: number; side: 'home' | 'away'; rosterCount: number }) {
+  const ok = count === 11;
+  return (
+    <div className='flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3'>
+      <div>
+        <span className='text-[11px] font-black uppercase tracking-wider text-cyan-400'>
+          {side === 'home' ? 'Ev Sahibi' : 'Deplasman'}
+        </span>
+        <h3 className='text-base font-black text-white'>{title}</h3>
+      </div>
+      <div className='flex flex-wrap items-center gap-2 text-xs'>
+        <span className='inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-zinc-300'>
+          <Users className='h-3.5 w-3.5 text-cyan-400' />
+          Kadro: {rosterCount} kayıtlı oyuncu
+        </span>
+        <span
+          className={`rounded-md border px-2.5 py-1 font-bold ${
+            ok
+              ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
+              : 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+          }`}
+          data-testid='player-count'
+        >
+          {count} oyuncu{ok ? '' : ' (11 değil)'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function PlayerStatPills({
+  position,
+  rating,
+  goals,
+  assists,
+  shots,
+}: {
+  position: string | null | undefined;
+  rating: number | string | null | undefined;
+  goals: number | null | undefined;
+  assists: number | null | undefined;
+  shots: number | null | undefined;
+}) {
+  const formattedRating = rating === null || rating === undefined || rating === '' ? '–' : Number(rating).toFixed(1);
+  return (
+    <div className='flex flex-wrap items-center gap-1.5 text-xs'>
+      <span className='rounded-md border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 font-bold uppercase text-cyan-300'>
+        {position || '–'}
+      </span>
+      <span className='rounded-md border border-white/10 bg-[#060d18] px-2 py-0.5 text-zinc-300 tabular-nums'>
+        Puan: <b className='text-white'>{formattedRating}</b>
+      </span>
+      <span className='rounded-md border border-white/10 bg-[#060d18] px-2 py-0.5 text-zinc-300 tabular-nums'>
+        G: <b className='text-white'>{goals ?? 0}</b>
+      </span>
+      <span className='rounded-md border border-white/10 bg-[#060d18] px-2 py-0.5 text-zinc-300 tabular-nums'>
+        A: <b className='text-white'>{assists ?? 0}</b>
+      </span>
+      <span className='rounded-md border border-white/10 bg-[#060d18] px-2 py-0.5 text-zinc-300 tabular-nums'>
+        Şut: <b className='text-white'>{shots ?? 0}</b>
+      </span>
+    </div>
+  );
+}
+
+function TeamRosterDropdown({
+  roster,
+  currentProfileId,
+  usedProfileIds,
+  busy,
+  onSave,
+  onCancel,
+}: {
+  roster: RosterCandidate[];
+  currentProfileId: string | null;
+  usedProfileIds: Set<string>;
+  busy: boolean;
+  onSave: (profileId: string) => void;
+  onCancel?: () => void;
+}) {
+  const [selectedId, setSelectedId] = useState<string>(currentProfileId ?? '');
+
+  const isDuplicate = !!selectedId && selectedId !== currentProfileId && usedProfileIds.has(selectedId);
+  const canSave = !!selectedId && !isDuplicate && !busy;
+
+  return (
+    <div className='mt-2.5 flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-[#060d18] p-2.5' data-testid='team-roster-picker'>
+      <select
+        aria-label='Oyuncu seç'
+        className={`${smallInputCls} min-w-[14rem] flex-1`}
+        value={selectedId}
+        disabled={busy}
+        onChange={(e) => setSelectedId(e.target.value)}
+      >
+        <option value=''>Oyuncu seç…</option>
+        {roster.map((candidate) => {
+          const takenByOther = candidate.id !== currentProfileId && usedProfileIds.has(candidate.id);
+          return (
+            <option key={candidate.id} value={candidate.id} disabled={takenByOther}>
+              @{candidate.username}
+              {candidate.fullName ? ` (${candidate.fullName})` : ''}
+              {takenByOther ? ' — Bu maçta başka oyuncuya atandı' : ''}
+            </option>
+          );
+        })}
+      </select>
+      <button
+        type='button'
+        className={`${miniBtnCls} bg-cyan-500 text-black hover:bg-cyan-400`}
+        disabled={!canSave}
+        onClick={() => {
+          if (selectedId) onSave(selectedId);
+        }}
+      >
+        {busy ? <Loader2 className='inline h-3.5 w-3.5 animate-spin' /> : <Check className='inline h-3.5 w-3.5' />}{' '}
+        Eşleştirmeyi kaydet
+      </button>
+      {onCancel && (
+        <button type='button' className={`${miniBtnCls} border border-white/10 bg-white/5 text-zinc-300 hover:text-white`} onClick={onCancel}>
+          Vazgeç
+        </button>
+      )}
+      {roster.length === 0 && (
+        <span className='w-full text-[11px] text-amber-300'>
+          Bu takımın seçili sezonda aktif kadro üyeliği bulunamadı.
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- draft (file content before sending to review)
+function DraftPanel({
+  m,
+  onSaveLink,
+  onToggleOow,
+  onSend,
+  onDelete,
+  busy,
+}: {
+  m: any;
+  onSaveLink: (eaPlayerId: string, profileId: string) => void;
+  onToggleOow: () => void;
+  onSend: () => void;
+  onDelete: () => void;
+  busy: string | null;
+}) {
+  const [changingId, setChangingId] = useState<string | null>(null);
   const undecided = m.outOfWindow && !m.outOfWindowAccepted;
   const canSend = m.errors.length === 0 && !undecided && !!m.sendHash;
-  const side = (s: 'home' | 'away', title: string) => {
+
+  const usedProfileIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of m.players ?? []) {
+      const activeId = p.linkedProfileId ?? (p.suggestion?.status === 'MATCHED' ? p.suggestion.profileId : null);
+      if (activeId) set.add(activeId);
+    }
+    return set;
+  }, [m.players]);
+
+  const renderSide = (s: 'home' | 'away', title: string, roster: RosterCandidate[]) => {
     const players = m.players.filter((p: any) => p.side === s);
     return (
-      <div className='min-w-0 flex-1' data-testid={`side-${s}`}>
-        <SideHeader title={title} count={players.length} side={s} />
-        <table className='w-full text-[11px]'>
-          <StatHead />
-          <tbody>
-            {players.map((p: any) => {
-              const st = p.linkedProfileId ? 'TO_LINK' : p.suggestion.status;
-              return (
-                <tr key={p.eaPlayerId} className='border-t border-white/5' data-testid='player-row' data-state={st} title={p.suggestion.warning ?? ''}>
-                  <td className='max-w-[9rem] truncate py-1 pr-2 text-white'>{p.stats.mom ? '⭐ ' : ''}{p.eaPlayerName ?? '—'}</td>
-                  <td className='pr-2 text-zinc-400'>{p.stats.position ?? '–'}</td>
-                  <td className='pr-1 text-right tabular-nums'>{p.stats.rating === null ? '–' : p.stats.rating.toFixed(1)}</td>
-                  <td className='pr-1 text-right tabular-nums'>{p.stats.goals}</td>
-                  <td className='pr-1 text-right tabular-nums'>{p.stats.assists}</td>
-                  <td className='pr-2 text-right tabular-nums'>{p.stats.shots}</td>
-                  <td>
-                    <MatchBadge status={st} suggestion={p.suggestion.username} />
-                    {p.suggestion.status === 'MATCHED' && p.suggestion.profileId && (
-                      <label className='ml-2 inline-flex items-center gap-1 text-zinc-300'>
-                        <input type='checkbox' checked={!!p.linkedProfileId} onChange={() => onToggleLink(p.eaPlayerId, p.suggestion.profileId)} data-match={m.eaMatchId} />
-                        öneriyi kabul et
-                      </label>
+      <div className='min-w-0 rounded-xl border border-white/10 bg-[#07101f] p-4 space-y-3' data-testid={`side-${s}`}>
+        <SideHeader title={title} count={players.length} side={s} rosterCount={roster.length} />
+        <div className='space-y-2.5'>
+          {players.map((p: any) => {
+            const isLinked = !!p.linkedProfileId;
+            const st: 'TO_LINK' | 'MATCHED' | 'UNMATCHED' | 'AMBIGUOUS' = isLinked
+              ? 'TO_LINK'
+              : p.suggestion.status;
+            const matchedUsername = p.linkedUsername ?? p.suggestion.username ?? null;
+            const currentProfileId = p.linkedProfileId ?? (p.suggestion.status === 'MATCHED' ? p.suggestion.profileId : null);
+            const needsSelection = !isLinked && p.suggestion.status !== 'MATCHED';
+            const showPicker = needsSelection || changingId === p.eaPlayerId;
+
+            return (
+              <div
+                key={p.eaPlayerId}
+                className='rounded-lg border border-white/10 bg-[#0b172a] p-3.5 space-y-2'
+                data-testid='player-row'
+                data-state={st}
+              >
+                <div className='flex flex-wrap items-start justify-between gap-2'>
+                  <div className='min-w-0 space-y-1'>
+                    <div className='flex flex-wrap items-center gap-2'>
+                      <span className='text-sm font-bold text-white'>
+                        {p.stats.mom ? '⭐ ' : ''}
+                        {p.eaPlayerName ?? '—'}
+                      </span>
+                    </div>
+                    <PlayerStatPills
+                      position={p.stats.position}
+                      rating={p.stats.rating}
+                      goals={p.stats.goals}
+                      assists={p.stats.assists}
+                      shots={p.stats.shots}
+                    />
+                  </div>
+                  <div className='flex flex-wrap items-center gap-2'>
+                    <MatchBadge status={st} username={matchedUsername} />
+                    {!needsSelection && (
+                      <button
+                        type='button'
+                        className={`${miniBtnCls} border border-white/10 bg-white/5 text-zinc-300 hover:text-cyan-300`}
+                        onClick={() => setChangingId(changingId === p.eaPlayerId ? null : p.eaPlayerId)}
+                      >
+                        {changingId === p.eaPlayerId ? 'Kapat' : 'Değiştir'}
+                      </button>
                     )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                  </div>
+                </div>
+
+                {p.suggestion.warning && !isLinked && (
+                  <p className='text-xs text-amber-300'>{p.suggestion.warning}</p>
+                )}
+
+                {showPicker && (
+                  <TeamRosterDropdown
+                    roster={roster}
+                    currentProfileId={currentProfileId}
+                    usedProfileIds={usedProfileIds}
+                    busy={busy !== null}
+                    onSave={(profileId) => {
+                      setChangingId(null);
+                      onSaveLink(p.eaPlayerId, profileId);
+                    }}
+                    onCancel={!needsSelection ? () => setChangingId(null) : undefined}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   };
+
   return (
-    <div className='mt-4 space-y-3 border-t border-white/5 pt-4' data-testid='review-panel' data-kind='draft'>
+    <div className='mt-5 space-y-4 border-t border-white/10 pt-5' data-testid='review-panel' data-kind='draft'>
       {m.errors.map((e: any, i: number) => (
-        <p key={i} className='flex items-start gap-1 text-xs text-red-300'><AlertTriangle className='mt-0.5 h-3 w-3 shrink-0' /><span><b>{e.code}</b> — {e.message}</span></p>
+        <p key={i} className='flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-xs text-red-200'>
+          <AlertTriangle className='mt-0.5 h-4 w-4 shrink-0 text-red-400' />
+          <span>
+            <b>{e.code}</b> — {e.message}
+          </span>
+        </p>
       ))}
       {m.warnings.map((w: any, i: number) => (
-        <p key={i} className='text-xs text-amber-300'>{w.message}</p>
+        <p key={i} className='rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2 text-xs text-amber-200'>
+          {w.message}
+        </p>
       ))}
-      <p className='rounded-lg bg-white/5 px-3 py-2 text-xs text-zinc-400'>
-        Taslak, doğrulanmış dosya içeriğidir ve değiştirilemez. Yalnızca sunucunun kesin önerilerini kabul edebilirsiniz; eşleşmeyen/belirsiz oyuncular için profil araması, skor ve istatistik düzenleme maç onaya gönderildikten sonra bu panelde açılır.
-      </p>
-      <div className='flex flex-col gap-4 lg:flex-row'>
-        {side('home', m.homeName)}
-        {side('away', m.awayName)}
+
+      <div className='grid grid-cols-1 gap-6 lg:grid-cols-2'>
+        {renderSide('home', m.homeName, m.homeRoster ?? [])}
+        {renderSide('away', m.awayName, m.awayRoster ?? [])}
       </div>
+
       {m.outOfWindow && (
-        <label className='flex items-center gap-2 text-xs'>
+        <label className='flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 text-xs text-amber-200'>
           <input type='checkbox' checked={m.outOfWindowAccepted} onChange={onToggleOow} />
-          Zaman aralığı dışında olduğunu biliyorum; yine de gönder
+          Zaman aralığı dışında olduğunu biliyorum; yine de onay kuyruğuna gönder
         </label>
       )}
-      <div className='flex flex-wrap gap-2'>
-        <button type='button' className={`${btn} bg-emerald-500 text-black hover:bg-emerald-400`} disabled={!canSend || busy !== null} onClick={onSend}>
-          {busy === m.eaMatchId ? <Loader2 className='inline h-3 w-3 animate-spin' /> : null} Onaya Gönder
+
+      <div className='flex flex-wrap items-center gap-3 pt-1'>
+        <button
+          type='button'
+          className={`${btnCls} bg-emerald-500 text-black hover:bg-emerald-400`}
+          disabled={!canSend || busy !== null}
+          onClick={onSend}
+        >
+          {busy === m.eaMatchId ? <Loader2 className='inline h-3.5 w-3.5 animate-spin mr-1' /> : null}
+          Onaya Gönder
         </button>
-        <button type='button' className={`${btn} border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20`} disabled={busy !== null} title='Taslağı bu görünümden kaldırır; veritabanında kayıt olmadığından hiçbir kayıt silinmez' onClick={onDelete}>
-          Sil
+        <button
+          type='button'
+          className={`${btnCls} border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20`}
+          disabled={busy !== null}
+          title='Taslağı bu görünümden kaldırır; veritabanında kayıt olmadığından hiçbir kayıt silinmez'
+          onClick={onDelete}
+        >
+          Listeden Kaldır
         </button>
-        <span className='self-center text-[11px] text-zinc-500'>Onaya Gönder maçı yalnızca PENDING_REVIEW yapar; nihai onay Maç Onay ekranındadır.</span>
+        <span className='text-xs text-zinc-400'>
+          Onaya Gönder maçı yalnızca <b>PENDING_REVIEW</b> durumuna taşır; nihai onay Maç Onay ekranındadır.
+        </span>
       </div>
     </div>
   );
 }
 
-// ---------------------------------------------------------------- stored match (sent / reviewed): edits go through the existing admin actions
-const EDIT_FIELDS: [string, string][] = [['goals', 'G'], ['assists', 'A'], ['shots', 'Şut'], ['passes_made', 'Pas'], ['pass_attempts', 'Pas den.']];
-const INT_FIELDS = ['goals', 'assists', 'shots', 'passes_made', 'pass_attempts', 'tackles_made', 'tackle_attempts', 'saves', 'goals_conceded', 'cleansheets_gk', 'cleansheets_def', 'red_cards'];
+// ---------------------------------------------------------------- stored match (PENDING_REVIEW / REJECTED / APPROVED)
+const EDIT_FIELDS: [string, string][] = [
+  ['goals', 'G'],
+  ['assists', 'A'],
+  ['shots', 'Şut'],
+  ['passes_made', 'Pas'],
+  ['pass_attempts', 'Pas den.'],
+];
+const INT_FIELDS = [
+  'goals',
+  'assists',
+  'shots',
+  'passes_made',
+  'pass_attempts',
+  'tackles_made',
+  'tackle_attempts',
+  'saves',
+  'goals_conceded',
+  'cleansheets_gk',
+  'cleansheets_def',
+  'red_cards',
+];
 
-function PlayerSearch({ row, onSaved, setFb }: { row: any; onSaved: () => void; setFb: (f: Feedback) => void }) {
-  const [q, setQ] = useState('');
-  const [results, setResults] = useState<any[] | null>(null);
-  const [picked, setPicked] = useState<any>(null);
-  const [busy, setBusy] = useState(false);
-  const search = async () => {
-    setBusy(true);
-    const res: any = await searchProfilesAction(q);
-    setBusy(false);
-    if (res.error) return setFb({ type: 'err', text: res.error });
-    setResults(res.data);
-  };
-  const save = async () => {
-    if (!picked) return;
-    setBusy(true);
-    const res: any = await assignPlayerStatsProfileAction(row.id, picked.id, 'EA JSON inceleme paneli');
-    setBusy(false);
-    if (res.error) return setFb({ type: 'err', text: res.error });
-    setFb({ type: 'ok', text: res.success });
-    onSaved();
-  };
-  return (
-    <div className='mt-1 space-y-1 rounded border border-white/10 bg-[#060d18] p-2' data-testid='profile-search'>
-      <div className='flex gap-1'>
-        <input
-          aria-label='Profil ara'
-          className={`${small} flex-1`}
-          placeholder='Kullanıcı adı veya ad (en az 2 harf)'
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void search(); } }}
-        />
-        <button type='button' className={`${mini} bg-white/10 text-white hover:bg-white/20`} disabled={busy || q.trim().length < 2} onClick={search}>
-          <Search className='inline h-3 w-3' /> Ara
-        </button>
-      </div>
-      {results && (
-        <ul className='max-h-32 overflow-y-auto' data-testid='profile-results'>
-          {results.length === 0 && <li className='text-zinc-500'>Sonuç yok.</li>}
-          {results.map((p) => (
-            <li key={p.id}>
-              <button type='button' className={`w-full rounded px-1 py-0.5 text-left hover:bg-white/10 ${picked?.id === p.id ? 'bg-cyan-500/20 text-cyan-300' : 'text-zinc-200'}`} onClick={() => setPicked(p)}>
-                @{p.username}{p.full_name ? ` · ${p.full_name}` : ''}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {picked && (
-        <div className='flex items-center gap-2'>
-          <span className='text-zinc-300' data-testid='picked-profile'>Seçilen: <b className='text-white'>@{picked.username}</b></span>
-          <button type='button' className={`${mini} bg-cyan-500 text-black hover:bg-cyan-400`} disabled={busy} onClick={save}>
-            <Check className='inline h-3 w-3' /> Profili Kaydet
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function StatsEditor({ row, onSaved, onCancel, setFb }: { row: any; onSaved: () => void; onCancel: () => void; setFb: (f: Feedback) => void }) {
+function StatsEditor({
+  row,
+  onSaved,
+  onCancel,
+  setFb,
+}: {
+  row: any;
+  onSaved: (updatedFields: Record<string, unknown>) => void;
+  onCancel: () => void;
+  setFb: (f: Feedback) => void;
+}) {
   const [busy, setBusy] = useState(false);
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const fields: Record<string, unknown> = {};
-    for (const k of INT_FIELDS) fields[k] = fd.has(k) ? Number(fd.get(k)) : row[k] ?? 0; // fields not shown keep their stored value
+    for (const k of INT_FIELDS) fields[k] = fd.has(k) ? Number(fd.get(k)) : row[k] ?? 0;
     const ratingRaw = String(fd.get('rating') ?? '').trim();
     fields.rating = ratingRaw === '' ? null : Number(ratingRaw);
     fields.is_mom = !!row.is_mom;
@@ -218,136 +428,329 @@ function StatsEditor({ row, onSaved, onCancel, setFb }: { row: any; onSaved: () 
     const res: any = await updatePlayerStatsAction(row.id, fields);
     setBusy(false);
     if (res.error) return setFb({ type: 'err', text: res.error });
-    setFb({ type: 'ok', text: res.success });
-    onSaved();
+    setFb({ type: 'ok', text: res.success ?? 'Oyuncu istatistikleri güncellendi.' });
+    onSaved(fields);
   };
   return (
-    <form onSubmit={submit} className='mt-1 flex flex-wrap items-end gap-1 rounded border border-white/10 bg-[#060d18] p-2' data-testid='stats-editor'>
-      <label className='text-zinc-500'>Puan<input name='rating' type='number' step='0.01' min='0' max='10' defaultValue={row.rating ?? ''} className={`${small} block w-14`} /></label>
+    <form
+      onSubmit={submit}
+      className='mt-2.5 flex flex-wrap items-end gap-2 rounded-lg border border-white/10 bg-[#060d18] p-3'
+      data-testid='stats-editor'
+    >
+      <label className='text-xs text-zinc-400'>
+        Puan
+        <input
+          name='rating'
+          type='number'
+          step='0.01'
+          min='0'
+          max='10'
+          defaultValue={row.rating ?? ''}
+          className={`${smallInputCls} mt-1 block w-16`}
+        />
+      </label>
       {EDIT_FIELDS.map(([k, label]) => (
-        <label key={k} className='text-zinc-500'>{label}<input name={k} type='number' min='0' max='1000' required defaultValue={row[k] ?? 0} className={`${small} block w-12`} /></label>
+        <label key={k} className='text-xs text-zinc-400'>
+          {label}
+          <input
+            name={k}
+            type='number'
+            min='0'
+            max='1000'
+            required
+            defaultValue={row[k] ?? 0}
+            className={`${smallInputCls} mt-1 block w-14`}
+          />
+        </label>
       ))}
-      <button type='submit' className={`${mini} bg-cyan-500 text-black hover:bg-cyan-400`} disabled={busy}>İstatistiği Kaydet</button>
-      <button type='button' className={`${mini} text-zinc-400 hover:text-white`} onClick={onCancel}>Vazgeç</button>
+      <button type='submit' className={`${miniBtnCls} bg-cyan-500 text-black hover:bg-cyan-400`} disabled={busy}>
+        {busy ? <Loader2 className='inline h-3.5 w-3.5 animate-spin' /> : null} İstatistiği Kaydet
+      </button>
+      <button type='button' className={`${miniBtnCls} border border-white/10 bg-white/5 text-zinc-300 hover:text-white`} onClick={onCancel}>
+        Vazgeç
+      </button>
     </form>
   );
 }
 
 function StoredPanel({ m, recordId, onChanged }: { m: any; recordId: string; onChanged: () => void }) {
   const [data, setData] = useState<any>(null);
-  const [version, setVersion] = useState(0);
   const [fb, setFb] = useState<Feedback>(null);
-  const [edit, setEdit] = useState<{ id: string; kind: 'profile' | 'stats' } | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [editStatsId, setEditStatsId] = useState<string | null>(null);
+  const [changeProfileId, setChangeProfileId] = useState<string | null>(null);
+  const [savingRowId, setSavingRowId] = useState<string | null>(null);
+  const [scoreBusy, setScoreBusy] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    getReviewMatchAction(recordId).then((res: any) => { if (alive) setData(res); });
-    return () => { alive = false; };
-  }, [recordId, version]);
+    getReviewMatchAction(recordId).then((res: any) => {
+      if (alive) setData(res);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [recordId]);
 
-  const reload = () => { setEdit(null); setVersion((v) => v + 1); onChanged(); };
+  const usedProfileIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of data?.players ?? []) {
+      if (p.player_id) set.add(p.player_id);
+    }
+    return set;
+  }, [data?.players]);
 
-  if (!data) return <p className='mt-4 text-xs text-zinc-400'><Loader2 className='inline h-3 w-3 animate-spin' /> Maç kaydı yükleniyor…</p>;
-  if (data.error) return <div className='mt-4'><Note fb={{ type: 'err', text: data.error }} /></div>;
+  if (!data) {
+    return (
+      <p className='mt-4 text-xs text-zinc-400'>
+        <Loader2 className='inline h-3.5 w-3.5 animate-spin mr-1' /> Maç detayları yükleniyor…
+      </p>
+    );
+  }
+  if (data.error) {
+    return (
+      <div className='mt-4'>
+        <Note fb={{ type: 'err', text: data.error }} />
+      </div>
+    );
+  }
 
-  const { match, players } = data;
+  const { match, players, homeRoster = [], awayRoster = [] } = data;
   const editable = match.status !== 'APPROVED';
+
   const saveScore = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    setBusy(true);
-    const res: any = await updateMatchScoreAction(match.id, Number(fd.get('home_score')), Number(fd.get('away_score')));
-    setBusy(false);
+    const nextHome = Number(fd.get('home_score'));
+    const nextAway = Number(fd.get('away_score'));
+    setScoreBusy(true);
+    const res: any = await updateMatchScoreAction(match.id, nextHome, nextAway);
+    setScoreBusy(false);
     if (res.error) return setFb({ type: 'err', text: res.error });
-    setFb({ type: 'ok', text: res.success });
-    reload();
+    setFb({ type: 'ok', text: res.success ?? 'Maç skoru güncellendi.' });
+    setData((prev: any) =>
+      prev ? { ...prev, match: { ...prev.match, home_score: nextHome, away_score: nextAway } } : prev
+    );
+    onChanged();
   };
+
+  const handleSaveRosterPlayer = async (rowId: string, profileId: string) => {
+    setSavingRowId(rowId);
+    const res = await assignReviewMatchPlayerAction(rowId, profileId);
+    setSavingRowId(null);
+    if ('error' in res && res.error) {
+      setFb({ type: 'err', text: res.error });
+      return;
+    }
+    if ('success' in res && res.success) {
+      setChangeProfileId(null);
+      setFb({ type: 'ok', text: `Oyuncu eşleştirmesi kaydedildi: @${res.profile.username}` });
+      setData((prev: any) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          players: prev.players.map((p: any) =>
+            p.id === rowId
+              ? {
+                  ...p,
+                  player_id: res.profile.id,
+                  username: res.profile.username,
+                  fullName: res.profile.fullName,
+                  identifierStatus: 'MATCHED',
+                }
+              : p
+          ),
+        };
+      });
+      onChanged();
+    }
+  };
+
   const sum = (s: string) => players.filter((p: any) => p.side === s).reduce((a: number, p: any) => a + (p.goals || 0), 0);
 
-  const side = (s: 'home' | 'away', title: string) => {
+  const renderSide = (s: 'home' | 'away', title: string, roster: RosterCandidate[]) => {
     const list = players.filter((p: any) => p.side === s);
     return (
-      <div className='min-w-0 flex-1' data-testid={`side-${s}`}>
-        <SideHeader title={title} count={list.length} side={s} />
-        <table className='w-full text-[11px]'>
-          <StatHead />
-          <tbody>
-            {list.map((p: any) => {
-              const st = p.player_id ? 'LINKED' : p.identifierStatus === 'AMBIGUOUS' ? 'AMBIGUOUS' : 'UNMATCHED';
-              const open = edit?.id === p.id;
-              return (
-                <tr key={p.id} className='border-t border-white/5 align-top' data-testid='player-row' data-state={st}>
-                  <td className='max-w-[9rem] truncate py-1 pr-2 text-white'>{p.is_mom ? '⭐ ' : ''}{p.ea_player_name ?? '—'}</td>
-                  <td className='py-1 pr-2 text-zinc-400'>{p.position ?? '–'}</td>
-                  <td className='py-1 pr-1 text-right tabular-nums'>{p.rating === null ? '–' : Number(p.rating).toFixed(1)}</td>
-                  <td className='py-1 pr-1 text-right tabular-nums'>{p.goals}</td>
-                  <td className='py-1 pr-1 text-right tabular-nums'>{p.assists}</td>
-                  <td className='py-1 pr-2 text-right tabular-nums'>{p.shots}</td>
-                  <td className='py-1'>
-                    <MatchBadge status={st} username={p.username} />
-                    {editable && (
-                      <span className='ml-2 inline-flex gap-1'>
-                        <button type='button' className={`${mini} bg-white/5 text-zinc-300 hover:text-cyan-400`} onClick={() => setEdit(open && edit?.kind === 'profile' ? null : { id: p.id, kind: 'profile' })}>
-                          {p.player_id ? 'Değiştir' : 'Profil Ara'}
-                        </button>
-                        <button type='button' className={`${mini} bg-white/5 text-zinc-300 hover:text-cyan-400`} onClick={() => setEdit(open && edit?.kind === 'stats' ? null : { id: p.id, kind: 'stats' })}>
-                          Düzenle
-                        </button>
+      <div className='min-w-0 rounded-xl border border-white/10 bg-[#07101f] p-4 space-y-3' data-testid={`side-${s}`}>
+        <SideHeader title={title} count={list.length} side={s} rosterCount={roster.length} />
+        <div className='space-y-2.5'>
+          {list.map((p: any) => {
+            const st: 'LINKED' | 'AMBIGUOUS' | 'UNMATCHED' = p.player_id
+              ? 'LINKED'
+              : p.identifierStatus === 'AMBIGUOUS'
+              ? 'AMBIGUOUS'
+              : 'UNMATCHED';
+            const isUnmatched = !p.player_id;
+            const showRosterDropdown = editable && (isUnmatched || changeProfileId === p.id);
+            const showStatsEditor = editable && editStatsId === p.id;
+
+            return (
+              <div
+                key={p.id}
+                className='rounded-lg border border-white/10 bg-[#0b172a] p-3.5 space-y-2'
+                data-testid='player-row'
+                data-state={st}
+              >
+                <div className='flex flex-wrap items-start justify-between gap-2'>
+                  <div className='min-w-0 space-y-1'>
+                    <div className='flex flex-wrap items-center gap-2'>
+                      <span className='text-sm font-bold text-white'>
+                        {p.is_mom ? '⭐ ' : ''}
+                        {p.ea_player_name ?? '—'}
                       </span>
+                    </div>
+                    <PlayerStatPills
+                      position={p.position}
+                      rating={p.rating}
+                      goals={p.goals}
+                      assists={p.assists}
+                      shots={p.shots}
+                    />
+                  </div>
+
+                  <div className='flex flex-wrap items-center gap-2'>
+                    <MatchBadge status={st} username={p.username} />
+                    {editable && !isUnmatched && (
+                      <button
+                        type='button'
+                        className={`${miniBtnCls} border border-white/10 bg-white/5 text-zinc-300 hover:text-cyan-300`}
+                        onClick={() => setChangeProfileId(changeProfileId === p.id ? null : p.id)}
+                      >
+                        {changeProfileId === p.id ? 'Kapat' : 'Değiştir'}
+                      </button>
                     )}
-                    {open && edit?.kind === 'profile' && <PlayerSearch row={p} onSaved={reload} setFb={setFb} />}
-                    {open && edit?.kind === 'stats' && <StatsEditor row={p} onSaved={reload} onCancel={() => setEdit(null)} setFb={setFb} />}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    {editable && (
+                      <button
+                        type='button'
+                        className={`${miniBtnCls} border border-white/10 bg-white/5 text-zinc-300 hover:text-cyan-300`}
+                        onClick={() => setEditStatsId(editStatsId === p.id ? null : p.id)}
+                      >
+                        <Edit3 className='inline h-3 w-3 mr-1' />
+                        İstatistik
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {showRosterDropdown && (
+                  <TeamRosterDropdown
+                    roster={roster}
+                    currentProfileId={p.player_id ?? null}
+                    usedProfileIds={usedProfileIds}
+                    busy={savingRowId === p.id}
+                    onSave={(profileId) => void handleSaveRosterPlayer(p.id, profileId)}
+                    onCancel={!isUnmatched ? () => setChangeProfileId(null) : undefined}
+                  />
+                )}
+
+                {showStatsEditor && (
+                  <StatsEditor
+                    row={p}
+                    onSaved={(updatedFields) => {
+                      setEditStatsId(null);
+                      setData((prev: any) => {
+                        if (!prev) return prev;
+                        return {
+                          ...prev,
+                          players: prev.players.map((row: any) =>
+                            row.id === p.id ? { ...row, ...updatedFields } : row
+                          ),
+                        };
+                      });
+                      onChanged();
+                    }}
+                    onCancel={() => setEditStatsId(null)}
+                    setFb={setFb}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   };
 
   return (
-    <div className='mt-4 space-y-3 border-t border-white/5 pt-4' data-testid='review-panel' data-kind='stored'>
+    <div className='mt-5 space-y-4 border-t border-white/10 pt-5' data-testid='review-panel' data-kind='stored'>
       <Note fb={fb} />
-      <div className='flex flex-wrap items-center gap-3 text-xs'>
+      <div className='flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-[#07101f] px-4 py-3 text-xs'>
         {editable ? (
-          <form onSubmit={saveScore} className='flex items-center gap-2' data-testid='score-editor' key={`${match.home_score}-${match.away_score}`}>
-            <span className='text-zinc-400'>Skor</span>
-            <input aria-label='Ev sahibi skoru' name='home_score' type='number' min='0' required defaultValue={match.home_score ?? 0} className={`${small} w-14 text-center`} />
-            <span>–</span>
-            <input aria-label='Deplasman skoru' name='away_score' type='number' min='0' required defaultValue={match.away_score ?? 0} className={`${small} w-14 text-center`} />
-            <button type='submit' className={`${mini} bg-cyan-500 text-black hover:bg-cyan-400`} disabled={busy}>Skoru Kaydet</button>
+          <form
+            onSubmit={saveScore}
+            className='flex flex-wrap items-center gap-2'
+            data-testid='score-editor'
+            key={`${match.home_score}-${match.away_score}`}
+          >
+            <span className='font-bold text-zinc-300'>Maç Skoru:</span>
+            <input
+              aria-label='Ev sahibi skoru'
+              name='home_score'
+              type='number'
+              min='0'
+              required
+              defaultValue={match.home_score ?? 0}
+              className={`${smallInputCls} w-16 text-center font-bold`}
+            />
+            <span className='font-bold text-zinc-500'>–</span>
+            <input
+              aria-label='Deplasman skoru'
+              name='away_score'
+              type='number'
+              min='0'
+              required
+              defaultValue={match.away_score ?? 0}
+              className={`${smallInputCls} w-16 text-center font-bold`}
+            />
+            <button type='submit' className={`${miniBtnCls} bg-cyan-500 text-black hover:bg-cyan-400`} disabled={scoreBusy}>
+              {scoreBusy ? <Loader2 className='inline h-3.5 w-3.5 animate-spin' /> : null} Skoru Kaydet
+            </button>
           </form>
         ) : (
-          <span className='text-zinc-400'>Onaylanmış maç burada düzenlenemez; değişiklik için Maç Onay ekranını kullanın.</span>
+          <span className='text-zinc-400'>
+            Onaylanmış (APPROVED) maç salt okunurdur; değişiklik için Maç Onay ekranını kullanın.
+          </span>
         )}
-        <span className={sum('home') === match.home_score && sum('away') === match.away_score ? 'text-emerald-400' : 'text-amber-400'} data-testid='goal-check'>
-          Gol toplamları: {sum('home')} – {sum('away')} (skor {match.home_score} – {match.away_score})
+        <span
+          className={`font-semibold ${
+            sum('home') === match.home_score && sum('away') === match.away_score ? 'text-emerald-400' : 'text-amber-400'
+          }`}
+          data-testid='goal-check'
+        >
+          Oyuncu gol toplamı: {sum('home')} – {sum('away')} (Skor: {match.home_score} – {match.away_score})
         </span>
-        <Link href='/admin/matches' className='ml-auto text-cyan-400 hover:underline'>Maç Onay ekranında aç (nihai onay)</Link>
+        <Link href='/admin/matches' className='ml-auto font-bold text-cyan-400 hover:underline'>
+          Maç Onay ekranında aç (nihai onay) →
+        </Link>
       </div>
-      <div className='flex flex-col gap-4 lg:flex-row'>
-        {side('home', m.homeName)}
-        {side('away', m.awayName)}
+
+      <div className='grid grid-cols-1 gap-6 lg:grid-cols-2'>
+        {renderSide('home', m.homeName, homeRoster)}
+        {renderSide('away', m.awayName, awayRoster)}
       </div>
     </div>
   );
 }
 
-// ---------------------------------------------------------------- page
-export function EAImportManager({ seasons, leagues, weeksByLeague }: { seasons: any[]; leagues: any[]; weeksByLeague: Record<string, number[]> }) {
+// ---------------------------------------------------------------- main screen
+export function EAImportManager({
+  seasons,
+  leagues,
+  weeksByLeague,
+}: {
+  seasons: any[];
+  leagues: any[];
+  weeksByLeague: Record<string, number[]>;
+}) {
   const [seasonId, setSeasonId] = useState(seasons.find((s) => s.status === 'ACTIVE')?.id || seasons[0]?.id || '');
   const [leagueId, setLeagueId] = useState('');
   const [week, setWeek] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [oow, setOow] = useState<Set<string>>(new Set());
   const [links, setLinks] = useState<Map<string, { eaMatchId: string; eaPlayerId: string; profileId: string }>>(new Map());
-  const [hidden, setHidden] = useState<Set<string>>(new Set()); // deleted drafts (a draft is only the uploaded file; nothing is stored for it)
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [preview, setPreview] = useState<any>(null);
   const [records, setRecords] = useState<Record<string, StoredSummary>>({});
-  const [openId, setOpenId] = useState<string | null>(null); // one review panel at a time
+  const [openId, setOpenId] = useState<string | null>(null); // only one match open at a time
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<Feedback>(null);
 
@@ -366,15 +769,44 @@ export function EAImportManager({ seasons, leagues, weeksByLeague }: { seasons: 
     return fd;
   };
 
-  const run = async (o: Set<string> = oow, l: Map<string, any> = links, keepMsg = false) => {
+  const collectAutoMatchedLinks = (p: any) => {
+    const next = new Map<string, { eaMatchId: string; eaPlayerId: string; profileId: string }>();
+    for (const pl of p?.plans ?? []) {
+      for (const m of pl.matches ?? []) {
+        for (const pp of m.players ?? []) {
+          if (pp.suggestion?.status === 'MATCHED' && pp.suggestion.profileId) {
+            const key = `${m.eaMatchId}:${pp.eaPlayerId}`;
+            next.set(key, { eaMatchId: m.eaMatchId, eaPlayerId: pp.eaPlayerId, profileId: pp.suggestion.profileId });
+          }
+        }
+      }
+    }
+    return next;
+  };
+
+  const run = async (o: Set<string> = oow, l: Map<string, any> = links, keepMsg = false, seedAutoLinks = false) => {
     setBusy('preview');
     if (!keepMsg) setMsg(null);
     const res: any = await previewJsonMatchesAction(form(o, l));
-    setBusy(null);
     if (res.error) {
+      setBusy(null);
       setPreview(null);
       return setMsg({ type: 'err', text: res.error });
     }
+    if (seedAutoLinks) {
+      const autoLinks = collectAutoMatchedLinks(res.preview);
+      if (autoLinks.size > 0) {
+        setLinks(autoLinks);
+        const seededRes: any = await previewJsonMatchesAction(form(o, autoLinks));
+        setBusy(null);
+        if (!seededRes.error) {
+          setPreview(seededRes.preview);
+          setRecords(seededRes.records ?? {});
+          return;
+        }
+      }
+    }
+    setBusy(null);
     setPreview(res.preview);
     setRecords(res.records ?? {});
   };
@@ -388,20 +820,22 @@ export function EAImportManager({ seasons, leagues, weeksByLeague }: { seasons: 
     setOpenId(null);
     setMsg(null);
   };
+
   const toggleOow = (id: string) => {
     const next = new Set(oow);
     if (next.has(id)) next.delete(id);
     else next.add(id);
     setOow(next);
-    void run(next, links);
+    void run(next, links, true);
   };
-  const toggleLink = (eaMatchId: string, eaPlayerId: string, profileId: string) => {
+
+  const saveDraftLink = async (eaMatchId: string, eaPlayerId: string, profileId: string) => {
     const key = `${eaMatchId}:${eaPlayerId}`;
     const next = new Map(links);
-    if (next.has(key)) next.delete(key);
-    else next.set(key, { eaMatchId, eaPlayerId, profileId });
+    next.set(key, { eaMatchId, eaPlayerId, profileId });
     setLinks(next);
-    void run(oow, next);
+    await run(oow, next, true);
+    setMsg({ type: 'ok', text: 'Oyuncu eşleştirmesi sunucuda doğrulandı ve kaydedildi.' });
   };
 
   const send = async (m: any) => {
@@ -415,7 +849,7 @@ export function EAImportManager({ seasons, leagues, weeksByLeague }: { seasons: 
       setMsg({ type: 'err', text: res.error });
       return run(oow, links, true);
     }
-    setMsg({ type: 'ok', text: `EA maçı #${m.eaMatchId} onaya gönderildi (PENDING_REVIEW). Diğer maçlar taslak olarak kaldı.` });
+    setMsg({ type: 'ok', text: `${m.homeName} – ${m.awayName} maçı onay kuyruğuna gönderildi (PENDING_REVIEW).` });
     await run(oow, links, true);
   };
 
@@ -423,119 +857,263 @@ export function EAImportManager({ seasons, leagues, weeksByLeague }: { seasons: 
 
   return (
     <div className='text-white space-y-6'>
-      <div className='rounded-xl border border-white/5 bg-[#0a1628] p-6'>
-        <h2 className='mb-4 text-xs font-black uppercase tracking-widest text-cyan-400'>Dosya ve hedef</h2>
+      <div className='rounded-xl border border-white/10 bg-[#0a1628] p-6'>
+        <h2 className='mb-4 text-xs font-black uppercase tracking-widest text-cyan-400'>Dosya ve Hedef Seçimi</h2>
         <div className='flex flex-wrap items-end gap-4'>
-          <label className='block text-[10px] font-bold uppercase tracking-widest text-zinc-500'>
+          <label className='block text-[10px] font-bold uppercase tracking-widest text-zinc-400'>
             Sezon
-            <select aria-label='Sezon' className={`${input} mt-1 block`} value={seasonId} onChange={(e) => { setSeasonId(e.target.value); setLeagueId(''); setWeek(''); reset(); }}>
+            <select
+              aria-label='Sezon'
+              className={`${inputCls} mt-1 block`}
+              value={seasonId}
+              onChange={(e) => {
+                setSeasonId(e.target.value);
+                setLeagueId('');
+                setWeek('');
+                reset();
+              }}
+            >
               {seasons.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
               ))}
             </select>
           </label>
-          <label className='block text-[10px] font-bold uppercase tracking-widest text-zinc-500'>
+          <label className='block text-[10px] font-bold uppercase tracking-widest text-zinc-400'>
             Lig
-            <select aria-label='Lig' className={`${input} mt-1 block`} value={leagueId} onChange={(e) => { setLeagueId(e.target.value); setWeek(''); reset(); }}>
+            <select
+              aria-label='Lig'
+              className={`${inputCls} mt-1 block`}
+              value={leagueId}
+              onChange={(e) => {
+                setLeagueId(e.target.value);
+                setWeek('');
+                reset();
+              }}
+            >
               <option value=''>Lig seçin…</option>
               {availableLeagues.map((l) => (
-                <option key={l.id} value={l.id}>{l.name}</option>
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
               ))}
             </select>
           </label>
-          <label className='block text-[10px] font-bold uppercase tracking-widest text-zinc-500'>
+          <label className='block text-[10px] font-bold uppercase tracking-widest text-zinc-400'>
             Hafta
-            <select aria-label='Hafta' className={`${input} mt-1 block`} value={week} onChange={(e) => { setWeek(e.target.value); reset(); }} disabled={!leagueId}>
+            <select
+              aria-label='Hafta'
+              className={`${inputCls} mt-1 block`}
+              value={week}
+              onChange={(e) => {
+                setWeek(e.target.value);
+                reset();
+              }}
+              disabled={!leagueId}
+            >
               <option value=''>Hafta seçin…</option>
               {weeks.map((w) => (
-                <option key={w} value={w}>{w}. hafta</option>
+                <option key={w} value={w}>
+                  {w}. hafta
+                </option>
               ))}
             </select>
           </label>
-          <label className='block text-[10px] font-bold uppercase tracking-widest text-zinc-500'>
+          <label className='block text-[10px] font-bold uppercase tracking-widest text-zinc-400'>
             JSON dosyası
-            <input aria-label='JSON dosyası' type='file' accept='application/json,.json' className='mt-1 block text-sm text-zinc-300' onChange={(e) => { setFile(e.target.files?.[0] ?? null); reset(); }} />
+            <input
+              aria-label='JSON dosyası'
+              type='file'
+              accept='application/json,.json'
+              className='mt-1 block text-sm text-zinc-300'
+              onChange={(e) => {
+                setFile(e.target.files?.[0] ?? null);
+                reset();
+              }}
+            />
           </label>
-          <button type='button' className={`${btn} bg-cyan-500 text-black hover:bg-cyan-400`} disabled={busy !== null || !leagueId || !week || !file} onClick={() => { setHidden(new Set()); void run(); }}>
-            {busy === 'preview' ? <Loader2 className='inline h-4 w-4 animate-spin' /> : <FileCheck2 className='inline h-4 w-4' />} Doğrula ve Eşleştir
+          <button
+            type='button'
+            className={`${btnCls} bg-cyan-500 text-black hover:bg-cyan-400`}
+            disabled={busy !== null || !leagueId || !week || !file}
+            onClick={() => {
+              setHidden(new Set());
+              void run(new Set(), new Map(), false, true);
+            }}
+          >
+            {busy === 'preview' ? (
+              <Loader2 className='inline h-4 w-4 animate-spin mr-1' />
+            ) : (
+              <FileCheck2 className='inline h-4 w-4 mr-1' />
+            )}
+            Doğrula ve Eşleştir
           </button>
         </div>
-        <p className='mt-3 text-xs text-zinc-500'>
-          Dosyanın şeması, checksum&apos;ı ve kimliği sunucuda doğrulanır; hedef sezon/lig/hafta seçiminizle karşılaştırılır. Takım, EA kulüp kimliği, fikstür güncelliği ve maç zamanı canlı kayıtlarla denetlenir. Doğrulama hiçbir şey yazmaz.
+        <p className='mt-3 text-xs text-zinc-400'>
+          Dosyanın şeması, checksum&apos;ı ve kimliği sunucuda doğrulanır; hedef sezon/lig/hafta seçiminizle karşılaştırılır.
         </p>
-        {msg && <div className='mt-3'><Note fb={msg} /></div>}
+        {msg && (
+          <div className='mt-3'>
+            <Note fb={msg} />
+          </div>
+        )}
       </div>
 
       {plan && (
-        <div className='space-y-3' data-testid='file-plan'>
+        <div className='space-y-4' data-testid='file-plan'>
           {preview.batchErrors.map((e: string, i: number) => (
-            <p key={i} role='alert' className='rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300'>{e}</p>
+            <p key={i} role='alert' className='rounded-lg border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-200'>
+              {e}
+            </p>
           ))}
           {plan.rejections.map((r: string, i: number) => (
-            <p key={i} role='alert' className='rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300'>{r}</p>
+            <p key={i} role='alert' className='rounded-lg border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-200'>
+              {r}
+            </p>
           ))}
           {plan.warnings.map((w: string, i: number) => (
-            <p key={i} className='rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-300'>{w}</p>
+            <p key={i} className='rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2 text-xs text-amber-200'>
+              {w}
+            </p>
           ))}
           {plan.scope && (
-            <p className='text-sm text-zinc-300' data-testid='plan-summary'>
+            <p className='text-sm font-medium text-zinc-300' data-testid='plan-summary'>
               {plan.fileName} · {plan.scope.leagueName} · {plan.scope.weekNumber}. hafta · {visible.length} maç
             </p>
           )}
 
           {hidden.size > 0 && (
-            <p className='rounded-lg bg-white/5 px-3 py-2 text-xs text-zinc-400' data-testid='hidden-note'>
-              {hidden.size} taslak bu görünümden kaldırıldı. Taslaklar veritabanında kayıtlı değildir; &ldquo;Doğrula ve Eşleştir&rdquo; ile ya da dosyayı yeniden seçerek geri getirebilirsiniz.
+            <p className='rounded-lg border border-white/10 bg-white/5 px-3.5 py-2 text-xs text-zinc-300' data-testid='hidden-note'>
+              {hidden.size} taslak bu görünümden kaldırıldı. &ldquo;Doğrula ve Eşleştir&rdquo; ile geri getirebilirsiniz.
             </p>
           )}
 
-          {visible.map((m: any) => {
-            const d = DELIVERY[m.delivery];
-            const rec: StoredSummary | undefined = m.recordId ? records[m.recordId] : undefined;
-            const homeScore = rec ? rec.homeScore : m.homeScore;
-            const awayScore = rec ? rec.awayScore : m.awayScore;
-            const total = rec ? rec.players : m.players.length;
-            const linked = rec ? rec.linked : m.players.filter((p: any) => p.linkedProfileId).length;
-            const suggested = rec ? 0 : m.players.filter((p: any) => p.suggestion.status === 'MATCHED' && !p.linkedProfileId).length;
-            const unclear = total - linked - suggested;
-            const isOpen = openId === m.eaMatchId;
-            const draftIssues = m.delivery === 'DRAFT' && (m.errors.length > 0 || (m.outOfWindow && !m.outOfWindowAccepted));
-            return (
-              <article key={m.eaMatchId} className={`rounded-xl border bg-[#0a1628] p-4 ${isOpen ? 'border-cyan-500/40' : 'border-white/5'}`} data-testid='match-card' data-delivery={m.delivery}>
-                <div className='flex flex-wrap items-center gap-x-4 gap-y-2'>
-                  <span className={`rounded border px-2 py-0.5 text-[10px] font-black ${d.cls}`} data-testid='delivery'>{d.label}</span>
-                  <div className='flex items-center gap-2 text-sm font-black' data-testid='card-score'>
-                    <span data-testid='home-name'>{m.homeName}</span>
-                    <span className='rounded bg-white/5 px-2 tabular-nums' data-testid='home-score'>{homeScore ?? '–'}</span>
-                    <span className='text-zinc-500'>–</span>
-                    <span className='rounded bg-white/5 px-2 tabular-nums' data-testid='away-score'>{awayScore ?? '–'}</span>
-                    <span data-testid='away-name'>{m.awayName}</span>
-                  </div>
-                  <span className='text-xs text-zinc-400' data-testid='card-date'>{plan.scope?.weekNumber}. hafta · {new Date(m.playedAt).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })}</span>
-                  <span className={`text-xs ${unclear > 0 ? 'text-amber-400' : 'text-emerald-400'}`} data-testid='card-players'>
-                    {total} oyuncu · {linked} eşleşti{suggested ? ` · ${suggested} öneri` : ''}{unclear > 0 ? ` · ${unclear} eşleşmedi/belirsiz` : ''}
-                  </span>
-                  {draftIssues && <span className='text-xs font-bold text-red-300'><AlertTriangle className='inline h-3 w-3' /> Gönderilemez: incelemeyi açın</span>}
-                  <button type='button' aria-expanded={isOpen} className={`${btn} ml-auto border border-white/10 bg-white/5 text-zinc-200 hover:text-cyan-400`} onClick={() => setOpenId(isOpen ? null : m.eaMatchId)}>
-                    {isOpen ? <ChevronUp className='inline h-3 w-3' /> : <ChevronDown className='inline h-3 w-3' />} {isOpen ? 'Kapat' : 'İncele'}
-                  </button>
-                </div>
+          <div className='space-y-4'>
+            {visible.map((m: any) => {
+              const d = DELIVERY[m.delivery] ?? DELIVERY.DRAFT;
+              const rec: StoredSummary | undefined = m.recordId ? records[m.recordId] : undefined;
+              const homeScore = rec ? rec.homeScore : m.homeScore;
+              const awayScore = rec ? rec.awayScore : m.awayScore;
+              const total = rec ? rec.players : m.players.length;
+              const matchedCount = rec
+                ? rec.linked
+                : m.players.filter((p: any) => p.linkedProfileId || p.suggestion?.status === 'MATCHED').length;
+              const unmatchedCount = Math.max(0, total - matchedCount);
+              const isOpen = openId === m.eaMatchId;
+              const draftIssues = m.delivery === 'DRAFT' && (m.errors.length > 0 || (m.outOfWindow && !m.outOfWindowAccepted));
 
-                {isOpen && m.delivery === 'DRAFT' && (
-                  <DraftPanel
-                    m={m}
-                    busy={busy}
-                    onToggleLink={(pid, prof) => toggleLink(m.eaMatchId, pid, prof)}
-                    onToggleOow={() => toggleOow(m.eaMatchId)}
-                    onSend={() => send(m)}
-                    onDelete={() => { setHidden(new Set(hidden).add(m.eaMatchId)); setOpenId(null); }}
-                  />
-                )}
-                {isOpen && m.delivery !== 'DRAFT' && m.recordId && <StoredPanel m={m} recordId={m.recordId} onChanged={() => void run(oow, links, true)} />}
-              </article>
-            );
-          })}
-          {visible.length === 0 && plan.status !== 'REJECTED' && <p className='text-sm text-zinc-500'>Gösterilecek maç kalmadı.</p>}
+              return (
+                <article
+                  key={m.eaMatchId}
+                  className={`rounded-xl border bg-[#0a1628] p-5 transition-colors ${
+                    isOpen ? 'border-cyan-500/50 shadow-lg shadow-cyan-950/20' : 'border-white/10'
+                  }`}
+                  data-testid='match-card'
+                  data-delivery={m.delivery}
+                >
+                  <div className='flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between'>
+                    {/* Left: Week, Date, Match Status */}
+                    <div className='flex flex-wrap items-center gap-2.5 lg:w-1/4'>
+                      <span className={`rounded-md border px-2.5 py-1 text-xs font-black ${d.cls}`} data-testid='delivery'>
+                        {d.label}
+                      </span>
+                      <span className='text-xs text-zinc-300' data-testid='card-date'>
+                        {plan.scope?.weekNumber}. Hafta ·{' '}
+                        {new Date(m.playedAt).toLocaleString('tr-TR', {
+                          timeZone: 'Europe/Istanbul',
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+
+                    {/* Center: Prominent Scoreboard */}
+                    <div
+                      className='flex items-center justify-center gap-3 rounded-xl border border-white/10 bg-[#060d18] px-5 py-3 lg:flex-1'
+                      data-testid='card-score'
+                    >
+                      <span className='flex-1 text-right text-sm font-black text-white sm:text-base' data-testid='home-name'>
+                        {m.homeName}
+                      </span>
+                      <div className='flex items-center gap-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3.5 py-1.5 text-lg font-black text-white tabular-nums'>
+                        <span data-testid='home-score'>{homeScore ?? '–'}</span>
+                        <span className='text-cyan-400'>:</span>
+                        <span data-testid='away-score'>{awayScore ?? '–'}</span>
+                      </div>
+                      <span className='flex-1 text-left text-sm font-black text-white sm:text-base' data-testid='away-name'>
+                        {m.awayName}
+                      </span>
+                    </div>
+
+                    {/* Right: Matched/Unmatched Counts & Single İncele Button */}
+                    <div className='flex flex-wrap items-center justify-between gap-3 lg:w-auto lg:justify-end'>
+                      <div className='flex flex-wrap items-center gap-2 text-xs' data-testid='card-players'>
+                        <span className='rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 font-bold text-emerald-300'>
+                          {matchedCount} eşleşen
+                        </span>
+                        <span
+                          className={`rounded-md border px-2.5 py-1 font-bold ${
+                            unmatchedCount > 0
+                              ? 'border-orange-500/30 bg-orange-500/15 text-orange-300'
+                              : 'border-white/10 bg-white/5 text-zinc-400'
+                          }`}
+                        >
+                          {unmatchedCount} eşleşmeyen
+                        </span>
+                        {draftIssues && (
+                          <span className='inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-1 font-bold text-red-300'>
+                            <AlertTriangle className='h-3.5 w-3.5' /> Karar/Hata var
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        type='button'
+                        aria-expanded={isOpen}
+                        className={`${btnCls} border ${
+                          isOpen
+                            ? 'border-cyan-500/50 bg-cyan-500/15 text-cyan-300'
+                            : 'border-white/15 bg-white/5 text-white hover:border-cyan-500/40 hover:text-cyan-300'
+                        }`}
+                        onClick={() => setOpenId(isOpen ? null : m.eaMatchId)}
+                      >
+                        {isOpen ? (
+                          <ChevronUp className='inline h-4 w-4 mr-1' />
+                        ) : (
+                          <ChevronDown className='inline h-4 w-4 mr-1' />
+                        )}
+                        İncele
+                      </button>
+                    </div>
+                  </div>
+
+                  {isOpen && m.delivery === 'DRAFT' && (
+                    <DraftPanel
+                      m={m}
+                      busy={busy}
+                      onSaveLink={(pid, prof) => void saveDraftLink(m.eaMatchId, pid, prof)}
+                      onToggleOow={() => toggleOow(m.eaMatchId)}
+                      onSend={() => void send(m)}
+                      onDelete={() => {
+                        setHidden(new Set(hidden).add(m.eaMatchId));
+                        setOpenId(null);
+                      }}
+                    />
+                  )}
+                  {isOpen && m.delivery !== 'DRAFT' && m.recordId && (
+                    <StoredPanel m={m} recordId={m.recordId} onChanged={() => void run(oow, links, true)} />
+                  )}
+                </article>
+              );
+            })}
+          </div>
+          {visible.length === 0 && plan.status !== 'REJECTED' && (
+            <p className='text-sm text-zinc-400'>Gösterilecek maç kalmadı.</p>
+          )}
         </div>
       )}
     </div>

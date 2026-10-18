@@ -6,8 +6,9 @@ import { createClient } from '@/utils/supabase/server';
 import { logAdminAudit } from '@/lib/audit';
 import { requireAdmin } from '@/lib/fixture-import-service';
 import { UUID_RE } from '@/lib/fixture-weekly';
-import { MAX_MATCH_FILE_BYTES, applyMatchImport, previewMatchImport } from '@/lib/match-import-service';
+import { MAX_MATCH_FILE_BYTES, applyMatchImport, loadReviewMatchWithRosters, previewMatchImport, validateReviewRosterAssignment } from '@/lib/match-import-service';
 import type { LinkDecision } from '@/lib/match-import-plan';
+import { assignPlayerStatsProfileAction } from '../actions';
 
 // JSON-based match transfer screen: one file (teta.weekly-matches v1), matches are sent to the admin review queue one by one.
 // Everything is validated on the server again; the browser only chooses what to send.
@@ -73,42 +74,39 @@ async function loadRecordSummaries(supabase: Supa, preview: Awaited<ReturnType<t
 
 /**
  * Review panel of a match that is already stored (sent to review / reviewed). Read-only; edits go through the existing
- * admin actions (assignPlayerStatsProfileAction, updatePlayerStatsAction, updateMatchScoreAction) with their own checks.
+ * admin actions (assignReviewMatchPlayerAction, updatePlayerStatsAction, updateMatchScoreAction) with their own checks.
  * The raw EA player id is not returned: it is only used on the server for matching.
  */
 export async function getReviewMatchAction(matchId: string) {
   const supabase = createClient(await cookies());
-  const auth = await requireAdmin(supabase);
-  if (!auth.ok) return { error: auth.error };
   if (!UUID_RE.test(String(matchId))) return { error: 'Geçersiz maç kimliği.' };
+  return loadReviewMatchWithRosters(supabase, matchId);
+}
 
-  const { data: match, error } = await supabase
-    .from('matches')
-    .select('id, status, home_score, away_score, home_team_id, away_team_id, played_at')
-    .eq('id', matchId)
-    .maybeSingle();
-  if (error || !match) return { error: 'Maç kaydı bulunamadı.' };
+/**
+ * Assigns a stored match_player_stats row to a registered TETA player profile after strictly verifying on the server
+ * that the profile is an active member of that side's team in the match's season and not duplicated in the same match.
+ */
+export async function assignReviewMatchPlayerAction(statsId: string, profileId: string) {
+  const supabase = createClient(await cookies());
+  if (!UUID_RE.test(String(statsId)) || !UUID_RE.test(String(profileId))) {
+    return { error: 'Geçersiz kayıt veya oyuncu profili kimliği.' };
+  }
+  const check = await validateReviewRosterAssignment(supabase, { statsId, profileId });
+  if (!check.ok) return { error: check.error };
 
-  const { data: rows, error: statsErr } = await supabase
-    .from('match_player_stats')
-    .select(
-      'id, team_id, player_id, ea_player_name, position, goals, assists, shots, passes_made, pass_attempts, tackles_made, tackle_attempts, saves, goals_conceded, cleansheets_gk, cleansheets_def, red_cards, rating, is_mom, extra_stats, profiles!match_player_stats_player_id_fkey(id, username)'
-    )
-    .eq('match_id', matchId)
-    .order('ea_player_name');
-  if (statsErr) return { error: 'Oyuncu istatistikleri okunamadı: ' + statsErr.message };
+  const res = await assignPlayerStatsProfileAction(statsId, profileId, 'EA JSON inceleme ekranı — takım kadrosundan eşleştirme');
+  if ('error' in res && res.error) return { error: res.error };
 
-  const players = (rows ?? []).map((r) => {
-    const { extra_stats: extra, profiles: prof, ...rest } = r as typeof r & { extra_stats: { ea_identifier_status?: string } | null; profiles: { id: string; username: string } | { id: string; username: string }[] | null };
-    const profile = Array.isArray(prof) ? prof[0] ?? null : prof;
-    return {
-      ...rest,
-      side: r.team_id === match.home_team_id ? ('home' as const) : ('away' as const),
-      username: profile?.username ?? null,
-      identifierStatus: extra?.ea_identifier_status ?? null,
-    };
-  });
-  return { match, players };
+  revalidatePath('/admin/matches/ea-import');
+  return {
+    success: true as const,
+    profile: {
+      id: check.profile.id,
+      username: check.profile.username,
+      fullName: check.profile.full_name ?? null,
+    },
+  };
 }
 
 /** Sends ONE draft match to the admin review queue (PENDING_REVIEW) through the atomic RPC. Never approves. */

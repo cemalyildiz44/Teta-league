@@ -56,6 +56,11 @@ export interface LinkDecision {
   eaPlayerId: string;
   profileId: string;
 }
+export interface RosterCandidate {
+  id: string;
+  username: string;
+  fullName: string | null;
+}
 export interface PlayerPlan {
   eaPlayerId: string;
   eaPlayerName: string | null;
@@ -63,8 +68,9 @@ export interface PlayerPlan {
   teamId: string;
   /** Suggestion only. Never applied unless the admin accepts it. */
   suggestion: { status: 'MATCHED' | 'UNMATCHED' | 'AMBIGUOUS'; profileId: string | null; username: string | null; warning: string | null };
-  /** profile that WILL be linked (admin accepted the suggestion), else null */
+  /** profile that WILL be linked (admin accepted the suggestion or selected from active team roster), else null */
   linkedProfileId: string | null;
+  linkedUsername: string | null;
   rosterStatus: string;
   /** values exactly as in the file (shown in the preview so the admin sees what will be written) */
   stats: { position: string | null; goals: number; assists: number; rating: number | null; shots: number; passesMade: number; passAttempts: number; tacklesMade: number; tackleAttempts: number; saves: number; mom: boolean };
@@ -95,6 +101,8 @@ export interface MatchPlan {
   outOfWindow: boolean;
   outOfWindowAccepted: boolean;
   players: PlayerPlan[];
+  homeRoster: RosterCandidate[];
+  awayRoster: RosterCandidate[];
 }
 export type PlanStatus = 'REJECTED' | 'BLOCKED' | 'NOOP' | 'NEEDS_DECISION' | 'READY';
 export interface MatchFilePlan {
@@ -183,8 +191,29 @@ export function planMatchImport(args: {
 
   const fixtureById = new Map(live.fixtures.map((f) => [f.id, f]));
   const teamById = new Map(live.teams.map((t) => [t.id, t]));
+  const profileById = new Map(live.profiles.map((p) => [p.id, p]));
   const links = new Map((args.acceptedLinks ?? []).map((l) => [`${l.eaMatchId}:${l.eaPlayerId}`, l.profileId]));
   const memberships = live.memberships;
+
+  const isEligibleProfile = (prof: ProfileCandidate | undefined): prof is ProfileCandidate => {
+    if (!prof) return false;
+    const p = prof as ProfileCandidate & { is_active?: boolean; status?: string };
+    return p.is_active !== false && p.status !== 'BANNED';
+  };
+
+  const buildTeamRoster = (teamId: string): RosterCandidate[] => {
+    const seen = new Set<string>();
+    const list: RosterCandidate[] = [];
+    for (const mem of memberships) {
+      if (mem.team_id !== teamId || mem.season_id !== doc.target.seasonId || mem.left_at) continue;
+      if (seen.has(mem.player_id)) continue;
+      const prof = profileById.get(mem.player_id);
+      if (!isEligibleProfile(prof)) continue;
+      seen.add(mem.player_id);
+      list.push({ id: prof.id, username: prof.username, fullName: prof.full_name ?? null });
+    }
+    return list.sort((a, b) => a.username.localeCompare(b.username, 'tr'));
+  };
 
   const matches: MatchPlan[] = doc.matches.map((m: ResultsMatch): MatchPlan => {
     const errors: PlanIssue[] = [];
@@ -228,10 +257,20 @@ export function planMatchImport(args: {
       if (sum('home') !== m.home.score || sum('away') !== m.away.score) mw.push({ code: 'GOALS_MISMATCH', message: 'Oyuncu golleri skorla uyuşmuyor.' });
     }
 
-    // ---- player identity: suggestions only ----
+    // ---- player identity: suggestions + validated team roster assignments ----
     const suggestions = m.players.map((p) => matchPlayerToProfile({ ea_player_id: p.eaPlayerId, ea_player_name: p.eaPlayerName }, live.profiles));
     const usage = new Map<string, number>();
     for (const s of suggestions) if (s.player_id) usage.set(s.player_id, (usage.get(s.player_id) ?? 0) + 1);
+
+    const acceptedCount = new Map<string, number>();
+    for (const p of m.players) {
+      const acc = links.get(`${m.eaMatchId}:${p.eaPlayerId}`);
+      if (acc) acceptedCount.set(acc, (acceptedCount.get(acc) ?? 0) + 1);
+    }
+
+    const homeTeamId = f?.home_team_id ?? m.home.teamId;
+    const awayTeamId = f?.away_team_id ?? m.away.teamId;
+
     const players: PlayerPlan[] = m.players.map((p, i) => {
       const s = suggestions[i];
       let status = s.status;
@@ -242,13 +281,24 @@ export function planMatchImport(args: {
         warning = 'Belirsiz/çakışan eşleşme: Bu profil aynı maçta birden fazla EA oyuncusuyla eşleşti';
         profileId = null;
       }
-      const teamId = p.side === 'home' ? m.home.teamId : m.away.teamId;
+      const teamId = p.side === 'home' ? homeTeamId : awayTeamId;
       const accepted = links.get(`${m.eaMatchId}:${p.eaPlayerId}`) ?? null;
       let linked: string | null = null;
       if (accepted) {
-        if (status === 'MATCHED' && profileId === accepted) linked = accepted;
-        else bad('LINK_NOT_VALID', `${p.eaPlayerName ?? p.eaPlayerId}: kabul edilen profil bağlantısı artık geçerli bir öneri değil.`);
+        const isDuplicateInMatch = (acceptedCount.get(accepted) ?? 0) > 1;
+        const isMatchedSuggestion = status === 'MATCHED' && profileId === accepted;
+        const isActiveTeamMember =
+          memberships.some((mem) => mem.player_id === accepted && mem.team_id === teamId && mem.season_id === doc.target.seasonId && !mem.left_at) &&
+          isEligibleProfile(profileById.get(accepted));
+        if (isDuplicateInMatch) {
+          bad('LINK_NOT_VALID', `${p.eaPlayerName ?? p.eaPlayerId}: aynı oyuncu profili bu maçta birden fazla oyuncuya atanamaz.`);
+        } else if (isMatchedSuggestion || isActiveTeamMember) {
+          linked = accepted;
+        } else {
+          bad('LINK_NOT_VALID', `${p.eaPlayerName ?? p.eaPlayerId}: kabul edilen profil bağlantısı artık geçerli bir öneri değil veya takımın aktif kadrosunda yer almıyor.`);
+        }
       }
+      const linkedProfile = linked ? profileById.get(linked) ?? null : null;
       const roster = validateRosterMembership({ player_id: linked, match_team_id: teamId, season_id: doc.target.seasonId, memberships });
       return {
         eaPlayerId: p.eaPlayerId,
@@ -257,6 +307,7 @@ export function planMatchImport(args: {
         teamId,
         suggestion: { status, profileId, username: s.matched_profile?.username ?? null, warning },
         linkedProfileId: linked,
+        linkedUsername: linkedProfile?.username ?? (linked && linked === profileId ? (s.matched_profile?.username ?? null) : null),
         rosterStatus: roster.roster_status,
         stats: { position: p.position, goals: p.goals, assists: p.assists, rating: p.rating, shots: p.shots, passesMade: p.passesMade, passAttempts: p.passAttempts, tacklesMade: p.tacklesMade, tackleAttempts: p.tackleAttempts, saves: p.saves, mom: p.mom },
       };
@@ -279,6 +330,8 @@ export function planMatchImport(args: {
       outOfWindow,
       outOfWindowAccepted: outOfWindow && oowOk.has(m.eaMatchId),
       players,
+      homeRoster: buildTeamRoster(homeTeamId),
+      awayRoster: buildTeamRoster(awayTeamId),
     };
   });
 
