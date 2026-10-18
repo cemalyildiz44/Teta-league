@@ -4,6 +4,7 @@ import { getLeagueBySlugs } from "../../../utils";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import TeamLogo from "@/components/TeamLogo";
+import { isDefenderPosition, isGoalkeeperPosition } from "@/app/utils/positions";
 
 export default async function LeagueStatsPage({ params }: { params: Promise<{ seasonSlug: string; leagueSlug: string }> }) {
   const resolvedParams = await params;
@@ -100,12 +101,12 @@ export default async function LeagueStatsPage({ params }: { params: Promise<{ se
   const mostWinsPlayers = [...allPlayers].filter(p => p.wins > 0).sort((a, b) => b.wins - a.wins || a.matches - b.matches).slice(0, 5);
   
   const goalkeepers = [...allPlayers]
-    .filter(p => p.position === 'Kaleci' || p.position === 'GK')
+    .filter(p => isGoalkeeperPosition(p.position))
     .sort((a, b) => b.cleansheets - a.cleansheets || b.matches - a.matches)
     .slice(0, 5);
 
   const bestDefenders = [...allPlayers]
-    .filter(p => ['CB', 'LB', 'RB', 'LWB', 'RWB', 'STP', 'SĞB', 'SLB'].includes(p.position))
+    .filter(p => isDefenderPosition(p.position))
     .sort((a, b) => parseFloat(b.avgRating) - parseFloat(a.avgRating) || b.matches - a.matches)
     .slice(0, 5);
 

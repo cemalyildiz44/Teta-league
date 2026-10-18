@@ -97,3 +97,57 @@ export function formatPlatform(platform: string | null | undefined): string {
   }
   return platform;
 }
+
+const GOALKEEPER_TOKENS = new Set([
+  'GOALKEEPER',
+  'GK',
+  'KL',
+  'KALECI',
+]);
+
+const DEFENDER_TOKENS = new Set([
+  'DEFENDER',
+  'DEF',
+  'DEFANS',
+  'CB',
+  'LB',
+  'RB',
+  'LWB',
+  'RWB',
+  'STP',
+  'STOPER',
+  'SGB',
+  'SAG BEK',
+  'SLB',
+  'SOL BEK',
+  'SGKB',
+  'SAG KANAT BEK',
+  'SLKB',
+  'SOL KANAT BEK',
+]);
+
+function normalizePositionToken(posValue: string | null | undefined): string {
+  if (!posValue || typeof posValue !== 'string') return '';
+  const trimmed = posValue.trim();
+  if (!trimmed) return '';
+  const beforeParen = trimmed.split('(')[0].trim();
+  return beforeParen
+    .replace(/[iıİ]/g, 'I')
+    .replace(/[ğĞ]/g, 'G')
+    .replace(/[üÜ]/g, 'U')
+    .replace(/[şŞ]/g, 'S')
+    .replace(/[öÖ]/g, 'O')
+    .replace(/[çÇ]/g, 'C')
+    .toUpperCase()
+    .replace(/\s+/g, ' ');
+}
+
+export function isGoalkeeperPosition(posValue: string | null | undefined): boolean {
+  const token = normalizePositionToken(posValue);
+  return token !== '' && GOALKEEPER_TOKENS.has(token);
+}
+
+export function isDefenderPosition(posValue: string | null | undefined): boolean {
+  const token = normalizePositionToken(posValue);
+  return token !== '' && DEFENDER_TOKENS.has(token);
+}

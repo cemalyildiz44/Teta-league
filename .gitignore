@@ -56,6 +56,7 @@ next-env.d.ts
 test*.js
 test*.mjs
 !tests/test-csv-season-stats-import.mjs
+!tests/test-player-profile-stats-query.mjs
 check*.js
 write*.js
 fix*.js
