@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { exportFormError } from '@/lib/fixture-export-form';
 import { applyFixtureImportAction, previewFixtureImportAction } from './actions';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -53,16 +54,7 @@ export function FixtureTransferManager({ seasons, leagues, history }: { seasons:
   const [exBusy, setExBusy] = useState(false);
   const [exMsg, setExMsg] = useState<{ type: 'ok' | 'err'; text: string; notices?: string[] } | null>(null);
 
-  const weekOk = (v: string) => /^d+$/.test(v) && Number(v) >= 1 && Number(v) <= 200;
-  const exportError = !exLeagues.length
-    ? 'En az bir lig seçin.'
-    : exMode === 'single' && !weekOk(week)
-      ? 'Hafta 1-200 arasında bir tam sayı olmalı.'
-      : exMode === 'range' && (!weekOk(weekFrom) || !weekOk(weekTo))
-        ? 'Hafta değerleri 1-200 arasında tam sayı olmalı.'
-        : exMode === 'range' && Number(weekFrom) > Number(weekTo)
-          ? 'Başlangıç haftası bitiş haftasından büyük olamaz.'
-          : null;
+  const exportError = exportFormError({ leagueCount: exLeagues.length, mode: exMode, week, weekFrom, weekTo });
 
   // Fetch (instead of a bare link) so server-side errors and notices are shown here, not as a raw JSON page.
   const downloadExport = async () => {
