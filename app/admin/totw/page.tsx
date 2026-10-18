@@ -41,8 +41,8 @@ export default async function AdminTotwPage() {
       .order('created_at', { ascending: false }),
     supabase
       .from('leagues')
-      .select('id, season_id, name, slug, tier_order, is_active')
-      .order('tier_order', { ascending: true })
+      .select('id, season_id, name, level, status')
+      .order('level', { ascending: true })
       .order('name', { ascending: true }),
     supabase
       .from('fixtures')
@@ -58,6 +58,17 @@ export default async function AdminTotwPage() {
       .select('season_id, league_id, week_number, formation, trophy_id, is_locked, submitted_at'),
   ]);
 
+  const initialQueryErrors: string[] = [];
+  if (seasonsRes.error) {
+    initialQueryErrors.push(`Sezonlar yüklenemedi: ${seasonsRes.error.message}`);
+  }
+  if (leaguesRes.error) {
+    initialQueryErrors.push(`Ligler yüklenemedi: ${leaguesRes.error.message}`);
+  }
+  if (fixturesRes.error) {
+    initialQueryErrors.push(`Fikstür haftaları yüklenemedi: ${fixturesRes.error.message}`);
+  }
+
   const seasons: TotwSeasonOption[] = (seasonsRes.data || []).map((s: any) => ({
     id: s.id,
     name: s.name,
@@ -69,9 +80,9 @@ export default async function AdminTotwPage() {
     id: l.id,
     season_id: l.season_id,
     name: l.name,
-    slug: l.slug,
-    tier_order: l.tier_order ?? 1,
-    is_active: Boolean(l.is_active),
+    slug: '',
+    tier_order: l.level ?? 1,
+    is_active: l.status === 'ACTIVE',
   }));
 
   // Group distinct week numbers by `${season_id}:${league_id}`
@@ -118,6 +129,19 @@ export default async function AdminTotwPage() {
 
   return (
     <div className="space-y-6">
+      {initialQueryErrors.length > 0 && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 text-xs sm:text-sm text-red-300 space-y-1">
+          <p className="font-black uppercase tracking-wider text-red-400">
+            Veri Yükleme Hatası
+          </p>
+          {initialQueryErrors.map((errMsg, idx) => (
+            <p key={idx} className="font-semibold">
+              • {errMsg}
+            </p>
+          ))}
+        </div>
+      )}
+
       <TotwManager
         seasons={seasons}
         leagues={leagues}
