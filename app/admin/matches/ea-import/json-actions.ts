@@ -43,7 +43,72 @@ export async function previewJsonMatchesAction(formData: FormData) {
   if (!auth.ok) return { error: auth.error };
   const input = await readInput(formData);
   if ('error' in input) return { error: input.error };
-  return { preview: await previewMatchImport(supabase, input) };
+  const preview = await previewMatchImport(supabase, input);
+  return { preview, records: await loadRecordSummaries(supabase, preview) };
+}
+
+type Supa = ReturnType<typeof createClient>;
+
+/**
+ * Stored state of the file's matches that were already sent (score and profile links may have been edited after sending),
+ * so the compact cards show the record, not the file. Read-only.
+ */
+async function loadRecordSummaries(supabase: Supa, preview: Awaited<ReturnType<typeof previewMatchImport>>) {
+  const ids = preview.plans.flatMap((pl) => pl.matches.map((m) => m.recordId)).filter((id): id is string => !!id);
+  const records: Record<string, { status: string; homeScore: number | null; awayScore: number | null; players: number; linked: number }> = {};
+  if (!ids.length) return records;
+  const [{ data: matches }, { data: stats }] = await Promise.all([
+    supabase.from('matches').select('id, status, home_score, away_score').in('id', ids),
+    supabase.from('match_player_stats').select('match_id, player_id').in('match_id', ids).limit(5000),
+  ]);
+  for (const m of matches ?? []) records[m.id] = { status: m.status, homeScore: m.home_score, awayScore: m.away_score, players: 0, linked: 0 };
+  for (const st of stats ?? []) {
+    const r = records[st.match_id];
+    if (!r) continue;
+    r.players += 1;
+    if (st.player_id) r.linked += 1;
+  }
+  return records;
+}
+
+/**
+ * Review panel of a match that is already stored (sent to review / reviewed). Read-only; edits go through the existing
+ * admin actions (assignPlayerStatsProfileAction, updatePlayerStatsAction, updateMatchScoreAction) with their own checks.
+ * The raw EA player id is not returned: it is only used on the server for matching.
+ */
+export async function getReviewMatchAction(matchId: string) {
+  const supabase = createClient(await cookies());
+  const auth = await requireAdmin(supabase);
+  if (!auth.ok) return { error: auth.error };
+  if (!UUID_RE.test(String(matchId))) return { error: 'Geçersiz maç kimliği.' };
+
+  const { data: match, error } = await supabase
+    .from('matches')
+    .select('id, status, home_score, away_score, home_team_id, away_team_id, played_at')
+    .eq('id', matchId)
+    .maybeSingle();
+  if (error || !match) return { error: 'Maç kaydı bulunamadı.' };
+
+  const { data: rows, error: statsErr } = await supabase
+    .from('match_player_stats')
+    .select(
+      'id, team_id, player_id, ea_player_name, position, goals, assists, shots, passes_made, pass_attempts, tackles_made, tackle_attempts, saves, goals_conceded, cleansheets_gk, cleansheets_def, red_cards, rating, is_mom, extra_stats, profiles!match_player_stats_player_id_fkey(id, username)'
+    )
+    .eq('match_id', matchId)
+    .order('ea_player_name');
+  if (statsErr) return { error: 'Oyuncu istatistikleri okunamadı: ' + statsErr.message };
+
+  const players = (rows ?? []).map((r) => {
+    const { extra_stats: extra, profiles: prof, ...rest } = r as typeof r & { extra_stats: { ea_identifier_status?: string } | null; profiles: { id: string; username: string } | { id: string; username: string }[] | null };
+    const profile = Array.isArray(prof) ? prof[0] ?? null : prof;
+    return {
+      ...rest,
+      side: r.team_id === match.home_team_id ? ('home' as const) : ('away' as const),
+      username: profile?.username ?? null,
+      identifierStatus: extra?.ea_identifier_status ?? null,
+    };
+  });
+  return { match, players };
 }
 
 /** Sends ONE draft match to the admin review queue (PENDING_REVIEW) through the atomic RPC. Never approves. */
