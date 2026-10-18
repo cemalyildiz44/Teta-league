@@ -267,24 +267,25 @@ export default async function TeamPage({ params }: Props) {
   // 4. Stage 4 Parallel: Roster Stats & Market Value Bulk Fetch
   let totalTeamValue = 0;
   if (roster.length > 0) {
-    const eaPlayerIds = roster.map((r: any) => r.current_ea_player_id).filter(Boolean);
-    const profileIds = roster.map((r: any) => r.id);
+    const profileIds = roster.map((r: any) => r.id).filter(Boolean);
 
-    const shouldFetchRosterStats = approvedMatchIds.length > 0 && eaPlayerIds.length > 0;
+    const shouldFetchRosterStats = approvedMatchIds.length > 0 && profileIds.length > 0;
 
     const [pStatsRes, bulkStatsRes, bulkAchievementsRes] = await Promise.all([
       shouldFetchRosterStats
         ? supabase
             .from('match_player_stats')
-            .select('ea_player_id, goals, assists, rating')
+            .select('player_id, goals, assists, rating')
             .in('match_id', approvedMatchIds)
-            .in('ea_player_id', eaPlayerIds)
+            .in('player_id', profileIds)
         : Promise.resolve({ data: null }),
-      supabase
-        .from('match_player_stats')
-        .select('ea_player_id, team_id, goals, assists, rating, cleansheets_gk, cleansheets_def, red_cards, matches!inner(home_team_id, away_team_id, home_score, away_score, status, season_id)')
-        .in('ea_player_id', eaPlayerIds)
-        .eq('matches.status', 'APPROVED'),
+      profileIds.length > 0
+        ? supabase
+            .from('match_player_stats')
+            .select('player_id, team_id, goals, assists, rating, cleansheets_gk, cleansheets_def, red_cards, matches!inner(home_team_id, away_team_id, home_score, away_score, status, season_id)')
+            .in('player_id', profileIds)
+            .eq('matches.status', 'APPROVED')
+        : Promise.resolve({ data: [] }),
       supabase
         .from('player_achievements')
         .select('player_id, achievement_type, season_id')
@@ -294,7 +295,7 @@ export default async function TeamPage({ params }: Props) {
     const pStats = pStatsRes.data;
     if (pStats && pStats.length > 0) {
       roster = roster.map((r: any) => {
-        const myStats = pStats.filter((s: any) => s.ea_player_id === r.current_ea_player_id);
+        const myStats = pStats.filter((s: any) => s.player_id === r.id);
         if (myStats.length > 0) {
           const matchesCount = myStats.length;
           const goals = myStats.reduce((sum: number, s: any) => sum + (s.goals || 0), 0);
@@ -325,18 +326,20 @@ export default async function TeamPage({ params }: Props) {
       });
     }
 
-    const statsByEaId = new Map();
+    const statsByPlayerId = new Map();
     if (bulkStats) {
       bulkStats.forEach(s => {
-        if (!statsByEaId.has(s.ea_player_id)) statsByEaId.set(s.ea_player_id, []);
-        statsByEaId.get(s.ea_player_id).push(s);
+        if (s.player_id) {
+          if (!statsByPlayerId.has(s.player_id)) statsByPlayerId.set(s.player_id, []);
+          statsByPlayerId.get(s.player_id).push(s);
+        }
       });
     }
 
     roster.forEach(r => {
       let tM=0, tW=0, tD=0, tL=0, tG=0, tA=0, tCGK=0, tCDEF=0, tRC=0;
       const sMap = new Map();
-      const pStatsList = r.current_ea_player_id ? statsByEaId.get(r.current_ea_player_id) || [] : [];
+      const pStatsList = r.id ? statsByPlayerId.get(r.id) || [] : [];
 
       pStatsList.forEach((s: any) => {
         tM++; tG += s.goals || 0; tA += s.assists || 0; tRC += s.red_cards || 0;

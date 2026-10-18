@@ -22,18 +22,17 @@ export default async function PlayersPage() {
 
   const validProfiles = (profiles || []).filter((p: any) => p.status !== 'BANNED');
   const profileIds = validProfiles.map(p => p.id);
-  const eaPlayerIds = validProfiles.map(p => p.current_ea_player_id).filter(Boolean) as string[];
 
   // 2, 3, 4. Fetch memberships, match stats, achievements, and active teams concurrently (Bulk Queries - No N+1)
   const [ { data: memData }, { data: bulkStats }, { data: bulkAchievements }, { data: activeTeamsData } ] = await Promise.all([
     profileIds.length > 0
       ? supabase.from('team_memberships').select('player_id, team_id').in('player_id', profileIds).is('left_at', null)
       : Promise.resolve({ data: [] }),
-    eaPlayerIds.length > 0
+    profileIds.length > 0
       ? supabase
           .from('match_player_stats')
-          .select('ea_player_id, team_id, goals, assists, rating, cleansheets_gk, cleansheets_def, red_cards, matches!inner(home_team_id, away_team_id, home_score, away_score, status, season_id)')
-          .in('ea_player_id', eaPlayerIds)
+          .select('player_id, team_id, goals, assists, rating, cleansheets_gk, cleansheets_def, red_cards, matches!inner(home_team_id, away_team_id, home_score, away_score, status, season_id)')
+          .in('player_id', profileIds)
           .eq('matches.status', 'APPROVED')
       : Promise.resolve({ data: [] }),
     profileIds.length > 0
@@ -41,7 +40,7 @@ export default async function PlayersPage() {
           .from('player_achievements')
           .select('player_id, achievement_type, season_id')
           .in('player_id', profileIds)
-      : Promise.resolve({ data: [] }),
+        : Promise.resolve({ data: [] }),
     supabase.from('teams').select('id, name').eq('is_active', true)
   ]);
 
@@ -63,19 +62,20 @@ export default async function PlayersPage() {
     });
   }
 
-  // Index match stats by ea_player_id
-  const statsByEaId = new Map<string, any[]>();
+  // Index match stats by player_id
+  const statsByPlayerId = new Map<string, any[]>();
   if (bulkStats) {
     bulkStats.forEach((s: any) => {
-      if (!statsByEaId.has(s.ea_player_id)) statsByEaId.set(s.ea_player_id, []);
-      statsByEaId.get(s.ea_player_id)!.push(s);
+      if (s.player_id) {
+        if (!statsByPlayerId.has(s.player_id)) statsByPlayerId.set(s.player_id, []);
+        statsByPlayerId.get(s.player_id)!.push(s);
+      }
     });
   }
 
   // Calculate Market Value for each player
   const rankingsArray: PlayerRanking[] = validProfiles.map(p => {
-    const eaId = p.current_ea_player_id as string;
-    const pStatsList = eaId ? statsByEaId.get(eaId) || [] : [];
+    const pStatsList = p.id ? statsByPlayerId.get(p.id) || [] : [];
 
     let tM = 0, tW = 0, tD = 0, tL = 0, tG = 0, tA = 0, tCGK = 0, tCDEF = 0, tRC = 0;
     const sMap = new Map<string, { season_id: string, rating_sum: number, rating_count: number }>();

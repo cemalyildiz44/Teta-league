@@ -67,17 +67,15 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   // ── 2. Parallel Fetches ────────────────────────────────────────────
   let playerStats: any[] = [];
   let approvedMatches: any[] = [];
-  if (profile.current_ea_player_id) {
-    const { data: statsWithMatches } = await supabase
-      .from("match_player_stats")
-      .select("match_id, team_id, position, rating, goals, assists, shots, passes_made, pass_attempts, tackles_made, tackle_attempts, saves, goals_conceded, is_mom, red_cards, cleansheets_gk, cleansheets_def, matches!inner(id, home_team_id, away_team_id, home_score, away_score, season_id, league_id, played_at, status, fixtures(week_number))")
-      .eq("ea_player_id", profile.current_ea_player_id)
-      .eq("matches.status", "APPROVED");
+  const { data: statsWithMatches } = await supabase
+    .from("match_player_stats")
+    .select("match_id, team_id, position, rating, goals, assists, shots, passes_made, pass_attempts, tackles_made, tackle_attempts, saves, goals_conceded, is_mom, red_cards, cleansheets_gk, cleansheets_def, matches!inner(id, home_team_id, away_team_id, home_score, away_score, season_id, league_id, played_at, status, fixtures(week_number))")
+    .eq("player_id", profile.id)
+    .eq("matches.status", "APPROVED");
 
-    if (statsWithMatches) {
-      playerStats = statsWithMatches;
-      approvedMatches = statsWithMatches.map((s: any) => s.matches);
-    }
+  if (statsWithMatches) {
+    playerStats = statsWithMatches;
+    approvedMatches = statsWithMatches.map((s: any) => s.matches);
   }
 
   const [

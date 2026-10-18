@@ -33,7 +33,7 @@ export async function reviewMatchAction(matchId: string, status: 'APPROVED' | 'R
   // Fetch current match to guard against re-approval and collect route info for revalidation
   const { data: existingMatch } = await supabase
     .from('matches')
-    .select('id, status, season_id, league_id')
+    .select('id, status, season_id, league_id, home_team_id, away_team_id')
     .eq('id', matchId)
     .single();
 
@@ -79,6 +79,36 @@ export async function reviewMatchAction(matchId: string, status: 'APPROVED' | 'R
       revalidatePath(`/lig/${seasonSlug}/${leagueSlug}`);
       revalidatePath(`/lig/${seasonSlug}/${leagueSlug}/istatistikler`);
       revalidatePath(`/lig/${seasonSlug}/${leagueSlug}/fikstur`);
+    }
+
+    // Takım profillerini revalidate et
+    const teamIds = [existingMatch.home_team_id, existingMatch.away_team_id].filter(Boolean);
+    if (teamIds.length > 0) {
+      const { data: matchTeams } = await supabase
+        .from('teams')
+        .select('slug')
+        .in('id', teamIds);
+      for (const tm of matchTeams || []) {
+        if (tm.slug) {
+          revalidatePath(`/takim/${tm.slug}`);
+        }
+      }
+    }
+
+    // Maçta oynayan ve eşleşmiş oyuncuların profillerini revalidate et
+    const { data: matchPlayerRows } = await supabase
+      .from('match_player_stats')
+      .select('profiles!match_player_stats_player_id_fkey(username)')
+      .eq('match_id', matchId)
+      .not('player_id', 'is', null);
+
+    if (matchPlayerRows) {
+      for (const row of matchPlayerRows) {
+        const prof = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+        if (prof?.username) {
+          revalidatePath(`/oyuncular/${encodeURIComponent(prof.username)}`);
+        }
+      }
     }
   }
 
