@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { 
   Search, Shield, X, AlertTriangle, CheckCircle2, Loader2, Trash2, Edit2, Check, XCircle,
   Camera, Image as ImageIcon, ExternalLink, UserCheck, UserX, AlertCircle, ShieldAlert,
-  Calendar, ArrowRight, RefreshCw, Layers
+  Calendar, ArrowRight, RefreshCw, Layers, Lock
 } from 'lucide-react';
 import { 
   reviewMatchAction, deleteMatchAction, updateMatchScoreAction,
@@ -16,7 +16,30 @@ import {
 import TeamLogo from '@/components/TeamLogo';
 
 type StatsRow = { id: string; ea_player_name?: string | null; ea_player_id?: string | null; profiles?: { username?: string | null } | null; rating?: number | null; is_mom?: boolean | null; [k: string]: unknown };
-type CheckStat = { team_id: string; player_id: string | null; goals?: number | null };
+interface DetailStat {
+  id: string;
+  team_id?: string | null;
+  player_id?: string | null;
+  ea_player_name?: string | null;
+  ea_player_id?: string | null;
+  position?: string | null;
+  goals?: number;
+  assists?: number;
+  rating?: number | null;
+  is_mom?: boolean | null;
+  profiles?: {
+    id?: string;
+    username?: string | null;
+    full_name?: string | null;
+    current_ea_player_id?: string | null;
+  } | null;
+  extra_stats?: {
+    roster_status?: string | null;
+    registered_team_name?: string | null;
+    [k: string]: unknown;
+  } | null;
+  [k: string]: unknown;
+}
 
 function getMatchEaData(m: any) {
   if (!m) return null;
@@ -275,11 +298,24 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
 
   const handleEditScore = async (e: any) => {
     e.preventDefault();
+    if (editScoreModal?.status === 'APPROVED') {
+      showFeedback('Onaylanmış maçın skoru doğrudan değiştirilemez.', 'error');
+      setEditScoreModal(null);
+      return;
+    }
     setLoading(true);
     const fd = new FormData(e.currentTarget);
-    const res = await updateMatchScoreAction(editScoreModal.id, parseInt(fd.get('home_score') as string), parseInt(fd.get('away_score') as string));
-    if (res.error) showFeedback(res.error, 'error');
-    else { showFeedback(res.success || '', 'success'); setEditScoreModal(null); router.refresh(); }
+    const newHome = parseInt(fd.get('home_score') as string, 10);
+    const newAway = parseInt(fd.get('away_score') as string, 10);
+    const res = await updateMatchScoreAction(editScoreModal.id, newHome, newAway);
+    if (res.error) {
+      showFeedback(res.error, 'error');
+    } else {
+      showFeedback(res.success || '', 'success');
+      setEditScoreModal(null);
+      setDetailModal((prev: any) => (prev && prev.id === editScoreModal.id ? { ...prev, home_score: newHome, away_score: newAway } : prev));
+      router.refresh();
+    }
     setLoading(false);
   };
 
@@ -512,406 +548,498 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
       </div>
 
       {/* Detail Modal */}
-      {detailModal && (
-        <div className='fixed inset-0 z-50 flex justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm overflow-y-auto'>
-          <div className='card-surface w-full max-w-4xl rounded-2xl border border-white/10 flex flex-col my-auto max-h-[90vh]'>
-            <div className='flex justify-between items-center p-4 border-b border-white/5 bg-[#0a1628] shrink-0'>
-              <h2 className='text-sm font-black text-white tracking-widest'>MAÇ DETAYI</h2>
-              <button onClick={() => setDetailModal(null)} className='text-zinc-400 hover:text-white'><X className='w-5 h-5'/></button>
-            </div>
-            
-            <div className='flex-1 overflow-y-auto p-6 space-y-8'>
-              {/* Header Info */}
-              <div className='flex flex-col items-center justify-center gap-4 bg-[#060d18] p-6 rounded-xl border border-white/5'>
-                <div className='text-xs font-bold text-zinc-400 uppercase tracking-widest text-center'>
-                  {detailModal.seasons?.name} • {detailModal.leagues?.name} • Hafta {detailModal.fixtures?.week_number || '?'}
-                  {detailModal.fixtures?.id && (
-                    <Link
-                      href='/admin/fixtures'
-                      className='ml-2 text-cyan-400 hover:text-cyan-300 underline font-normal text-[11px]'
-                    >
-                      (Fikstür #{detailModal.fixtures.id.substring(0, 8)})
-                    </Link>
-                  )}
-                  <br/>
-                  <span className='text-[10px]'>{new Date(detailModal.played_at).toLocaleString('tr-TR')}</span>
-                </div>
-                
-                <div className='flex items-center gap-8'>
-                  <div className='flex flex-col items-center gap-2 w-32'>
-                    <TeamLogo src={detailModal.home?.logo_url} name={detailModal.home?.name} size="xl" className="w-16 h-16" />
-                    <span className='font-bold text-white text-center'>{detailModal.home?.name || 'Unknown'}</span>
-                  </div>
-                  
-                  <div className='flex flex-col items-center gap-2'>
-                    {detailModal.home_score !== null && detailModal.away_score !== null ? (
-                      <div className='text-4xl font-black text-white px-6 py-2 bg-[#0a1628] border border-white/10 rounded-lg shadow-xl flex items-center gap-4'>
-                        <span>{detailModal.home_score}</span>
-                        <span className='text-zinc-600'>-</span>
-                        <span>{detailModal.away_score}</span>
-                      </div>
-                    ) : (
-                      <span className='text-sm text-zinc-500 italic'>Skor Yok</span>
-                    )}
-                    <div className='flex items-center gap-2 mt-1'>
-                      <StatusBadge status={detailModal.status} />
-                      {detailModal.ea_match_id && (
-                        <span className='px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20 font-mono'>
-                          EA #{detailModal.ea_match_id}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+      {detailModal && (() => {
+        const isEaMatch = detailModal.source === 'AUTO' || Boolean(detailModal.ea_match_id) || (Array.isArray(detailModal.match_raw_ea_data) ? detailModal.match_raw_ea_data.length > 0 : Boolean(detailModal.match_raw_ea_data));
+        const allStats = (detailModal.stats || []) as DetailStat[];
+        const homeStats = allStats.filter((s) => s.team_id === detailModal.home_team_id);
+        const awayStats = allStats.filter((s) => s.team_id === detailModal.away_team_id);
+        const otherStats = allStats.filter((s) => s.team_id !== detailModal.home_team_id && s.team_id !== detailModal.away_team_id);
 
-                  <div className='flex flex-col items-center gap-2 w-32'>
-                    <TeamLogo src={detailModal.away?.logo_url} name={detailModal.away?.name} size="xl" className="w-16 h-16" />
-                    <span className='font-bold text-white text-center'>{detailModal.away?.name || 'Unknown'}</span>
-                  </div>
-                </div>
+        const unmatchedCount = allStats.filter((s) => !s.player_id).length;
+        const mismatchCount = allStats.filter((s) => s.extra_stats?.roster_status === 'ROSTER_MISMATCH').length;
+        const unlicensedCount = allStats.filter((s) => s.extra_stats?.roster_status === 'UNLICENSED').length;
+        const hasRosterWarnings = unmatchedCount > 0 || mismatchCount > 0 || unlicensedCount > 0;
 
-                {/* EA Raw Score vs Current Match Score Comparison Card */}
-                {(() => {
-                  const eaInfo = getMatchEaData(detailModal);
-                  if (!eaInfo && !detailModal.ea_match_id) return null;
+        const eaInfo = getMatchEaData(detailModal);
+        const hasEaScores = eaInfo && eaInfo.homeScore !== null && eaInfo.awayScore !== null;
+        const isScoreEdited = hasEaScores && (eaInfo.homeScore !== detailModal.home_score || eaInfo.awayScore !== detailModal.away_score);
 
-                  const hasEaScores = eaInfo && eaInfo.homeScore !== null && eaInfo.awayScore !== null;
-                  const isScoreEdited = hasEaScores && (eaInfo.homeScore !== detailModal.home_score || eaInfo.awayScore !== detailModal.away_score);
-
-                  return (
-                    <div className={`w-full mt-2 p-3.5 rounded-xl border text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
-                      isScoreEdited
-                        ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-                        : 'bg-[#0a1628] border-white/10 text-zinc-300'
-                    }`}>
-                      <div className='flex items-center gap-2.5'>
-                        {isScoreEdited ? (
-                          <AlertTriangle className='w-4 h-4 text-amber-400 shrink-0' />
-                        ) : (
-                          <CheckCircle2 className='w-4 h-4 text-emerald-400 shrink-0' />
-                        )}
-                        <div>
-                          <div className='flex items-center gap-2'>
-                            <span className='font-bold text-white'>EA Maç Kaydı:</span>
-                            {hasEaScores ? (
-                              <span className='font-mono font-bold bg-[#060d18] px-2 py-0.5 rounded border border-white/10'>
-                                {eaInfo.homeScore} - {eaInfo.awayScore}
-                              </span>
-                            ) : (
-                              <span className='font-mono text-zinc-400'>Skor EA API'den çekilemedi</span>
-                            )}
-                            {isScoreEdited && (
-                              <span className='text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30'>
-                                Skor Yönetici Tarafından Düzeltildi
-                              </span>
-                            )}
-                            {!isScoreEdited && hasEaScores && (
-                              <span className='text-[10px] font-bold text-emerald-400'>
-                                ✓ EA API skoru ile birebir uyumlu
-                              </span>
-                            )}
-                          </div>
-                          {isScoreEdited && (
-                            <p className='text-[11px] text-zinc-400 mt-1'>
-                              Onaylandığında puan durumuna ve kayıtlara <strong>{detailModal.home_score} - {detailModal.away_score}</strong> skoru işlenecektir.
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      {detailModal.ea_match_id && (
-                        <span className='text-[10px] font-mono text-zinc-400 shrink-0'>
-                          EA ID #{detailModal.ea_match_id}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Actions */}
-              <div className='flex flex-col gap-3'>
-                <div className='flex flex-wrap gap-3 justify-center'>
-                  <Link href={'/mac/' + detailModal.id} target='_blank' className='px-4 py-2 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5'>
-                    <ExternalLink className='w-3.5 h-3.5' /> Public Sayfayı Aç
-                  </Link>
-                  <button onClick={() => setEditScoreModal(detailModal)} className='px-4 py-2 bg-zinc-500/10 text-zinc-300 hover:bg-zinc-500/20 rounded-lg text-xs font-bold transition-colors flex items-center gap-2'>
-                    <Edit2 className='w-4 h-4' /> Skoru Düzenle
-                  </button>
-                  {detailModal.status !== 'APPROVED' && (
-                    <button
-                      onClick={() => handleStatus(detailModal, 'APPROVED')}
-                      className='px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-black transition-colors flex items-center gap-2 shadow-lg shadow-emerald-950/40'
-                    >
-                      <CheckCircle2 className='w-4 h-4' /> Maçı Onayla (Puan Durumu & İstatistikleri Güncelle)
-                    </button>
-                  )}
-                  {detailModal.status !== 'REJECTED' && (
-                    <button onClick={() => handleStatus(detailModal, 'REJECTED')} className='px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-xs font-bold transition-colors flex items-center gap-2'>
-                      <XCircle className='w-4 h-4' /> Reddet / Geçersiz Kıl
-                    </button>
-                  )}
-                  <button onClick={() => handleDelete(detailModal)} className='px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-xs font-bold transition-colors flex items-center gap-2 ml-auto border border-red-500/30'>
-                    <Trash2 className='w-4 h-4' /> Maçı Sil
-                  </button>
-                </div>
-                <div className='text-center text-[11px] text-zinc-500 flex items-center justify-center gap-1.5'>
-                  <RefreshCw className='w-3 h-3 text-emerald-500' />
-                  Onaylama işlemi veritabanı tetikleyicisiyle lig puan tablosunu ve liderlik sıralamasını otomatik hesaplar.
-                </div>
-              </div>
-
-              {/* Evidence Screenshot & Notes */}
-              <div className='bg-[#060d18] p-5 rounded-xl border border-white/5 space-y-4'>
-                <div className='flex items-center justify-between border-b border-white/5 pb-2'>
-                  <h3 className='text-xs font-black text-cyan-400 tracking-widest uppercase flex items-center gap-2'>
-                    <Camera className='w-3.5 h-3.5' /> Maç Kanıtı & Kaptan Notları
-                  </h3>
-                  {detailModal.source && (
-                    <span className='text-[10px] font-mono px-2 py-0.5 rounded bg-white/5 text-zinc-400'>
-                      Kaynak: {detailModal.source}
+        const renderTeamPanel = (teamStats: DetailStat[], team: { name?: string | null; logo_url?: string | null } | null | undefined, isHome: boolean) => {
+          const teamName = team?.name || (isHome ? 'Ev Sahibi' : 'Deplasman');
+          return (
+            <div className='flex flex-col bg-[#060d18] rounded-xl border border-white/5 overflow-hidden shadow-lg'>
+              {/* Panel Header */}
+              <div className='flex items-center justify-between p-3.5 bg-[#0a1628] border-b border-white/10 shrink-0'>
+                <div className='flex items-center gap-2.5 min-w-0'>
+                  <TeamLogo src={team?.logo_url} name={teamName} size='sm' className='w-6 h-6' />
+                  <div className='min-w-0'>
+                    <span className='font-black text-xs sm:text-sm text-white tracking-wide truncate block'>
+                      {teamName}
                     </span>
-                  )}
+                    <span className='text-[10px] text-zinc-400 font-medium'>
+                      {isHome ? 'Ev Sahibi Kadrosu' : 'Deplasman Kadrosu'}
+                    </span>
+                  </div>
                 </div>
-
-                {detailModal.notes && (
-                  <div className='text-xs text-zinc-300 bg-[#0a1628] p-3 rounded-lg border border-white/5'>
-                    <span className='font-bold text-zinc-400 block mb-1 text-[10px] uppercase tracking-wider'>Kaptan Notu:</span>
-                    {detailModal.notes}
-                  </div>
-                )}
-
-                {detailModal.screenshot_url ? (
-                  <div className='space-y-2'>
-                    <div className='relative max-h-96 rounded-lg overflow-hidden border border-white/10 bg-black/50 flex items-center justify-center group'>
-                      <img
-                        src={detailModal.screenshot_url}
-                        alt="Maç Kanıtı"
-                        className='max-h-96 w-auto object-contain rounded-lg transition-transform group-hover:scale-[1.01]'
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          const fallback = e.currentTarget.parentElement?.querySelector('.screenshot-error-fallback');
-                          if (fallback) fallback.classList.remove('hidden');
-                        }}
-                      />
-                      <div className='screenshot-error-fallback hidden p-8 text-center text-zinc-500 text-xs'>
-                        <AlertTriangle className='w-8 h-8 text-amber-500/70 mx-auto mb-2' />
-                        Görsel yüklenemedi veya bağlantı geçersiz.
-                        <div className='mt-2'>
-                          <a href={detailModal.screenshot_url} target='_blank' rel='noopener noreferrer' className='text-cyan-400 underline'>
-                            Doğrudan bağlantıyı aç
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-                    <div className='flex justify-end'>
-                      <a
-                        href={detailModal.screenshot_url}
-                        target='_blank'
-                        rel='noopener noreferrer'
-                        className='text-[11px] font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors'
-                      >
-                        <ExternalLink className='w-3 h-3' /> Görseli Tam Boyut Görüntüle
-                      </a>
-                    </div>
-                  </div>
-                ) : (
-                  <div className='p-6 bg-[#0a1628]/60 rounded-lg border border-dashed border-white/10 text-center text-zinc-500 text-xs flex flex-col items-center gap-2'>
-                    <ImageIcon className='w-6 h-6 text-zinc-600' />
-                    <span>Bu maç için kanıt görseli (ekran görüntüsü) yüklenmemiş.</span>
-                  </div>
-                )}
+                <span className='text-xs font-mono font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 rounded shrink-0'>
+                  {teamStats.length} Oyuncu
+                </span>
               </div>
 
-              {/* Player Stats */}
-              <div>
-                <div className='flex items-center justify-between mb-4 border-b border-white/5 pb-2'>
-                  <h3 className='text-xs font-black text-cyan-400 tracking-widest uppercase flex items-center gap-2'>
-                    <Shield className='w-3.5 h-3.5' /> Oyuncu İstatistikleri ({detailModal.stats?.length || 0} Oyuncu)
-                  </h3>
-                  {detailModal.stats && detailModal.stats.length > 0 && (
-                    <span className='text-[10px] text-zinc-500 font-mono'>
-                      Yalnızca eşleşmiş lisanslı oyuncuların verileri profil liderlik tablolarına işlenir
-                    </span>
-                  )}
-                </div>
+              {/* Panel Content */}
+              {teamStats.length > 0 ? (
+                <div className='overflow-x-auto'>
+                  <table className='w-full text-left text-xs'>
+                    <thead className='bg-[#081220] text-[10px] uppercase font-black text-zinc-500 border-b border-white/5'>
+                      <tr>
+                        <th className='px-3 py-2'>Oyuncu & Profil</th>
+                        <th className='px-2 py-2 text-center'>Poz</th>
+                        <th className='px-1.5 py-2 text-center' title='Gol'>G</th>
+                        <th className='px-1.5 py-2 text-center' title='Asist'>A</th>
+                        <th className='px-1.5 py-2 text-center' title='Rating'>Rat</th>
+                        <th className='px-3 py-2 text-right'>İşlemler</th>
+                      </tr>
+                    </thead>
+                    <tbody className='divide-y divide-white/5'>
+                      {teamStats.map((s) => {
+                        const rosterStatus = s.extra_stats?.roster_status;
+                        const registeredName = s.extra_stats?.registered_team_name;
+                        const hasWarning = !s.player_id || rosterStatus === 'ROSTER_MISMATCH' || rosterStatus === 'UNLICENSED';
 
-                {/* Re-check panel: 11 v 11, profile matches, goals vs score */}
-                {(() => {
-                  const stats = (detailModal.stats || []) as CheckStat[];
-                  const homeStats = stats.filter((s) => s.team_id === detailModal.home_team_id);
-                  const awayStats = stats.filter((s) => s.team_id === detailModal.away_team_id);
-                  const unmatched = stats.filter((s) => !s.player_id).length;
-                  const sum = (arr: CheckStat[]) => arr.reduce((a, s) => a + (s.goals || 0), 0);
-                  const items: { ok: boolean; text: string }[] = [
-                    { ok: homeStats.length === 11 && awayStats.length === 11, text: 'Oyuncu sayısı: ' + homeStats.length + ' / ' + awayStats.length + ' (ev / deplasman, beklenen 11 / 11)' },
-                    { ok: unmatched === 0, text: unmatched === 0 ? 'Tüm oyuncuların profili eşleşmiş' : unmatched + ' oyuncunun profili eşleşmedi' },
-                    { ok: sum(homeStats) === detailModal.home_score && sum(awayStats) === detailModal.away_score, text: 'Gol toplamları: ' + sum(homeStats) + ' - ' + sum(awayStats) + ' (skor ' + detailModal.home_score + ' - ' + detailModal.away_score + ')' },
-                  ];
-                  return (
-                    <div className='mb-4 rounded-xl border border-white/10 bg-[#0a1628] p-3.5 text-xs' data-testid='match-check'>
-                      <div className='mb-2 flex items-center justify-between'>
-                        <span className='font-black uppercase tracking-widest text-cyan-400'>Kontrol</span>
-                        <button type='button' onClick={() => router.refresh()} className='px-2 py-1 rounded border border-white/10 bg-white/5 text-[10px] font-bold text-zinc-300 hover:text-cyan-400'>Yeniden Kontrol Et</button>
-                      </div>
-                      <ul className='space-y-0.5'>
-                        {items.map((i, n) => (
-                          <li key={n} className={i.ok ? 'text-emerald-400' : 'text-amber-400'}>{i.ok ? '✓ ' : '⚠ '}{i.text}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  );
-                })()}
-
-                {/* Player Warning Alert Banner */}
-                {(() => {
-                  if (!detailModal.stats || detailModal.stats.length === 0) return null;
-                  const unmatched = detailModal.stats.filter((s: any) => !s.player_id).length;
-                  const mismatch = detailModal.stats.filter((s: any) => s.extra_stats?.roster_status === 'ROSTER_MISMATCH').length;
-                  const unlicensed = detailModal.stats.filter((s: any) => s.extra_stats?.roster_status === 'UNLICENSED').length;
-
-                  if (unmatched === 0 && mismatch === 0 && unlicensed === 0) return null;
-
-                  return (
-                    <div className='p-3.5 mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs text-amber-300 flex items-start gap-3'>
-                      <AlertTriangle className='w-4 h-4 text-amber-400 mt-0.5 shrink-0' />
-                      <div className='space-y-1 flex-1'>
-                        <p className='font-bold text-white'>Kadro ve Lisans Uyuşmazlığı Uyarıları:</p>
-                        <ul className='list-disc list-inside space-y-0.5 text-zinc-300 text-[11px]'>
-                          {unmatched > 0 && (
-                            <li>
-                              <strong className='text-amber-400'>{unmatched} oyuncunun profili eşleşmedi.</strong> Bu oyuncuların gol/asist verileri genel liderlik tablosuna dahil edilmeyecektir. "Profil Ata" butonunu kullanarak eşleştirebilirsiniz.
-                            </li>
-                          )}
-                          {mismatch > 0 && (
-                            <li>
-                              <strong className='text-red-400'>{mismatch} oyuncu</strong> bu ligde başka bir takımda lisanslı görünüyor (kadro uyuşmazlığı).
-                            </li>
-                          )}
-                          {unlicensed > 0 && (
-                            <li>
-                              <strong className='text-amber-400'>{unlicensed} oyuncu</strong> için geçerli takım lisansı bulunamadı.
-                            </li>
-                          )}
-                        </ul>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {detailModal.stats && detailModal.stats.length > 0 ? (
-                  <div className='overflow-x-auto rounded-lg border border-white/5'>
-                    <table className='w-full text-left text-sm text-zinc-400'>
-                      <thead className='bg-[#0a1628] text-[10px] uppercase font-black text-zinc-500'>
-                        <tr>
-                          <th className='px-3 py-2'>Oyuncu & Profil</th>
-                          <th className='px-3 py-2'>Maç / Kadro Durumu</th>
-                          <th className='px-3 py-2'>Poz</th>
-                          <th className='px-3 py-2 text-center'>Gol</th>
-                          <th className='px-3 py-2 text-center'>Asist</th>
-                          <th className='px-3 py-2 text-center'>Rating</th>
-                          <th className='px-3 py-2 text-center'>Şut</th>
-                          <th className='px-3 py-2 text-center'>Pas</th>
-                          <th className='px-3 py-2 text-center'>MOM</th>
-                          <th className='px-3 py-2 text-right'>Profil Ata</th>
-                        </tr>
-                      </thead>
-                      <tbody className='divide-y divide-white/5 bg-[#060d18]'>
-                        {detailModal.stats.map((s:any) => {
-                          const matchTeamName = s.team_id === detailModal.home_team_id ? detailModal.home?.name : detailModal.away?.name;
-                          const rosterStatus = s.extra_stats?.roster_status;
-                          const registeredName = s.extra_stats?.registered_team_name;
-                          const hasWarning = !s.player_id || rosterStatus === 'ROSTER_MISMATCH' || rosterStatus === 'UNLICENSED';
-
-                          return (
-                            <tr key={s.id} className={'hover:bg-white/5 ' + (hasWarning ? 'bg-amber-500/[0.03]' : '')}>
-                              <td className='px-3 py-2'>
+                        return (
+                          <tr key={s.id} className={'hover:bg-white/5 transition-colors ' + (hasWarning ? 'bg-amber-500/[0.03]' : '')}>
+                            <td className='px-3 py-2.5'>
+                              <div className='flex flex-col gap-0.5 min-w-0'>
                                 {s.profiles?.username ? (
-                                  <div className='flex flex-col'>
-                                    <span className='font-bold text-white text-xs flex items-center gap-1.5'>
-                                      {s.profiles.username}
-                                      {s.profiles.full_name && <span className='text-[10px] text-zinc-500 font-normal'>({s.profiles.full_name})</span>}
+                                  <div className='flex items-center gap-1.5 flex-wrap'>
+                                    <span className='font-bold text-white text-xs'>
+                                      @{s.profiles.username}
                                     </span>
-                                    <span className='text-[10px] text-zinc-400 font-mono'>
-                                      EA: {s.ea_player_name || s.ea_player_id || '-'}
-                                    </span>
+                                    {s.profiles.full_name && (
+                                      <span className='text-[10px] text-zinc-400 font-normal'>
+                                        ({s.profiles.full_name})
+                                      </span>
+                                    )}
                                   </div>
                                 ) : (
-                                  <div className='flex flex-col gap-1'>
-                                    <span className='inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30 w-fit'>
-                                      <AlertTriangle className='w-2.5 h-2.5' /> PROFİL EŞLEŞMEDİ
-                                    </span>
-                                    <span className='text-[10px] text-zinc-300 font-mono'>
-                                      EA: {s.ea_player_name || s.ea_player_id || 'Bilinmiyor'}
-                                    </span>
-                                  </div>
+                                  <span className='inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30 w-fit'>
+                                    <AlertTriangle className='w-2.5 h-2.5' /> PROFİL EŞLEŞMEDİ
+                                  </span>
                                 )}
-                              </td>
-                              <td className='px-3 py-2 text-xs'>
-                                <div className='flex flex-col gap-0.5'>
-                                  <span className='text-zinc-300 font-semibold'>{matchTeamName}</span>
+                                <span className='text-[10px] text-zinc-400 font-mono truncate'>
+                                  EA: {s.ea_player_name || s.ea_player_id || 'Bilinmiyor'}
+                                </span>
+                                <div className='pt-0.5'>
+                                  {rosterStatus === 'VALID' && (
+                                    <span className='inline-flex items-center gap-1 text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20'>
+                                      <Check className='w-2.5 h-2.5' /> Lisanslı
+                                    </span>
+                                  )}
                                   {rosterStatus === 'ROSTER_MISMATCH' && (
-                                    <span className='inline-flex items-center gap-1 text-[9px] font-black text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20 w-fit'>
+                                    <span className='inline-flex items-center gap-1 text-[9px] font-black text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20'>
                                       <ShieldAlert className='w-2.5 h-2.5' /> Kadro Uyuşmazlığı ({registeredName || 'Başka Takım'})
                                     </span>
                                   )}
                                   {rosterStatus === 'UNLICENSED' && (
-                                    <span className='inline-flex items-center gap-1 text-[9px] font-black text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 w-fit'>
-                                      <AlertCircle className='w-2.5 h-2.5' /> Lisanssız Oyuncu
-                                    </span>
-                                  )}
-                                  {rosterStatus === 'VALID' && (
-                                    <span className='inline-flex items-center gap-1 text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 w-fit'>
-                                      <Check className='w-2.5 h-2.5' /> Lisanslı
+                                    <span className='inline-flex items-center gap-1 text-[9px] font-black text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20'>
+                                      <AlertCircle className='w-2.5 h-2.5' /> Lisanssız
                                     </span>
                                   )}
                                   {(!s.player_id || rosterStatus === 'UNMATCHED') && (
-                                    <span className='inline-flex items-center gap-1 text-[9px] font-bold text-amber-300/80 bg-white/5 px-1.5 py-0.5 rounded border border-white/10 w-fit'>
+                                    <span className='inline-flex items-center gap-1 text-[9px] font-bold text-amber-300/80 bg-white/5 px-1.5 py-0.5 rounded border border-white/10'>
                                       <UserX className='w-2.5 h-2.5' /> Profil Yok
                                     </span>
                                   )}
                                 </div>
-                              </td>
-                              <td className='px-3 py-2 text-[10px] font-mono'>{s.position}</td>
-                              <td className='px-3 py-2 text-center font-bold text-white'>{s.goals}</td>
-                              <td className='px-3 py-2 text-center font-bold text-white'>{s.assists}</td>
-                              <td className='px-3 py-2 text-center text-amber-400 font-mono'>{s.rating}</td>
-                              <td className='px-3 py-2 text-center'>{s.shots}</td>
-                              <td className='px-3 py-2 text-center'>{s.passes_made}/{s.pass_attempts}</td>
-                              <td className='px-3 py-2 text-center'>{s.is_mom ? <span className='text-amber-400'>⭐</span> : '-'}</td>
-                              <td className='px-3 py-2 text-right whitespace-nowrap'>
+                              </div>
+                            </td>
+                            <td className='px-2 py-2.5 text-center'>
+                              <span className='font-mono font-bold text-[10px] text-zinc-300 bg-white/5 px-1.5 py-0.5 rounded border border-white/5'>
+                                {s.position || '-'}
+                              </span>
+                            </td>
+                            <td className='px-1.5 py-2.5 text-center font-bold text-white'>
+                              {(s.goals ?? 0) > 0 ? <span className='text-emerald-400'>{s.goals}</span> : <span className='text-zinc-600'>0</span>}
+                            </td>
+                            <td className='px-1.5 py-2.5 text-center font-bold text-white'>
+                              {(s.assists ?? 0) > 0 ? <span className='text-cyan-400'>{s.assists}</span> : <span className='text-zinc-600'>0</span>}
+                            </td>
+                            <td className='px-1.5 py-2.5 text-center font-mono font-bold'>
+                              {s.rating ? (
+                                <span className='text-amber-400 flex items-center justify-center gap-0.5'>
+                                  {s.rating}
+                                  {s.is_mom && <span title='Maçın Adamı' className='text-[10px]'>⭐</span>}
+                                </span>
+                              ) : (
+                                <span className='text-zinc-600'>-</span>
+                              )}
+                            </td>
+                            <td className='px-3 py-2.5 text-right whitespace-nowrap'>
+                              <div className='flex items-center justify-end gap-1.5'>
                                 {detailModal.status !== 'APPROVED' && (
                                   <button
                                     type='button'
                                     onClick={() => setStatsModal(s)}
-                                    className='mr-1 px-2 py-1 bg-white/5 hover:bg-cyan-500/10 text-zinc-300 hover:text-cyan-400 border border-white/10 rounded text-[10px] font-bold'
+                                    className='px-2 py-1 bg-white/5 hover:bg-cyan-500/10 text-zinc-300 hover:text-cyan-400 border border-white/10 hover:border-cyan-500/30 rounded text-[10px] font-bold transition-all'
+                                    title='İstatistikleri Düzenle'
                                   >
-                                    İstatistik Düzenle
+                                    İst. Düzenle
                                   </button>
                                 )}
                                 <button
                                   type='button'
                                   onClick={() => openAssignModal(s)}
                                   className='px-2 py-1 bg-white/5 hover:bg-cyan-500/10 text-zinc-300 hover:text-cyan-400 border border-white/10 hover:border-cyan-500/30 rounded text-[10px] font-bold transition-all inline-flex items-center gap-1'
+                                  title={s.player_id ? 'Profili Değiştir' : 'Profil Ata'}
                                 >
                                   <UserCheck className='w-3 h-3' />
                                   {s.player_id ? 'Değiştir' : 'Ata'}
                                 </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className='p-8 text-center text-zinc-500 text-xs italic'>
+                  Bu takım için oyuncu kaydı bulunmuyor.
+                </div>
+              )}
+            </div>
+          );
+        };
+
+        return (
+          <div className='fixed inset-0 z-50 flex justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-sm overflow-y-auto'>
+            <div className='card-surface w-full max-w-6xl xl:max-w-7xl rounded-2xl border border-white/10 flex flex-col my-auto max-h-[92vh] shadow-2xl'>
+              <div className='flex justify-between items-center p-4 border-b border-white/5 bg-[#0a1628] shrink-0'>
+                <div className='flex items-center gap-2.5'>
+                  <Shield className='w-4 h-4 text-cyan-400' />
+                  <h2 className='text-sm font-black text-white tracking-widest uppercase'>MAÇ İNCELEME & DETAY</h2>
+                  <StatusBadge status={detailModal.status} />
+                </div>
+                <button
+                  type='button'
+                  onClick={() => setDetailModal(null)}
+                  className='text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors'
+                  aria-label='Kapat'
+                >
+                  <X className='w-5 h-5'/>
+                </button>
+              </div>
+
+              <div className='flex-1 overflow-y-auto p-4 sm:p-6 space-y-6'>
+                {/* 1. Header Info: Teams, Clickable Score */}
+                <div className='flex flex-col items-center justify-center gap-4 bg-[#060d18] p-5 sm:p-6 rounded-xl border border-white/5'>
+                  <div className='text-xs font-bold text-zinc-400 uppercase tracking-widest text-center'>
+                    {detailModal.seasons?.name} • {detailModal.leagues?.name} • Hafta {detailModal.fixtures?.week_number || '?'}
+                    {detailModal.fixtures?.id && (
+                      <Link
+                        href='/admin/fixtures'
+                        className='ml-2 text-cyan-400 hover:text-cyan-300 underline font-normal text-[11px]'
+                      >
+                        (Fikstür #{detailModal.fixtures.id.substring(0, 8)})
+                      </Link>
+                    )}
+                    <br/>
+                    <span className='text-[10px] text-zinc-500 font-medium'>
+                      {new Date(detailModal.played_at).toLocaleString('tr-TR')}
+                    </span>
                   </div>
-                ) : (
-                  <div className='p-8 bg-[#060d18] rounded-xl border border-white/5 text-center text-zinc-500 text-sm'>
-                    Bu maç için oyuncu istatistiği bulunmuyor.
+
+                  <div className='flex items-center justify-between w-full max-w-2xl px-2'>
+                    {/* Home Team */}
+                    <div className='flex flex-col items-center gap-2 w-32 sm:w-40'>
+                      <TeamLogo src={detailModal.home?.logo_url} name={detailModal.home?.name} size="xl" className="w-14 h-14 sm:w-16 sm:h-16" />
+                      <span className='font-bold text-white text-xs sm:text-sm text-center line-clamp-2'>
+                        {detailModal.home?.name || 'Ev Sahibi'}
+                      </span>
+                    </div>
+
+                    {/* Interactive Clickable Score (Disabled if match is APPROVED) */}
+                    <div className='flex flex-col items-center gap-1.5'>
+                      {detailModal.status === 'APPROVED' ? (
+                        <div
+                          className='flex flex-col items-center gap-1 px-5 sm:px-7 py-2 sm:py-2.5 bg-[#0a1628] border border-white/5 rounded-xl shadow-xl cursor-default opacity-90'
+                          title='Onaylanmış maçın skoru kilitlidir'
+                        >
+                          <div className='flex items-center gap-3 text-3xl sm:text-5xl font-black text-white font-mono tracking-tight'>
+                            <span>{detailModal.home_score !== null && detailModal.home_score !== undefined ? detailModal.home_score : '-'}</span>
+                            <span className='text-zinc-600 font-sans'>-</span>
+                            <span>{detailModal.away_score !== null && detailModal.away_score !== undefined ? detailModal.away_score : '-'}</span>
+                            <Lock className='w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400/80 ml-1' />
+                          </div>
+                          <span className='text-[9px] sm:text-[10px] text-zinc-500 font-medium'>
+                            Onaylanmış maç skoru kilitlidir
+                          </span>
+                        </div>
+                      ) : (
+                        <button
+                          type='button'
+                          onClick={() => setEditScoreModal(detailModal)}
+                          className='group relative flex flex-col items-center gap-1 px-5 sm:px-7 py-2 sm:py-2.5 bg-[#0a1628] hover:bg-[#0d1d36] border border-white/10 hover:border-cyan-500/50 rounded-xl shadow-xl transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyan-500/50'
+                          title='Skoru düzenlemek için tıklayın'
+                          aria-label='Skoru düzenlemek için tıklayın'
+                        >
+                          <div className='flex items-center gap-3 text-3xl sm:text-5xl font-black text-white font-mono tracking-tight'>
+                            <span className='group-hover:text-cyan-400 transition-colors'>
+                              {detailModal.home_score !== null && detailModal.home_score !== undefined ? detailModal.home_score : '-'}
+                            </span>
+                            <span className='text-zinc-600 font-sans'>-</span>
+                            <span className='group-hover:text-cyan-400 transition-colors'>
+                              {detailModal.away_score !== null && detailModal.away_score !== undefined ? detailModal.away_score : '-'}
+                            </span>
+                            <Edit2 className='w-3.5 h-3.5 sm:w-4 sm:h-4 text-zinc-500 group-hover:text-cyan-400 transition-colors ml-1' />
+                          </div>
+                          <span className='text-[9px] sm:text-[10px] text-zinc-400 group-hover:text-cyan-300 transition-colors font-medium'>
+                            Skoru değiştirmek için tıklayın
+                          </span>
+                        </button>
+                      )}
+                      <div className='flex items-center gap-2 mt-1'>
+                        <StatusBadge status={detailModal.status} />
+                        {detailModal.ea_match_id && (
+                          <span className='px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20 font-mono'>
+                            EA #{detailModal.ea_match_id}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Away Team */}
+                    <div className='flex flex-col items-center gap-2 w-32 sm:w-40'>
+                      <TeamLogo src={detailModal.away?.logo_url} name={detailModal.away?.name} size="xl" className="w-14 h-14 sm:w-16 sm:h-16" />
+                      <span className='font-bold text-white text-xs sm:text-sm text-center line-clamp-2'>
+                        {detailModal.away?.name || 'Deplasman'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* EA Raw Score vs Current Match Score Comparison Card */}
+                  {(() => {
+                    if (!eaInfo && !detailModal.ea_match_id) return null;
+
+                    return (
+                      <div className={`w-full max-w-2xl mt-2 p-3 rounded-xl border text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+                        isScoreEdited
+                          ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                          : 'bg-[#0a1628] border-white/10 text-zinc-300'
+                      }`}>
+                        <div className='flex items-center gap-2.5'>
+                          {isScoreEdited ? (
+                            <AlertTriangle className='w-4 h-4 text-amber-400 shrink-0' />
+                          ) : (
+                            <CheckCircle2 className='w-4 h-4 text-emerald-400 shrink-0' />
+                          )}
+                          <div>
+                            <div className='flex items-center gap-2 flex-wrap'>
+                              <span className='font-bold text-white'>EA Maç Kaydı:</span>
+                              {hasEaScores ? (
+                                <span className='font-mono font-bold bg-[#060d18] px-2 py-0.5 rounded border border-white/10'>
+                                  {eaInfo.homeScore} - {eaInfo.awayScore}
+                                </span>
+                              ) : (
+                                <span className='font-mono text-zinc-400'>Skor EA API&apos;den çekilemedi</span>
+                              )}
+                              {isScoreEdited && (
+                                <span className='text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30'>
+                                  Skor Yönetici Tarafından Düzeltildi
+                                </span>
+                              )}
+                              {!isScoreEdited && hasEaScores && (
+                                <span className='text-[10px] font-bold text-emerald-400'>
+                                  ✓ EA API skoru ile birebir uyumlu
+                                </span>
+                              )}
+                            </div>
+                            {isScoreEdited && (
+                              <p className='text-[11px] text-zinc-400 mt-1'>
+                                Onaylandığında puan durumuna ve kayıtlara <strong>{detailModal.home_score} - {detailModal.away_score}</strong> skoru işlenecektir.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        {detailModal.ea_match_id && (
+                          <span className='text-[10px] font-mono text-zinc-400 shrink-0'>
+                            EA ID #{detailModal.ea_match_id}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* 2. Player Warning Alert Banner (Retained) */}
+                {hasRosterWarnings && (
+                  <div className='p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs text-amber-300 flex items-start gap-3'>
+                    <AlertTriangle className='w-4 h-4 text-amber-400 mt-0.5 shrink-0' />
+                    <div className='space-y-1 flex-1'>
+                      <p className='font-bold text-white'>Kadro ve Lisans Uyuşmazlığı Uyarıları:</p>
+                      <ul className='list-disc list-inside space-y-0.5 text-zinc-300 text-[11px]'>
+                        {unmatchedCount > 0 && (
+                          <li>
+                            <strong className='text-amber-400'>{unmatchedCount} oyuncunun profili eşleşmedi.</strong> Bu oyuncuların gol/asist verileri genel liderlik tablosuna dahil edilmeyecektir. &quot;Ata&quot; butonunu kullanarak eşleştirebilirsiniz.
+                          </li>
+                        )}
+                        {mismatchCount > 0 && (
+                          <li>
+                            <strong className='text-red-400'>{mismatchCount} oyuncu</strong> bu ligde başka bir takımda lisanslı görünüyor (kadro uyuşmazlığı).
+                          </li>
+                        )}
+                        {unlicensedCount > 0 && (
+                          <li>
+                            <strong className='text-amber-400'>{unlicensedCount} oyuncu</strong> için geçerli takım lisansı bulunamadı.
+                          </li>
+                        )}
+                      </ul>
+                    </div>
                   </div>
                 )}
+
+                {/* 3. Evidence Screenshot & Notes (ONLY for non-EA matches) */}
+                {!isEaMatch && (
+                  <div className='bg-[#060d18] p-5 rounded-xl border border-white/5 space-y-4'>
+                    <div className='flex items-center justify-between border-b border-white/5 pb-2'>
+                      <h3 className='text-xs font-black text-cyan-400 tracking-widest uppercase flex items-center gap-2'>
+                        <Camera className='w-3.5 h-3.5' /> Maç Kanıtı & Kaptan Notları
+                      </h3>
+                      {detailModal.source && (
+                        <span className='text-[10px] font-mono px-2 py-0.5 rounded bg-white/5 text-zinc-400'>
+                          Kaynak: {detailModal.source}
+                        </span>
+                      )}
+                    </div>
+
+                    {detailModal.notes && (
+                      <div className='text-xs text-zinc-300 bg-[#0a1628] p-3 rounded-lg border border-white/5'>
+                        <span className='font-bold text-zinc-400 block mb-1 text-[10px] uppercase tracking-wider'>Kaptan Notu:</span>
+                        {detailModal.notes}
+                      </div>
+                    )}
+
+                    {detailModal.screenshot_url ? (
+                      <div className='space-y-2'>
+                        <div className='relative max-h-96 rounded-lg overflow-hidden border border-white/10 bg-black/50 flex items-center justify-center group'>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={detailModal.screenshot_url}
+                            alt="Maç Kanıtı"
+                            className='max-h-96 w-auto object-contain rounded-lg transition-transform group-hover:scale-[1.01]'
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              const fallback = e.currentTarget.parentElement?.querySelector('.screenshot-error-fallback');
+                              if (fallback) fallback.classList.remove('hidden');
+                            }}
+                          />
+                          <div className='screenshot-error-fallback hidden p-8 text-center text-zinc-500 text-xs'>
+                            <AlertTriangle className='w-8 h-8 text-amber-500/70 mx-auto mb-2' />
+                            Görsel yüklenemedi veya bağlantı geçersiz.
+                            <div className='mt-2'>
+                              <a href={detailModal.screenshot_url} target='_blank' rel='noopener noreferrer' className='text-cyan-400 underline'>
+                                Doğrudan bağlantıyı aç
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                        <div className='flex justify-end'>
+                          <a
+                            href={detailModal.screenshot_url}
+                            target='_blank'
+                            rel='noopener noreferrer'
+                            className='text-[11px] font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors'
+                          >
+                            <ExternalLink className='w-3 h-3' /> Görseli Tam Boyut Görüntüle
+                          </a>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className='p-6 bg-[#0a1628]/60 rounded-lg border border-dashed border-white/10 text-center text-zinc-500 text-xs flex flex-col items-center gap-2'>
+                        <ImageIcon className='w-6 h-6 text-zinc-600' />
+                        <span>Bu maç için kanıt görseli (ekran görüntüsü) yüklenmemiş.</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 4. Player Stats: Two Columns (Home & Away) */}
+                <div>
+                  <div className='flex items-center justify-between mb-4 border-b border-white/5 pb-2'>
+                    <h3 className='text-xs font-black text-cyan-400 tracking-widest uppercase flex items-center gap-2'>
+                      <Shield className='w-3.5 h-3.5' /> Oyuncu İstatistikleri ({allStats.length} Oyuncu)
+                    </h3>
+                    {allStats.length > 0 && (
+                      <span className='text-[10px] text-zinc-500 font-mono hidden sm:inline'>
+                        Yalnızca eşleşmiş lisanslı oyuncuların verileri profil liderlik tablolarına işlenir
+                      </span>
+                    )}
+                  </div>
+
+                  {allStats.length > 0 ? (
+                    <div className='space-y-6'>
+                      <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
+                        {renderTeamPanel(homeStats, detailModal.home, true)}
+                        {renderTeamPanel(awayStats, detailModal.away, false)}
+                      </div>
+                      {otherStats.length > 0 && (
+                        <div className='mt-4'>
+                          {renderTeamPanel(otherStats, { name: 'Diğer Oyuncular' }, false)}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className='p-8 bg-[#060d18] rounded-xl border border-white/5 text-center text-zinc-500 text-sm'>
+                      Bu maç için oyuncu istatistiği bulunmuyor.
+                    </div>
+                  )}
+                </div>
+
+                {/* 5. Dangerous Actions At The Bottom */}
+                <div className='pt-4 border-t border-white/10'>
+                  <div className='flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#0a1628]/60 p-4 rounded-xl border border-white/5'>
+                    <div className='flex flex-wrap items-center gap-2.5'>
+                      {detailModal.status !== 'REJECTED' && (
+                        <button
+                          type='button'
+                          onClick={() => handleStatus(detailModal, 'REJECTED')}
+                          className='px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-lg text-xs font-bold transition-colors flex items-center gap-2'
+                        >
+                          <XCircle className='w-4 h-4' /> Reddet / Geçersiz Kıl
+                        </button>
+                      )}
+                      <button
+                        type='button'
+                        onClick={() => handleDelete(detailModal)}
+                        className='px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-bold transition-colors flex items-center gap-2'
+                      >
+                        <Trash2 className='w-4 h-4' /> Maçı Sil
+                      </button>
+                    </div>
+
+                    <div>
+                      {detailModal.status !== 'APPROVED' && (
+                        <button
+                          type='button'
+                          onClick={() => handleStatus(detailModal, 'APPROVED')}
+                          className='w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-black transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/40'
+                        >
+                          <CheckCircle2 className='w-4 h-4' /> Maçı Onayla (Puan Durumu & İstatistikleri Güncelle)
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className='text-center text-[11px] text-zinc-500 flex items-center justify-center gap-1.5 mt-2'>
+                    <RefreshCw className='w-3 h-3 text-emerald-500 shrink-0' />
+                    Onaylama işlemi veritabanı tetikleyicisiyle lig puan tablosunu ve liderlik sıralamasını otomatik hesaplar.
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Edit Score Modal */}
       {editScoreModal && (

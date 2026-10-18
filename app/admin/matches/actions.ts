@@ -173,6 +173,11 @@ export async function updateMatchScoreAction(matchId: string, home_score: number
 
   if (!existingMatch) return { error: 'Maç bulunamadı.' };
 
+  // Guard against editing score of already approved matches
+  if (existingMatch.status === 'APPROVED') {
+    return { error: 'Onaylanmış maçın skoru doğrudan değiştirilemez. Önce maç onayını geri alınız veya maçı incelemeye alınız.' };
+  }
+
   const { error } = await supabase.from('matches').update({
     home_score,
     away_score,

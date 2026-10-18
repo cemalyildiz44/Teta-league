@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   normalizeEaId,
+  normalizePlayerIdentifier,
   matchPlayerToProfile,
   validateRosterMembership,
   sanitizeProfileSearchQuery,
@@ -14,7 +15,6 @@ import {
   validateFixtureUpdate,
   validateAndDetermineScoreStatus,
   calculateWeekScheduledAt,
-  getMondaySessionDetails,
   getFirstMondayDate,
   getMidSeasonBreakInfo
 } from '../lib/fixture-generator.ts';
@@ -25,13 +25,35 @@ console.log('UNIT & INTEGRITY TEST SUITE');
 console.log('================================================================\n');
 
 // -----------------------------------------------------------------------------
-// Test 1: EA ID büyük/küçük harf farkı (Case-Insensitive Matching)
+// Test 1: EA ID & Kullanıcı Adı Büyük/Küçük Harf ve Türkçe Karakter Normalizasyonu
 // -----------------------------------------------------------------------------
-console.log('TEST 1: EA ID büyük/küçük harf normalizasyonu ve eşleşme...');
+console.log('TEST 1: EA ID ve kullanıcı adı büyük/küçük harf normalizasyonu ve eşleşme...');
 
 assert.equal(normalizeEaId('  iBo_F16  '), 'ibo_f16', 'normalizeEaId should trim and lowercase');
 assert.equal(normalizeEaId(null), '', 'normalizeEaId null should return empty string');
 assert.equal(normalizeEaId(undefined), '', 'normalizeEaId undefined should return empty string');
+
+// 1.0: normalizePlayerIdentifier ve normalizeEaId Türkçe karakter & Canovic1905 testleri
+assert.equal(normalizePlayerIdentifier('Canovic1905'), 'canovic1905');
+assert.equal(normalizePlayerIdentifier('canovic1905'), 'canovic1905');
+assert.equal(normalizePlayerIdentifier('CANOVIC1905'), 'canovic1905');
+assert.equal(normalizePlayerIdentifier('CANOVİC1905'), 'canovic1905');
+assert.equal(normalizePlayerIdentifier('CANOVıC1905'), 'canovic1905');
+
+assert.equal(normalizePlayerIdentifier('İSMAİL'), 'ismail');
+assert.equal(normalizePlayerIdentifier('ISMAIL'), 'ismail');
+assert.equal(normalizePlayerIdentifier('ismail'), 'ismail');
+assert.equal(normalizePlayerIdentifier('ısmail'), 'ismail');
+assert.equal(normalizePlayerIdentifier('ÇINAR'), 'çinar');
+assert.equal(normalizePlayerIdentifier('çınar'), 'çinar');
+assert.equal(normalizePlayerIdentifier('ŞAHİN'), 'şahin');
+assert.equal(normalizePlayerIdentifier('şahin'), 'şahin');
+assert.equal(normalizePlayerIdentifier('ÖZGÜR'), 'özgür');
+assert.equal(normalizePlayerIdentifier('özgür'), 'özgür');
+assert.equal(normalizePlayerIdentifier('YAĞIZ'), 'yağiz');
+assert.equal(normalizePlayerIdentifier('yağız'), 'yağiz');
+assert.equal(normalizePlayerIdentifier('GÜVEN'), 'güven');
+assert.equal(normalizePlayerIdentifier('güven'), 'güven');
 
 const profilesPool1 = [
   { id: 'usr-1', username: 'ibo_f16', current_ea_player_id: 'iBo_F16' },
@@ -53,7 +75,71 @@ const res1c = matchPlayerToProfile({ ea_player_id: '  IBO_F16  ', ea_player_name
 assert.equal(res1c.status, 'MATCHED', '1c whitespace trimmed should match');
 assert.equal(res1c.player_id, 'usr-1', '1c player_id should match usr-1');
 
-console.log('  [PASS] Büyük/küçük harf ve boşluk farkları başarıyla normalize edildi ve eşleştirildi.\n');
+// 1d: Canovic1905 kullanıcı adı eşleşmesi (current_ea_player_id null olsa dahi)
+const canovicPool = [
+  { id: 'usr-canovic', username: 'canovic1905', current_ea_player_id: null }
+];
+// 1d-1: EA adı CANOVIC1905 -> kullanıcı adı canovic1905 ile eşleşmeli
+const res1d1 = matchPlayerToProfile({ ea_player_id: '326658010', ea_player_name: 'CANOVIC1905' }, canovicPool);
+assert.equal(res1d1.status, 'MATCHED', '1d1 status should be MATCHED');
+assert.equal(res1d1.player_id, 'usr-canovic', '1d1 player_id should match usr-canovic');
+
+// 1d-2: EA adı Canovic1905 -> kullanıcı adı canovic1905 ile eşleşmeli
+const res1d2 = matchPlayerToProfile({ ea_player_id: 'Canovic1905', ea_player_name: 'Canovic1905' }, canovicPool);
+assert.equal(res1d2.status, 'MATCHED', '1d2 status should be MATCHED');
+assert.equal(res1d2.player_id, 'usr-canovic', '1d2 player_id should match usr-canovic');
+
+// 1d-3: EA adı canovic1905 -> büyük harfli profil kullanıcı adı ile eşleşmeli
+const canovicUpperPool = [
+  { id: 'usr-canovic-up', username: 'CANOVIC1905', current_ea_player_id: null }
+];
+const res1d3 = matchPlayerToProfile({ ea_player_id: 'canovic1905', ea_player_name: 'canovic1905' }, canovicUpperPool);
+assert.equal(res1d3.status, 'MATCHED', '1d3 status should be MATCHED');
+assert.equal(res1d3.player_id, 'usr-canovic-up', '1d3 player_id should match usr-canovic-up');
+
+// 1e: Türkçe karakterli kullanıcı adları (İsmail, Çınar, Şahin, Özgür)
+const turkishPool = [
+  { id: 'usr-ismail', username: 'ismail', current_ea_player_id: null },
+  { id: 'usr-cinar', username: 'çınar', current_ea_player_id: null },
+  { id: 'usr-sahin', username: 'şahin', current_ea_player_id: null },
+  { id: 'usr-ozgur', username: 'özgür', current_ea_player_id: null }
+];
+// İSMAİL -> ismail
+const res1e1 = matchPlayerToProfile({ ea_player_id: 'İSMAİL', ea_player_name: 'İSMAİL' }, turkishPool);
+assert.equal(res1e1.status, 'MATCHED');
+assert.equal(res1e1.player_id, 'usr-ismail');
+
+// ISMAIL -> ismail
+const res1e2 = matchPlayerToProfile({ ea_player_id: 'ISMAIL', ea_player_name: 'ISMAIL' }, turkishPool);
+assert.equal(res1e2.status, 'MATCHED');
+assert.equal(res1e2.player_id, 'usr-ismail');
+
+// ÇINAR -> çınar
+const res1e3 = matchPlayerToProfile({ ea_player_id: 'ÇINAR', ea_player_name: 'ÇINAR' }, turkishPool);
+assert.equal(res1e3.status, 'MATCHED');
+assert.equal(res1e3.player_id, 'usr-cinar');
+
+// ŞAHİN -> şahin
+const res1e4 = matchPlayerToProfile({ ea_player_id: 'ŞAHİN', ea_player_name: 'ŞAHİN' }, turkishPool);
+assert.equal(res1e4.status, 'MATCHED');
+assert.equal(res1e4.player_id, 'usr-sahin');
+
+// ÖZGÜR -> özgür
+const res1e5 = matchPlayerToProfile({ ea_player_id: 'ÖZGÜR', ea_player_name: 'ÖZGÜR' }, turkishPool);
+assert.equal(res1e5.status, 'MATCHED');
+assert.equal(res1e5.player_id, 'usr-ozgur');
+
+// 1f: Yalnızca harf büyüklüğü farklı olan birden fazla profil varsa AMBIGUOUS dönmeli (otomatik atama yapılmamalı)
+const ambiguousCasePool = [
+  { id: 'usr-can1', username: 'canovic1905', current_ea_player_id: null },
+  { id: 'usr-can2', username: 'CANOVIC1905', current_ea_player_id: null }
+];
+const res1f = matchPlayerToProfile({ ea_player_id: 'canovic1905', ea_player_name: 'Canovic1905' }, ambiguousCasePool);
+assert.equal(res1f.status, 'AMBIGUOUS', '1f multiple case candidates must be AMBIGUOUS');
+assert.equal(res1f.player_id, null, '1f player_id must be null for multiple candidates');
+assert.ok(res1f.warning?.includes('Belirsiz eşleşme'), '1f warning must state Belirsiz eşleşme');
+
+console.log('  [PASS] Büyük/küçük harf, Türkçe karakterler ve Canovic1905 varyantları başarıyla normalize edildi ve eşleştirildi.\n');
 
 
 // -----------------------------------------------------------------------------
@@ -624,7 +710,7 @@ console.log('  [PASS] PostgREST filtre enjeksiyon, syntax ve wildcard enumeratio
 // -----------------------------------------------------------------------------
 console.log('TEST 13: Skor Güncelleme Parametre Doğrulaması (Negatif / Kesirli Skor Koruması)...');
 
-function validateScoreInput(matchId, homeScore, awayScore) {
+function validateScoreInput(matchId, homeScore, awayScore, status = 'PENDING_REVIEW') {
   if (!matchId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(matchId)) {
     return { error: 'Geçersiz maç kimliği.' };
   }
@@ -638,6 +724,9 @@ function validateScoreInput(matchId, homeScore, awayScore) {
   ) {
     return { error: 'Geçersiz skor: Skorlar negatif olamaz ve tam sayı olmalıdır.' };
   }
+  if (status === 'APPROVED') {
+    return { error: 'Onaylanmış maçın skoru doğrudan değiştirilemez. Önce maç onayını geri alınız veya maçı incelemeye alınız.' };
+  }
   return { success: true };
 }
 
@@ -648,8 +737,11 @@ assert.ok(validateScoreInput(validUuid, -1, 2).error, '13c negative score reject
 assert.ok(validateScoreInput(validUuid, 2.5, 1).error, '13d float score rejected');
 assert.ok(validateScoreInput(validUuid, NaN, 1).error, '13e NaN score rejected');
 assert.ok(validateScoreInput('not-a-uuid', 1, 0).error, '13f invalid uuid rejected');
+// 13g: Onaylanmış (APPROVED) maçta skor düzenleme kesinlikle reddedilmeli
+assert.ok(validateScoreInput(validUuid, 3, 1, 'APPROVED').error, '13g approved match score update must be rejected');
+assert.equal(validateScoreInput(validUuid, 3, 1, 'PENDING_REVIEW').success, true, '13h pending match score update allowed');
 
-console.log('  [PASS] Negatif, kesirli ve geçersiz skor girişleri başarıyla engellendi.\n');
+console.log('  [PASS] Negatif, kesirli ve geçersiz skor girişleri ile onaylanmış maç koruması doğrulandı.\n');
 
 
 // -----------------------------------------------------------------------------
@@ -1004,6 +1096,7 @@ const w10 = calculateWeekScheduledAt(baseMondayStr, 10);
 const w11 = calculateWeekScheduledAt(baseMondayStr, 11);
 const w12 = calculateWeekScheduledAt(baseMondayStr, 12);
 assert.equal(w10.sessionNumber, 4, '18q Hafta 10 -> Oturum 4');
+assert.equal(w11.scheduledAt, '2026-11-02T19:30:00.000Z', '18q2 Hafta 11 -> 2 Kasım 22:30 TRT');
 assert.equal(w12.scheduledAt, '2026-11-02T20:00:00.000Z', '18r Hafta 12 -> 2 Kasım 23:00 TRT');
 
 // 18c: DEVRE ARASI (Mid-Season Break) Atlama Kuralı:
@@ -1030,6 +1123,7 @@ const w17 = calculateWeekScheduledAt(baseMondayStr, 17);
 const w18 = calculateWeekScheduledAt(baseMondayStr, 18);
 assert.equal(w16.sessionNumber, 6, '18y Hafta 16 -> Oturum 6');
 assert.equal(w16.scheduledAt, '2026-11-23T19:00:00.000Z', '18z Hafta 16 -> 23 Kasım 22:00 TRT');
+assert.equal(w17.scheduledAt, '2026-11-23T19:30:00.000Z', '18z2 Hafta 17 -> 23 Kasım 22:30 TRT');
 assert.equal(w18.scheduledAt, '2026-11-23T20:00:00.000Z', '18aa Hafta 18 -> 23 Kasım 23:00 TRT');
 
 // Oturum 7: Hafta 19, 20 (2 maç: 22:00, 22:30 TRT) -> 30 Kasım

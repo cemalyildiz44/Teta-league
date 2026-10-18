@@ -35,23 +35,49 @@ export interface RosterValidationResult {
 }
 
 /**
- * Normalizes an EA player identifier (gamertag or ID) by trimming and lowercasing.
+ * Normalizes a player identifier or username for robust case-insensitive comparison,
+ * safely handling Turkish character casing (e.g. I/İ/ı/i, Ç/ç, Ğ/ğ, Ö/ö, Ş/ş, Ü/ü).
+ *
+ * Symmetrically folds:
+ * - 'Canovic1905', 'canovic1905', 'CANOVIC1905', 'CANOVİC1905', 'CANOVıC1905' -> 'canovic1905'
+ * - 'İsmail', 'ismail', 'ISMAIL', 'İSMAİL', 'ısmail' -> 'ismail'
+ * - 'Çınar', 'çınar', 'ÇINAR' -> 'çinar'
+ * - 'Şahin', 'şahin', 'ŞAHİN' -> 'şahin'
+ * - 'Özgür', 'özgür', 'ÖZGÜR' -> 'özgür'
+ * - 'Yağız', 'yağız', 'YAĞIZ' -> 'yağiz'
+ * - 'Güven', 'güven', 'GÜVEN' -> 'güven'
+ */
+export function normalizePlayerIdentifier(val: string | null | undefined): string {
+  if (!val || typeof val !== 'string') return '';
+  return val
+    .normalize('NFC')
+    .trim()
+    .replace(/İ/g, 'i')
+    .replace(/I/g, 'i')
+    .replace(/ı/g, 'i')
+    .toLowerCase()
+    .replace(/\u0307/g, '');
+}
+
+/**
+ * Normalizes an EA player identifier (gamertag or ID) by trimming and lowercasing with Turkish case-folding safety.
+ * Backward-compatible alias for normalizePlayerIdentifier.
  */
 export function normalizeEaId(val: string | null | undefined): string {
-  if (!val) return '';
-  return val.trim().toLowerCase();
+  return normalizePlayerIdentifier(val);
 }
 
 /**
  * Matches a single player against a pool of profile candidates using case-insensitive normalization.
+ * Supports matching against both profile current_ea_player_id and username with Turkish casing safety.
  * Detects ambiguous collisions and never guesses unknown players.
  */
 export function matchPlayerToProfile(
   player: { ea_player_id?: string | null; ea_player_name?: string | null },
   profiles: ProfileCandidate[]
 ): PlayerMatchResult {
-  const normId = normalizeEaId(player.ea_player_id);
-  const normName = normalizeEaId(player.ea_player_name);
+  const normId = normalizePlayerIdentifier(player.ea_player_id);
+  const normName = normalizePlayerIdentifier(player.ea_player_name);
 
   if (!normId && !normName) {
     return {
@@ -61,19 +87,37 @@ export function matchPlayerToProfile(
     };
   }
 
-  // Index profiles by normalized EA identifier
-  const idToProfiles = new Map<string, ProfileCandidate[]>();
+  // Index profiles by normalized identifiers (both current_ea_player_id and username).
+  // Inner map keyed by profile.id guarantees uniqueness per profile under each key.
+  const keyToProfiles = new Map<string, Map<string, ProfileCandidate>>();
+
+  const addIndex = (key: string, p: ProfileCandidate) => {
+    if (!key) return;
+    let profileMap = keyToProfiles.get(key);
+    if (!profileMap) {
+      profileMap = new Map<string, ProfileCandidate>();
+      keyToProfiles.set(key, profileMap);
+    }
+    profileMap.set(p.id, p);
+  };
+
   for (const p of profiles) {
-    if (!p.current_ea_player_id) continue;
-    const key = normalizeEaId(p.current_ea_player_id);
-    if (!key) continue;
-    const existing = idToProfiles.get(key) || [];
-    existing.push(p);
-    idToProfiles.set(key, existing);
+    if (p.current_ea_player_id) {
+      addIndex(normalizePlayerIdentifier(p.current_ea_player_id), p);
+    }
+    if (p.username) {
+      addIndex(normalizePlayerIdentifier(p.username), p);
+    }
   }
 
-  const matchesFromId = normId ? idToProfiles.get(normId) || [] : [];
-  const matchesFromName = normName ? idToProfiles.get(normName) || [] : [];
+  const getMatchesForKey = (key: string): ProfileCandidate[] => {
+    if (!key) return [];
+    const map = keyToProfiles.get(key);
+    return map ? Array.from(map.values()) : [];
+  };
+
+  const matchesFromId = getMatchesForKey(normId);
+  const matchesFromName = getMatchesForKey(normName);
 
   // Check collision / ambiguity for matches from ea_player_id
   if (matchesFromId.length > 1) {

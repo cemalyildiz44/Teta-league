@@ -55,7 +55,7 @@ async function loadContext(supabase: Supa, p: { seasonId: string; leagueId: stri
     p.eaMatchIds.length ? supabase.from('matches').select('id, fixture_id, ea_match_id, status').in('ea_match_id', p.eaMatchIds) : Promise.resolve({ data: [], error: null }),
     supabase.from('match_import_history').select('result, checksum, file_generated_at, season_id, league_id, week_number').eq('league_id', p.leagueId).limit(5000),
     supabase.from('fixture_import_history').select('result, checksum, week_number').eq('league_id', p.leagueId).limit(5000),
-    supabase.from('profiles').select('id, username, full_name, current_ea_player_id, is_active, status').not('current_ea_player_id', 'is', null).limit(5000),
+    supabase.from('profiles').select('id, username, full_name, current_ea_player_id, is_active, status').limit(5000),
     // No embedded teams(...): team_memberships references league_teams (composite FK), so PostgREST has no direct relationship to teams.
     supabase.from('team_memberships').select('id, player_id, team_id, season_id, left_at').eq('season_id', p.seasonId).is('left_at', null).limit(5000),
   ]);
