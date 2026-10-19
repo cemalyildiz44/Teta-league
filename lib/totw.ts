@@ -24,7 +24,73 @@ export interface TotwFormationSlot {
 
 export type FormationSlot = TotwFormationSlot;
 
+export const DEFAULT_TOTW_FORMATION: FormationKey = '3-5-2';
+
 export const FORMATION_KEYS: FormationKey[] = ['4-3-3', '4-4-2', '4-2-3-1', '3-5-2'];
+
+export interface TotwPeriod {
+  periodNumber: number;
+  startWeek: number;
+  endWeek: number;
+  weeks: number[];
+  label: string;
+  displayTitle: string;
+}
+
+export function getTotwPeriodWeeks(periodNumber: number): number[] {
+  const p = Math.max(1, Math.floor(periodNumber));
+  const start = (p - 1) * 3 + 1;
+  return [start, start + 1, start + 2];
+}
+
+export function getTotwPeriodNumber(weekNumber: number): number {
+  if (!weekNumber || weekNumber < 1) return 1;
+  return Math.floor((weekNumber - 1) / 3) + 1;
+}
+
+export function getTotwPeriodLabel(periodNumber: number, customWeeks?: number[]): string {
+  const weeks = customWeeks && customWeeks.length > 0 ? customWeeks : getTotwPeriodWeeks(periodNumber);
+  const minW = Math.min(...weeks);
+  const maxW = Math.max(...weeks);
+  if (minW === maxW) return `HAFTA ${minW} TOTW`;
+  return `HAFTA ${minW}–${maxW} TOTW`;
+}
+
+export function buildTotwPeriods(fixtureWeeks: number[]): TotwPeriod[] {
+  if (!fixtureWeeks || fixtureWeeks.length === 0) return [];
+  const uniqueWeeks = Array.from(
+    new Set(fixtureWeeks.filter((w) => typeof w === 'number' && w >= 1))
+  ).sort((a, b) => a - b);
+  if (uniqueWeeks.length === 0) return [];
+
+  const maxWeek = Math.max(...uniqueWeeks);
+  const maxPeriod = Math.ceil(maxWeek / 3);
+  const periods: TotwPeriod[] = [];
+
+  for (let p = 1; p <= maxPeriod; p++) {
+    const defaultWeeks = getTotwPeriodWeeks(p);
+    const startWeek = defaultWeeks[0];
+    const endWeek = defaultWeeks[defaultWeeks.length - 1];
+    const periodWeeks = uniqueWeeks.filter((w) => w >= startWeek && w <= endWeek);
+    if (periodWeeks.length === 0) continue;
+
+    const actualMin = Math.min(...periodWeeks);
+    const actualMax = Math.max(...periodWeeks);
+    const label = actualMin === actualMax ? `HAFTA ${actualMin} TOTW` : `HAFTA ${actualMin}–${actualMax} TOTW`;
+    const displayTitle = `${label} (Dönem ${p})`;
+
+    periods.push({
+      periodNumber: p,
+      startWeek: actualMin,
+      endWeek: actualMax,
+      weeks: periodWeeks,
+      label,
+      displayTitle,
+    });
+  }
+
+  return periods;
+}
 
 export const FORMATIONS: Record<FormationKey, TotwFormationSlot[]> = {
   '4-3-3': [
@@ -292,6 +358,13 @@ export function isPlayerCompatibleWithSlot(
     return { compatible: true };
   }
 
+  // Tactical versatility: Outfield flexibility across positions (MID can support DEF/FWD; DEF/FWD can support MID)
+  const isSlotOutfield = slot.roleGroup !== 'GK';
+  const isPlayerOutfield = Array.from(roles).some((r) => r !== 'GK');
+  if (isSlotOutfield && isPlayerOutfield) {
+    return { compatible: true };
+  }
+
   const roleLabels: Record<RoleGroup, string> = {
     GK: 'Kaleci (KL)',
     DEF: 'Defans (STP / SĞB / SLB)',
@@ -306,20 +379,28 @@ export function isPlayerCompatibleWithSlot(
 }
 
 /**
- * Deterministically selects the best 11 players for a given formation from the week's approved match candidates.
- * - Only considers candidates with `playedInWeek === true` and a valid role matching the slot's `roleGroup`.
- * - Never places a player in more than one slot.
- * - Never places a player of another role group into an unfilled slot; leaves the slot empty (`player: null`) if not enough eligible players exist.
+ * Deterministically selects the best 11 players for a given formation (fixed 3-5-2 by default)
+ * from the period's approved match candidates.
+ *
+ * Requirements:
+ * - 1 GK, 3 DEF, 5 MID, 2 FWD = 11 players for 3-5-2.
+ * - Prioritizes top candidates by rating and composite score who played in that period.
+ * - Sub-position matching preference (e.g. STP, SLB, SGB for DEF; CAM, LM, RM, CDM for MID; ST/LW/RW for FWD).
+ * - If a position lacks candidates with primary role matching the slot:
+ *   1) Falls back to candidates with that role in eligibleRoleGroups.
+ *   2) Falls back to logical alternative outfield positions (e.g. DEF <- MID; FWD <- MID; MID <- FWD/DEF).
+ * - Never duplicates a player in more than one slot.
+ * - Leaves a slot empty only if total eligible candidate pool has fewer players than slots.
  */
 export function selectAutoTotwLineup(
   candidates: TotwPlayerCandidate[],
-  formationKey: FormationKey
+  formationKey: FormationKey = DEFAULT_TOTW_FORMATION
 ): {
   assignments: TotwSlotAssignment[];
   missingCount: number;
   missingByRole: Record<RoleGroup, number>;
 } {
-  const slots = FORMATIONS[formationKey] || FORMATIONS['4-3-3'];
+  const slots = FORMATIONS[formationKey] || FORMATIONS['3-5-2'];
   const usedPlayerIds = new Set<string>();
   const assignmentsByIndex = new Map<number, TotwSlotAssignment>();
 
@@ -330,19 +411,20 @@ export function selectAutoTotwLineup(
 
   const roleGroups: RoleGroup[] = ['GK', 'DEF', 'MID', 'FWD'];
   const missingByRole: Record<RoleGroup, number> = { GK: 0, DEF: 0, MID: 0, FWD: 0 };
+  const openSlots: TotwFormationSlot[] = [];
 
+  // Pass 1: Assign top candidates whose primary roleGroup matches the slot's roleGroup
   for (const rg of roleGroups) {
     const roleSlots = slots.filter((s) => s.roleGroup === rg);
     const pool = weekCandidates.filter(
       (c) => !usedPlayerIds.has(c.playerId) && c.roleGroup === rg
     );
 
-    // Take up to roleSlots.length best candidates in this role group
     const topPool = pool.slice(0, roleSlots.length);
     const assignedInRole = new Set<string>();
-    const openSlots: TotwFormationSlot[] = [];
+    const unassignedRoleSlots: TotwFormationSlot[] = [];
 
-    // Pass 1: Match specific sub-positions (e.g., SLB -> LB, STP -> CB, SĞB -> RB) among topPool
+    // Sub-pass 1A: Match preferred sub-positions
     for (const slot of roleSlots) {
       const preferred = new Set(slot.preferredSubPositions.map((p) => normalizePosToken(p)));
       const match = topPool.find((cand) => {
@@ -360,14 +442,14 @@ export function selectAutoTotwLineup(
           isManualOverride: false,
         });
       } else {
-        openSlots.push(slot);
+        unassignedRoleSlots.push(slot);
       }
     }
 
-    // Pass 2: Fill remaining slots in this role group with remaining topPool candidates (same role group only)
+    // Sub-pass 1B: Fill remaining slots in this role group with remaining topPool candidates
     const remainingCandidates = topPool.filter((c) => !assignedInRole.has(c.playerId));
-    for (let i = 0; i < openSlots.length; i++) {
-      const slot = openSlots[i];
+    for (let i = 0; i < unassignedRoleSlots.length; i++) {
+      const slot = unassignedRoleSlots[i];
       const cand = remainingCandidates[i] || null;
       if (cand) {
         assignedInRole.add(cand.playerId);
@@ -378,7 +460,62 @@ export function selectAutoTotwLineup(
           isManualOverride: false,
         });
       } else {
-        missingByRole[rg] += 1;
+        openSlots.push(slot);
+      }
+    }
+  }
+
+  // Pass 2: Position fallback for remaining open slots (e.g. DEF, MID, FWD lacking candidates)
+  if (openSlots.length > 0) {
+    for (const slot of openSlots) {
+      if (assignmentsByIndex.has(slot.slotIndex)) continue;
+
+      // 2A: Check remaining candidates with eligibleRoleGroups containing slot.roleGroup
+      let fallbackCandidate = weekCandidates.find(
+        (c) =>
+          !usedPlayerIds.has(c.playerId) &&
+          c.eligibleRoleGroups &&
+          c.eligibleRoleGroups.includes(slot.roleGroup)
+      );
+
+      // 2B: Tactical cross-position fallback for outfield positions
+      if (!fallbackCandidate && slot.roleGroup !== 'GK') {
+        if (slot.roleGroup === 'DEF') {
+          // Unfilled DEF: take best available MID (defensive minded)
+          fallbackCandidate = weekCandidates.find(
+            (c) => !usedPlayerIds.has(c.playerId) && c.roleGroup === 'MID'
+          );
+        } else if (slot.roleGroup === 'FWD') {
+          // Unfilled FWD: take best available MID (attacking minded)
+          fallbackCandidate = weekCandidates.find(
+            (c) => !usedPlayerIds.has(c.playerId) && c.roleGroup === 'MID'
+          );
+        } else if (slot.roleGroup === 'MID') {
+          // Unfilled MID: take best available FWD or DEF
+          fallbackCandidate = weekCandidates.find(
+            (c) =>
+              !usedPlayerIds.has(c.playerId) &&
+              (c.roleGroup === 'FWD' || c.roleGroup === 'DEF')
+          );
+        }
+
+        // 2C: Any remaining outfield candidate
+        if (!fallbackCandidate) {
+          fallbackCandidate = weekCandidates.find(
+            (c) => !usedPlayerIds.has(c.playerId) && c.roleGroup !== 'GK'
+          );
+        }
+      }
+
+      if (fallbackCandidate) {
+        usedPlayerIds.add(fallbackCandidate.playerId);
+        assignmentsByIndex.set(slot.slotIndex, {
+          slot,
+          player: fallbackCandidate,
+          isManualOverride: false,
+        });
+      } else {
+        missingByRole[slot.roleGroup] += 1;
         assignmentsByIndex.set(slot.slotIndex, {
           slot,
           player: null,

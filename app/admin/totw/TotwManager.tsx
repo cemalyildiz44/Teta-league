@@ -3,14 +3,17 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import {
+  DEFAULT_TOTW_FORMATION,
   FORMATIONS,
-  FORMATION_KEYS,
   ROLE_GROUP_LABELS,
+  buildTotwPeriods,
+  getTotwPeriodLabel,
   isPlayerCompatibleWithSlot,
   selectAutoTotwLineup,
   type FormationKey,
   type FormationSlot,
   type RoleGroup,
+  type TotwPeriod,
   type TotwPlayerCandidate,
 } from '@/lib/totw';
 import {
@@ -65,7 +68,8 @@ export interface DraftLineupSlot {
 interface TotwManagerProps {
   seasons: TotwSeasonOption[];
   leagues: TotwLeagueOption[];
-  weeksBySeasonLeague: Record<string, number[]>;
+  periodsBySeasonLeague?: Record<string, TotwPeriod[]>;
+  weeksBySeasonLeague?: Record<string, number[]>;
   trophies: TotwTrophyOption[];
   initialLockedWeeks: LockedWeekSummary[];
   initialSchemaPending: boolean;
@@ -81,6 +85,7 @@ const ROLE_BADGE_STYLES: Record<RoleGroup, string> = {
 export default function TotwManager({
   seasons,
   leagues,
+  periodsBySeasonLeague,
   weeksBySeasonLeague,
   trophies,
   initialLockedWeeks,
@@ -103,16 +108,28 @@ export default function TotwManager({
     return first?.id || '';
   });
 
-  const availableWeeks = useMemo(() => {
+  const availablePeriods = useMemo<TotwPeriod[]>(() => {
     if (!selectedSeasonId || !selectedLeagueId) return [];
-    return weeksBySeasonLeague[`${selectedSeasonId}:${selectedLeagueId}`] || [];
-  }, [weeksBySeasonLeague, selectedSeasonId, selectedLeagueId]);
+    const key = `${selectedSeasonId}:${selectedLeagueId}`;
+    if (periodsBySeasonLeague && periodsBySeasonLeague[key] && periodsBySeasonLeague[key].length > 0) {
+      return periodsBySeasonLeague[key];
+    }
+    const weeks = weeksBySeasonLeague?.[key] || [];
+    return buildTotwPeriods(weeks);
+  }, [periodsBySeasonLeague, weeksBySeasonLeague, selectedSeasonId, selectedLeagueId]);
 
-  const [selectedWeekNumber, setSelectedWeekNumber] = useState<number | null>(null);
-  const [selectedFormation, setSelectedFormation] = useState<FormationKey>('4-3-3');
+  const [selectedPeriodNumber, setSelectedPeriodNumber] = useState<number | null>(null);
+  const selectedPeriod = useMemo(
+    () => availablePeriods.find((p) => p.periodNumber === selectedPeriodNumber) || null,
+    [availablePeriods, selectedPeriodNumber]
+  );
+
+  // Fixed formation: strictly 3-5-2 across all TOTWs
+  const formation: FormationKey = DEFAULT_TOTW_FORMATION;
+
   const [selectedTrophyId, setSelectedTrophyId] = useState<string>('');
 
-  // Server data for the selected week
+  // Server data for the selected period
   const [weekData, setWeekData] = useState<LoadTotwWeekResult | null>(null);
   const [isLoadingWeek, setIsLoadingWeek] = useState<boolean>(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -120,7 +137,7 @@ export default function TotwManager({
   // Active 11 slots on pitch
   const [lineupSlots, setLineupSlots] = useState<DraftLineupSlot[]>([]);
 
-  // Persisted locked weeks list (synced from server)
+  // Persisted locked periods list (synced from server)
   const [lockedWeeks, setLockedWeeks] = useState<LockedWeekSummary[]>(initialLockedWeeks);
 
   // Replacement modal state
@@ -135,6 +152,13 @@ export default function TotwManager({
     type: 'success' | 'error';
     text: string;
   } | null>(null);
+
+  const periodLabel = useMemo(() => {
+    if (weekData?.lockedTotw?.periodLabel) return weekData.lockedTotw.periodLabel;
+    if (selectedPeriod?.label) return selectedPeriod.label;
+    if (selectedPeriodNumber) return getTotwPeriodLabel(selectedPeriodNumber);
+    return '';
+  }, [weekData?.lockedTotw, selectedPeriod, selectedPeriodNumber]);
 
   // Filter trophies eligible for players and matching season (or global trophies without season restriction)
   const eligibleTrophies = useMemo(() => {
@@ -171,7 +195,7 @@ export default function TotwManager({
     const nextLeagues = leagues.filter((l) => l.season_id === newSeasonId);
     const nextLeagueId = nextLeagues[0]?.id || '';
     setSelectedLeagueId(nextLeagueId);
-    setSelectedWeekNumber(null);
+    setSelectedPeriodNumber(null);
     setWeekData(null);
     setLineupSlots([]);
     setFeedbackBanner(null);
@@ -179,27 +203,27 @@ export default function TotwManager({
 
   const handleLeagueChange = (newLeagueId: string) => {
     setSelectedLeagueId(newLeagueId);
-    setSelectedWeekNumber(null);
+    setSelectedPeriodNumber(null);
     setWeekData(null);
     setLineupSlots([]);
     setFeedbackBanner(null);
   };
 
-  const handleWeekChange = (weekVal: string) => {
-    const parsed = parseInt(weekVal, 10);
+  const handlePeriodChange = (val: string) => {
+    const parsed = parseInt(val, 10);
     if (Number.isNaN(parsed) || parsed < 1) {
-      setSelectedWeekNumber(null);
+      setSelectedPeriodNumber(null);
       setWeekData(null);
       setLineupSlots([]);
     } else {
-      setSelectedWeekNumber(parsed);
+      setSelectedPeriodNumber(parsed);
     }
     setFeedbackBanner(null);
   };
 
   const buildAutoSlots = useCallback(
-    (candidates: TotwPlayerCandidate[], formation: FormationKey): DraftLineupSlot[] => {
-      const auto = selectAutoTotwLineup(candidates, formation);
+    (candidates: TotwPlayerCandidate[], formKey: FormationKey): DraftLineupSlot[] => {
+      const auto = selectAutoTotwLineup(candidates, formKey);
       return auto.assignments.map((s) => ({
         slot: s.slot,
         player: s.player,
@@ -211,7 +235,7 @@ export default function TotwManager({
 
   const buildLockedSlots = useCallback(
     (locked: NonNullable<LoadTotwWeekResult['lockedTotw']>): DraftLineupSlot[] => {
-      const fKey = FORMATION_KEYS.includes(locked.formation) ? locked.formation : '4-3-3';
+      const fKey = FORMATIONS[locked.formation] ? locked.formation : DEFAULT_TOTW_FORMATION;
       const fSlots = FORMATIONS[fKey];
       return fSlots.map((fSlot) => {
         const saved = locked.slots.find(
@@ -235,20 +259,25 @@ export default function TotwManager({
     []
   );
 
-  // Fetch week data from server; if locked, directly hydrate from persisted DB record without recalculating
-  const fetchWeekData = useCallback(
+  // Fetch period data from server; if locked, directly hydrate from persisted DB record without recalculating
+  const fetchPeriodData = useCallback(
     async (
       seasonId: string,
       leagueId: string,
-      weekNumber: number,
-      currentFormation: FormationKey
+      periodNumber: number,
+      periodWeeks: number[]
     ): Promise<LoadTotwWeekResult | null> => {
       setIsLoadingWeek(true);
       setLoadError(null);
       try {
-        const res = await loadTotwWeekDataAction({ seasonId, leagueId, weekNumber });
+        const res = await loadTotwWeekDataAction({
+          seasonId,
+          leagueId,
+          periodNumber,
+          periodWeeks,
+        });
         if (!res.ok) {
-          setLoadError(res.error || 'Hafta verisi yüklenemedi.');
+          setLoadError(res.error || 'Dönem verisi yüklenemedi.');
           setWeekData(res);
           setLineupSlots([]);
           return res;
@@ -257,7 +286,6 @@ export default function TotwManager({
 
         if (res.lockedTotw) {
           const locked = res.lockedTotw;
-          setSelectedFormation(locked.formation);
           setSelectedTrophyId(locked.trophyId);
           setLineupSlots(buildLockedSlots(locked));
           // Sync lockedWeeks state from authoritative server record
@@ -267,13 +295,13 @@ export default function TotwManager({
                 !(
                   lw.seasonId === locked.seasonId &&
                   lw.leagueId === locked.leagueId &&
-                  lw.weekNumber === locked.weekNumber
+                  lw.weekNumber === (locked.periodNumber || locked.weekNumber)
                 )
             ),
             {
               seasonId: locked.seasonId,
               leagueId: locked.leagueId,
-              weekNumber: locked.weekNumber,
+              weekNumber: locked.periodNumber || locked.weekNumber,
               formation: locked.formation,
               trophyId: locked.trophyId,
               isLocked: true,
@@ -281,7 +309,7 @@ export default function TotwManager({
             },
           ]);
         } else {
-          setLineupSlots(buildAutoSlots(res.candidates, currentFormation));
+          setLineupSlots(buildAutoSlots(res.candidates, formation));
         }
         return res;
       } catch (err: any) {
@@ -291,38 +319,33 @@ export default function TotwManager({
         setIsLoadingWeek(false);
       }
     },
-    [buildAutoSlots, buildLockedSlots]
+    [buildAutoSlots, buildLockedSlots, formation]
   );
 
   useEffect(() => {
-    if (!selectedSeasonId || !selectedLeagueId || !selectedWeekNumber) {
+    if (!selectedSeasonId || !selectedLeagueId || !selectedPeriodNumber) {
       setWeekData(null);
       setLineupSlots([]);
       return;
     }
-    fetchWeekData(selectedSeasonId, selectedLeagueId, selectedWeekNumber, selectedFormation);
-    // Only re-fetch from server when season/league/week changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSeasonId, selectedLeagueId, selectedWeekNumber, fetchWeekData]);
-
-  // When formation changes on an unlocked week, recalculate lineup immediately in client
-  const handleFormationChange = (newFormation: FormationKey) => {
-    if (weekData?.lockedTotw) return;
-    setSelectedFormation(newFormation);
-    if (weekData && weekData.ok) {
-      setLineupSlots(buildAutoSlots(weekData.candidates, newFormation));
-    }
-  };
+    const currentPeriod = availablePeriods.find((p) => p.periodNumber === selectedPeriodNumber);
+    const pWeeks = currentPeriod?.weeks || [
+      (selectedPeriodNumber - 1) * 3 + 1,
+      (selectedPeriodNumber - 1) * 3 + 2,
+      selectedPeriodNumber * 3,
+    ];
+    fetchPeriodData(selectedSeasonId, selectedLeagueId, selectedPeriodNumber, pWeeks);
+  }, [selectedSeasonId, selectedLeagueId, selectedPeriodNumber, availablePeriods, fetchPeriodData]);
 
   const handleResetToAuto = () => {
     if (!weekData || weekData.lockedTotw) return;
-    setLineupSlots(buildAutoSlots(weekData.candidates, selectedFormation));
+    setLineupSlots(buildAutoSlots(weekData.candidates, formation));
     setFeedbackBanner(null);
   };
 
   const isLocked = Boolean(weekData?.lockedTotw);
   const hasValidFilterSelection = Boolean(
-    selectedSeasonId && selectedLeagueId && selectedWeekNumber !== null
+    selectedSeasonId && selectedLeagueId && selectedPeriodNumber !== null
   );
 
   const filledSlotsCount = useMemo(
@@ -442,7 +465,7 @@ export default function TotwManager({
     Boolean(selectedTrophyId);
 
   const handleConfirmAndSendRewards = async () => {
-    if (!canSubmitTotw || !selectedWeekNumber) return;
+    if (!canSubmitTotw || !selectedPeriodNumber || !selectedPeriod) return;
     setIsSubmitting(true);
     setFeedbackBanner(null);
 
@@ -450,8 +473,9 @@ export default function TotwManager({
       const payload = {
         seasonId: selectedSeasonId,
         leagueId: selectedLeagueId,
-        weekNumber: selectedWeekNumber,
-        formation: selectedFormation,
+        periodNumber: selectedPeriod.periodNumber,
+        periodWeeks: selectedPeriod.weeks,
+        formation,
         trophyId: selectedTrophyId,
         slots: lineupSlots.map((s) => ({
           slotKey: s.slot.slotKey,
@@ -474,11 +498,11 @@ export default function TotwManager({
       setIsConfirmModalOpen(false);
 
       // Reload authoritative persisted record from server and derive locked UI state from it
-      const freshWeekData = await fetchWeekData(
+      const freshWeekData = await fetchPeriodData(
         selectedSeasonId,
         selectedLeagueId,
-        selectedWeekNumber,
-        selectedFormation
+        selectedPeriod.periodNumber,
+        selectedPeriod.weeks
       );
 
       if (freshWeekData?.lockedTotw) {
@@ -486,7 +510,7 @@ export default function TotwManager({
           type: 'success',
           text:
             result.message ||
-            `${selectedWeekNumber}. Hafta TOTW ödülleri 11 oyuncuya başarıyla gönderildi ve hafta kapatıldı.`,
+            `${periodLabel} TOTW ödülleri 11 oyuncuya başarıyla gönderildi ve dönem kapatıldı.`,
         });
       } else {
         setFeedbackBanner({
@@ -505,13 +529,13 @@ export default function TotwManager({
     }
   };
 
-  const isWeekLockedInSummary = useCallback(
-    (weekNum: number) =>
+  const isPeriodLockedInSummary = useCallback(
+    (periodNum: number) =>
       lockedWeeks.some(
         (lw) =>
           lw.seasonId === selectedSeasonId &&
           lw.leagueId === selectedLeagueId &&
-          lw.weekNumber === weekNum
+          lw.weekNumber === periodNum
       ),
     [lockedWeeks, selectedSeasonId, selectedLeagueId]
   );
@@ -590,54 +614,48 @@ export default function TotwManager({
             </select>
           </div>
 
-          {/* 3. Week Select (Always enabled when league is selected) */}
+          {/* 3. Period Select (Always enabled when league is selected) */}
           <div>
             <label className="block text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1">
-              Hafta
+              TOTW Dönemi
             </label>
             <select
-              value={selectedWeekNumber ?? ''}
-              onChange={(e) => handleWeekChange(e.target.value)}
-              disabled={!selectedLeagueId || availableWeeks.length === 0}
+              value={selectedPeriodNumber ?? ''}
+              onChange={(e) => handlePeriodChange(e.target.value)}
+              disabled={!selectedLeagueId || availablePeriods.length === 0}
               className="w-full bg-[#060d18] border border-white/15 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-white focus:outline-none focus:border-[#00e5ff] disabled:opacity-50"
             >
               <option value="">
-                {availableWeeks.length === 0
-                  ? 'Fikstür Haftası Yok'
-                  : 'Hafta Seçin...'}
+                {availablePeriods.length === 0
+                  ? 'Fikstür Dönemi Yok'
+                  : 'TOTW Dönemi Seçin...'}
               </option>
-              {availableWeeks.map((w) => {
-                const locked = isWeekLockedInSummary(w);
+              {availablePeriods.map((p) => {
+                const locked = isPeriodLockedInSummary(p.periodNumber);
                 return (
-                  <option key={w} value={w}>
-                    {w}. Hafta {locked ? '• Ödüller Gönderildi' : ''}
+                  <option key={p.periodNumber} value={p.periodNumber}>
+                    {p.displayTitle} {locked ? '• Ödüller Gönderildi' : ''}
                   </option>
                 );
               })}
             </select>
           </div>
 
-          {/* 4. Formation Select (Disabled when week is locked) */}
+          {/* 4. Fixed Formation Indicator */}
           <div>
             <label className="block text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1">
-              Formasyon {isLocked && <span className="text-emerald-400">(Kaydedildi)</span>}
+              Diziliş (Formasyon)
             </label>
-            <select
-              value={selectedFormation}
-              onChange={(e) => handleFormationChange(e.target.value as FormationKey)}
-              disabled={isLocked || !hasValidFilterSelection}
-              className="w-full bg-[#060d18] border border-white/15 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-white focus:outline-none focus:border-[#00e5ff] disabled:opacity-55 disabled:cursor-not-allowed"
-            >
-              {FORMATION_KEYS.map((fKey) => (
-                <option key={fKey} value={fKey}>
-                  {fKey} Dizilişi
-                </option>
-              ))}
-            </select>
+            <div className="w-full bg-[#060d18] border border-emerald-500/30 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-emerald-400 flex items-center justify-between">
+              <span>3-5-2 Dizilişi</span>
+              <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-black">
+                Sabit
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Status Bar Directly Under Filters when a Week is Selected */}
+        {/* Status Bar Directly Under Filters when a Period is Selected */}
         {hasValidFilterSelection && !isLoadingWeek && weekData && weekData.ok && (
           <div
             className={`rounded-xl px-4 py-2.5 border flex flex-wrap items-center justify-between gap-3 ${
@@ -654,7 +672,7 @@ export default function TotwManager({
                   </span>
                   <span className="text-xs font-bold text-white">
                     {selectedSeasonObj?.name} • {selectedLeagueObj?.name} •{' '}
-                    {selectedWeekNumber}. Hafta
+                    {periodLabel}
                   </span>
                   <span className="text-xs text-gray-300">
                     • Ödül:{' '}
@@ -674,7 +692,7 @@ export default function TotwManager({
                   </span>
                   <span className="text-xs font-bold text-white">
                     {selectedSeasonObj?.name} • {selectedLeagueObj?.name} •{' '}
-                    {selectedWeekNumber}. Hafta
+                    {periodLabel}
                   </span>
                   <span className="text-xs font-bold text-gray-300">
                     • Onaylı Maç:{' '}
@@ -746,18 +764,18 @@ export default function TotwManager({
         </div>
       )}
 
-      {/* Empty State when Season, League, or Week is not selected */}
+      {/* Empty State when Season, League, or Period is not selected */}
       {!hasValidFilterSelection && (
         <div className="bg-[#0a1628] border border-dashed border-white/15 rounded-2xl p-10 text-center">
           <div className="w-12 h-12 rounded-2xl bg-[#00e5ff]/10 border border-[#00e5ff]/30 flex items-center justify-center mx-auto mb-3 text-xl">
             ⚽
           </div>
           <h2 className="text-base sm:text-lg font-black text-white mb-1">
-            TOTW Kadrosunu Görüntülemek İçin Hafta Seçin
+            TOTW Kadrosunu Görüntülemek İçin Dönem Seçin
           </h2>
           <p className="text-xs sm:text-sm text-gray-400 max-w-md mx-auto">
             Üst panelden <strong>Sezon</strong>, <strong>Lig</strong> ve{' '}
-            <strong>Hafta</strong> seçtiğinizde o haftanın onaylanmış maç istatistiklerine göre Haftanın Takımı otomatik olarak sahaya dizilir.
+            <strong>TOTW Dönemi</strong> seçtiğinizde o 3 haftalık dönemin onaylanmış maç istatistiklerine göre Haftanın Takımı 3-5-2 formasyonunda otomatik olarak sahaya dizilir.
           </p>
         </div>
       )}
@@ -767,7 +785,7 @@ export default function TotwManager({
         <div className="bg-[#0a1628] border border-white/10 rounded-2xl p-10 text-center">
           <div className="inline-block w-7 h-7 border-2 border-[#00e5ff] border-t-transparent rounded-full animate-spin mb-2.5" />
           <p className="text-xs sm:text-sm font-bold text-gray-300">
-            {selectedWeekNumber}. Hafta TOTW verileri yükleniyor...
+            {periodLabel || 'TOTW'} verileri yükleniyor...
           </p>
         </div>
       )}
@@ -790,7 +808,7 @@ export default function TotwManager({
                 <span>
                   {weekData.approvedMatchCount === 0 ? (
                     <>
-                      <strong>Onaylı Maç Yok:</strong> Bu haftada henüz onaylanmış maç bulunmuyor. Boş pozisyon kartlarındaki <strong>Değiştir</strong> butonuyla lig oyuncularını manuel seçebilirsiniz.
+                      <strong>Onaylı Maç Yok:</strong> Bu dönemde henüz onaylanmış maç bulunmuyor. Boş pozisyon kartlarındaki <strong>Değiştir</strong> butonuyla lig oyuncularını manuel seçebilirsiniz.
                     </>
                   ) : (
                     <>
@@ -908,10 +926,10 @@ export default function TotwManager({
               {/* Pitch Top Overlay Bar */}
               <div className="absolute top-3 left-5 right-5 flex items-center justify-between pointer-events-none z-10">
                 <span className="text-[10px] font-black tracking-widest uppercase text-emerald-300/80">
-                  TETA LEAGUE • {selectedWeekNumber}. HAFTA TOTW
+                  TETA LEAGUE • {periodLabel || 'HAFTA 1–3 TOTW'}
                 </span>
                 <span className="px-2 py-0.5 rounded bg-black/35 border border-emerald-400/25 text-[10px] font-black tracking-widest uppercase text-emerald-300">
-                  {selectedFormation}
+                  {formation}
                 </span>
               </div>
 
@@ -1140,7 +1158,7 @@ export default function TotwManager({
                     Seçilen 11 ve Kadro Özeti
                   </h2>
                   <p className="text-[11px] text-gray-400 mt-0.5">
-                    {selectedFormation} Dizilişi • {filledSlotsCount}/11 Oyuncu
+                    {formation} Dizilişi • {filledSlotsCount}/11 Oyuncu
                     {squadAvgRating ? ` • Ort. Reyting: ${squadAvgRating}` : ''}
                   </p>
                 </div>
@@ -1425,7 +1443,7 @@ export default function TotwManager({
                 TOTW Ödüllerini Gönder
               </h3>
               <p className="text-xs text-gray-400 mt-1">
-                Onayladığınızda seçilen TOTW kadrosu kaydedilecek, 11 oyuncuya seçilen ödül dağıtılacak ve bu hafta düzenlemeye kapatılacaktır.
+                Onayladığınızda seçilen TOTW kadrosu kaydedilecek, 11 oyuncuya seçilen ödül dağıtılacak ve bu dönem düzenlemeye kapatılacaktır.
               </p>
             </div>
 
@@ -1439,9 +1457,9 @@ export default function TotwManager({
                   </strong>
                 </div>
                 <div>
-                  <span className="text-gray-400 block">Hafta / Formasyon:</span>
+                  <span className="text-gray-400 block">Dönem / Formasyon:</span>
                   <strong className="text-white text-sm">
-                    {selectedWeekNumber}. Hafta ({selectedFormation})
+                    {periodLabel} ({formation})
                   </strong>
                 </div>
                 <div className="col-span-2 pt-2 border-t border-white/10 flex items-center gap-3">

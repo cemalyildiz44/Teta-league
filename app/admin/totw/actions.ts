@@ -5,14 +5,19 @@ import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { logAdminAudit } from '@/lib/audit';
 import {
+  DEFAULT_TOTW_FORMATION,
   FORMATIONS,
   FORMATION_KEYS,
   classifyPositionRoleGroup,
   compareTotwCandidates,
   computeCandidateMetrics,
+  getTotwPeriodLabel,
+  getTotwPeriodNumber,
+  getTotwPeriodWeeks,
   isPlayerCompatibleWithSlot,
   type FormationKey,
   type RoleGroup,
+  type TotwPeriod,
   type TotwPlayerCandidate,
 } from '@/lib/totw';
 
@@ -52,6 +57,9 @@ export interface LockedTotwView {
   seasonId: string;
   leagueId: string;
   weekNumber: number;
+  periodNumber?: number;
+  periodWeeks?: number[];
+  periodLabel?: string;
   formation: FormationKey;
   trophyId: string;
   trophyTitle: string;
@@ -69,13 +77,20 @@ export interface LoadTotwWeekResult {
   totalFixtureCount: number;
   lockedTotw: LockedTotwView | null;
   candidates: TotwPlayerCandidate[];
+  periodNumber?: number;
+  periodWeeks?: number[];
+  periodLabel?: string;
 }
 
-export async function loadTotwWeekDataAction(params: {
+export interface LoadTotwDataParams {
   seasonId: string;
   leagueId: string;
-  weekNumber: number;
-}): Promise<LoadTotwWeekResult> {
+  periodNumber?: number;
+  periodWeeks?: number[];
+  weekNumber?: number; // backward compatibility
+}
+
+export async function loadTotwWeekDataAction(params: LoadTotwDataParams): Promise<LoadTotwWeekResult> {
   try {
     const cookieStore = await cookies();
     const supabase = createClient(cookieStore);
@@ -92,11 +107,25 @@ export async function loadTotwWeekDataAction(params: {
       };
     }
 
-    const { seasonId, leagueId, weekNumber } = params;
-    if (!seasonId || !leagueId || !Number.isInteger(weekNumber) || weekNumber < 1) {
+    const { seasonId, leagueId } = params;
+    const periodNum =
+      params.periodNumber && Number.isInteger(params.periodNumber) && params.periodNumber >= 1
+        ? params.periodNumber
+        : params.weekNumber && Number.isInteger(params.weekNumber) && params.weekNumber >= 1
+        ? getTotwPeriodNumber(params.weekNumber)
+        : 1;
+
+    const periodWeeks =
+      Array.isArray(params.periodWeeks) && params.periodWeeks.length > 0
+        ? params.periodWeeks
+        : (params.weekNumber && !params.periodNumber ? [params.weekNumber] : getTotwPeriodWeeks(periodNum));
+
+    const periodLabel = getTotwPeriodLabel(periodNum, periodWeeks);
+
+    if (!seasonId || !leagueId || periodNum < 1 || periodWeeks.length === 0) {
       return {
         ok: false,
-        error: 'Geçerli sezon, lig ve hafta seçilmelidir.',
+        error: 'Geçerli sezon, lig ve dönem seçilmelidir.',
         approvedMatchCount: 0,
         totalFixtureCount: 0,
         lockedTotw: null,
@@ -104,10 +133,11 @@ export async function loadTotwWeekDataAction(params: {
       };
     }
 
-    // 1. Check if this Season + League + Week is already submitted and locked
+    // 1. Check if this Season + League + Period is already submitted and locked
     let lockedTotw: LockedTotwView | null = null;
     let isSchemaPending = false;
 
+    const queryWeekNumbers = Array.from(new Set([periodNum, ...(params.weekNumber ? [params.weekNumber] : [])]));
     const { data: existingTotw, error: totwErr } = await supabase
       .from('totw_weeks')
       .select(
@@ -138,7 +168,9 @@ export async function loadTotwWeekDataAction(params: {
       )
       .eq('season_id', seasonId)
       .eq('league_id', leagueId)
-      .eq('week_number', weekNumber)
+      .in('week_number', queryWeekNumbers)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (totwErr) {
@@ -207,14 +239,25 @@ export async function loadTotwWeekDataAction(params: {
         };
       });
 
+      const firstSnap = sortedSelections[0]?.stats_snapshot || {};
+      const recPeriodNum = Number(firstSnap?.periodNumber) || periodNum;
+      const recPeriodWeeks =
+        Array.isArray(firstSnap?.periodWeeks) && firstSnap.periodWeeks.length > 0
+          ? firstSnap.periodWeeks
+          : periodWeeks;
+      const recPeriodLabel = firstSnap?.periodLabel || getTotwPeriodLabel(recPeriodNum, recPeriodWeeks);
+
       lockedTotw = {
         id: existingTotw.id,
         seasonId: existingTotw.season_id,
         leagueId: existingTotw.league_id,
         weekNumber: existingTotw.week_number,
+        periodNumber: recPeriodNum,
+        periodWeeks: recPeriodWeeks,
+        periodLabel: recPeriodLabel,
         formation: (FORMATION_KEYS.includes(existingTotw.formation as FormationKey)
           ? existingTotw.formation
-          : '4-3-3') as FormationKey,
+          : DEFAULT_TOTW_FORMATION) as FormationKey,
         trophyId: existingTotw.trophy_id,
         trophyTitle: tr?.title || 'TOTW Ödülü',
         trophyImageUrl: tr?.image_url || '',
@@ -224,13 +267,13 @@ export async function loadTotwWeekDataAction(params: {
       };
     }
 
-    // 2. Fetch fixtures for the selected (seasonId, leagueId, weekNumber)
+    // 2. Fetch fixtures for all weeks in the selected period
     const { data: fixtures, error: fixErr } = await supabase
       .from('fixtures')
       .select('id, week_number, status')
       .eq('season_id', seasonId)
       .eq('league_id', leagueId)
-      .eq('week_number', weekNumber);
+      .in('week_number', periodWeeks);
 
     if (fixErr) {
       return {
@@ -281,6 +324,9 @@ export async function loadTotwWeekDataAction(params: {
         totalFixtureCount,
         lockedTotw,
         candidates: [],
+        periodNumber: periodNum,
+        periodWeeks,
+        periodLabel,
       };
     }
 
@@ -629,6 +675,9 @@ export async function loadTotwWeekDataAction(params: {
       totalFixtureCount,
       lockedTotw,
       candidates,
+      periodNumber: periodNum,
+      periodWeeks,
+      periodLabel,
     };
   } catch (err: any) {
     return {
@@ -642,11 +691,13 @@ export async function loadTotwWeekDataAction(params: {
   }
 }
 
-export async function submitAndLockTotwAction(payload: {
+export interface SubmitTotwPayload {
   seasonId: string;
   leagueId: string;
-  weekNumber: number;
-  formation: FormationKey;
+  periodNumber?: number;
+  periodWeeks?: number[];
+  weekNumber?: number;
+  formation?: FormationKey;
   trophyId: string;
   slots: {
     slotKey: string;
@@ -654,7 +705,9 @@ export async function submitAndLockTotwAction(payload: {
     playerId: string;
     isManualOverride: boolean;
   }[];
-}): Promise<{ ok: boolean; error?: string; message?: string }> {
+}
+
+export async function submitAndLockTotwAction(payload: SubmitTotwPayload): Promise<{ ok: boolean; error?: string; message?: string }> {
   try {
     const cookieStore = await cookies();
     const supabase = createClient(cookieStore);
@@ -662,14 +715,24 @@ export async function submitAndLockTotwAction(payload: {
     const auth = await requireAdminUser(supabase);
     if (!auth.ok) return { ok: false, error: auth.error };
 
-    const { seasonId, leagueId, weekNumber, formation, trophyId, slots } = payload;
+    const { seasonId, leagueId, trophyId, slots } = payload;
+    const periodNum =
+      payload.periodNumber && Number.isInteger(payload.periodNumber) && payload.periodNumber >= 1
+        ? payload.periodNumber
+        : payload.weekNumber && Number.isInteger(payload.weekNumber) && payload.weekNumber >= 1
+        ? getTotwPeriodNumber(payload.weekNumber)
+        : 1;
 
-    if (!seasonId || !leagueId || !Number.isInteger(weekNumber) || weekNumber < 1) {
-      return { ok: false, error: 'Geçerli sezon, lig ve hafta seçilmelidir.' };
-    }
+    const periodWeeks =
+      Array.isArray(payload.periodWeeks) && payload.periodWeeks.length > 0
+        ? payload.periodWeeks
+        : getTotwPeriodWeeks(periodNum);
 
-    if (!FORMATION_KEYS.includes(formation)) {
-      return { ok: false, error: 'Geçersiz formasyon seçimi.' };
+    const periodLabel = getTotwPeriodLabel(periodNum, periodWeeks);
+    const formation: FormationKey = DEFAULT_TOTW_FORMATION; // Always fixed to 3-5-2
+
+    if (!seasonId || !leagueId || periodNum < 1) {
+      return { ok: false, error: 'Geçerli sezon, lig ve dönem seçilmelidir.' };
     }
 
     if (!trophyId) {
@@ -681,14 +744,19 @@ export async function submitAndLockTotwAction(payload: {
       return { ok: false, error: 'Kadroda eksik pozisyon var. Tüm 11 pozisyon dolu olmalıdır.' };
     }
 
-    // Load fresh week data to validate players and ensure week is not already locked
-    const weekData = await loadTotwWeekDataAction({ seasonId, leagueId, weekNumber });
+    // Load fresh period data to validate players and ensure period is not already locked
+    const weekData = await loadTotwWeekDataAction({
+      seasonId,
+      leagueId,
+      periodNumber: periodNum,
+      periodWeeks,
+    });
     if (!weekData.ok) {
-      return { ok: false, error: weekData.error || 'Hafta verisi doğrulanamadı.' };
+      return { ok: false, error: weekData.error || 'Dönem verisi doğrulanamadı.' };
     }
 
     if (weekData.lockedTotw) {
-      return { ok: false, error: 'Bu sezon, lig ve hafta için TOTW zaten gönderilmiş ve kilitlenmiş.' };
+      return { ok: false, error: `Bu sezon ve lig için ${periodLabel} zaten gönderilmiş ve kilitlenmiş.` };
     }
 
     const candidateById = new Map(weekData.candidates.map((c) => [c.playerId, c]));
@@ -715,7 +783,7 @@ export async function submitAndLockTotwAction(payload: {
 
       const cand = candidateById.get(submittedSlot.playerId);
       if (!cand) {
-        return { ok: false, error: `Seçilen oyuncu (${submittedSlot.playerId}) bu lig/hafta aday listesinde bulunamadı.` };
+        return { ok: false, error: `Seçilen oyuncu (${submittedSlot.playerId}) bu lig/dönem aday listesinde bulunamadı.` };
       }
 
       const compat = isPlayerCompatibleWithSlot(cand, fSlot);
@@ -735,6 +803,9 @@ export async function submitAndLockTotwAction(payload: {
         rating: cand.effectiveRating > 0 ? String(cand.effectiveRating) : '',
         score: cand.totwScore > 0 ? String(cand.totwScore) : '',
         stats_snapshot: {
+          periodNumber: periodNum,
+          periodWeeks,
+          periodLabel,
           username: cand.username,
           fullName: cand.fullName,
           avatarUrl: cand.avatarUrl,
@@ -762,19 +833,33 @@ export async function submitAndLockTotwAction(payload: {
       });
     }
 
+    // Retrieve league & season name for descriptive notes
+    const { data: leagueRow } = await supabase
+      .from('leagues')
+      .select('name, season:seasons!season_id(name)')
+      .eq('id', leagueId)
+      .maybeSingle();
+
+    const sName =
+      (Array.isArray((leagueRow as any)?.season)
+        ? (leagueRow as any)?.season[0]?.name
+        : (leagueRow as any)?.season?.name) || 'Sezon';
+    const lName = (leagueRow as any)?.name || 'Lig';
+    const notesPrefix = `${sName} • ${lName} • ${periodLabel}`;
+
     const { data: rpcRes, error: rpcErr } = await supabase.rpc('submit_and_lock_totw', {
       p_season_id: seasonId,
       p_league_id: leagueId,
-      p_week_number: weekNumber,
+      p_week_number: periodNum,
       p_formation: formation,
       p_trophy_id: trophyId,
       p_selections: rpcSelections,
-      p_notes_prefix: null,
+      p_notes_prefix: notesPrefix,
     });
 
     if (rpcErr) {
       if (rpcErr.code === '23505' || rpcErr.message?.includes('ALREADY_LOCKED')) {
-        return { ok: false, error: 'Bu hafta için TOTW zaten gönderilmiş ve kilitlenmiş.' };
+        return { ok: false, error: `Bu dönem (${periodLabel}) için TOTW zaten gönderilmiş ve kilitlenmiş.` };
       }
       return { ok: false, error: 'TOTW gönderilirken hata oluştu: ' + rpcErr.message };
     }
@@ -783,12 +868,14 @@ export async function submitAndLockTotwAction(payload: {
       action: 'TOTW_SUBMIT_AND_LOCK',
       entity_type: 'totw_weeks',
       entity_id: (rpcRes as any)?.totw_week_id || leagueId,
-      entity_label: `Hafta ${weekNumber} TOTW (${formation})`,
-      description: `${weekNumber}. Hafta TOTW kadrosu (${formation}) gönderildi, kilitlendi ve 11 oyuncuya "${(rpcRes as any)?.trophy_title || 'TOTW'}" ödülü dağıtıldı.`,
+      entity_label: `${periodLabel} (${formation})`,
+      description: `${periodLabel} kadrosu (${formation}) gönderildi, kilitlendi ve 11 oyuncuya "${(rpcRes as any)?.trophy_title || 'TOTW'}" ödülü dağıtıldı.`,
       new_data: {
         seasonId,
         leagueId,
-        weekNumber,
+        periodNumber: periodNum,
+        periodWeeks,
+        periodLabel,
         formation,
         trophyId,
         players: usernamesToRevalidate,
@@ -807,7 +894,7 @@ export async function submitAndLockTotwAction(payload: {
 
     return {
       ok: true,
-      message: `${weekNumber}. Hafta TOTW kadrosu başarıyla kaydedildi, kilitlendi ve 11 oyuncuya ödülleri verildi.`,
+      message: `${periodLabel} kadrosu (${formation}) başarıyla kaydedildi, kilitlendi ve 11 oyuncuya ödülleri verildi.`,
     };
   } catch (err: any) {
     return {

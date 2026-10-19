@@ -100,6 +100,34 @@ export default async function AdminTotwPage() {
     weeksMapRecord[key] = Array.from(set).sort((a, b) => a - b);
   }
 
+  // Pre-calculate 3-week periods for each league
+  const periodsMapRecord: Record<string, any[]> = {};
+  for (const [key, weeks] of Object.entries(weeksMapRecord)) {
+    // We import buildTotwPeriods or build directly
+    const maxWeek = weeks.length > 0 ? Math.max(...weeks) : 0;
+    const maxPeriod = Math.ceil(maxWeek / 3);
+    const pList = [];
+    for (let p = 1; p <= maxPeriod; p++) {
+      const start = (p - 1) * 3 + 1;
+      const end = p * 3;
+      const pWeeks = weeks.filter((w) => w >= start && w <= end);
+      if (pWeeks.length === 0) continue;
+      const minW = Math.min(...pWeeks);
+      const maxW = Math.max(...pWeeks);
+      const label = minW === maxW ? `HAFTA ${minW} TOTW` : `HAFTA ${minW}–${maxW} TOTW`;
+      const displayTitle = `${label} (Dönem ${p})`;
+      pList.push({
+        periodNumber: p,
+        startWeek: minW,
+        endWeek: maxW,
+        weeks: pWeeks,
+        label,
+        displayTitle,
+      });
+    }
+    periodsMapRecord[key] = pList;
+  }
+
   const trophies: TotwTrophyOption[] = (trophiesRes.data || []).map((t: any) => ({
     id: t.id,
     title: t.title,
@@ -145,6 +173,7 @@ export default async function AdminTotwPage() {
       <TotwManager
         seasons={seasons}
         leagues={leagues}
+        periodsBySeasonLeague={periodsMapRecord}
         weeksBySeasonLeague={weeksMapRecord}
         trophies={trophies}
         initialLockedWeeks={lockedWeeks}
