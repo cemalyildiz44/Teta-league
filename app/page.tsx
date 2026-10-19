@@ -9,7 +9,7 @@ import Hero from "@/components/Hero";
 
 export default async function Home() {
   return (
-    <div className="w-full flex flex-col">
+    <div className="w-full flex flex-col page-enter">
       <Hero />
       <div className="mx-auto max-w-[1500px] w-full px-4 lg:px-6 py-12 md:py-16">
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_380px] gap-8 xl:gap-12">

@@ -71,13 +71,13 @@ export default async function RecentTransfers() {
         {formattedTransfers.map((transfer) => (
           <div
             key={transfer.id}
-            className="client-glass p-3.5 rounded-xl border border-white/5 border-l-2 border-l-[#00e5ff] hover:border-white/10 hover:bg-white/[0.02] transition-all relative overflow-hidden group space-y-2.5"
+            className="client-glass card-hover-lift p-3.5 rounded-xl border border-white/5 border-l-2 border-l-[#00e5ff] hover:border-[#00e5ff]/40 hover:bg-[#00e5ff]/[0.03] transition-all duration-200 relative overflow-hidden group space-y-2.5 cursor-pointer"
           >
             {/* ÜST SATIR: Oyuncu Avatarı + Adı + Tarih */}
             <div className="flex items-center justify-between gap-3 min-w-0">
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 {/* Oyuncu Profil Fotoğrafı (40x40) */}
-                <div className="w-10 h-10 rounded-full bg-[#0a1628] border border-white/10 overflow-hidden shrink-0 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-[#0a1628] border border-white/10 overflow-hidden shrink-0 flex items-center justify-center group-hover:scale-105 transition-transform duration-200">
                   {transfer.avatarUrl ? (
                     <img
                       src={transfer.avatarUrl}
@@ -163,7 +163,7 @@ export default async function RecentTransfers() {
                 )}
 
                 {/* Hedef Takım Logosu */}
-                <TeamLogo src={transfer.toTeamLogo} name={transfer.toTeamName} size="xs" />
+                <TeamLogo src={transfer.toTeamLogo} name={transfer.toTeamName} size="xs" className="group-hover:scale-110 transition-transform duration-200" />
               </div>
             </div>
           </div>

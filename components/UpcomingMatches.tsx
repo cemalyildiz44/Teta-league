@@ -139,7 +139,7 @@ export default async function UpcomingMatches() {
               const awayName = awayTeam?.name || 'Bilinmeyen';
 
               return (
-                <div key={fixture.id} className="card-surface rounded-xl p-5 hover:scale-[1.02] transition-transform relative overflow-hidden group">
+                <div key={fixture.id} className="card-surface rounded-xl p-5 relative overflow-hidden group cursor-pointer">
                   <div className="flex justify-between items-center mb-4 gap-3">
                     <span className="text-[10px] font-bold tracking-widest uppercase min-w-0">
                       <span className="text-[#00e5ff]">{league.name}</span>
@@ -153,19 +153,19 @@ export default async function UpcomingMatches() {
                   <div className="flex items-center justify-between">
                     {/* Home */}
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <TeamLogo src={homeTeam?.logo_url} name={homeName} size="md" />
-                      <span className="text-[15px] font-[700] text-white whitespace-normal break-words min-w-0">{homeName}</span>
+                      <TeamLogo src={homeTeam?.logo_url} name={homeName} size="md" className="group-hover:scale-[1.04] transition-transform duration-200" />
+                      <span className="text-[15px] font-[700] text-white whitespace-normal break-words min-w-0 group-hover:text-[#00e5ff] transition-colors duration-200">{homeName}</span>
                     </div>
 
                     {/* VS */}
                     <div className="w-[20%] flex justify-center">
-                      <span className="text-xs font-black text-gray-500">VS</span>
+                      <span className="text-xs font-black text-gray-500 group-hover:text-gray-400 transition-colors duration-200">VS</span>
                     </div>
 
                     {/* Away */}
                     <div className="flex items-center gap-3 flex-1 min-w-0 justify-end text-right">
-                      <span className="text-[15px] font-[700] text-white whitespace-normal break-words min-w-0">{awayName}</span>
-                      <TeamLogo src={awayTeam?.logo_url} name={awayName} size="md" />
+                      <span className="text-[15px] font-[700] text-white whitespace-normal break-words min-w-0 group-hover:text-[#00e5ff] transition-colors duration-200">{awayName}</span>
+                      <TeamLogo src={awayTeam?.logo_url} name={awayName} size="md" className="group-hover:scale-[1.04] transition-transform duration-200" />
                     </div>
                   </div>
 

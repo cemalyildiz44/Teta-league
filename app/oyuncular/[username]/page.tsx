@@ -510,7 +510,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
 
   return (
     <main className="min-h-screen bg-[#01060b] pt-8 pb-20">
-      <div className="max-w-[1200px] mx-auto px-4 lg:px-6">
+      <div className="max-w-[1200px] mx-auto px-4 lg:px-6 page-enter">
 
         {/* ════════════════════════════════════════════════════════════ */}
         {/* HEADER — 3 Bölge: Sol (Bilgi), Orta (Kariyer), Sağ (Görsel) */}
@@ -693,8 +693,10 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
             { l: "ORT. RATING", v: combinedAvgRating, c: "text-[#00e5ff]" },
             { l: "KAZANILAN KUPA", v: validDynamicTrophies.length, c: "text-amber-400" },
           ].map((s, i) => (
-            <div key={i} className="flex-1 min-w-[120px] px-4 py-6 flex flex-col items-center justify-center hover:bg-white/[0.02] transition-colors">
-              <span className={`text-[28px] md:text-[32px] font-[900] leading-none mb-2 ${s.c} ${s.c.includes("00e5ff") ? "drop-shadow-[0_0_12px_rgba(0,229,255,0.4)]" : ""}`}>{s.v}</span>
+            <div key={i} className="flex-1 min-w-[120px] px-4 py-6 flex flex-col items-center justify-center hover:bg-white/[0.04] transition-colors duration-150 group">
+              <span className={`text-[28px] md:text-[32px] font-[900] leading-none mb-2 ${s.c} ${s.c.includes("00e5ff") ? "drop-shadow-[0_0_12px_rgba(0,229,255,0.4)]" : ""} group-hover:scale-105 transition-transform duration-200`}>
+                {s.v}
+              </span>
               <span className="text-[10px] font-[800] tracking-[0.15em] text-gray-500 uppercase text-center">{s.l}</span>
             </div>
           ))}
@@ -728,7 +730,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
         {/* ════════════════════════════════════════════════════════════ */}
         {/* TAB CONTENTS                                                 */}
         {/* ════════════════════════════════════════════════════════════ */}
-        <div className="animate-in fade-in duration-500">
+        <div key={activeTab} className="tab-pane-enter">
 
           {/* GENEL TAB */}
           {activeTab === 'genel' && (
@@ -783,9 +785,11 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                     { label: "MAÇIN ADAMI", value: tMOM, sub: null, accent: true },
                     { label: "TOPLAM KATKI", value: combinedTotalGoals + combinedTotalAssists, sub: `${combinedTotalGoals}G + ${combinedTotalAssists}A` },
                   ].map((s, i) => (
-                    <div key={i} className="bg-[#03070c] border border-white/5 rounded-2xl p-5 hover:border-white/10 transition-colors text-center">
+                    <div key={i} className="bg-[#03070c] border border-white/5 rounded-2xl p-5 hover:border-[#00e5ff]/30 hover:shadow-[0_0_15px_rgba(0,229,255,0.08)] hover:-translate-y-1 transition-all duration-200 text-center">
                       <div className="text-[10px] font-[900] tracking-[0.15em] text-gray-600 uppercase mb-2">{s.label}</div>
-                      <div className={`text-[24px] font-[900] leading-none ${(s as any).danger ? "text-red-400" : (s as any).accent ? "text-amber-400" : "text-white"}`}>{s.value}</div>
+                      <div className={`text-[24px] font-[900] leading-none ${(s as any).danger ? "text-red-400" : (s as any).accent ? "text-amber-400" : "text-white"}`}>
+                        {s.value}
+                      </div>
                       {s.sub && <div className="text-[11px] font-[700] text-gray-500 mt-1.5">{s.sub}</div>}
                     </div>
                   ))}
@@ -819,7 +823,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                           const opp = teamsMap.get(m.opponentId);
                           const rc = m.result === "W" ? "text-emerald-400" : m.result === "L" ? "text-red-400" : "text-amber-400";
                           return (
-                            <tr key={m.matchId} className="hover:bg-white/[0.02] transition-colors text-[13px]">
+                            <tr key={m.matchId} className="hover:bg-white/[0.04] transition-colors text-[13px] group">
                               <td className="py-3 pl-6 pr-3">
                                 <Link href={`/mac/${m.matchId}`} className="font-[700] text-gray-400 hover:text-white transition-colors">
                                   {new Date(m.playedAt).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" })}
@@ -827,8 +831,8 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                               </td>
                               <td className="px-3 py-3 text-center font-[900] text-gray-600">{m.weekNumber || "-"}</td>
                               <td className="px-3 py-3">
-                                <Link href={opp?.slug ? `/takim/${opp.slug}` : "#"} className="flex items-center gap-3 group">
-                                  <TeamLogo src={opp?.logo_url} name={opp?.name} size="xs" />
+                                <Link href={opp?.slug ? `/takim/${opp.slug}` : "#"} className="flex items-center gap-3">
+                                  <TeamLogo src={opp?.logo_url} name={opp?.name} size="xs" className="group-hover:scale-110 transition-transform duration-200" />
                                   <span className="font-[800] text-gray-300 group-hover:text-[#00e5ff] transition-colors truncate">{opp?.name || "?"}</span>
                                 </Link>
                               </td>

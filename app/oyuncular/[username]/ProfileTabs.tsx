@@ -34,7 +34,7 @@ export default function ProfileTabs({
             <button
               key={tab.id}
               onClick={() => setActive(tab.id)}
-              className={`px-4 py-4 text-[11px] font-[900] tracking-widest uppercase whitespace-nowrap transition-all border-b-2 ${
+              className={`px-4 py-4 text-[11px] font-[900] tracking-widest uppercase whitespace-nowrap transition-all duration-150 active:scale-[0.98] border-b-2 ${
                 active === tab.id
                   ? 'text-[#00e5ff] border-[#00e5ff] bg-[#00e5ff]/5 drop-shadow-[0_0_8px_rgba(0,229,255,0.3)]'
                   : 'text-gray-500 hover:text-gray-300 border-transparent hover:border-white/20'
@@ -46,8 +46,8 @@ export default function ProfileTabs({
         </div>
       </nav>
 
-      {/* Tab Contents */}
-      <div className="animate-in fade-in duration-500">
+      {/* Tab Contents with smooth fade-in */}
+      <div key={active} className="tab-pane-enter">
         {active === 'genel' && genel}
         {active === 'maclar' && maclar}
         {active === 'sezonlar' && sezonlar}

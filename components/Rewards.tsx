@@ -46,32 +46,32 @@ export default function Rewards() {
           return (
             <div
               key={idx}
-              className={`flex items-center justify-between p-3 sm:p-3.5 rounded-lg border transition-all ${
+              className={`flex items-center justify-between p-3 sm:p-3.5 rounded-lg border transition-all duration-200 cursor-default group/item hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(0,229,255,0.12)] ${
                 item.highlight
-                  ? 'bg-[#00e5ff]/10 border-[#00e5ff]/30 shadow-[0_0_15px_rgba(0,229,255,0.08)]'
-                  : 'bg-white/[0.02] border-white/5 hover:border-white/10'
+                  ? 'bg-[#00e5ff]/10 border-[#00e5ff]/30 shadow-[0_0_15px_rgba(0,229,255,0.08)] hover:border-[#00e5ff]/50'
+                  : 'bg-white/[0.02] border-white/5 hover:border-white/20 hover:bg-white/[0.04]'
               }`}
             >
               <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                 <div
-                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform duration-200 group-hover/item:scale-110 ${
                     item.highlight
                       ? 'bg-[#00e5ff]/20 text-[#00e5ff]'
-                      : 'bg-white/5 text-gray-400'
+                      : 'bg-white/5 text-gray-400 group-hover/item:text-[#00e5ff]'
                   }`}
                 >
                   <Icon size={15} />
                 </div>
                 <span
-                  className={`text-xs sm:text-[13px] font-bold uppercase tracking-wider truncate ${
-                    item.highlight ? 'text-white' : 'text-gray-300'
+                  className={`text-xs sm:text-[13px] font-bold uppercase tracking-wider truncate transition-colors ${
+                    item.highlight ? 'text-white' : 'text-gray-300 group-hover/item:text-white'
                   }`}
                 >
                   {item.title}
                 </span>
               </div>
               <span
-                className={`text-xs sm:text-sm md:text-[15px] font-black tracking-wider shrink-0 pl-2 ${
+                className={`text-xs sm:text-sm md:text-[15px] font-black tracking-wider shrink-0 pl-2 font-mono ${
                   item.highlight
                     ? 'text-[#00e5ff] drop-shadow-[0_0_8px_rgba(0,229,255,0.5)]'
                     : 'text-[#00e5ff]'

@@ -78,7 +78,7 @@ export default function TeamRosterCarousel({ players }: { players: RosterPlayer[
             key={p.id}
             className="shrink-0 w-[240px] md:w-[260px] snap-center group/card cursor-pointer"
           >
-            <div className="relative h-[380px] rounded-2xl overflow-hidden bg-[#03070c] border border-white/10 group-hover/card:border-[#00e5ff]/50 transition-all duration-500 shadow-[0_4px_20px_rgba(0,0,0,0.5)] group-hover/card:shadow-[0_0_30px_rgba(0,229,255,0.15)] flex flex-col">
+            <div className="relative h-[380px] rounded-2xl overflow-hidden bg-[#03070c] border border-white/10 group-hover/card:border-[#00e5ff]/50 transition-all duration-300 shadow-[0_4px_20px_rgba(0,0,0,0.5)] group-hover/card:shadow-[0_16px_36px_-4px_rgba(0,0,0,0.72),0_0_22px_-2px_rgba(0,229,255,0.22)] group-hover/card:-translate-y-1.5 group-active/card:translate-y-0 group-active/card:scale-[0.992] flex flex-col">
               
               {/* Image Section */}
               <div className="h-[200px] relative overflow-hidden bg-gradient-to-b from-transparent to-[#03070c]">

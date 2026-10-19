@@ -56,36 +56,39 @@ body {
   border: 1px solid rgba(255,255,255,0.06);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   border-radius: 16px;
-  transition: all 0.3s ease;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.22s ease, background 0.22s ease;
 }
 
-.client-glass-interactive:hover {
-  background: rgba(10, 20, 30, 0.45);
-  box-shadow: 0 10px 30px var(--brand-glow);
-  border-color: rgba(0, 229, 255, 0.25);
+.client-glass-interactive,
+.card-surface,
+.card-hover-lift {
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.22s ease, background 0.22s ease !important;
+  will-change: transform, box-shadow;
 }
 
-.card-surface {
-  background: rgba(5, 10, 15, 0.35);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255,255,255,0.06);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  border-radius: 16px;
-  transition: all 0.3s ease;
-}
-.card-surface:hover {
-  background: rgba(10, 20, 30, 0.45);
-  box-shadow: 0 10px 30px var(--brand-glow);
-  border-color: rgba(0, 229, 255, 0.25);
+.client-glass-interactive:hover,
+.card-surface:hover,
+.card-hover-lift:hover {
+  background: rgba(10, 20, 30, 0.55);
+  box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.72), 0 0 22px -2px rgba(0, 229, 255, 0.22) !important;
+  border-color: rgba(0, 229, 255, 0.35) !important;
+  transform: translateY(-2.5px) !important;
 }
 
-/* TETA: Shimmer Buttons */
+.client-glass-interactive:active,
+.card-surface:active,
+.card-hover-lift:active {
+  transform: translateY(-0.5px) scale(0.992) !important;
+  box-shadow: 0 6px 20px -2px rgba(0, 0, 0, 0.6), 0 0 12px rgba(0, 229, 255, 0.15) !important;
+  transition-duration: 0.08s !important;
+}
+
+/* TETA: Shimmer Buttons & Tactile Feedback */
 .flat-button {
   position: relative;
   overflow: hidden;
   border-radius: 10px;
-  transition: all 0.3s ease;
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
   background: rgba(0, 229, 255, 0.08);
   border: 1px solid rgba(0, 229, 255, 0.25);
   color: #00E5FF;
@@ -95,6 +98,7 @@ body {
   justify-content: center;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  user-select: none;
 }
 
 .flat-button-solid {
@@ -119,9 +123,18 @@ body {
 
 .flat-button:hover {
   box-shadow: 0 0 20px var(--brand-glow);
+  transform: translateY(-1px);
+}
+.flat-button:active {
+  transform: scale(0.97);
+  box-shadow: 0 0 10px var(--brand-glow);
 }
 .flat-button-solid:hover {
   background: #00cfeb;
+  transform: translateY(-1px);
+}
+.flat-button-solid:active {
+  transform: scale(0.97);
 }
 
 /* Typography Hierarchy Helpers */
@@ -169,16 +182,56 @@ body {
   font-weight: 500;
 }
 
-/* Animations */
+/* Animations & Stagger Helpers */
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
+  from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
 .fade-in-up {
-  animation: fadeInUp 0.4s ease-out forwards;
+  animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.page-enter {
+  animation: pageFadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes cardFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-card-in {
+  animation: cardFadeIn 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.stagger-1 { animation-delay: 30ms; }
+.stagger-2 { animation-delay: 60ms; }
+.stagger-3 { animation-delay: 90ms; }
+.stagger-4 { animation-delay: 120ms; }
+.stagger-5 { animation-delay: 150ms; }
+.stagger-6 { animation-delay: 180ms; }
+.stagger-7 { animation-delay: 210ms; }
+.stagger-8 { animation-delay: 240ms; }
+
+/* Tab panel transitions */
+.tab-pane-enter {
+  animation: pageFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Utilities */
 .text-muted {
   color: var(--text-muted);
+}
+
+/* Reduced Motion Override for Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

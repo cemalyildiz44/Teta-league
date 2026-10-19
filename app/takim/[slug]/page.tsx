@@ -374,7 +374,7 @@ export default async function TeamPage({ params }: Props) {
   const shortTag = `#${(team.ea_club_name || team.slug.substring(0,3)).toUpperCase()}`;
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 lg:px-6 py-12 md:py-16">
+    <div className="mx-auto max-w-[1400px] px-4 lg:px-6 py-12 md:py-16 page-enter">
 
       {/* HERO SECTION */}
       <div className="client-glass rounded-2xl p-6 lg:p-10 relative overflow-hidden mb-8 border border-[#00e5ff]/20 bg-[#01060b]">
@@ -476,7 +476,9 @@ export default async function TeamPage({ params }: Props) {
                 <div className="px-6 py-3 bg-gradient-to-br from-[#00e5ff]/10 to-transparent backdrop-blur-md border border-[#00e5ff]/30 rounded-xl flex flex-col shadow-[0_0_15px_rgba(0,229,255,0.1)] relative overflow-hidden group">
                   <div className="absolute inset-0 bg-[#00e5ff] opacity-0 group-hover:opacity-[0.05] transition-opacity" />
                   <span className="text-[10px] text-[#00e5ff] font-[900] uppercase tracking-[0.2em] mb-1 z-10">KADRO DEĞERİ</span>
-                  <span className="text-[16px] text-white font-[900] tracking-wider uppercase z-10">{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(totalTeamValue)}</span>
+                  <span className="text-[16px] text-white font-[900] tracking-wider uppercase z-10">
+                    {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(totalTeamValue)}
+                  </span>
                 </div>
               )}
 
@@ -528,9 +530,11 @@ export default async function TeamPage({ params }: Props) {
             { label: "YENİLEN", value: stats.goals_against },
             { label: "AVERAJ", value: stats.goal_difference }
           ].map((stat, i) => (
-            <div key={i} className={`client-glass rounded-xl border p-4 text-center flex flex-col justify-center ${stat.highlight ? 'border-[#00e5ff]/30 bg-[#00e5ff]/5' : 'border-white/5 bg-[#03070c]'}`}>
+            <div key={i} className={`client-glass rounded-xl border p-4 text-center flex flex-col justify-center hover:-translate-y-0.5 transition-all duration-200 ${stat.highlight ? 'border-[#00e5ff]/30 bg-[#00e5ff]/5 shadow-[0_0_15px_rgba(0,229,255,0.08)]' : 'border-white/5 bg-[#03070c] hover:border-white/10'}`}>
               <span className={`text-[9px] font-[900] tracking-[0.2em] uppercase mb-2 ${stat.highlight ? 'text-[#00e5ff]' : 'text-gray-500'}`}>{stat.label}</span>
-              <span className={`text-xl lg:text-2xl font-[900] ${stat.highlight ? 'text-[#00e5ff] drop-shadow-[0_0_10px_rgba(0,229,255,0.4)]' : (stat.color || 'text-white')}`}>{stat.value}</span>
+              <span className={`text-xl lg:text-2xl font-[900] ${stat.highlight ? 'text-[#00e5ff] drop-shadow-[0_0_10px_rgba(0,229,255,0.4)]' : (stat.color || 'text-white')}`}>
+                {stat.value}
+              </span>
             </div>
           ))}
           </div>
@@ -663,7 +667,7 @@ export default async function TeamPage({ params }: Props) {
                     : (match.status === 'PENDING_REVIEW' ? 'İNCELEMEDE' : 'VS');
 
                   return (
-                    <div key={match.id || match.fixture_id} className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                    <div key={match.id || match.fixture_id} className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] hover:border-[#00e5ff]/30 transition-all duration-200 group">
                       <div className="flex flex-col items-center justify-center min-w-[65px] pr-4 border-r border-white/10">
                         <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">
                           {dateStr}
@@ -674,7 +678,7 @@ export default async function TeamPage({ params }: Props) {
                       </div>
                       <div className="flex-1 flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 truncate">
-                          <TeamLogo src={opponent?.logo_url} name={opponent?.name} size="sm" />
+                          <TeamLogo src={opponent?.logo_url} name={opponent?.name} size="sm" className="group-hover:scale-[1.04] transition-transform duration-200" />
                           <Link href={opponent?.slug ? `/takim/${opponent.slug}` : "#"} className="text-[14px] font-[800] text-gray-300 hover:text-[#00e5ff] truncate transition-colors">
                             {opponent?.name || 'Rakip Takım'}
                           </Link>
@@ -719,7 +723,7 @@ export default async function TeamPage({ params }: Props) {
                     : `${match.week_number}. Hafta`;
 
                   return (
-                    <Link href={`/mac/${match.id}`} key={match.id} className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/20 transition-colors group">
+                    <Link href={`/mac/${match.id}`} key={match.id} className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] hover:border-[#00e5ff]/30 transition-all duration-200 group">
                       <div className="flex flex-col items-center justify-center min-w-[65px] pr-4 border-r border-white/10">
                         <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">
                           {dateStr}
@@ -730,8 +734,8 @@ export default async function TeamPage({ params }: Props) {
                       </div>
                       <div className="flex-1 flex items-center justify-between">
                         <div className="flex items-center gap-3 truncate">
-                          <TeamLogo src={opponent?.logo_url} name={opponent?.name} size="sm" />
-                          <span className="text-[14px] font-[800] text-gray-300 truncate group-hover:text-white transition-colors">
+                          <TeamLogo src={opponent?.logo_url} name={opponent?.name} size="sm" className="group-hover:scale-[1.04] transition-transform duration-200" />
+                          <span className="text-[14px] font-[800] text-gray-300 truncate group-hover:text-[#00e5ff] transition-colors">
                             {opponent?.name || 'Rakip Takım'}
                           </span>
                         </div>

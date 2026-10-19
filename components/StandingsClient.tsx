@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import TeamLogo from '@/components/TeamLogo';
 import { getStandingsZone } from '@/lib/standingsZones';
+import FlipList from '@/components/motion/FlipList';
 
 export interface StandingsTeamRow {
   team_id: string;
@@ -118,7 +119,7 @@ export default function StandingsClient({ superLig, ecl }: StandingsClientProps)
         </div>
 
         {/* SATIRLAR: İLK 5 TAKIM */}
-        <div className="divide-y divide-white/[0.05]">
+        <FlipList as="div" className="divide-y divide-white/[0.05]">
           {displayTeams.map((row, index) => {
             const rank = index + 1;
             const zone = getStandingsZone(rank, isLevel1);
@@ -126,7 +127,8 @@ export default function StandingsClient({ superLig, ecl }: StandingsClientProps)
             return (
               <div
                 key={row.team_id || index}
-                className="flex items-center justify-between px-2 h-14 sm:h-[58px] hover:bg-white/[0.02] transition-colors"
+                data-flip-key={row.team_id || row.team_slug || index}
+                className="flex items-center justify-between px-2.5 h-14 sm:h-[58px] hover:bg-white/[0.06] hover:shadow-[inset_3px_0_0_#00e5ff] transition-all duration-150 group rounded-r-lg"
               >
                 {/* SOL: SIRA + ZONE ÇİZGİSİ + LOGO + TAKIM ADI */}
                 <div className="flex items-center gap-3 min-w-0 flex-1 pr-3">
@@ -149,7 +151,7 @@ export default function StandingsClient({ superLig, ecl }: StandingsClientProps)
                       src={row.team_logo_url}
                       name={row.team_name}
                       size="md"
-                      className="w-9 h-9 sm:w-10 sm:h-10 shrink-0"
+                      className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 group-hover:scale-105 transition-transform duration-200"
                     />
                     <span className="font-bold text-sm sm:text-[15px] text-white group-hover:text-[#00e5ff] transition-colors truncate tracking-wide uppercase">
                       {row.team_name}
@@ -175,7 +177,7 @@ export default function StandingsClient({ superLig, ecl }: StandingsClientProps)
               Henüz puan durumu verisi bulunmuyor
             </div>
           )}
-        </div>
+        </FlipList>
 
         {/* ALT LEGEND: SADE VE KUTUSUZ TEK SATIR */}
         <div className="pt-3 pb-1 border-t border-white/[0.06] flex items-center justify-between text-[11px] text-zinc-500 font-medium">

@@ -44,7 +44,7 @@ export default function TeamLogo({
         <img
           src={src}
           alt={resolvedAlt}
-          className={`w-full h-full object-contain pointer-events-none ${imgClassName}`.trim()}
+          className={`w-full h-full object-contain pointer-events-none transition-transform duration-200 ease-out will-change-transform ${imgClassName}`.trim()}
           loading="lazy"
         />
       </div>
@@ -53,7 +53,7 @@ export default function TeamLogo({
 
   return (
     <div
-      className={`shrink-0 flex items-center justify-center font-black rounded-lg bg-white/5 border border-white/10 text-[#00e5ff] select-none ${dimensionClass} ${fallbackClassName} ${className}`.trim()}
+      className={`shrink-0 flex items-center justify-center font-black rounded-lg bg-white/5 border border-white/10 text-[#00e5ff] select-none transition-transform duration-200 ease-out will-change-transform ${dimensionClass} ${fallbackClassName} ${className}`.trim()}
     >
       <span className="text-xs uppercase tracking-wider">{monogram}</span>
     </div>

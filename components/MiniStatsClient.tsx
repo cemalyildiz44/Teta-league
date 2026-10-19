@@ -18,22 +18,24 @@ export function MiniStatsClient({
   const [activeTab, setActiveTab] = useState<'gol' | 'asist' | 'cleansheet' | 'rating'>('gol');
 
   const renderList = (players: any[], valueKey: string) => (
-    <div className="divide-y divide-white/5">
+    <div key={activeTab} className="divide-y divide-white/5 tab-pane-enter">
       {players && players.length > 0 ? players.map((player, idx) => (
-        <div key={idx} className="flex items-center justify-between p-4 hover:bg-[#00E5FF]/5 hover:shadow-[inset_4px_0_0_#00E5FF] transition-colors">
+        <div key={idx} className="flex items-center justify-between p-4 hover:bg-[#00E5FF]/5 hover:shadow-[inset_4px_0_0_#00E5FF] transition-all duration-200 group">
           <div className="flex items-center gap-4">
-            <span className={`text-[24px] font-[900] w-8 text-center ${idx === 0 ? 'text-[#00e5ff]' : 'text-gray-600'}`}>
+            <span className={`text-[24px] font-[900] w-8 text-center transition-transform duration-200 group-hover:scale-110 ${idx === 0 ? 'text-[#00e5ff]' : 'text-gray-600'}`}>
               {idx + 1}
             </span>
             <div className="flex items-center gap-3">
-              <TeamLogo src={player.teamLogo} name={player.teamName} size="sm" />
+              <TeamLogo src={player.teamLogo} name={player.teamName} size="sm" className="group-hover:scale-[1.04] transition-transform duration-200" />
               <div>
-                <div className="text-[16px] font-[800] text-white tracking-wide">{player.playerName}</div>
+                <div className="text-[16px] font-[800] text-white tracking-wide group-hover:text-[#00e5ff] transition-colors">{player.playerName}</div>
                 <div className="data-label truncate max-w-[120px]">{player.teamName}</div>
               </div>
             </div>
           </div>
-          <div className="data-value text-[24px] text-[#00E5FF]">{player[valueKey]}</div>
+          <div className="data-value text-[24px] text-[#00E5FF]">
+            {player[valueKey]}
+          </div>
         </div>
       )) : (
         <div className="empty-state !py-12"><span className="empty-state-title text-[18px]">Veri Yok</span></div>

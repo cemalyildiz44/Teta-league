@@ -116,7 +116,7 @@ export default async function LeagueStandingsPage({
   const hasPenalties = penaltyPointsMap.size > 0 || expelledTeams.size > 0;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 page-enter">
       {/* ÜST BÖLÜM: BAŞLIK & METADATA (KUTUSUZ) */}
       <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 pb-2 border-b border-white/[0.08]">
         <div>
@@ -172,7 +172,7 @@ export default async function LeagueStandingsPage({
               return (
                 <tr
                   key={stat.team_id || idx}
-                  className="h-14 sm:h-[58px] hover:bg-white/[0.02] transition-colors"
+                  className="h-14 sm:h-[58px] hover:bg-white/[0.05] hover:shadow-[inset_3px_0_0_#00e5ff] transition-all duration-150 group"
                 >
                   {/* SIRA & SOL INCE ZONE INDICATOR */}
                   <td className="py-3 px-2 text-center">
@@ -197,7 +197,7 @@ export default async function LeagueStandingsPage({
                         src={team?.logo_url}
                         name={team?.name}
                         size="md"
-                        className="w-9 h-9 sm:w-10 sm:h-10 shrink-0"
+                        className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 group-hover/team:scale-105 transition-transform duration-200"
                       />
                       <div className="flex items-center gap-2 min-w-0">
                         <span
