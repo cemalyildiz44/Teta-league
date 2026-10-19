@@ -395,7 +395,7 @@ export async function addPlayerLegacyCareerAction(playerId: string, formData: Fo
       revalidatePath(`/oyuncular/${profile.username}`);
     }
 
-    return { success: 'Eski kariyer sezon kaydı başarıyla eklendi.' };
+    return { success: 'Sezon kariyer kaydı başarıyla eklendi.' };
   } catch (err: any) {
     console.error('Unexpected error in addPlayerLegacyCareerAction:', err);
     return { error: err.message || 'Beklenmeyen bir hata oluştu.' };
@@ -423,12 +423,17 @@ export async function updatePlayerLegacyCareerAction(statId: string, formData: F
 
     const { data: existingStat, error: statErr } = await supabase
       .from('player_legacy_career_stats')
-      .select('id, player_id, season_name, league_name, team_name, team_id, matches_played, goals, assists, rating_avg, profiles(username)')
+      .select('id, player_id, season_name, league_name, team_name, team_id, matches_played, goals, assists, rating_avg, profiles!player_legacy_career_stats_player_id_fkey(username)')
       .eq('id', statId)
       .is('deleted_at', null)
       .maybeSingle();
 
-    if (statErr || !existingStat) {
+    if (statErr) {
+      console.error('Error fetching legacy career stat for update:', statErr);
+      return { error: `Legacy kariyer kaydı sorgulanırken veritabanı hatası oluştu: ${statErr.message}` };
+    }
+
+    if (!existingStat) {
       return { error: 'Güncellenecek aktif legacy kariyer kaydı bulunamadı.' };
     }
 
@@ -500,7 +505,7 @@ export async function updatePlayerLegacyCareerAction(statId: string, formData: F
       revalidatePath(`/oyuncular/${profileObj.username}`);
     }
 
-    return { success: 'Eski kariyer sezon kaydı başarıyla güncellendi.' };
+    return { success: 'Sezon kariyer kaydı başarıyla güncellendi.' };
   } catch (err: any) {
     console.error('Unexpected error in updatePlayerLegacyCareerAction:', err);
     return { error: err.message || 'Beklenmeyen bir hata oluştu.' };
@@ -528,12 +533,17 @@ export async function deletePlayerLegacyCareerAction(statId: string) {
 
     const { data: existingStat, error: statErr } = await supabase
       .from('player_legacy_career_stats')
-      .select('id, player_id, season_name, league_name, team_name, profiles(username)')
+      .select('id, player_id, season_name, league_name, team_name, profiles!player_legacy_career_stats_player_id_fkey(username)')
       .eq('id', statId)
       .is('deleted_at', null)
       .maybeSingle();
 
-    if (statErr || !existingStat) {
+    if (statErr) {
+      console.error('Error fetching legacy career stat for delete:', statErr);
+      return { error: `Legacy kariyer kaydı sorgulanırken veritabanı hatası oluştu: ${statErr.message}` };
+    }
+
+    if (!existingStat) {
       return { error: 'Silinecek aktif legacy kariyer kaydı bulunamadı.' };
     }
 
@@ -568,7 +578,7 @@ export async function deletePlayerLegacyCareerAction(statId: string) {
       revalidatePath(`/oyuncular/${profileObj.username}`);
     }
 
-    return { success: 'Eski kariyer sezon kaydı başarıyla silindi (arşive alındı).' };
+    return { success: 'Sezon kariyer kaydı başarıyla silindi (arşive alındı).' };
   } catch (err: any) {
     console.error('Unexpected error in deletePlayerLegacyCareerAction:', err);
     return { error: err.message || 'Beklenmeyen bir hata oluştu.' };

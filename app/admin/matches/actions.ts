@@ -65,54 +65,68 @@ export async function reviewMatchAction(matchId: string, status: 'APPROVED' | 'R
   });
 
   // 3. Cache Invalidation: Revalidate necessary public paths and admin paths
+  await revalidateMatchDependencies(supabase, matchId, existingMatch);
+
+  return { success: 'Maç durumu güncellendi.' };
+}
+
+export async function revalidateMatchDependencies(supabase: any, matchId: string, matchData?: any) {
   revalidatePath('/admin/matches');
+  revalidatePath('/admin/players');
+  revalidatePath('/');
+  revalidatePath('/ligler');
+  revalidatePath('/oyuncular');
+  revalidatePath('/istatistikler');
+  revalidatePath(`/mac/${matchId}`);
 
-  if (status === 'APPROVED' || existingMatch.status === 'APPROVED') {
-    revalidatePath('/');
-    revalidatePath('/ligler');
-    revalidatePath('/oyuncular');
-    revalidatePath(`/mac/${matchId}`);
+  let match = matchData;
+  if (!match) {
+    const { data } = await supabase
+      .from('matches')
+      .select('id, status, season_id, league_id, home_team_id, away_team_id')
+      .eq('id', matchId)
+      .maybeSingle();
+    match = data;
+  }
+  if (!match) return;
 
-    const { seasonSlug, leagueName } = await getScopeNames(supabase, existingMatch);
-    if (seasonSlug && leagueName) {
-      const leagueSlug = slugify(leagueName);
-      revalidatePath(`/lig/${seasonSlug}/${leagueSlug}`);
-      revalidatePath(`/lig/${seasonSlug}/${leagueSlug}/istatistikler`);
-      revalidatePath(`/lig/${seasonSlug}/${leagueSlug}/fikstur`);
-    }
+  const { seasonSlug, leagueName } = await getScopeNames(supabase, match);
+  if (seasonSlug && leagueName) {
+    const leagueSlug = slugify(leagueName);
+    revalidatePath(`/lig/${seasonSlug}/${leagueSlug}`);
+    revalidatePath(`/lig/${seasonSlug}/${leagueSlug}/istatistikler`);
+    revalidatePath(`/lig/${seasonSlug}/${leagueSlug}/fikstur`);
+  }
 
-    // Takım profillerini revalidate et
-    const teamIds = [existingMatch.home_team_id, existingMatch.away_team_id].filter(Boolean);
-    if (teamIds.length > 0) {
-      const { data: matchTeams } = await supabase
-        .from('teams')
-        .select('slug')
-        .in('id', teamIds);
-      for (const tm of matchTeams || []) {
-        if (tm.slug) {
-          revalidatePath(`/takim/${tm.slug}`);
-        }
-      }
-    }
-
-    // Maçta oynayan ve eşleşmiş oyuncuların profillerini revalidate et
-    const { data: matchPlayerRows } = await supabase
-      .from('match_player_stats')
-      .select('profiles!match_player_stats_player_id_fkey(username)')
-      .eq('match_id', matchId)
-      .not('player_id', 'is', null);
-
-    if (matchPlayerRows) {
-      for (const row of matchPlayerRows) {
-        const prof = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
-        if (prof?.username) {
-          revalidatePath(`/oyuncular/${encodeURIComponent(prof.username)}`);
-        }
+  // Takım profillerini revalidate et
+  const teamIds = [match.home_team_id, match.away_team_id].filter(Boolean);
+  if (teamIds.length > 0) {
+    const { data: matchTeams } = await supabase
+      .from('teams')
+      .select('slug')
+      .in('id', teamIds);
+    for (const tm of matchTeams || []) {
+      if (tm.slug) {
+        revalidatePath(`/takim/${tm.slug}`);
       }
     }
   }
 
-  return { success: 'Maç durumu güncellendi.' };
+  // Maçta oynayan ve eşleşmiş oyuncuların profillerini revalidate et
+  const { data: matchPlayerRows } = await supabase
+    .from('match_player_stats')
+    .select('profiles!match_player_stats_player_id_fkey(username)')
+    .eq('match_id', matchId)
+    .not('player_id', 'is', null);
+
+  if (matchPlayerRows) {
+    for (const row of matchPlayerRows) {
+      const prof = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+      if (prof?.username) {
+        revalidatePath(`/oyuncular/${encodeURIComponent(prof.username)}`);
+      }
+    }
+  }
 }
 
 export async function deleteMatchAction(matchId: string) {
@@ -128,7 +142,7 @@ export async function deleteMatchAction(matchId: string) {
   // Fetch match details to know if public caches need revalidation
   const { data: existingMatch } = await supabase
     .from('matches')
-    .select('id, status, season_id, league_id')
+    .select('id, status, season_id, league_id, home_team_id, away_team_id')
     .eq('id', matchId)
     .maybeSingle();
 
@@ -151,21 +165,10 @@ export async function deleteMatchAction(matchId: string) {
     actor_id: user.id
   });
 
-  revalidatePath('/admin/matches');
-
   if (existingMatch.status === 'APPROVED') {
-    revalidatePath('/');
-    revalidatePath('/ligler');
-    revalidatePath('/oyuncular');
-    revalidatePath(`/mac/${matchId}`);
-
-    const { seasonSlug, leagueName } = await getScopeNames(supabase, existingMatch);
-    if (seasonSlug && leagueName) {
-      const leagueSlug = slugify(leagueName);
-      revalidatePath(`/lig/${seasonSlug}/${leagueSlug}`);
-      revalidatePath(`/lig/${seasonSlug}/${leagueSlug}/istatistikler`);
-      revalidatePath(`/lig/${seasonSlug}/${leagueSlug}/fikstur`);
-    }
+    await revalidateMatchDependencies(supabase, matchId, existingMatch);
+  } else {
+    revalidatePath('/admin/matches');
   }
 
   return { success: 'Maç başarıyla silindi.' };
@@ -197,16 +200,11 @@ export async function updateMatchScoreAction(matchId: string, home_score: number
   // Fetch match details to inspect current state
   const { data: existingMatch } = await supabase
     .from('matches')
-    .select('id, status, season_id, league_id, home_score, away_score')
+    .select('id, status, season_id, league_id, home_team_id, away_team_id, home_score, away_score')
     .eq('id', matchId)
     .maybeSingle();
 
   if (!existingMatch) return { error: 'Maç bulunamadı.' };
-
-  // Guard against editing score of already approved matches
-  if (existingMatch.status === 'APPROVED') {
-    return { error: 'Onaylanmış maçın skoru doğrudan değiştirilemez. Önce maç onayını geri alınız veya maçı incelemeye alınız.' };
-  }
 
   const { error } = await supabase.from('matches').update({
     home_score,
@@ -227,21 +225,10 @@ export async function updateMatchScoreAction(matchId: string, home_score: number
     actor_id: user.id
   });
 
-  revalidatePath('/admin/matches');
-
   if (existingMatch.status === 'APPROVED') {
-    revalidatePath('/');
-    revalidatePath('/ligler');
-    revalidatePath('/oyuncular');
-    revalidatePath(`/mac/${matchId}`);
-
-    const { seasonSlug, leagueName } = await getScopeNames(supabase, existingMatch);
-    if (seasonSlug && leagueName) {
-      const leagueSlug = slugify(leagueName);
-      revalidatePath(`/lig/${seasonSlug}/${leagueSlug}`);
-      revalidatePath(`/lig/${seasonSlug}/${leagueSlug}/istatistikler`);
-      revalidatePath(`/lig/${seasonSlug}/${leagueSlug}/fikstur`);
-    }
+    await revalidateMatchDependencies(supabase, matchId, existingMatch);
+  } else {
+    revalidatePath('/admin/matches');
   }
 
   return { success: 'Skor başarıyla güncellendi.' };
@@ -497,7 +484,6 @@ export async function updatePlayerStatsAction(statsId: string, fields: Record<st
   if (!stat) return { error: 'İlgili oyuncu istatistik kaydı bulunamadı.' };
   const rel = (stat as unknown as { matches?: { status?: string } | { status?: string }[] | null }).matches;
   const matchStatus = (Array.isArray(rel) ? rel[0] : rel)?.status;
-  if (matchStatus === 'APPROVED') return { error: 'Onaylanmış maçın istatistikleri düzenlenemez; önce onayı geri alın.' };
 
   const { error } = await supabase.from('match_player_stats').update({ ...update, updated_at: new Date().toISOString() }).eq('id', statsId);
   if (error) return { error: 'İstatistik güncellenemedi: ' + error.message };
@@ -512,6 +498,249 @@ export async function updatePlayerStatsAction(statsId: string, fields: Record<st
     description: `Oyuncu istatistikleri düzenlendi (maç #${String(stat.match_id).substring(0, 8)}).`,
     actor_id: user.id,
   });
-  revalidatePath('/admin/matches');
+
+  if (matchStatus === 'APPROVED') {
+    await revalidateMatchDependencies(supabase, stat.match_id);
+  } else {
+    revalidatePath('/admin/matches');
+  }
+
   return { success: 'İstatistikler güncellendi.' };
 }
+
+export interface ApprovedMatchPlayerStatUpdate {
+  id: string;
+  goals?: number;
+  assists?: number;
+  rating?: number | null;
+  shots?: number;
+  passes_made?: number;
+  pass_attempts?: number;
+  tackles_made?: number;
+  tackle_attempts?: number;
+  saves?: number;
+  goals_conceded?: number;
+  cleansheets_gk?: number;
+  cleansheets_def?: number;
+  red_cards?: number;
+  is_mom?: boolean;
+}
+
+export interface UpdateApprovedMatchPayload {
+  home_score: number;
+  away_score: number;
+  player_stats?: ApprovedMatchPlayerStatUpdate[];
+  allow_discrepancy?: boolean;
+}
+
+/**
+ * Updates match score and player stats in an approved match (or match in review)
+ * and automatically triggers season recalculation and revalidation of all public views.
+ */
+export async function updateApprovedMatchDetailsAction(
+  matchId: string,
+  payload: UpdateApprovedMatchPayload
+) {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!(await checkAdmin(supabase, user)) || !user) return { error: 'Yetkisiz erişim.' };
+
+  if (!matchId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(matchId)) {
+    return { error: 'Geçersiz maç kimliği.' };
+  }
+
+  const { home_score, away_score, player_stats = [], allow_discrepancy = false } = payload;
+
+  if (
+    typeof home_score !== 'number' ||
+    typeof away_score !== 'number' ||
+    !Number.isInteger(home_score) ||
+    !Number.isInteger(away_score) ||
+    home_score < 0 ||
+    away_score < 0 ||
+    home_score > 99 ||
+    away_score > 99
+  ) {
+    return { error: 'Geçersiz skor: Skorlar 0-99 arası tam sayı olmalıdır.' };
+  }
+
+  // 1. Fetch match and existing stats
+  const { data: existingMatch, error: matchErr } = await supabase
+    .from('matches')
+    .select('id, status, season_id, league_id, home_team_id, away_team_id, home_score, away_score')
+    .eq('id', matchId)
+    .maybeSingle();
+
+  if (matchErr || !existingMatch) return { error: 'Maç bulunamadı.' };
+
+  const { data: existingStats, error: statsErr } = await supabase
+    .from('match_player_stats')
+    .select('*')
+    .eq('match_id', matchId);
+
+  if (statsErr) return { error: 'Mevcut oyuncu istatistikleri okunamadı: ' + statsErr.message };
+
+  const statsById = new Map((existingStats || []).map((s: any) => [s.id, s]));
+
+  // 2. Validate player_stats
+  let homePlayerGoals = 0;
+  let awayPlayerGoals = 0;
+
+  for (const s of player_stats) {
+    if (!s.id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s.id)) {
+      return { error: 'Geçersiz oyuncu istatistik kimliği.' };
+    }
+    const current = statsById.get(s.id);
+    if (!current) {
+      return { error: `İstatistik kaydı bu maça ait değil: ${s.id}` };
+    }
+
+    // Validate int fields
+    for (const key of STAT_INT_FIELDS) {
+      if (s[key] !== undefined) {
+        const val = s[key];
+        if (typeof val !== 'number' || !Number.isInteger(val) || val < 0 || val > 1000) {
+          return { error: `Geçersiz değer: ${key} 0-1000 arası tam sayı olmalıdır.` };
+        }
+      }
+    }
+
+    // Validate rating
+    if (s.rating !== undefined && s.rating !== null) {
+      if (typeof s.rating !== 'number' || !Number.isFinite(s.rating) || s.rating < 0 || s.rating > 10) {
+        return { error: 'Geçersiz reyting: Reyting 0 ile 10 arasında olmalıdır.' };
+      }
+    }
+
+    const effectiveGoals = s.goals !== undefined ? s.goals : (current.goals || 0);
+    if (current.team_id === existingMatch.home_team_id) {
+      homePlayerGoals += effectiveGoals;
+    } else if (current.team_id === existingMatch.away_team_id) {
+      awayPlayerGoals += effectiveGoals;
+    }
+  }
+
+  // Account for any stats rows not present in payload
+  const updatedStatIds = new Set(player_stats.map(p => p.id));
+  for (const [id, current] of statsById) {
+    if (!updatedStatIds.has(id)) {
+      const g = current.goals || 0;
+      if (current.team_id === existingMatch.home_team_id) {
+        homePlayerGoals += g;
+      } else if (current.team_id === existingMatch.away_team_id) {
+        awayPlayerGoals += g;
+      }
+    }
+  }
+
+  // 3. Discrepancy Check (if not explicitly allowed)
+  if (!allow_discrepancy) {
+    if (homePlayerGoals > home_score) {
+      return {
+        error: `Ev sahibi oyuncu golleri toplamı (${homePlayerGoals}), girilen maç skorunu (${home_score}) aşıyor. Lütfen skor veya gol sayılarını kontrol ediniz.`
+      };
+    }
+    if (awayPlayerGoals > away_score) {
+      return {
+        error: `Deplasman oyuncu golleri toplamı (${awayPlayerGoals}), girilen maç skorunu (${away_score}) aşıyor. Lütfen skor veya gol sayılarını kontrol ediniz.`
+      };
+    }
+  }
+
+  // 4. Update Match Score if changed
+  const scoreChanged = existingMatch.home_score !== home_score || existingMatch.away_score !== away_score;
+  if (scoreChanged) {
+    const { error: matchUpdateErr } = await supabase
+      .from('matches')
+      .update({
+        home_score,
+        away_score,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', matchId);
+
+    if (matchUpdateErr) return { error: 'Skor güncellenemedi: ' + matchUpdateErr.message };
+  }
+
+  // 5. Update Player Stats rows that changed
+  const modifiedOldStats: any[] = [];
+  const modifiedNewStats: any[] = [];
+
+  for (const s of player_stats) {
+    const current = statsById.get(s.id);
+    if (!current) continue;
+
+    const fieldsToUpdate: Record<string, any> = {};
+    let hasChanges = false;
+
+    for (const key of STAT_INT_FIELDS) {
+      if (s[key] !== undefined && s[key] !== current[key]) {
+        fieldsToUpdate[key] = s[key];
+        hasChanges = true;
+      }
+    }
+
+    if (s.rating !== undefined) {
+      const normalizedRating = s.rating === null ? null : Math.round(s.rating * 100) / 100;
+      if (normalizedRating !== current.rating) {
+        fieldsToUpdate.rating = normalizedRating;
+        hasChanges = true;
+      }
+    }
+
+    if (s.is_mom !== undefined && s.is_mom !== !!current.is_mom) {
+      fieldsToUpdate.is_mom = s.is_mom;
+      hasChanges = true;
+    }
+
+    if (hasChanges) {
+      fieldsToUpdate.updated_at = new Date().toISOString();
+      const { error: statUpdateErr } = await supabase
+        .from('match_player_stats')
+        .update(fieldsToUpdate)
+        .eq('id', s.id);
+
+      if (statUpdateErr) {
+        return { error: `Oyuncu istatistiği güncellenemedi (${current.ea_player_name || s.id}): ${statUpdateErr.message}` };
+      }
+
+      modifiedOldStats.push({ id: s.id, player_name: current.ea_player_name, ...current });
+      modifiedNewStats.push({ id: s.id, player_name: current.ea_player_name, ...fieldsToUpdate });
+    }
+  }
+
+  // 6. Audit Logging
+  await logAdminAudit({
+    action: 'UPDATE_APPROVED_MATCH',
+    entity_type: 'matches',
+    entity_id: matchId,
+    entity_label: `Maç #${matchId.substring(0, 8)}`,
+    old_data: {
+      home_score: existingMatch.home_score,
+      away_score: existingMatch.away_score,
+      modified_count: modifiedOldStats.length,
+      modified_stats: modifiedOldStats
+    },
+    new_data: {
+      home_score,
+      away_score,
+      modified_count: modifiedNewStats.length,
+      modified_stats: modifiedNewStats,
+      discrepancy_allowed: allow_discrepancy
+    },
+    description: `Onaylanmış maç (#${matchId.substring(0, 8)}) düzenlendi: Skor ${existingMatch.home_score}-${existingMatch.away_score} -> ${home_score}-${away_score}, ${modifiedNewStats.length} oyuncu istatistiği güncellendi.`,
+    actor_id: user.id
+  });
+
+  // 7. Invalidate Caches
+  if (existingMatch.status === 'APPROVED') {
+    await revalidateMatchDependencies(supabase, matchId, existingMatch);
+  } else {
+    revalidatePath('/admin/matches');
+  }
+
+  return { success: 'Maç ve oyuncu istatistikleri başarıyla güncellendi.' };
+}
+

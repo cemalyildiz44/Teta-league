@@ -11,7 +11,8 @@ import {
 } from 'lucide-react';
 import { 
   reviewMatchAction, deleteMatchAction, updateMatchScoreAction,
-  assignPlayerStatsProfileAction, getTeamRosterCandidatesAction, searchProfilesAction, updatePlayerStatsAction
+  assignPlayerStatsProfileAction, getTeamRosterCandidatesAction, searchProfilesAction, updatePlayerStatsAction,
+  updateApprovedMatchDetailsAction, type UpdateApprovedMatchPayload
 } from './actions';
 import TeamLogo from '@/components/TeamLogo';
 
@@ -92,6 +93,12 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
   const [assignModal, setAssignModal] = useState<any>(null);
   const [statsModal, setStatsModal] = useState<StatsRow | null>(null); // player stats row being edited
 
+  // Edit mode for approved matches
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editScores, setEditScores] = useState<{ home_score: number; away_score: number }>({ home_score: 0, away_score: 0 });
+  const [editPlayerStats, setEditPlayerStats] = useState<Record<string, { goals: number; assists: number; rating: number | null; [k: string]: any }>>({});
+  const [savingApprovedMatch, setSavingApprovedMatch] = useState(false);
+
   // After router.refresh() keep the open detail modal in sync with the refreshed match (edits, assignments, re-check)
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing the modal snapshot with refreshed server data
@@ -111,6 +118,12 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
     setTimeout(() => setFeedback(null), 5000);
   };
   const closeConfirm = () => setConfirmModal({ ...confirmModal, isOpen: false });
+
+  const closeDetailModal = () => {
+    setIsEditMode(false);
+    setEditPlayerStats({});
+    setDetailModal(null);
+  };
 
   // Filtered
   const filteredMatches = useMemo(() => {
@@ -189,20 +202,158 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
     });
   };
 
+  const enterEditMode = () => {
+    if (!detailModal) return;
+    setEditScores({
+      home_score: detailModal.home_score ?? 0,
+      away_score: detailModal.away_score ?? 0,
+    });
+    const statsMap: Record<string, any> = {};
+    for (const s of detailModal.stats || []) {
+      statsMap[s.id] = {
+        goals: s.goals ?? 0,
+        assists: s.assists ?? 0,
+        rating: s.rating ?? null,
+        shots: s.shots ?? 0,
+        passes_made: s.passes_made ?? 0,
+        pass_attempts: s.pass_attempts ?? 0,
+        tackles_made: s.tackles_made ?? 0,
+        tackle_attempts: s.tackle_attempts ?? 0,
+        saves: s.saves ?? 0,
+        goals_conceded: s.goals_conceded ?? 0,
+        cleansheets_gk: s.cleansheets_gk ?? 0,
+        cleansheets_def: s.cleansheets_def ?? 0,
+        red_cards: s.red_cards ?? 0,
+        is_mom: !!s.is_mom,
+      };
+    }
+    setEditPlayerStats(statsMap);
+    setIsEditMode(true);
+  };
+
+  const cancelEditMode = () => {
+    setIsEditMode(false);
+    setEditPlayerStats({});
+  };
+
+  const executeSaveApprovedMatch = async (allowDiscrepancy: boolean) => {
+    if (!detailModal) return;
+    setSavingApprovedMatch(true);
+
+    const payload: UpdateApprovedMatchPayload = {
+      home_score: editScores.home_score,
+      away_score: editScores.away_score,
+      player_stats: Object.entries(editPlayerStats).map(([id, stats]) => ({
+        id,
+        ...stats,
+      })),
+      allow_discrepancy: allowDiscrepancy,
+    };
+
+    const res = await updateApprovedMatchDetailsAction(detailModal.id, payload);
+
+    if (res.error) {
+      showFeedback(res.error, 'error');
+      setSavingApprovedMatch(false);
+      return;
+    }
+
+    showFeedback(res.success || 'Maç ve istatistikler başarıyla güncellendi.', 'success');
+
+    // Update local state so modal immediately reflects new scores and stats
+    setDetailModal((prev: any) => {
+      if (!prev) return prev;
+      const updatedStats = (prev.stats || []).map((s: any) => {
+        const draft = editPlayerStats[s.id];
+        return draft ? { ...s, ...draft } : s;
+      });
+      return {
+        ...prev,
+        home_score: editScores.home_score,
+        away_score: editScores.away_score,
+        stats: updatedStats,
+      };
+    });
+
+    setIsEditMode(false);
+    setSavingApprovedMatch(false);
+    router.refresh();
+  };
+
+  const handleSaveApprovedMatch = () => {
+    if (!detailModal) return;
+
+    const allStats = (detailModal.stats || []) as DetailStat[];
+    const homeStats = allStats.filter((s) => s.team_id === detailModal.home_team_id);
+    const awayStats = allStats.filter((s) => s.team_id === detailModal.away_team_id);
+
+    const homePlayerGoals = homeStats.reduce((sum, s) => {
+      const g = editPlayerStats[s.id]?.goals ?? s.goals ?? 0;
+      return sum + (typeof g === 'number' ? g : 0);
+    }, 0);
+    const awayPlayerGoals = awayStats.reduce((sum, s) => {
+      const g = editPlayerStats[s.id]?.goals ?? s.goals ?? 0;
+      return sum + (typeof g === 'number' ? g : 0);
+    }, 0);
+
+    const hasDiscrepancy = homePlayerGoals > editScores.home_score || awayPlayerGoals > editScores.away_score;
+
+    if (hasDiscrepancy) {
+      const reasons: string[] = [];
+      if (homePlayerGoals > editScores.home_score) {
+        reasons.push(`${detailModal.home?.name || 'Ev Sahibi'}: Oyuncu golleri (${homePlayerGoals}) > Takım skoru (${editScores.home_score})`);
+      }
+      if (awayPlayerGoals > editScores.away_score) {
+        reasons.push(`${detailModal.away?.name || 'Deplasman'}: Oyuncu golleri (${awayPlayerGoals}) > Takım skoru (${editScores.away_score})`);
+      }
+
+      setConfirmModal({
+        isOpen: true,
+        title: 'Gol Uyuşmazlığı Uyarısı',
+        type: 'warning',
+        message: `Aşağıdaki takımlarda oyuncu golleri toplamı maç skorundan fazladır:\n\n• ` +
+          reasons.join('\n• ') +
+          `\n\nBu durum istatistiksel tutarsızlığa yol açabilir. Yine de bu değerlerle kaydetmek istiyor musunuz?`,
+        action: async () => {
+          closeConfirm();
+          await executeSaveApprovedMatch(true);
+        },
+      });
+      return;
+    }
+
+    executeSaveApprovedMatch(false);
+  };
+
   const handleStatsSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!statsModal) return;
-    setLoading(true);
     const fd = new FormData(e.currentTarget);
     const num = (k: string) => Number(fd.get(k));
     const ratingRaw = String(fd.get('rating') ?? '').trim();
-    const res = await updatePlayerStatsAction(statsModal.id, {
+    const statsData = {
       goals: num('goals'), assists: num('assists'), shots: num('shots'), passes_made: num('passes_made'), pass_attempts: num('pass_attempts'),
       tackles_made: num('tackles_made'), tackle_attempts: num('tackle_attempts'), saves: num('saves'), goals_conceded: num('goals_conceded'),
       cleansheets_gk: num('cleansheets_gk'), cleansheets_def: num('cleansheets_def'), red_cards: num('red_cards'),
       rating: ratingRaw === '' ? null : Number(ratingRaw),
       is_mom: fd.get('is_mom') === 'on',
-    });
+    };
+
+    if (isEditMode) {
+      setEditPlayerStats((prev) => ({
+        ...prev,
+        [statsModal.id]: {
+          ...(prev[statsModal.id] || {}),
+          ...statsData,
+        },
+      }));
+      setStatsModal(null);
+      showFeedback('Detay istatistikler taslağa işlendi. Kaydet butonuna basmayı unutmayınız.', 'success');
+      return;
+    }
+
+    setLoading(true);
+    const res = await updatePlayerStatsAction(statsModal.id, statsData);
     if (res.error) showFeedback(res.error, 'error');
     else { showFeedback((res.success || '') + ' Kontrol yenileniyor.', 'success'); setStatsModal(null); router.refresh(); }
     setLoading(false);
@@ -298,11 +449,6 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
 
   const handleEditScore = async (e: any) => {
     e.preventDefault();
-    if (editScoreModal?.status === 'APPROVED') {
-      showFeedback('Onaylanmış maçın skoru doğrudan değiştirilemez.', 'error');
-      setEditScoreModal(null);
-      return;
-    }
     setLoading(true);
     const fd = new FormData(e.currentTarget);
     const newHome = parseInt(fd.get('home_score') as string, 10);
@@ -564,8 +710,27 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
         const hasEaScores = eaInfo && eaInfo.homeScore !== null && eaInfo.awayScore !== null;
         const isScoreEdited = hasEaScores && (eaInfo.homeScore !== detailModal.home_score || eaInfo.awayScore !== detailModal.away_score);
 
+        const homePlayerGoalsTotal = homeStats.reduce((sum, s) => {
+          const g = isEditMode ? (editPlayerStats[s.id]?.goals ?? s.goals ?? 0) : (s.goals ?? 0);
+          return sum + (typeof g === 'number' ? g : 0);
+        }, 0);
+        const awayPlayerGoalsTotal = awayStats.reduce((sum, s) => {
+          const g = isEditMode ? (editPlayerStats[s.id]?.goals ?? s.goals ?? 0) : (s.goals ?? 0);
+          return sum + (typeof g === 'number' ? g : 0);
+        }, 0);
+
         const renderTeamPanel = (teamStats: DetailStat[], team: { name?: string | null; logo_url?: string | null } | null | undefined, isHome: boolean) => {
           const teamName = team?.name || (isHome ? 'Ev Sahibi' : 'Deplasman');
+          const targetScore = isEditMode
+            ? (isHome ? editScores.home_score : editScores.away_score)
+            : (isHome ? detailModal.home_score : detailModal.away_score);
+          const teamPlayerGoals = teamStats.reduce((sum, s) => {
+            const g = isEditMode ? (editPlayerStats[s.id]?.goals ?? s.goals ?? 0) : (s.goals ?? 0);
+            return sum + (typeof g === 'number' ? g : 0);
+          }, 0);
+          const isExcess = targetScore !== null && targetScore !== undefined && teamPlayerGoals > targetScore;
+          const isExact = targetScore !== null && targetScore !== undefined && teamPlayerGoals === targetScore;
+
           return (
             <div className='flex flex-col bg-[#060d18] rounded-xl border border-white/5 overflow-hidden shadow-lg'>
               {/* Panel Header */}
@@ -581,9 +746,26 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                     </span>
                   </div>
                 </div>
-                <span className='text-xs font-mono font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 rounded shrink-0'>
-                  {teamStats.length} Oyuncu
-                </span>
+                <div className='flex items-center gap-2 shrink-0'>
+                  {targetScore !== null && targetScore !== undefined && (
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-colors ${
+                        isExcess
+                          ? 'bg-red-500/20 text-red-300 border-red-500/40'
+                          : isExact
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                            : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
+                      }`}
+                      title={isExcess ? 'Oyuncu golleri maç skorunu aşıyor!' : isExact ? 'Goller maç skoru ile tam uyuşuyor' : 'Kendi kalesine / atanmamış goller olabilir'}
+                    >
+                      Goller: {teamPlayerGoals}/{targetScore}
+                      {isExcess && ' ⚠️'}
+                    </span>
+                  )}
+                  <span className='text-xs font-mono font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 rounded shrink-0'>
+                    {teamStats.length} Oyuncu
+                  </span>
+                </div>
               </div>
 
               {/* Panel Content */}
@@ -658,34 +840,102 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                                 {s.position || '-'}
                               </span>
                             </td>
-                            <td className='px-1.5 py-2.5 text-center font-bold text-white'>
-                              {(s.goals ?? 0) > 0 ? <span className='text-emerald-400'>{s.goals}</span> : <span className='text-zinc-600'>0</span>}
-                            </td>
-                            <td className='px-1.5 py-2.5 text-center font-bold text-white'>
-                              {(s.assists ?? 0) > 0 ? <span className='text-cyan-400'>{s.assists}</span> : <span className='text-zinc-600'>0</span>}
-                            </td>
-                            <td className='px-1.5 py-2.5 text-center font-mono font-bold'>
-                              {s.rating ? (
-                                <span className='text-amber-400 flex items-center justify-center gap-0.5'>
-                                  {s.rating}
-                                  {s.is_mom && <span title='Maçın Adamı' className='text-[10px]'>⭐</span>}
-                                </span>
-                              ) : (
-                                <span className='text-zinc-600'>-</span>
-                              )}
-                            </td>
+                            {isEditMode ? (
+                              <>
+                                <td className='px-1 py-2 text-center'>
+                                  <input
+                                    type='number'
+                                    min='0'
+                                    max='99'
+                                    value={editPlayerStats[s.id]?.goals ?? 0}
+                                    onChange={(e) => {
+                                      const val = Math.max(0, parseInt(e.target.value) || 0);
+                                      setEditPlayerStats(prev => ({
+                                        ...prev,
+                                        [s.id]: { ...(prev[s.id] || {}), goals: val }
+                                      }));
+                                    }}
+                                    disabled={savingApprovedMatch}
+                                    aria-label={`${s.profiles?.username || s.ea_player_name || 'Oyuncu'} gol`}
+                                    className='w-11 sm:w-12 text-center font-bold bg-[#060d18] border border-cyan-500/30 focus:border-cyan-400 rounded px-1 py-1 text-emerald-400 text-xs focus:outline-none font-mono'
+                                  />
+                                </td>
+                                <td className='px-1 py-2 text-center'>
+                                  <input
+                                    type='number'
+                                    min='0'
+                                    max='99'
+                                    value={editPlayerStats[s.id]?.assists ?? 0}
+                                    onChange={(e) => {
+                                      const val = Math.max(0, parseInt(e.target.value) || 0);
+                                      setEditPlayerStats(prev => ({
+                                        ...prev,
+                                        [s.id]: { ...(prev[s.id] || {}), assists: val }
+                                      }));
+                                    }}
+                                    disabled={savingApprovedMatch}
+                                    aria-label={`${s.profiles?.username || s.ea_player_name || 'Oyuncu'} asist`}
+                                    className='w-11 sm:w-12 text-center font-bold bg-[#060d18] border border-cyan-500/30 focus:border-cyan-400 rounded px-1 py-1 text-cyan-400 text-xs focus:outline-none font-mono'
+                                  />
+                                </td>
+                                <td className='px-1 py-2 text-center'>
+                                  <input
+                                    type='number'
+                                    step='0.01'
+                                    min='0'
+                                    max='10'
+                                    placeholder='-'
+                                    value={editPlayerStats[s.id]?.rating ?? ''}
+                                    onChange={(e) => {
+                                      const str = e.target.value;
+                                      const val = str === '' ? null : Math.min(10, Math.max(0, parseFloat(str) || 0));
+                                      setEditPlayerStats(prev => ({
+                                        ...prev,
+                                        [s.id]: { ...(prev[s.id] || {}), rating: val }
+                                      }));
+                                    }}
+                                    disabled={savingApprovedMatch}
+                                    aria-label={`${s.profiles?.username || s.ea_player_name || 'Oyuncu'} rating`}
+                                    className='w-13 sm:w-14 text-center font-mono font-bold bg-[#060d18] border border-amber-500/30 focus:border-amber-400 rounded px-1 py-1 text-amber-400 text-xs focus:outline-none'
+                                  />
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td className='px-1.5 py-2.5 text-center font-bold text-white'>
+                                  {(s.goals ?? 0) > 0 ? <span className='text-emerald-400'>{s.goals}</span> : <span className='text-zinc-600'>0</span>}
+                                </td>
+                                <td className='px-1.5 py-2.5 text-center font-bold text-white'>
+                                  {(s.assists ?? 0) > 0 ? <span className='text-cyan-400'>{s.assists}</span> : <span className='text-zinc-600'>0</span>}
+                                </td>
+                                <td className='px-1.5 py-2.5 text-center font-mono font-bold'>
+                                  {s.rating ? (
+                                    <span className='text-amber-400 flex items-center justify-center gap-0.5'>
+                                      {s.rating}
+                                      {s.is_mom && <span title='Maçın Adamı' className='text-[10px]'>⭐</span>}
+                                    </span>
+                                  ) : (
+                                    <span className='text-zinc-600'>-</span>
+                                  )}
+                                </td>
+                              </>
+                            )}
                             <td className='px-3 py-2.5 text-right whitespace-nowrap'>
                               <div className='flex items-center justify-end gap-1.5'>
-                                {detailModal.status !== 'APPROVED' && (
-                                  <button
-                                    type='button'
-                                    onClick={() => setStatsModal(s)}
-                                    className='px-2 py-1 bg-white/5 hover:bg-cyan-500/10 text-zinc-300 hover:text-cyan-400 border border-white/10 hover:border-cyan-500/30 rounded text-[10px] font-bold transition-all'
-                                    title='İstatistikleri Düzenle'
-                                  >
-                                    İst. Düzenle
-                                  </button>
-                                )}
+                                <button
+                                  type='button'
+                                  onClick={() => {
+                                    if (isEditMode && editPlayerStats[s.id]) {
+                                      setStatsModal({ ...s, ...editPlayerStats[s.id] });
+                                    } else {
+                                      setStatsModal(s);
+                                    }
+                                  }}
+                                  className='px-2 py-1 bg-white/5 hover:bg-cyan-500/10 text-zinc-300 hover:text-cyan-400 border border-white/10 hover:border-cyan-500/30 rounded text-[10px] font-bold transition-all'
+                                  title='İstatistik Detaylarını Düzenle'
+                                >
+                                  {isEditMode ? 'İst. Detay' : 'İst. Düzenle'}
+                                </button>
                                 <button
                                   type='button'
                                   onClick={() => openAssignModal(s)}
@@ -716,19 +966,58 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
           <div className='fixed inset-0 z-50 flex justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-sm overflow-y-auto'>
             <div className='card-surface w-full max-w-6xl xl:max-w-7xl rounded-2xl border border-white/10 flex flex-col my-auto max-h-[92vh] shadow-2xl'>
               <div className='flex justify-between items-center p-4 border-b border-white/5 bg-[#0a1628] shrink-0'>
-                <div className='flex items-center gap-2.5'>
+                <div className='flex items-center gap-2.5 flex-wrap'>
                   <Shield className='w-4 h-4 text-cyan-400' />
-                  <h2 className='text-sm font-black text-white tracking-widest uppercase'>MAÇ İNCELEME & DETAY</h2>
+                  <h2 className='text-sm font-black text-white tracking-widest uppercase'>
+                    {isEditMode ? 'MAÇ VE İSTATİSTİK DÜZENLEME' : 'MAÇ İNCELEME & DETAY'}
+                  </h2>
                   <StatusBadge status={detailModal.status} />
+                  {isEditMode && (
+                    <span className='px-2 py-0.5 rounded text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1 animate-pulse'>
+                      <Edit2 className='w-3 h-3' /> DÜZENLEME MODU
+                    </span>
+                  )}
                 </div>
-                <button
-                  type='button'
-                  onClick={() => setDetailModal(null)}
-                  className='text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors'
-                  aria-label='Kapat'
-                >
-                  <X className='w-5 h-5'/>
-                </button>
+                <div className='flex items-center gap-2'>
+                  {isEditMode ? (
+                    <>
+                      <button
+                        type='button'
+                        onClick={cancelEditMode}
+                        disabled={savingApprovedMatch}
+                        className='px-3 py-1.5 bg-white/5 hover:bg-white/10 text-zinc-300 border border-white/10 rounded-lg text-xs font-bold transition-colors'
+                      >
+                        İPTAL
+                      </button>
+                      <button
+                        type='button'
+                        onClick={handleSaveApprovedMatch}
+                        disabled={savingApprovedMatch}
+                        className='px-4 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg text-xs font-black transition-colors flex items-center gap-1.5 shadow-lg shadow-cyan-950/40 disabled:opacity-50'
+                      >
+                        {savingApprovedMatch ? <Loader2 className='w-3.5 h-3.5 animate-spin' /> : <Check className='w-3.5 h-3.5' />}
+                        KAYDET
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type='button'
+                      onClick={enterEditMode}
+                      className='px-3 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm'
+                      title='Skor ve oyuncu istatistiklerini düzenle'
+                    >
+                      <Edit2 className='w-3.5 h-3.5' /> DÜZENLE
+                    </button>
+                  )}
+                  <button
+                    type='button'
+                    onClick={closeDetailModal}
+                    className='text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors ml-1'
+                    aria-label='Kapat'
+                  >
+                    <X className='w-5 h-5'/>
+                  </button>
+                </div>
               </div>
 
               <div className='flex-1 overflow-y-auto p-4 sm:p-6 space-y-6'>
@@ -759,30 +1048,50 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                       </span>
                     </div>
 
-                    {/* Interactive Clickable Score (Disabled if match is APPROVED) */}
+                    {/* Interactive Clickable Score */}
                     <div className='flex flex-col items-center gap-1.5'>
-                      {detailModal.status === 'APPROVED' ? (
-                        <div
-                          className='flex flex-col items-center gap-1 px-5 sm:px-7 py-2 sm:py-2.5 bg-[#0a1628] border border-white/5 rounded-xl shadow-xl cursor-default opacity-90'
-                          title='Onaylanmış maçın skoru kilitlidir'
-                        >
-                          <div className='flex items-center gap-3 text-3xl sm:text-5xl font-black text-white font-mono tracking-tight'>
-                            <span>{detailModal.home_score !== null && detailModal.home_score !== undefined ? detailModal.home_score : '-'}</span>
-                            <span className='text-zinc-600 font-sans'>-</span>
-                            <span>{detailModal.away_score !== null && detailModal.away_score !== undefined ? detailModal.away_score : '-'}</span>
-                            <Lock className='w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400/80 ml-1' />
+                      {isEditMode ? (
+                        <div className='flex flex-col items-center gap-1 px-4 sm:px-6 py-2 bg-[#0a1628] border border-cyan-500/40 rounded-xl shadow-xl'>
+                          <div className='flex items-center gap-2.5'>
+                            <div className='flex flex-col items-center'>
+                              <span className='text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5'>Ev Sahibi</span>
+                              <input
+                                type='number'
+                                min='0'
+                                max='99'
+                                value={editScores.home_score}
+                                onChange={(e) => setEditScores(prev => ({ ...prev, home_score: Math.max(0, parseInt(e.target.value) || 0) }))}
+                                disabled={savingApprovedMatch}
+                                aria-label='Ev sahibi skor'
+                                className='w-14 sm:w-16 text-center text-2xl sm:text-4xl font-black bg-[#060d18] border border-cyan-500/50 rounded-lg py-1 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 font-mono'
+                              />
+                            </div>
+                            <span className='text-zinc-600 font-sans text-2xl sm:text-4xl font-black mt-3'>-</span>
+                            <div className='flex flex-col items-center'>
+                              <span className='text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5'>Deplasman</span>
+                              <input
+                                type='number'
+                                min='0'
+                                max='99'
+                                value={editScores.away_score}
+                                onChange={(e) => setEditScores(prev => ({ ...prev, away_score: Math.max(0, parseInt(e.target.value) || 0) }))}
+                                disabled={savingApprovedMatch}
+                                aria-label='Deplasman skor'
+                                className='w-14 sm:w-16 text-center text-2xl sm:text-4xl font-black bg-[#060d18] border border-cyan-500/50 rounded-lg py-1 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 font-mono'
+                              />
+                            </div>
                           </div>
-                          <span className='text-[9px] sm:text-[10px] text-zinc-500 font-medium'>
-                            Onaylanmış maç skoru kilitlidir
+                          <span className='text-[9px] text-cyan-300 font-medium'>
+                            Skorları düzenliyorsunuz
                           </span>
                         </div>
                       ) : (
                         <button
                           type='button'
-                          onClick={() => setEditScoreModal(detailModal)}
+                          onClick={enterEditMode}
                           className='group relative flex flex-col items-center gap-1 px-5 sm:px-7 py-2 sm:py-2.5 bg-[#0a1628] hover:bg-[#0d1d36] border border-white/10 hover:border-cyan-500/50 rounded-xl shadow-xl transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyan-500/50'
-                          title='Skoru düzenlemek için tıklayın'
-                          aria-label='Skoru düzenlemek için tıklayın'
+                          title='Skor ve istatistikleri düzenlemek için tıklayın'
+                          aria-label='Skor ve istatistikleri düzenlemek için tıklayın'
                         >
                           <div className='flex items-center gap-3 text-3xl sm:text-5xl font-black text-white font-mono tracking-tight'>
                             <span className='group-hover:text-cyan-400 transition-colors'>
@@ -792,10 +1101,10 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                             <span className='group-hover:text-cyan-400 transition-colors'>
                               {detailModal.away_score !== null && detailModal.away_score !== undefined ? detailModal.away_score : '-'}
                             </span>
-                            <Edit2 className='w-3.5 h-3.5 sm:w-4 sm:h-4 text-zinc-500 group-hover:text-cyan-400 transition-colors ml-1' />
+                            <Edit2 className='w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400/80 group-hover:text-cyan-300 transition-colors ml-1' />
                           </div>
                           <span className='text-[9px] sm:text-[10px] text-zinc-400 group-hover:text-cyan-300 transition-colors font-medium'>
-                            Skoru değiştirmek için tıklayın
+                            Skor &amp; istatistikleri düzenlemek için tıklayın
                           </span>
                         </button>
                       )}
@@ -996,43 +1305,105 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                   )}
                 </div>
 
-                {/* 5. Dangerous Actions At The Bottom */}
+                {/* 5. Bottom Actions */}
                 <div className='pt-4 border-t border-white/10'>
-                  <div className='flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#0a1628]/60 p-4 rounded-xl border border-white/5'>
-                    <div className='flex flex-wrap items-center gap-2.5'>
-                      {detailModal.status !== 'REJECTED' && (
-                        <button
-                          type='button'
-                          onClick={() => handleStatus(detailModal, 'REJECTED')}
-                          className='px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-lg text-xs font-bold transition-colors flex items-center gap-2'
-                        >
-                          <XCircle className='w-4 h-4' /> Reddet / Geçersiz Kıl
-                        </button>
-                      )}
-                      <button
-                        type='button'
-                        onClick={() => handleDelete(detailModal)}
-                        className='px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-bold transition-colors flex items-center gap-2'
-                      >
-                        <Trash2 className='w-4 h-4' /> Maçı Sil
-                      </button>
-                    </div>
+                  {isEditMode ? (
+                    <div className='flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-[#0a1628] p-4 rounded-xl border border-cyan-500/30 shadow-xl'>
+                      <div className='space-y-1'>
+                        <div className='flex items-center gap-2'>
+                          <Edit2 className='w-4 h-4 text-cyan-400' />
+                          <span className='font-black text-white text-xs sm:text-sm tracking-wide'>
+                            Maç Düzenleme Modu Aktif
+                          </span>
+                        </div>
+                        <div className='text-xs text-zinc-400 flex items-center gap-3 flex-wrap'>
+                          <span>
+                            Skor: <strong className='text-white font-mono'>{editScores.home_score} - {editScores.away_score}</strong>
+                          </span>
+                          <span>•</span>
+                          <span>
+                            Ev Oyuncu Golleri: <strong className={homePlayerGoalsTotal > editScores.home_score ? 'text-red-400 font-mono' : 'text-emerald-400 font-mono'}>{homePlayerGoalsTotal}</strong> / {editScores.home_score}
+                          </span>
+                          <span>•</span>
+                          <span>
+                            Dep Oyuncu Golleri: <strong className={awayPlayerGoalsTotal > editScores.away_score ? 'text-red-400 font-mono' : 'text-emerald-400 font-mono'}>{awayPlayerGoalsTotal}</strong> / {editScores.away_score}
+                          </span>
+                        </div>
+                        {(homePlayerGoalsTotal > editScores.home_score || awayPlayerGoalsTotal > editScores.away_score) && (
+                          <p className='text-[11px] text-amber-300 font-semibold flex items-center gap-1.5 pt-1'>
+                            <AlertTriangle className='w-3.5 h-3.5 text-amber-400 shrink-0' />
+                            Dikkat: Oyuncu golleri toplamı girilen maç skorunu aşıyor.
+                          </p>
+                        )}
+                      </div>
 
-                    <div>
-                      {detailModal.status !== 'APPROVED' && (
+                      <div className='flex items-center gap-2.5 shrink-0'>
                         <button
                           type='button'
-                          onClick={() => handleStatus(detailModal, 'APPROVED')}
-                          className='w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-black transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/40'
+                          onClick={cancelEditMode}
+                          disabled={savingApprovedMatch}
+                          className='flex-1 sm:flex-none px-4 py-2.5 bg-white/5 hover:bg-white/10 text-zinc-300 border border-white/10 rounded-lg text-xs font-bold transition-colors'
                         >
-                          <CheckCircle2 className='w-4 h-4' /> Maçı Onayla (Puan Durumu & İstatistikleri Güncelle)
+                          İPTAL
                         </button>
-                      )}
+                        <button
+                          type='button'
+                          onClick={handleSaveApprovedMatch}
+                          disabled={savingApprovedMatch}
+                          className='flex-1 sm:flex-none px-6 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg text-xs font-black transition-colors flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/40 disabled:opacity-50'
+                        >
+                          {savingApprovedMatch ? <Loader2 className='w-3.5 h-3.5 animate-spin' /> : <Check className='w-3.5 h-3.5' />}
+                          DEĞİŞİKLİKLERİ KAYDET
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className='flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#0a1628]/60 p-4 rounded-xl border border-white/5'>
+                      <div className='flex flex-wrap items-center gap-2.5'>
+                        {detailModal.status !== 'REJECTED' && (
+                          <button
+                            type='button'
+                            onClick={() => handleStatus(detailModal, 'REJECTED')}
+                            className='px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-lg text-xs font-bold transition-colors flex items-center gap-2'
+                          >
+                            <XCircle className='w-4 h-4' /> Reddet / Geçersiz Kıl
+                          </button>
+                        )}
+                        <button
+                          type='button'
+                          onClick={() => handleDelete(detailModal)}
+                          className='px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-bold transition-colors flex items-center gap-2'
+                        >
+                          <Trash2 className='w-4 h-4' /> Maçı Sil
+                        </button>
+                      </div>
+
+                      <div className='flex items-center gap-2'>
+                        {detailModal.status === 'APPROVED' ? (
+                          <button
+                            type='button'
+                            onClick={enterEditMode}
+                            className='w-full sm:w-auto px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg text-xs font-black transition-colors flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/40'
+                          >
+                            <Edit2 className='w-4 h-4' /> Maçı Düzenle (Skor &amp; İstatistikler)
+                          </button>
+                        ) : (
+                          <button
+                            type='button'
+                            onClick={() => handleStatus(detailModal, 'APPROVED')}
+                            className='w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-black transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/40'
+                          >
+                            <CheckCircle2 className='w-4 h-4' /> Maçı Onayla (Puan Durumu &amp; İstatistikleri Güncelle)
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   <div className='text-center text-[11px] text-zinc-500 flex items-center justify-center gap-1.5 mt-2'>
                     <RefreshCw className='w-3 h-3 text-emerald-500 shrink-0' />
-                    Onaylama işlemi veritabanı tetikleyicisiyle lig puan tablosunu ve liderlik sıralamasını otomatik hesaplar.
+                    {isEditMode
+                      ? 'Değişiklikler kaydedildiğinde puan durumu ve oyuncu liderlik tabloları otomatik güncellenir.'
+                      : 'Onaylama işlemi veritabanı tetikleyicisiyle lig puan tablosunu ve liderlik sıralamasını otomatik hesaplar.'}
                   </div>
                 </div>
               </div>

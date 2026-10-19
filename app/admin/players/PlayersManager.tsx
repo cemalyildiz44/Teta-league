@@ -26,6 +26,20 @@ export interface TeamOption {
   is_active: boolean;
 }
 
+export interface LiveSeasonStat {
+  season_id: string;
+  season_name: string;
+  league_id: string | null;
+  league_name: string;
+  team_id: string | null;
+  team_name: string;
+  team_logo_url: string | null;
+  matches_played: number;
+  goals: number;
+  assists: number;
+  rating_avg: number;
+}
+
 interface PlayerRecord {
   id: string;
   username: string;
@@ -50,6 +64,7 @@ interface PlayerRecord {
     awarded_at: string;
   }[];
   legacy_stats: PlayerLegacyCareerStat[];
+  live_season_stats?: LiveSeasonStat | null;
 }
 
 interface PlayersManagerProps {
@@ -57,9 +72,10 @@ interface PlayersManagerProps {
   teams: TeamOption[];
   seasons?: SeasonOption[];
   leagueTeams?: ImporterLeagueTeamRef[];
+  activeSeason?: SeasonOption | null;
 }
 
-export function PlayersManager({ players, teams, seasons = [], leagueTeams = [] }: PlayersManagerProps) {
+export function PlayersManager({ players, teams, seasons = [], leagueTeams = [], activeSeason }: PlayersManagerProps) {
   const router = useRouter();
 
   const [search, setSearch] = useState('');
@@ -110,11 +126,24 @@ export function PlayersManager({ players, teams, seasons = [], leagueTeams = [] 
 
   const [legacyForm, setLegacyForm] = useState(initialLegacyForm);
 
-  const openAddLegacyModal = () => {
+  const openAddLegacyModal = (prefill?: Partial<typeof initialLegacyForm>) => {
     setEditingLegacyStat(null);
+    const defaultTeamId = selectedPlayer?.active_team?.id || teams[0]?.id || '';
+    const defaultSeasonName = activeSeason?.name || seasons.find(s => s.status === 'ACTIVE')?.name || 'TETA SEASON 6 | FC27';
+    const matchLt = leagueTeams.find(lt => lt.team_id === defaultTeamId);
+    const defaultLeagueName = matchLt?.league_name || 'TETA Süper Lig';
+
     setLegacyForm({
-      ...initialLegacyForm,
-      team_id: teams[0]?.id || ''
+      season_name: defaultSeasonName,
+      league_name: defaultLeagueName,
+      team_mode: 'EXISTING',
+      team_id: defaultTeamId,
+      custom_team_name: '',
+      matches_played: 0,
+      goals: 0,
+      assists: 0,
+      rating_avg: 7.0,
+      ...(prefill || {})
     });
     setLegacyFeedback(null);
     setLegacyModalOpen(true);
@@ -599,8 +628,15 @@ export function PlayersManager({ players, teams, seasons = [], leagueTeams = [] 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-[#060d18] p-4 rounded-xl border border-white/5">
                 <div>
                   <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Aktif Takım</div>
-                  <div className="text-sm font-bold text-white mt-0.5">
-                    {selectedPlayer.active_team ? selectedPlayer.active_team.name : 'Serbest Oyuncu'}
+                  <div className="text-sm font-bold text-white mt-0.5 flex items-center gap-2">
+                    {selectedPlayer.active_team ? (
+                      <>
+                        <TeamLogo src={selectedPlayer.active_team.logo_url} name={selectedPlayer.active_team.name} size="xs" />
+                        <span>{selectedPlayer.active_team.name}</span>
+                      </>
+                    ) : (
+                      <span className="text-zinc-500 italic">Serbest Oyuncu</span>
+                    )}
                   </div>
                 </div>
                 <div>
@@ -777,113 +813,188 @@ export function PlayersManager({ players, teams, seasons = [], leagueTeams = [] 
                 )}
               </div>
 
-              {/* KARİYER GEÇMİŞİ (ESKİ SEZONLAR) */}
+              {/* SEZON VE KARİYER PERFORMANSLARI */}
               <div className="border-t border-white/5 pt-5">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h4 className="text-sm font-black text-[#00e5ff] tracking-widest uppercase flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      KARİYER GEÇMİŞİ (ESKİ SEZONLAR) ({selectedPlayer.legacy_stats?.length || 0})
-                    </h4>
-                    <p className="text-[11px] text-zinc-500 mt-0.5">
-                      Önceki sezonlara ait takım ve maç performansları. Public profilde Sezonlar sekmesine ve kariyer toplamlarına dahil edilir.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={openAddLegacyModal}
-                    className="px-3 py-1.5 bg-[#00e5ff]/10 hover:bg-[#00e5ff]/20 text-[#00e5ff] text-xs font-bold rounded-lg border border-[#00e5ff]/30 flex items-center gap-1.5 transition-all tracking-wider shrink-0"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    YENİ SEZON EKLE
-                  </button>
-                </div>
+                {(() => {
+                  const live = selectedPlayer.live_season_stats;
+                  const pastLegacyStats = selectedPlayer.legacy_stats?.filter(
+                    stat => !stat.season_name.toLowerCase().includes('6') &&
+                            !(activeSeason?.name && stat.season_name.toLowerCase() === activeSeason.name.toLowerCase())
+                  ) || [];
+                  const totalCount = pastLegacyStats.length + (live ? 1 : 0);
 
-                {!selectedPlayer.legacy_stats || selectedPlayer.legacy_stats.length === 0 ? (
-                  <div className="p-4 rounded-xl bg-[#060d18] border border-white/5 text-center text-xs text-zinc-500 italic">
-                    Henüz kayıtlı bir eski kariyer sezonu bulunmuyor. Yeni sezon performansı eklemek için yukarıdaki &quot;Yeni Sezon Ekle&quot; butonunu kullanın.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {selectedPlayer.legacy_stats.map((stat) => {
-                      const linkedTeam = stat.team_id ? teams.find(t => t.id === stat.team_id) : null;
-                      const teamLogo = linkedTeam?.logo_url;
-                      const contribution = (Number(stat.matches_played) > 0)
-                        ? ((Number(stat.goals) + Number(stat.assists)) / Number(stat.matches_played)).toFixed(2)
-                        : '0.00';
+                  return (
+                    <>
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <h4 className="text-sm font-black text-[#00e5ff] tracking-widest uppercase flex items-center gap-2">
+                            <Calendar className="w-4 h-4" />
+                            SEZON VE KARİYER KAYITLARI ({totalCount})
+                          </h4>
+                          <p className="text-[11px] text-zinc-500 mt-0.5">
+                            Güncel (Season 6) resmi maç verileri ve önceki sezonlara ait performans kayıtları.
+                          </p>
+                        </div>
+                      </div>
 
-                      return (
-                        <div key={stat.id} className="p-4 rounded-xl bg-[#060d18] border border-white/5 hover:border-white/10 transition-all">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
-                            <div className="flex items-center gap-3">
-                              <TeamLogo src={teamLogo} name={stat.team_name} size="md" />
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm font-black text-white">{stat.team_name}</span>
-                                  {stat.team_id ? (
-                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                                      SİSTEM TAKIMI
-                                    </span>
-                                  ) : (
-                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-white/5">
-                                      TARİHSEL / ÖZEL
-                                    </span>
-                                  )}
+                      {totalCount === 0 ? (
+                        <div className="p-4 rounded-xl bg-[#060d18] border border-white/5 text-center text-xs text-zinc-500 italic">
+                          Henüz kayıtlı bir sezon kaydı bulunmuyor.
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {/* Live Season 6 Stats Card (Resmi onaylı maçlardan otomatik hesaplanan canlı performans - Salt Okunur) */}
+                          {live && (
+                            <div className="p-4 rounded-xl bg-[#060d18] border border-[#00e5ff]/25 hover:border-[#00e5ff]/40 transition-all shadow-[0_0_15px_rgba(0,229,255,0.03)]">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
+                                <div className="flex items-center gap-3">
+                                  <TeamLogo src={live.team_logo_url || selectedPlayer.active_team?.logo_url} name={live.team_name} size="md" />
+                                  <div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span className="text-sm font-black text-white">{live.team_name}</span>
+                                      <span className="text-[9px] font-black px-2 py-0.5 rounded bg-[#00e5ff]/15 text-[#00e5ff] border border-[#00e5ff]/30 tracking-wider">
+                                        GÜNCEL SEZON (CANLI MAÇLAR)
+                                      </span>
+                                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-white/10 tracking-wider">
+                                        SALT OKUNUR
+                                      </span>
+                                    </div>
+                                    <div className="text-xs text-zinc-400 flex items-center gap-2 mt-0.5">
+                                      <span className="font-bold text-[#00e5ff]">{live.season_name}</span>
+                                      <span className="text-zinc-600">•</span>
+                                      <span>{live.league_name}</span>
+                                    </div>
+                                    <div className="text-[11px] text-zinc-500 mt-1 flex items-center gap-1.5">
+                                      <span>Onaylı maç fixtures kayıtlarından otomatik hesaplanır.</span>
+                                      <a
+                                        href="/admin/matches"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[#00e5ff] hover:underline font-bold inline-flex items-center gap-0.5"
+                                      >
+                                        Maç Yönetimi <ExternalLink className="w-3 h-3 inline ml-0.5" />
+                                      </a>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="text-xs text-zinc-400 flex items-center gap-2 mt-0.5">
-                                  <span className="font-bold text-amber-400">{stat.season_name}</span>
-                                  <span className="text-zinc-600">•</span>
-                                  <span>{stat.league_name}</span>
+                              </div>
+
+                              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-3 text-center">
+                                <div className="bg-black/30 p-2 rounded-lg border border-white/5">
+                                  <div className="text-[9px] font-bold text-zinc-500 uppercase">Maç</div>
+                                  <div className="text-xs font-black text-white mt-0.5">{live.matches_played}</div>
+                                </div>
+                                <div className="bg-black/30 p-2 rounded-lg border border-white/5">
+                                  <div className="text-[9px] font-bold text-zinc-500 uppercase">Gol</div>
+                                  <div className="text-xs font-black text-white mt-0.5">{live.goals}</div>
+                                </div>
+                                <div className="bg-black/30 p-2 rounded-lg border border-white/5">
+                                  <div className="text-[9px] font-bold text-zinc-500 uppercase">Asist</div>
+                                  <div className="text-xs font-black text-white mt-0.5">{live.assists}</div>
+                                </div>
+                                <div className="bg-black/30 p-2 rounded-lg border border-white/5">
+                                  <div className="text-[9px] font-bold text-zinc-500 uppercase">Ort. Rating</div>
+                                  <div className="text-xs font-black text-[#00e5ff] mt-0.5">★ {Number(live.rating_avg).toFixed(2)}</div>
+                                </div>
+                                <div className="bg-black/30 p-2 rounded-lg border border-white/5 col-span-2 sm:col-span-1">
+                                  <div className="text-[9px] font-bold text-zinc-500 uppercase">Katkı / Maç</div>
+                                  <div className="text-xs font-black text-emerald-400 mt-0.5">
+                                    {live.matches_played > 0 ? ((live.goals + live.assists) / live.matches_played).toFixed(2) : '0.00'}
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-1 self-end sm:self-center">
-                              <button
-                                type="button"
-                                onClick={() => openEditLegacyModal(stat)}
-                                className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
-                                title="Düzenle"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setDeleteConfirmStatId(stat.id)}
-                                className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
-                                title="Sil (Arşivle)"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
+                          )}
 
-                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-3 text-center">
-                            <div className="bg-black/30 p-2 rounded-lg border border-white/5">
-                              <div className="text-[9px] font-bold text-zinc-500 uppercase">Maç</div>
-                              <div className="text-xs font-black text-white mt-0.5">{stat.matches_played}</div>
-                            </div>
-                            <div className="bg-black/30 p-2 rounded-lg border border-white/5">
-                              <div className="text-[9px] font-bold text-zinc-500 uppercase">Gol</div>
-                              <div className="text-xs font-black text-white mt-0.5">{stat.goals}</div>
-                            </div>
-                            <div className="bg-black/30 p-2 rounded-lg border border-white/5">
-                              <div className="text-[9px] font-bold text-zinc-500 uppercase">Asist</div>
-                              <div className="text-xs font-black text-white mt-0.5">{stat.assists}</div>
-                            </div>
-                            <div className="bg-black/30 p-2 rounded-lg border border-white/5">
-                              <div className="text-[9px] font-bold text-zinc-500 uppercase">Ort. Rating</div>
-                              <div className="text-xs font-black text-[#00e5ff] mt-0.5">★ {Number(stat.rating_avg).toFixed(2)}</div>
-                            </div>
-                            <div className="bg-black/30 p-2 rounded-lg border border-white/5 col-span-2 sm:col-span-1">
-                              <div className="text-[9px] font-bold text-zinc-500 uppercase">Katkı / Maç</div>
-                              <div className="text-xs font-black text-emerald-400 mt-0.5">{contribution}</div>
-                            </div>
-                          </div>
+                          {/* Past Seasons Career Stats (Season 5 / historical) */}
+                          {pastLegacyStats.map((stat) => {
+                            const linkedTeam = stat.team_id ? teams.find(t => t.id === stat.team_id) : null;
+                            const teamLogo = linkedTeam?.logo_url;
+                            const contribution = (Number(stat.matches_played) > 0)
+                              ? ((Number(stat.goals) + Number(stat.assists)) / Number(stat.matches_played)).toFixed(2)
+                              : '0.00';
+                            const isSeason6 = stat.season_name.toLowerCase().includes('6') ||
+                              (activeSeason?.name && stat.season_name.toLowerCase() === activeSeason.name.toLowerCase());
+
+                            return (
+                              <div key={stat.id} className={`p-4 rounded-xl bg-[#060d18] border transition-all ${isSeason6 ? 'border-[#00e5ff]/25 hover:border-[#00e5ff]/40 shadow-[0_0_15px_rgba(0,229,255,0.02)]' : 'border-white/5 hover:border-white/10'}`}>
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
+                                  <div className="flex items-center gap-3">
+                                    <TeamLogo src={teamLogo} name={stat.team_name} size="md" />
+                                    <div>
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <span className="text-sm font-black text-white">{stat.team_name}</span>
+                                        {isSeason6 ? (
+                                          <span className="text-[9px] font-black px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 tracking-wider">
+                                            GÜNCEL SEZON (MANUEL KAYIT)
+                                          </span>
+                                        ) : stat.team_id ? (
+                                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                                            SİSTEM TAKIMI
+                                          </span>
+                                        ) : (
+                                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-white/5">
+                                            TARİHSEL / ÖZEL
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-xs text-zinc-400 flex items-center gap-2 mt-0.5">
+                                        <span className={`font-bold ${isSeason6 ? 'text-[#00e5ff]' : 'text-amber-400'}`}>{stat.season_name}</span>
+                                        <span className="text-zinc-600">•</span>
+                                        <span>{stat.league_name}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1 self-end sm:self-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => openEditLegacyModal(stat)}
+                                      className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                                      title="Kayıt Bilgilerini Düzenle"
+                                    >
+                                      <Edit2 className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setDeleteConfirmStatId(stat.id)}
+                                      className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                                      title="Sil (Arşivle)"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-3 text-center">
+                                  <div className="bg-black/30 p-2 rounded-lg border border-white/5">
+                                    <div className="text-[9px] font-bold text-zinc-500 uppercase">Maç</div>
+                                    <div className="text-xs font-black text-white mt-0.5">{stat.matches_played}</div>
+                                  </div>
+                                  <div className="bg-black/30 p-2 rounded-lg border border-white/5">
+                                    <div className="text-[9px] font-bold text-zinc-500 uppercase">Gol</div>
+                                    <div className="text-xs font-black text-white mt-0.5">{stat.goals}</div>
+                                  </div>
+                                  <div className="bg-black/30 p-2 rounded-lg border border-white/5">
+                                    <div className="text-[9px] font-bold text-zinc-500 uppercase">Asist</div>
+                                    <div className="text-xs font-black text-white mt-0.5">{stat.assists}</div>
+                                  </div>
+                                  <div className="bg-black/30 p-2 rounded-lg border border-white/5">
+                                    <div className="text-[9px] font-bold text-zinc-500 uppercase">Ort. Rating</div>
+                                    <div className="text-xs font-black text-[#00e5ff] mt-0.5">★ {Number(stat.rating_avg).toFixed(2)}</div>
+                                  </div>
+                                  <div className="bg-black/30 p-2 rounded-lg border border-white/5 col-span-2 sm:col-span-1">
+                                    <div className="text-[9px] font-bold text-zinc-500 uppercase">Katkı / Maç</div>
+                                    <div className="text-xs font-black text-emerald-400 mt-0.5">{contribution}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
             </div>
@@ -920,7 +1031,7 @@ export function PlayersManager({ players, teams, seasons = [], leagueTeams = [] 
               <div>
                 <h3 className="text-base font-black text-white tracking-wide flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-[#00e5ff]" />
-                  {editingLegacyStat ? 'Eski Sezon Kaydını Düzenle' : 'Yeni Eski Sezon Kaydı Ekle'}
+                  {editingLegacyStat ? 'Sezon Kaydını Düzenle' : 'Yeni Sezon Kaydı Ekle'}
                 </h3>
                 <p className="text-xs text-zinc-400 mt-0.5">
                   Oyuncu: <span className="text-white font-bold">@{selectedPlayer.username}</span>
@@ -945,35 +1056,88 @@ export function PlayersManager({ players, teams, seasons = [], leagueTeams = [] 
               )}
 
               {/* Sezon & Lig Adı */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                    Sezon Adı *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={50}
-                    placeholder="Örn: 5. Sezon"
-                    value={legacyForm.season_name}
-                    onChange={e => setLegacyForm({ ...legacyForm, season_name: e.target.value })}
-                    className="input-field text-sm py-2"
-                  />
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 items-start">
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1.5">
+                      Sezon *
+                    </label>
+                    {seasons && seasons.length > 0 ? (
+                      <select
+                        value={seasons.some(s => s.name === legacyForm.season_name) ? legacyForm.season_name : '__CUSTOM__'}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '__CUSTOM__') {
+                            setLegacyForm({ ...legacyForm, season_name: '' });
+                          } else {
+                            // Find corresponding league for current team if available in leagueTeams
+                            const selSeason = seasons.find(s => s.name === val);
+                            let autoLeague = legacyForm.league_name;
+                            if (selSeason && leagueTeams && leagueTeams.length > 0) {
+                              const matchLt = leagueTeams.find(lt => lt.season_id === selSeason.id && lt.team_id === legacyForm.team_id);
+                              if (matchLt?.league_name) autoLeague = matchLt.league_name;
+                            }
+                            setLegacyForm({ ...legacyForm, season_name: val, league_name: autoLeague });
+                          }
+                        }}
+                        className="w-full h-10 px-3.5 py-2 bg-[#060d18] border border-white/10 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff]/30 transition-all cursor-pointer"
+                      >
+                        <option value="" disabled>-- Sezon Seçin --</option>
+                        {seasons.map(s => (
+                          <option key={s.id} value={s.name}>
+                            {s.name} {s.status === 'ACTIVE' ? '(Güncel Aktif Sezon)' : '(Tamamlandı)'}
+                          </option>
+                        ))}
+                        <option value="__CUSTOM__">Özel / Başka Sezon Adı Yaz...</option>
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        required
+                        maxLength={50}
+                        placeholder="Örn: TETA SEASON 6 | FC27"
+                        value={legacyForm.season_name}
+                        onChange={e => setLegacyForm({ ...legacyForm, season_name: e.target.value })}
+                        className="w-full h-10 px-3.5 py-2 bg-[#060d18] border border-white/10 rounded-xl text-xs font-bold text-white placeholder-zinc-500 focus:outline-none focus:border-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff]/30 transition-all"
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1.5">
+                      Lig / Turnuva Adı *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      maxLength={80}
+                      placeholder="Örn: TETA Süper Lig"
+                      value={legacyForm.league_name}
+                      onChange={e => setLegacyForm({ ...legacyForm, league_name: e.target.value })}
+                      className="w-full h-10 px-3.5 py-2 bg-[#060d18] border border-white/10 rounded-xl text-xs font-bold text-white placeholder-zinc-500 focus:outline-none focus:border-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff]/30 transition-all"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                    Lig / Turnuva Adı *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={80}
-                    placeholder="Örn: TETA Süper Lig"
-                    value={legacyForm.league_name}
-                    onChange={e => setLegacyForm({ ...legacyForm, league_name: e.target.value })}
-                    className="input-field text-sm py-2"
-                  />
-                </div>
+
+                {/* Özel Sezon Girişi (Yalnızca Listede Olmayan Sezonlar İçin) */}
+                {seasons && seasons.length > 0 && !seasons.some(s => s.name === legacyForm.season_name) && (
+                  <div className="p-3 bg-black/20 rounded-xl border border-[#00e5ff]/20">
+                    <label className="block text-[10px] font-bold text-[#00e5ff] uppercase tracking-wider mb-1.5">
+                      Özel Sezon İsmi *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      maxLength={50}
+                      placeholder="Örn: 6. Sezon, 5. Sezon, Beta..."
+                      value={legacyForm.season_name}
+                      onChange={e => setLegacyForm({ ...legacyForm, season_name: e.target.value })}
+                      className="w-full h-10 px-3.5 py-2 bg-[#060d18] border border-[#00e5ff]/30 rounded-xl text-xs font-bold text-white placeholder-zinc-500 focus:outline-none focus:border-[#00e5ff] focus:ring-1 focus:ring-[#00e5ff]/30 transition-all"
+                    />
+                    <p className="text-[10px] text-zinc-400 mt-1">
+                      Yukarıdaki listede yer almayan tarihsel veya özel bir sezon ismi girin.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Takım Seçimi */}
@@ -1005,7 +1169,7 @@ export function PlayersManager({ players, teams, seasons = [], leagueTeams = [] 
                     <select
                       value={legacyForm.team_id}
                       onChange={e => setLegacyForm({ ...legacyForm, team_id: e.target.value })}
-                      className="input-field text-sm py-2"
+                      className="w-full h-10 px-3.5 py-2 bg-[#060d18] border border-white/10 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-[#00e5ff] transition-all cursor-pointer"
                     >
                       <option value="">-- Takım Seçin --</option>
                       {teams.map(t => (
@@ -1027,7 +1191,7 @@ export function PlayersManager({ players, teams, seasons = [], leagueTeams = [] 
                       placeholder="Örn: Anatolian Lions, FC Bosphorus..."
                       value={legacyForm.custom_team_name}
                       onChange={e => setLegacyForm({ ...legacyForm, custom_team_name: e.target.value })}
-                      className="input-field text-sm py-2"
+                      className="w-full h-10 px-3.5 py-2 bg-[#060d18] border border-white/10 rounded-xl text-xs font-bold text-white placeholder-zinc-500 focus:outline-none focus:border-[#00e5ff] transition-all"
                     />
                     <p className="text-[10px] text-zinc-500 mt-1">
                       Artık aktif olmayan veya sistemde yer almayan eski takım adını girin.
@@ -1037,9 +1201,9 @@ export function PlayersManager({ players, teams, seasons = [], leagueTeams = [] 
               </div>
 
               {/* Bireysel İstatistikler Grid: MAÇ, GOL, ASİST, RATING */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1.5">
                     Oynanan Maç *
                   </label>
                   <input
@@ -1047,11 +1211,11 @@ export function PlayersManager({ players, teams, seasons = [], leagueTeams = [] 
                     min="0"
                     value={legacyForm.matches_played}
                     onChange={e => setLegacyForm({ ...legacyForm, matches_played: Math.max(0, parseInt(e.target.value) || 0) })}
-                    className="input-field text-sm py-2 font-bold"
+                    className="w-full h-10 px-3 py-2 bg-[#060d18] border border-white/10 rounded-xl text-xs font-black text-white focus:outline-none focus:border-[#00e5ff] text-center"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">
+                  <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1.5">
                     Gol
                   </label>
                   <input
@@ -1059,11 +1223,11 @@ export function PlayersManager({ players, teams, seasons = [], leagueTeams = [] 
                     min="0"
                     value={legacyForm.goals}
                     onChange={e => setLegacyForm({ ...legacyForm, goals: Math.max(0, parseInt(e.target.value) || 0) })}
-                    className="input-field text-sm py-2 font-bold"
+                    className="w-full h-10 px-3 py-2 bg-[#060d18] border border-white/10 rounded-xl text-xs font-black text-white focus:outline-none focus:border-[#00e5ff] text-center"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">
+                  <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1.5">
                     Asist
                   </label>
                   <input
@@ -1071,11 +1235,11 @@ export function PlayersManager({ players, teams, seasons = [], leagueTeams = [] 
                     min="0"
                     value={legacyForm.assists}
                     onChange={e => setLegacyForm({ ...legacyForm, assists: Math.max(0, parseInt(e.target.value) || 0) })}
-                    className="input-field text-sm py-2 font-bold"
+                    className="w-full h-10 px-3 py-2 bg-[#060d18] border border-white/10 rounded-xl text-xs font-black text-white focus:outline-none focus:border-[#00e5ff] text-center"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-[#00e5ff] uppercase tracking-wider mb-1">
+                  <label className="block text-[10px] font-bold text-[#00e5ff] uppercase tracking-wider mb-1.5">
                     Ort. Rating (0-10)
                   </label>
                   <input
@@ -1085,7 +1249,7 @@ export function PlayersManager({ players, teams, seasons = [], leagueTeams = [] 
                     max="10"
                     value={legacyForm.rating_avg}
                     onChange={e => setLegacyForm({ ...legacyForm, rating_avg: Math.min(10, Math.max(0, parseFloat(e.target.value) || 0)) })}
-                    className="input-field text-sm py-2 font-bold font-mono"
+                    className="w-full h-10 px-3 py-2 bg-[#060d18] border border-white/10 rounded-xl text-xs font-black text-[#00e5ff] focus:outline-none focus:border-[#00e5ff] text-center"
                   />
                 </div>
               </div>
@@ -1165,13 +1329,13 @@ export function PlayersManager({ players, teams, seasons = [], leagueTeams = [] 
                 <AlertTriangle className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="text-base font-black text-white">Eski Sezonu Sil</h4>
+                <h4 className="text-base font-black text-white">Sezon Kaydını Sil</h4>
                 <p className="text-xs text-zinc-400 mt-0.5">Bu işlem geri alınabilir (soft delete).</p>
               </div>
             </div>
 
             <p className="text-xs text-zinc-300 leading-relaxed">
-              Bu eski sezon kaydını silmek istediğinizden emin misiniz? Kayıt veritabanından kalıcı olarak silinmeyecek, güvenli şekilde arşivlenecektir.
+              Bu sezon kaydını silmek istediğinizden emin misiniz? Kayıt veritabanından kalıcı olarak silinmeyecek, güvenli şekilde arşivlenecektir.
             </p>
 
             <div className="flex items-center justify-end gap-3 pt-2">
