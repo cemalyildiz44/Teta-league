@@ -139,7 +139,7 @@ export default async function UpcomingMatches() {
               const awayName = awayTeam?.name || 'Bilinmeyen';
 
               return (
-                <div key={fixture.id} className="card-surface rounded-xl p-5 relative overflow-hidden group cursor-pointer">
+                <div key={fixture.id} className="card-surface card-hover-lift rounded-xl p-5 relative overflow-hidden group cursor-pointer">
                   <div className="flex justify-between items-center mb-4 gap-3">
                     <span className="text-[10px] font-bold tracking-widest uppercase min-w-0">
                       <span className="text-[#00e5ff]">{league.name}</span>
