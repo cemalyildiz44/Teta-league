@@ -1,6 +1,8 @@
 import { cache } from 'react';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { createClient } from '@/utils/supabase/server';
+import { hasSupabaseAuthCookie } from '@/lib/auth-cookies';
+import { verifyVerifiedUserHeaders, HEADER_AUTH_ERROR } from '@/lib/auth-server';
 
 /**
  * Request-level memoized server-side data fetchers.
@@ -24,9 +26,46 @@ export const getCachedUserProfile = cache(async (userId: string) => {
 
 export const getCachedUser = cache(async () => {
   const cookieStore = await cookies();
+
+  // 1. If no active Supabase SSR session cookie is present, visitor is unauthenticated.
+  // Immediately return null without touching Supabase Auth API (0 network calls).
+  if (!hasSupabaseAuthCookie(cookieStore.getAll())) {
+    return null;
+  }
+
+  // 2. Check if identity was already validated and securely signed by proxy.ts
+  try {
+    const headerList = await headers();
+    const verifiedUser = verifyVerifiedUserHeaders(headerList);
+    if (verifiedUser) {
+      const profile = await getCachedUserProfile(verifiedUser.id);
+      if (profile?.status === 'BANNED') {
+        const supabase = createClient(cookieStore);
+        await supabase.auth.signOut();
+        return null;
+      }
+      return verifiedUser;
+    }
+
+    // Check if proxy encountered an Auth rate limit (HTTP 429)
+    if (headerList.get(HEADER_AUTH_ERROR) === 'rate_limit') {
+      console.warn('[getCachedUser] Proxy reported Supabase Auth rate limit, skipping redundant Auth call.');
+      return null;
+    }
+  } catch {
+    // headers() might throw in non-request contexts; gracefully continue to fallback
+  }
+
+  // 3. Fallback: If proxy did not set verified headers (e.g. isolated test or direct invocation),
+  // execute standard Supabase SSR getUser()
   const supabase = createClient(cookieStore);
   const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) return null;
+  if (error || !user) {
+    if (error && (error.status === 429 || error.message?.toLowerCase().includes('rate limit'))) {
+      console.warn('[getCachedUser] Supabase Auth rate limit reached on fallback.');
+    }
+    return null;
+  }
 
   const profile = await getCachedUserProfile(user.id);
 

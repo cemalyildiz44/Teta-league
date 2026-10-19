@@ -2,6 +2,11 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/middleware";
 import { getSiteUrl, sanitizeNextUrl } from "@/lib/site-url";
 import { hasSupabaseAuthCookie } from "@/lib/auth-cookies";
+import {
+  stripClientAuthHeaders,
+  createVerifiedAuthHeaders,
+  HEADER_AUTH_ERROR,
+} from "@/lib/auth-server";
 
 // Next.js 16: "middleware" file convention is deprecated, use "proxy" instead.
 // Export must be named "proxy" (not "middleware").
@@ -48,6 +53,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(callbackUrl);
   }
 
+  // 3. Request Header Hygiene:
+  // Strip any internal auth headers sent by untrusted external clients
+  const requestHeaders = new Headers(request.headers);
+  stripClientAuthHeaders(requestHeaders);
+
   const { supabase, supabaseResponse } = createClient(request);
 
   // Check if any active Supabase SSR session cookies are present (standard or chunked).
@@ -57,10 +67,45 @@ export async function proxy(request: NextRequest) {
   // Only trigger session refresh if Supabase auth cookies are present.
   // For anonymous visitors, skip getUser() to avoid unnecessary CPU and Supabase Auth calls.
   if (hasAuthCookie) {
-    await supabase.auth.getUser();
+    try {
+      const { data, error: authErr } = await supabase.auth.getUser();
+      if (data?.user && !authErr) {
+        // Securely forward verified identity down to Server Components via requestHeaders
+        const verifiedHeaders = createVerifiedAuthHeaders(data.user);
+        for (const [key, value] of Object.entries(verifiedHeaders)) {
+          requestHeaders.set(key, value);
+        }
+      } else if (authErr) {
+        const isRateLimit =
+          authErr.status === 429 ||
+          authErr.message?.toLowerCase().includes("rate limit") ||
+          (authErr as any).code === "over_request_rate_limit";
+        if (isRateLimit) {
+          console.warn("[proxy] Supabase Auth rate limit reached (429).");
+          requestHeaders.set(HEADER_AUTH_ERROR, "rate_limit");
+        }
+      }
+    } catch (err: any) {
+      console.error("[proxy] Unexpected error during supabase.auth.getUser():", err?.message);
+    }
   }
 
-  return supabaseResponse;
+  // Forward the modified request headers down to Next.js App Router (Server Components)
+  // while preserving any updated/refreshed cookies (Set-Cookie headers) from createServerClient
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
+
+  supabaseResponse.cookies.getAll().forEach((cookie) => {
+    response.cookies.set(cookie.name, cookie.value, cookie);
+  });
+
+  // Explicitly ensure no internal auth or error headers leak into the client HTTP response headers
+  stripClientAuthHeaders(response.headers);
+
+  return response;
 }
 
 export const config = {

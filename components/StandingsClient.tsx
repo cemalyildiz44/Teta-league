@@ -145,6 +145,7 @@ export default function StandingsClient({ superLig, ecl }: StandingsClientProps)
 
                   <Link
                     href={row.team_slug ? `/takim/${row.team_slug}` : '#'}
+                    prefetch={false}
                     className="flex items-center gap-3 min-w-0 group"
                   >
                     <TeamLogo

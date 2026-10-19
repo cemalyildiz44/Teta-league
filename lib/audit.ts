@@ -1,5 +1,6 @@
 import { cookies, headers } from 'next/headers';
 import { createClient } from '@/utils/supabase/server';
+import { verifyVerifiedUserHeaders } from '@/lib/auth-server';
 
 export interface AuditLogInput {
   action: string;
@@ -57,17 +58,12 @@ export async function logAdminAudit(input: AuditLogInput): Promise<void> {
     const cookieStore = await cookies();
     const supabase = createClient(cookieStore);
 
-    let actorId = input.actor_id || null;
-    if (!actorId) {
-      const { data: { user } } = await supabase.auth.getUser();
-      actorId = user?.id || null;
-    }
-
     let ipAddress: string | null = null;
     let userAgent: string | null = null;
+    let headerList: Awaited<ReturnType<typeof headers>> | null = null;
 
     try {
-      const headerList = await headers();
+      headerList = await headers();
       ipAddress =
         headerList.get('x-forwarded-for')?.split(',')[0].trim() ||
         headerList.get('x-real-ip') ||
@@ -75,6 +71,19 @@ export async function logAdminAudit(input: AuditLogInput): Promise<void> {
       userAgent = headerList.get('user-agent') || null;
     } catch {
       // headers() may fail in non-standard server contexts
+    }
+
+    let actorId = input.actor_id || null;
+    if (!actorId && headerList) {
+      const verified = verifyVerifiedUserHeaders(headerList);
+      if (verified?.id) {
+        actorId = verified.id;
+      }
+    }
+
+    if (!actorId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      actorId = user?.id || null;
     }
 
     const sanitizedOld = sanitizeAuditData(input.old_data);

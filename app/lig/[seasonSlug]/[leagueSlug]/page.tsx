@@ -191,6 +191,7 @@ export default async function LeagueStandingsPage({
                   <td className="py-3 px-3">
                     <Link
                       href={`/takim/${team?.slug || ''}`}
+                      prefetch={false}
                       className="flex items-center gap-3.5 min-w-0 group/team"
                     >
                       <TeamLogo

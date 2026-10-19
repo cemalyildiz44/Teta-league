@@ -222,6 +222,7 @@ export default function FixtureWeekBrowser({ fixtures, initialWeek }: FixtureWee
                   {/* Home Team */}
                   <Link
                     href={home?.slug ? `/takim/${home.slug}` : '#'}
+                    prefetch={false}
                     className="flex-1 flex items-center justify-end gap-3 group min-w-0"
                   >
                     <span className="font-[800] text-white text-[14px] md:text-[18px] lg:text-[20px] tracking-wide text-right group-hover:text-[#00e5ff] transition-colors truncate">
@@ -235,6 +236,7 @@ export default function FixtureWeekBrowser({ fixtures, initialWeek }: FixtureWee
                     {approved ? (
                       <Link
                         href={`/mac/${approved.id}`}
+                        prefetch={false}
                         className="px-3.5 py-1.5 bg-[#060d18] hover:bg-[#00e5ff]/10 border border-[#00e5ff]/30 hover:border-[#00e5ff] rounded-xl flex items-center justify-center transition-all group/score shadow-[0_0_12px_rgba(0,229,255,0.15)]"
                         title="Maç Raporunu Gör"
                       >
@@ -260,6 +262,7 @@ export default function FixtureWeekBrowser({ fixtures, initialWeek }: FixtureWee
                   {/* Away Team */}
                   <Link
                     href={away?.slug ? `/takim/${away.slug}` : '#'}
+                    prefetch={false}
                     className="flex-1 flex items-center justify-start gap-3 group min-w-0"
                   >
                     <TeamLogo src={away?.logo_url} name={away?.name} size="sm" />
@@ -274,6 +277,7 @@ export default function FixtureWeekBrowser({ fixtures, initialWeek }: FixtureWee
                   {approved ? (
                     <Link
                       href={`/mac/${approved.id}`}
+                      prefetch={false}
                       className="w-full md:w-auto text-center px-4 py-2 bg-white/5 hover:bg-[#00e5ff]/10 text-gray-300 hover:text-[#00e5ff] border border-white/10 hover:border-[#00e5ff]/30 text-[11px] font-[800] uppercase tracking-wider rounded-xl transition-all"
                     >
                       MAÇ RAPORU
