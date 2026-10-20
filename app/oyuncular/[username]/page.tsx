@@ -595,7 +595,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                           <span className="text-base leading-none drop-shadow-sm">{tr.icon}</span>
                         )}
                         <span
-                          className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black leading-none ${
+                          className={`inline-flex items-center justify-center min-w-[22px] h-[18px] px-1.5 rounded-full text-[10px] font-black leading-none ${
                             tr.highlight === 'gold'
                               ? 'bg-amber-400 text-black shadow-sm font-black'
                               : tr.highlight === 'cyan'
@@ -603,7 +603,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                               : 'bg-white/15 text-white'
                           }`}
                         >
-                          {tr.count}
+                          {tr.count}x
                         </span>
                       </div>
                     ))}
@@ -1061,78 +1061,111 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
                 )}
               </div>
 
-              {validDynamicTrophies.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {validDynamicTrophies.map((dt: any) => {
-                    const tr = dt.trophy;
-                    const seasonDisplay = tr.season?.name || tr.season_name;
-                    const dateDisplay = dt.awarded_at
-                      ? new Intl.DateTimeFormat('tr-TR', {
-                          timeZone: 'Europe/Istanbul',
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        }).format(new Date(dt.awarded_at))
-                      : null;
+              {validDynamicTrophies.length > 0 ? (() => {
+                const groupedDynamicTrophies = Array.from(
+                  validDynamicTrophies.reduce((map: Map<string, any>, dt: any) => {
+                    const tid = dt.trophy?.id || dt.id;
+                    if (!map.has(tid)) {
+                      map.set(tid, {
+                        id: dt.id,
+                        trophy: dt.trophy,
+                        count: 0,
+                        awarded_at: dt.awarded_at,
+                        notes: [] as string[],
+                      });
+                    }
+                    const entry = map.get(tid);
+                    entry.count += 1;
+                    if (dt.notes && !entry.notes.includes(dt.notes)) {
+                      entry.notes.push(dt.notes);
+                    }
+                    if (dt.awarded_at && (!entry.awarded_at || new Date(dt.awarded_at) > new Date(entry.awarded_at))) {
+                      entry.awarded_at = dt.awarded_at;
+                    }
+                    return map;
+                  }, new Map<string, any>()).values()
+                );
 
-                    return (
-                      <div
-                        key={dt.id}
-                        className="group relative bg-[#03070c] border border-white/5 hover:border-amber-400/40 rounded-2xl p-6 flex flex-col items-center justify-between text-center transition-all duration-300 hover:shadow-[0_0_25px_rgba(245,158,11,0.15)] hover:-translate-y-0.5 overflow-hidden"
-                      >
-                        <div className="absolute inset-0 bg-gradient-to-b from-amber-500/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {groupedDynamicTrophies.map((item: any) => {
+                      const tr = item.trophy;
+                      const seasonDisplay = tr?.season?.name || tr?.season_name;
+                      const dateDisplay = item.awarded_at
+                        ? new Intl.DateTimeFormat('tr-TR', {
+                            timeZone: 'Europe/Istanbul',
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          }).format(new Date(item.awarded_at))
+                        : null;
 
-                        {/* Category badge */}
-                        {tr.category && (
-                          <span className="text-[9px] font-black tracking-widest uppercase px-2.5 py-0.5 rounded-full bg-white/5 text-gray-400 border border-white/5 mb-3 group-hover:border-amber-400/30 group-hover:text-amber-300 transition-colors">
-                            {tr.category}
-                          </span>
-                        )}
+                      return (
+                        <div
+                          key={item.id}
+                          className="group relative bg-[#03070c] border border-white/5 hover:border-amber-400/40 rounded-2xl p-6 flex flex-col items-center justify-between text-center transition-all duration-300 hover:shadow-[0_0_25px_rgba(245,158,11,0.15)] hover:-translate-y-0.5 overflow-hidden"
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-b from-amber-500/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
 
-                        {/* Trophy visual */}
-                        <div className="w-24 h-24 my-2 flex items-center justify-center relative">
-                          {tr.image_url ? (
-                            <img
-                              src={tr.image_url}
-                              alt={tr.title}
-                              className="max-h-full max-w-full object-contain filter drop-shadow-[0_4px_16px_rgba(0,0,0,0.8)] group-hover:scale-105 transition-transform duration-300 select-none"
-                            />
-                          ) : (
-                            <span className="text-5xl select-none">🏆</span>
-                          )}
-                        </div>
-
-                        {/* Title, Season & Notes */}
-                        <div className="mt-2 w-full">
-                          <h3 className="text-[14px] font-[900] text-white tracking-wide uppercase line-clamp-2 group-hover:text-amber-300 transition-colors">
-                            {tr.title}
-                          </h3>
-                          {seasonDisplay && (
-                            <span className="inline-block mt-1.5 px-2.5 py-0.5 rounded bg-black/60 border border-white/10 text-[10px] font-black text-amber-300 uppercase tracking-wider">
-                              {seasonDisplay}
+                          {/* Top row: Category badge & Repeat Count (1x, 2x, etc.) */}
+                          <div className="w-full flex items-center justify-between mb-3 gap-2">
+                            {tr?.category ? (
+                              <span className="text-[9px] font-black tracking-widest uppercase px-2.5 py-0.5 rounded-full bg-white/5 text-gray-400 border border-white/5 group-hover:border-amber-400/30 group-hover:text-amber-300 transition-colors truncate">
+                                {tr.category}
+                              </span>
+                            ) : (
+                              <span />
+                            )}
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-black shadow-sm font-mono shrink-0">
+                              {item.count}x
                             </span>
-                          )}
-                          {tr.description && (
-                            <p className="text-[11px] text-gray-400 font-medium line-clamp-2 mt-2 leading-relaxed">
-                              {tr.description}
-                            </p>
-                          )}
-                          {dt.notes && (
-                            <div className="mt-3 pt-2.5 border-t border-white/5 text-[11px] font-semibold text-cyan-300/90 truncate">
-                              🎖️ {dt.notes}
-                            </div>
-                          )}
-                          {dateDisplay && (
-                            <div className="text-[10px] text-gray-600 font-mono mt-1.5">
-                              {dateDisplay}
-                            </div>
-                          )}
+                          </div>
+
+                          {/* Trophy visual */}
+                          <div className="w-24 h-24 my-2 flex items-center justify-center relative">
+                            {tr?.image_url ? (
+                              <img
+                                src={tr.image_url}
+                                alt={tr.title}
+                                className="max-h-full max-w-full object-contain filter drop-shadow-[0_4px_16px_rgba(0,0,0,0.8)] group-hover:scale-105 transition-transform duration-300 select-none"
+                              />
+                            ) : (
+                              <span className="text-5xl select-none">🏆</span>
+                            )}
+                          </div>
+
+                          {/* Title, Season & Notes */}
+                          <div className="mt-2 w-full">
+                            <h3 className="text-[14px] font-[900] text-white tracking-wide uppercase line-clamp-2 group-hover:text-amber-300 transition-colors">
+                              {tr?.title || 'Kupa'}
+                            </h3>
+                            {seasonDisplay && (
+                              <span className="inline-block mt-1.5 px-2.5 py-0.5 rounded bg-black/60 border border-white/10 text-[10px] font-black text-amber-300 uppercase tracking-wider">
+                                {seasonDisplay}
+                              </span>
+                            )}
+                            {tr?.description && (
+                              <p className="text-[11px] text-gray-400 font-medium line-clamp-2 mt-2 leading-relaxed">
+                                {tr.description}
+                              </p>
+                            )}
+                            {item.notes.length > 0 && (
+                              <div className="mt-3 pt-2.5 border-t border-white/5 text-[11px] font-semibold text-cyan-300/90 truncate" title={item.notes.join(' • ')}>
+                                🎖️ {item.notes.join(' • ')}
+                              </div>
+                            )}
+                            {dateDisplay && (
+                              <div className="text-[10px] text-gray-600 font-mono mt-1.5">
+                                {dateDisplay}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
+                      );
+                    })}
+                  </div>
+                );
+              })() : (
                 <div className="bg-[#03070c] border border-white/5 rounded-2xl p-12 text-center flex flex-col items-center justify-center">
                   <div className="w-16 h-16 rounded-2xl bg-white/[0.02] border border-white/10 flex items-center justify-center text-3xl mb-4 text-gray-600">
                     🏆

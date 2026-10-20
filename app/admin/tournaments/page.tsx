@@ -37,9 +37,10 @@ export default async function AdminTournamentsPage() {
     { data: profilesData },
     { data: groupsData },
     { data: matchesData },
-    { data: submissionsData }
+    { data: submissionsData },
+    { data: trophiesData }
   ] = await Promise.all([
-    supabase.from('tournaments').select('*, seasons(id, name)').order('created_at', { ascending: false }),
+    supabase.from('tournaments').select('*, seasons(id, name), trophy:trophies(id, title, image_url, category)').order('created_at', { ascending: false }),
     supabase.from('tournament_winners').select('*, profiles(username, full_name, avatar_url), teams(name, logo_url), tournament_applications(team_name, logo_url)').order('placement', { ascending: true }),
     supabase.from('tournament_applications').select('*, profiles(id, username, full_name, avatar_url), tournament_application_players(id, profile_id, profiles(id, username, full_name, avatar_url))').order('created_at', { ascending: false }),
     supabase.from('seasons').select('id, name, status').order('created_at', { ascending: false }),
@@ -67,7 +68,8 @@ export default async function AdminTournamentsPage() {
         is_own_goal,
         player:profiles!player_id(id, username)
       )
-    `).order('created_at', { ascending: false })
+    `).order('created_at', { ascending: false }),
+    supabase.from('trophies').select('id, title, category, target_type, image_url').order('title', { ascending: true })
   ]);
 
   return (
@@ -86,6 +88,7 @@ export default async function AdminTournamentsPage() {
         groups={groupsData || []}
         matches={matchesData || []}
         submissions={submissionsData || []}
+        trophies={trophiesData || []}
       />
     </div>
   );

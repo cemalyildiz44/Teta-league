@@ -51,7 +51,7 @@ export default async function TournamentDetailPage({
   // 1. Fetch tournament
   const { data: tournamentData, error: tourError } = await supabase
     .from('tournaments')
-    .select('*, seasons(id, name)')
+    .select('*, seasons(id, name), trophy:trophies(id, title, image_url, category)')
     .eq('id', id)
     .maybeSingle();
 

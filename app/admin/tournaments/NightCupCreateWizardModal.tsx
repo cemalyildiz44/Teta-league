@@ -33,6 +33,7 @@ interface NightCupCreateWizardModalProps {
   isOpen: boolean;
   onClose: () => void;
   seasons: Array<{ id: string; name: string; is_active?: boolean }>;
+  trophies?: Array<{ id: string; title: string; image_url: string; category?: string; target_type?: string }>;
   onSuccess: (message: string) => void;
   onError: (message: string) => void;
 }
@@ -42,6 +43,7 @@ interface FormState {
   name: string;
   season_id: string;
   prize: string;
+  trophy_id: string;
   discord_url: string;
   image_file: File | null;
   imagePreviewUrl: string | null;
@@ -77,6 +79,7 @@ export default function NightCupCreateWizardModal({
   isOpen,
   onClose,
   seasons,
+  trophies = [],
   onSuccess,
   onError,
 }: NightCupCreateWizardModalProps) {
@@ -92,6 +95,7 @@ export default function NightCupCreateWizardModal({
     name: '',
     season_id: defaultSeasonId,
     prize: '',
+    trophy_id: '',
     discord_url: '',
     image_file: null,
     imagePreviewUrl: null,
@@ -264,6 +268,7 @@ export default function NightCupCreateWizardModal({
       payload.append('season_id', formData.season_id);
       payload.append('status', formData.status);
       payload.append('prize', formData.prize.trim());
+      payload.append('trophy_id', formData.trophy_id.trim());
       payload.append('discord_url', formData.discord_url.trim());
       payload.append('is_registration_open', formData.is_registration_open ? 'true' : 'false');
       payload.append('registration_start', formData.registration_start);
@@ -537,6 +542,64 @@ export default function NightCupCreateWizardModal({
                       Kaptanların maç koordinasyonu ve kurallar için katılacağı sunucu linki.
                     </p>
                   )}
+                </div>
+
+                {/* Kazanan Ödülü (Kupa Tanımı) */}
+                <div className="md:col-span-2 bg-[#050b14]/70 border border-white/10 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-black uppercase tracking-wider text-amber-300 flex items-center gap-2">
+                      <Trophy className="w-4 h-4 text-amber-400" />
+                      KAZANAN ŞAMPİYONLUK KUPASI
+                    </label>
+                    <span className="text-[10px] text-zinc-500 font-bold uppercase">Sistem Ödülü</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mb-3">
+                    Turnuva tamamlandığında şampiyon olan takımın temsilcisine/oyuncularına otomatik olarak takdim edilecek kupa.
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                    <div>
+                      <select
+                        value={formData.trophy_id}
+                        onChange={(e) => setFormData({ ...formData, trophy_id: e.target.value })}
+                        className="w-full bg-black/60 border border-white/10 focus:border-amber-400/80 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none transition-all cursor-pointer"
+                      >
+                        <option value="">Varsayılan (Night Cup Şampiyonu Rozeti)</option>
+                        {trophies.map((tr) => (
+                          <option key={tr.id} value={tr.id}>
+                            🏆 {tr.title} {tr.category ? `[${tr.category}]` : ''} {tr.target_type ? `(${tr.target_type === 'TEAM' ? 'Takım' : tr.target_type === 'PLAYER' ? 'Oyuncu' : 'Genel'})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {formData.trophy_id ? (() => {
+                      const sel = trophies.find((t) => t.id === formData.trophy_id);
+                      if (!sel) return null;
+                      return (
+                        <div className="flex items-center gap-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                          {sel.image_url ? (
+                            <img src={sel.image_url} alt="" className="w-10 h-10 object-contain shrink-0 drop-shadow-md" />
+                          ) : (
+                            <Trophy className="w-8 h-8 text-amber-400 shrink-0" />
+                          )}
+                          <div className="min-w-0">
+                            <span className="text-xs font-black text-amber-300 uppercase block truncate">
+                              {sel.title}
+                            </span>
+                            <span className="text-[10px] text-zinc-400 block truncate">
+                              {sel.category || 'Ödül'} • Şampiyona otomatik atanır
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })() : (
+                      <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/5 text-[11px] text-zinc-500 flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-cyan-400 shrink-0" />
+                        Özel bir kupa seçmezseniz standart "NIGHT_CUP_WINNER" başarımı verilir.
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1032,7 +1095,21 @@ export default function NightCupCreateWizardModal({
                       </div>
                       <div>
                         <span className="text-[10px] uppercase font-bold text-zinc-500 block">Ödül</span>
-                        <span className="text-amber-400 font-bold">{formData.prize || 'Belirtilmedi'}</span>
+                        <span className="text-amber-400 font-bold block">{formData.prize || 'Belirtilmedi'}</span>
+                        {formData.trophy_id && (() => {
+                          const sel = trophies.find((t) => t.id === formData.trophy_id);
+                          if (!sel) return null;
+                          return (
+                            <div className="flex items-center gap-1.5 mt-1 text-[11px] text-amber-300 font-bold bg-amber-500/10 px-2 py-1 rounded-md border border-amber-500/20">
+                              {sel.image_url ? (
+                                <img src={sel.image_url} alt="" className="w-4 h-4 object-contain shrink-0" />
+                              ) : (
+                                <Trophy className="w-3.5 h-3.5 shrink-0" />
+                              )}
+                              <span className="truncate">{sel.title}</span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
 

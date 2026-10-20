@@ -94,6 +94,7 @@ export default function AchievementsClient({
   const [selectedEntityId, setSelectedEntityId] = useState('');
   const [winnerNotes, setWinnerNotes] = useState('');
   const [entitySearch, setEntitySearch] = useState('');
+  const [winnerOperationId, setWinnerOperationId] = useState<string>('');
 
   // Trophy Form Preview & Upload State
   const [previewImageUrl, setPreviewImageUrl] = useState('');
@@ -144,6 +145,7 @@ export default function AchievementsClient({
     setSelectedEntityId('');
     setWinnerNotes('');
     setWinnerType(trophy.target_type === 'TEAM' ? 'TEAM' : 'PLAYER');
+    setWinnerOperationId(typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `op_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
   };
 
   // ── Dosya Seçim İşleyicisi ───────────────────────────────────────────────
@@ -297,9 +299,12 @@ export default function AchievementsClient({
     if (!managingTrophy || !selectedEntityId) return;
     setActionMsg(null);
 
+    const currentOpId = winnerOperationId || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `op_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
+
     const formData = new FormData();
     formData.append('trophy_id', managingTrophy.id);
     formData.append('winner_type', winnerType);
+    formData.append('idempotency_key', currentOpId);
     if (winnerType === 'PLAYER') {
       formData.append('player_id', selectedEntityId);
     } else {
@@ -318,6 +323,8 @@ export default function AchievementsClient({
         setSelectedEntityId('');
         setWinnerNotes('');
         setEntitySearch('');
+        // Bir sonraki bilinçli kupa verme işlemi için yeni benzersiz işlem anahtarı üret
+        setWinnerOperationId(typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `op_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
       }
     });
   };

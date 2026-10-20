@@ -193,10 +193,14 @@ export async function createNightCupAction(formData: FormData) {
   const parsedTeamsPerGroup = teams_per_group && teams_per_group.trim() ? parseInt(teams_per_group, 10) : 4;
   const parsedAdvancing = advancing_teams_per_group && advancing_teams_per_group.trim() ? parseInt(advancing_teams_per_group, 10) : 2;
 
+  const rawTrophyId = (formData.get('trophy_id') as string)?.trim() || null;
+  const trophy_id = rawTrophyId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawTrophyId) ? rawTrophyId : null;
+
   const fullPayload: Record<string, any> = {
     season_id,
     name: name.trim(),
     type: 'NIGHT_CUP',
+    ...(trophy_id ? { trophy_id } : {}),
     max_teams: parsedMaxTeams,
     is_registration_open,
     registration_start: registration_start || null,
@@ -607,6 +611,129 @@ export async function adminDeleteNightCupApplicationAction(application_id: strin
   return { success: `"${appData.team_name}" başvurusu başarıyla silindi.` };
 }
 
+async function awardNightCupTrophyHelper(
+  supabase: any,
+  tournament_id: string,
+  winner_application_id: string,
+  admin_user_id?: string | null
+) {
+  try {
+    // 1. Şampiyon takım başvurusunu ve temsilcisini çek
+    const { data: winnerApp } = await supabase
+      .from('tournament_applications')
+      .select('id, applicant_id, team_name')
+      .eq('id', winner_application_id)
+      .maybeSingle();
+
+    if (!winnerApp) return;
+
+    // 2. Night Cup geçici kadrosundaki (tournament_application_players) tüm oyuncuları çek
+    const { data: appPlayers } = await supabase
+      .from('tournament_application_players')
+      .select('profile_id')
+      .eq('application_id', winner_application_id);
+
+    // 3. Başvuran kaptan ve kadro oyuncularını birleştirip tekilleştir (resmi lig üyeliklerine dokunulmaz)
+    const playerIds = new Set<string>();
+    if (winnerApp.applicant_id) {
+      playerIds.add(winnerApp.applicant_id);
+    }
+    if (Array.isArray(appPlayers)) {
+      for (const p of appPlayers) {
+        if (p?.profile_id) {
+          playerIds.add(p.profile_id);
+        }
+      }
+    }
+
+    const uniquePlayerIds = Array.from(playerIds);
+    if (uniquePlayerIds.length === 0) return;
+
+    // 4. Turnuva detaylarını ve yapılandırılmış kupayı çek
+    const { data: tour } = await supabase
+      .from('tournaments')
+      .select('id, name, trophy_id, season_id')
+      .eq('id', tournament_id)
+      .maybeSingle();
+
+    const seasonId = tour?.season_id || null;
+    const selectedTrophyId = tour?.trophy_id;
+    const tournamentShortId = tournament_id.substring(0, 8);
+    const tournamentName = tour?.name || 'Night Cup';
+
+    if (selectedTrophyId) {
+      // Şampiyon kadrodaki tüm oyunculara kupayı atomik idempotency anahtarıyla dağıt
+      const note = `${tournamentName} Şampiyonu (#${tournamentShortId})`;
+
+      for (const playerId of uniquePlayerIds) {
+        const idempotencyKey = `night_cup_${tournament_id}_${playerId}`;
+
+        // Bu oyuncunun bu turnuva için daha önce ödül alıp almadığını kontrol et
+        const { data: existingAwardByKey } = await supabase
+          .from('trophy_winners')
+          .select('id')
+          .eq('idempotency_key', idempotencyKey)
+          .maybeSingle();
+
+        let isAlreadyAwarded = !!existingAwardByKey;
+        if (!isAlreadyAwarded) {
+          const { data: legacyAward } = await supabase
+            .from('trophy_winners')
+            .select('id')
+            .eq('trophy_id', selectedTrophyId)
+            .eq('player_id', playerId)
+            .ilike('notes', `%#${tournamentShortId}%`)
+            .maybeSingle();
+          isAlreadyAwarded = !!legacyAward;
+        }
+
+        if (!isAlreadyAwarded) {
+          const { error: insertErr } = await supabase
+            .from('trophy_winners')
+            .insert({
+              trophy_id: selectedTrophyId,
+              winner_type: 'PLAYER',
+              player_id: playerId,
+              notes: note,
+              awarded_by: admin_user_id || null,
+              idempotency_key: idempotencyKey,
+            });
+
+          if (insertErr && insertErr.code !== '23505') {
+            console.error('[awardNightCupTrophyHelper] Kupa atama hatası:', playerId, insertErr.message);
+          }
+        }
+      }
+    } else {
+      // Geriye dönük uyumluluk: trophy_id'si olmayan eski turnuvalar için NIGHT_CUP_WINNER dağıtımı
+      for (const playerId of uniquePlayerIds) {
+        let checkQuery = supabase
+          .from('player_achievements')
+          .select('id')
+          .eq('player_id', playerId)
+          .eq('achievement_type', 'NIGHT_CUP_WINNER');
+
+        if (seasonId) {
+          checkQuery = checkQuery.eq('season_id', seasonId);
+        }
+
+        const { data: existingAch } = await checkQuery.maybeSingle();
+
+        if (!existingAch) {
+          await supabase.from('player_achievements').insert({
+            player_id: playerId,
+            achievement_type: 'NIGHT_CUP_WINNER',
+            season_id: seasonId,
+            awarded_by: admin_user_id || null,
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[awardNightCupTrophyHelper Error]:', err);
+  }
+}
+
 export async function assignNightCupWinnerAction(tournament_id: string, application_id: string) {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
@@ -625,6 +752,19 @@ export async function assignNightCupWinnerAction(tournament_id: string, applicat
 
   if (error) return { error: 'Kazanan eklenemedi: ' + error.message };
 
+  // Mark tournament completed
+  await supabase
+    .from('tournaments')
+    .update({
+      status: 'COMPLETED',
+      is_registration_open: false,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', tournament_id);
+
+  // Award tournament trophy / achievement idempotently
+  await awardNightCupTrophyHelper(supabase, tournament_id, application_id, user?.id);
+
   await logAdminAudit({
     action: 'ASSIGN_TOURNAMENT_WINNER',
     entity_type: 'tournaments',
@@ -637,6 +777,9 @@ export async function assignNightCupWinnerAction(tournament_id: string, applicat
 
   revalidatePath('/admin/tournaments');
   revalidatePath('/turnuvalar');
+  revalidatePath(`/turnuvalar/${tournament_id}`);
+  revalidatePath('/oyuncular');
+  revalidatePath('/oyuncular/[username]', 'page');
   return { success: 'Night Cup kazananı kaydedildi.' };
 }
 
@@ -746,8 +889,12 @@ export async function updateNightCupDetailsAction(formData: FormData) {
     image_url = data.publicUrl;
   }
 
+  const rawTrophyId = (formData.get('trophy_id') as string)?.trim() || null;
+  const trophy_id = rawTrophyId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawTrophyId) ? rawTrophyId : null;
+
   const fullUpdatePayload: Record<string, any> = {
     name: name.trim(),
+    ...(formData.has('trophy_id') ? { trophy_id } : {}),
     description: description ? description.trim() : null,
     rules: rules ? rules.trim() : null,
     details: details ? details.trim() : null,
@@ -1578,35 +1725,8 @@ async function handleKnockoutWinnerProgression({
         })
         .eq('id', match.tournament_id);
 
-      // Award NIGHT_CUP_WINNER achievement idempotently
-      try {
-        const { data: winnerApp } = await supabase
-          .from('tournament_applications')
-          .select('id, applicant_id, team_name, tournament_application_players(profile_id)')
-          .eq('id', winnerId)
-          .maybeSingle();
-
-        if (winnerApp?.applicant_id) {
-          const seasonId = (match.tournament as any)?.season_id || null;
-          const { data: existingAch } = await supabase
-            .from('player_achievements')
-            .select('id')
-            .eq('player_id', winnerApp.applicant_id)
-            .eq('achievement_type', 'NIGHT_CUP_WINNER')
-            .maybeSingle();
-
-          if (!existingAch) {
-            await supabase.from('player_achievements').insert({
-              player_id: winnerApp.applicant_id,
-              achievement_type: 'NIGHT_CUP_WINNER',
-              season_id: seasonId,
-              awarded_by: userId || null,
-            });
-          }
-        }
-      } catch (err) {
-        console.warn('Achievement award check:', err);
-      }
+      // Award tournament winner trophy/achievement idempotently
+      await awardNightCupTrophyHelper(supabase, match.tournament_id, winnerId, userId);
     }
   }
 }

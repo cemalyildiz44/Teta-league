@@ -418,20 +418,61 @@ export async function addTrophyWinnerAction(prevState: any, formData: FormData) 
       return { error: `Bu kupa yalnızca "${trophy.target_type === 'PLAYER' ? 'Oyuncu' : 'Takım'}" türü için tanımlanmıştır.` };
     }
 
+    // Atomik İdempotency & İşlem Anahtarı Kontrolü
+    const rawOperationId = (
+      (formData.get('idempotency_key') as string) ||
+      (formData.get('operation_id') as string) ||
+      (formData.get('client_record_id') as string)
+    )?.trim() || null;
+
+    const idempotency_key = rawOperationId || null;
+
+    // Aynı işlem anahtarıyla daha önce bir kayıt oluşturulmuş mu kontrol et (idempotent tekrar kontrolü)
+    if (idempotency_key) {
+      const { data: existingOp } = await supabase
+        .from('trophy_winners')
+        .select('id')
+        .eq('idempotency_key', idempotency_key)
+        .maybeSingle();
+
+      if (existingOp) {
+        return { success: 'Bu ödül işlemi zaten başarıyla tamamlandı (idempotent istek).' };
+      }
+    }
+
+    const validClientUuid = idempotency_key && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idempotency_key);
+
     const insertData: any = {
+      ...(validClientUuid ? { id: idempotency_key } : {}),
       trophy_id,
       winner_type,
       notes,
       awarded_by: user.id,
       player_id: winner_type === 'PLAYER' ? player_id : null,
       team_id: winner_type === 'TEAM' ? team_id : null,
+      ...(idempotency_key ? { idempotency_key } : {}),
     };
 
-    const { error } = await supabase.from('trophy_winners').insert(insertData);
+    const { data: insertedWinner, error } = await supabase
+      .from('trophy_winners')
+      .insert(insertData)
+      .select('id')
+      .maybeSingle();
 
     if (error) {
       if (error.code === '23505') {
-        return { error: 'Bu kazanan zaten bu kupaya daha önce atanmış (Mükerrer Kayıt).' };
+        // İdempotency anahtarı veya birincil anahtar çakışması (aynı işlem eşzamanlı / retry olarak işlendi)
+        if (
+          error.message?.includes('unique_trophy_winners_idempotency') ||
+          error.message?.includes('trophy_winners_pkey') ||
+          error.details?.includes('idempotency_key')
+        ) {
+          return { success: 'Bu ödül işlemi zaten başarıyla tamamlandı (eşzamanlı istek işlendi).' };
+        }
+        if (error.message?.includes('unique_totw_week_player_winner')) {
+          return { error: 'Bu oyuncu bu TOTW haftasında zaten ödüllendirilmiş (haftalık tekillik kuralı).' };
+        }
+        return { error: 'Bu ödül veritabanındaki benzersiz kısıtlama nedeniyle yinelenemedi.' };
       }
       return { error: 'Kazanan eklenirken hata oluştu: ' + error.message };
     }
@@ -459,6 +500,8 @@ export async function addTrophyWinnerAction(prevState: any, formData: FormData) 
     revalidatePath('/admin/achievements');
     revalidatePath('/oyuncular');
     revalidatePath('/takimlar');
+    revalidatePath('/oyuncular/[username]', 'page');
+    revalidatePath('/takim/[slug]', 'page');
     return { success: 'Kazanan başarıyla eklendi.' };
   } catch (error: any) {
     return { error: 'Beklenmeyen hata: ' + error.message };
@@ -501,6 +544,8 @@ export async function removeTrophyWinnerAction(winner_id: string) {
     revalidatePath('/admin/achievements');
     revalidatePath('/oyuncular');
     revalidatePath('/takimlar');
+    revalidatePath('/oyuncular/[username]', 'page');
+    revalidatePath('/takim/[slug]', 'page');
     return { success: 'Kazanan kaldırıldı.' };
   } catch (error: any) {
     return { error: 'Beklenmeyen hata: ' + error.message };

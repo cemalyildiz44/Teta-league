@@ -20,7 +20,7 @@ import TournamentGroupsAdminModal from './TournamentGroupsAdminModal';
 import NightCupCreateWizardModal from './NightCupCreateWizardModal';
 import { formatTournamentDate, formatForDateTimeLocal } from '@/lib/date-utils';
 
-export function TournamentsManager({ tournaments, winners, applications, seasons, profiles, groups = [], matches = [], submissions = [] }: any) {
+export function TournamentsManager({ tournaments, winners, applications, seasons, profiles, groups = [], matches = [], submissions = [], trophies = [] }: any) {
   const router = useRouter();
 
   const [tab, setTab] = useState<'1V1' | 'KARMA' | 'NIGHT_CUP' | 'SONUC_ONAYLARI'>('1V1');
@@ -1269,6 +1269,7 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
           isOpen={createNightCupModal}
           onClose={() => setCreateNightCupModal(false)}
           seasons={seasons}
+          trophies={trophies}
           onSuccess={(msg) => {
             showFeedback(msg, 'success');
             setCreateNightCupModal(false);
@@ -1311,10 +1312,21 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
                 </div>
               </div>
 
-              <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+              <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
                 <div>
-                  <label className='block text-xs font-bold text-zinc-400 mb-1'>ÖDÜL BİLGİSİ</label>
+                  <label className='block text-xs font-bold text-zinc-400 mb-1'>ÖDÜL METNİ</label>
                   <input name='prize' type='text' defaultValue={editNightCupModal.prize || ''} placeholder='Örn: 5.000 TL + Kupa' className='input-field'/>
+                </div>
+                <div>
+                  <label className='block text-xs font-bold text-zinc-400 mb-1'>KAZANAN ÖDÜLÜ (KUPA)</label>
+                  <select name='trophy_id' defaultValue={editNightCupModal.trophy_id || ''} className='input-field text-xs'>
+                    <option value=''>Varsayılan (Night Cup Rozeti)</option>
+                    {trophies.map((tr: any) => (
+                      <option key={tr.id} value={tr.id}>
+                        🏆 {tr.title} {tr.category ? `[${tr.category}]` : ''}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className='block text-xs font-bold text-zinc-400 mb-1'>DISCORD BAĞLANTISI</label>
