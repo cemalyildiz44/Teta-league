@@ -1,128 +1,33 @@
-import { createClient } from "@/utils/supabase/server";
-import { cookies } from "next/headers";
 import Link from "next/link";
 import TeamLogo from "@/components/TeamLogo";
+import { getCachedFilterOptions, getCachedStatsData, PublicPlayerStatItem } from "./stats";
+
+export const revalidate = 60;
 
 export default async function GlobalStatsPage({ searchParams }: { searchParams: Promise<{ season?: string, league?: string }> }) {
   const resolvedParams = await searchParams;
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
 
-  // 1. Fetch seasons and leagues
-  const [{ data: seasons }, { data: leagues }] = await Promise.all([
-    supabase.from("seasons").select("id, name, status").order("created_at", { ascending: false }),
-    supabase.from("leagues").select("id, name, season_id").order("name")
-  ]);
-
+  // 1. Fetch cached filter options (seasons & leagues)
+  const { seasons, leagues } = await getCachedFilterOptions();
 
   const activeSeason = seasons?.find(s => s.status === "ACTIVE") || seasons?.[0];
   const selectedSeasonId = resolvedParams.season || activeSeason?.id;
   const availableLeagues = leagues?.filter(l => l.season_id === selectedSeasonId) || [];
   const selectedLeagueId = resolvedParams.league || availableLeagues[0]?.id;
 
-  // 2. Fetch APPROVED matches
-  let matchIds: string[] = [];
-  if (selectedSeasonId && selectedLeagueId) {
-    const { data: matches } = await supabase
-      .from("matches")
-      .select("id")
-      .eq("season_id", selectedSeasonId)
-      .eq("league_id", selectedLeagueId)
-      .eq("status", "APPROVED");
-    matchIds = (matches || []).map(m => m.id);
-  }
+  // 2. Fetch cached statistics result for the selected scope
+  const {
+    topScorers,
+    topAssisters,
+    topRatings,
+    mostMatches,
+    goalkeepers
+  } = await getCachedStatsData(selectedSeasonId, selectedLeagueId);
 
-  // 3. Fetch raw match_player_stats for those matches
-  let rawStats: any[] = [];
-  if (matchIds.length > 0) {
-    const { data: stats } = await supabase
-      .from("match_player_stats")
-      .select("ea_player_id, team_id, position, goals, assists, rating, saves, goals_conceded")
-      .in("match_id", matchIds);
-    rawStats = stats || [];
-  }
-
-  // 4. MİMARİ B SEÇENEĞİ: Yalnızca EA hesabı bağlı ve kayıtlı "gerçek" oyuncuları filtrele
-  // Önce istatistiklerdeki tüm ea_player_id'leri ve team_id'leri bul
-  const eaPlayerIds = Array.from(new Set(rawStats.map(s => s.ea_player_id).filter(Boolean)));
-  const teamIds = Array.from(new Set(rawStats.map(s => s.team_id).filter(Boolean)));
-
-  let validProfiles: any[] = [];
-  let eaToProfileMap = new Map();
-  let teamMap = new Map();
-
-  if (eaPlayerIds.length > 0 || teamIds.length > 0) {
-    const [profilesRes, teamsRes] = await Promise.all([
-      eaPlayerIds.length > 0
-        ? supabase
-            .from("profiles")
-            .select("id, username, current_ea_player_id")
-            .in("current_ea_player_id", eaPlayerIds)
-            .not("current_ea_player_id", "is", null)
-        : Promise.resolve({ data: [] }),
-      teamIds.length > 0
-        ? supabase
-            .from("teams")
-            .select("id, name, slug, logo_url")
-            .in("id", teamIds)
-        : Promise.resolve({ data: [] })
-    ]);
-
-    validProfiles = profilesRes.data || [];
-    eaToProfileMap = new Map(validProfiles.map((p: any) => [p.current_ea_player_id, p]));
-    teamMap = new Map((teamsRes.data || []).map((t: any) => [t.id, t]));
-  }
-
-  // Filtrelenmiş rawStats: Yalnızca ea_player_id'si bir profile bağlı olanları al.
-  const filteredStats = rawStats.filter(s => s.ea_player_id && eaToProfileMap.has(s.ea_player_id));
-
-  // 5. Aggregate stats per VALID player
-  const playerStatsMap = new Map<string, any>();
-  for (const s of filteredStats) {
-    const profile = eaToProfileMap.get(s.ea_player_id);
-    const key = profile.id; // Unique identifier is profile ID
-
-    if (!playerStatsMap.has(key)) {
-      playerStatsMap.set(key, {
-        profile_id: profile.id,
-        username: profile.username,
-        ea_player_id: s.ea_player_id,
-        team_id: s.team_id,
-        position: s.position,
-        matches_played: 0,
-        goals: 0,
-        assists: 0,
-        rating_sum: 0,
-        saves: 0,
-        goals_conceded: 0,
-      });
-    }
-
-    const ps = playerStatsMap.get(key);
-    ps.matches_played += 1;
-    ps.goals += (s.goals || 0);
-    ps.assists += (s.assists || 0);
-    ps.rating_sum += (parseFloat(s.rating) || 0);
-    ps.saves += (s.saves || 0);
-    ps.goals_conceded += (s.goals_conceded || 0);
-    if (s.team_id) ps.team_id = s.team_id;
-  }
-
-  const aggregated = Array.from(playerStatsMap.values()).map(ps => ({
-    ...ps,
-    avg_rating: ps.matches_played > 0 ? (ps.rating_sum / ps.matches_played).toFixed(2) : "0.00",
-    team: teamMap.get(ps.team_id)
-  }));
-
-  // Create sub-lists
-  const topScorers = [...aggregated].sort((a, b) => b.goals - a.goals || a.matches_played - b.matches_played).filter(p => p.goals > 0).slice(0, 10);
-  const topAssisters = [...aggregated].sort((a, b) => b.assists - a.assists || a.matches_played - b.matches_played).filter(p => p.assists > 0).slice(0, 10);
-  const topRatings = [...aggregated].sort((a, b) => parseFloat(b.avg_rating) - parseFloat(a.avg_rating) || b.matches_played - a.matches_played).filter(p => parseFloat(p.avg_rating) > 0).slice(0, 10);
-  const mostMatches = [...aggregated].sort((a, b) => b.matches_played - a.matches_played).slice(0, 10);
-  const goalkeepers = aggregated.filter(p => p.position === "goalkeeper" || p.saves > 0).sort((a, b) => b.saves - a.saves || a.goals_conceded - b.goals_conceded).slice(0, 10);
+  const hasAnyData = topScorers.length > 0 || topAssisters.length > 0 || topRatings.length > 0 || mostMatches.length > 0 || goalkeepers.length > 0;
 
   // Helper to render Team logo & name
-  const renderTeam = (team: any) => {
+  const renderTeam = (team: PublicPlayerStatItem["team"]) => {
     if (!team) return <span className="text-gray-600 text-xs">-</span>;
     return (
       <Link href={`/takim/${team.slug}`} className="flex items-center gap-2 group">
@@ -132,8 +37,8 @@ export default async function GlobalStatsPage({ searchParams }: { searchParams: 
     );
   };
 
-  const renderPlayer = (p: any) => (
-    <Link href={`/oyuncular/${p.username}`} className="font-bold text-white text-xs hover:text-[#00e5ff] hover:underline transition-colors">
+  const renderPlayer = (p: PublicPlayerStatItem) => (
+    <Link href={`/oyuncular/${encodeURIComponent(p.username)}`} className="font-bold text-white text-xs hover:text-[#00e5ff] hover:underline transition-colors">
       {p.username}
     </Link>
   );
@@ -185,7 +90,7 @@ export default async function GlobalStatsPage({ searchParams }: { searchParams: 
           </form>
         </div>
 
-        {aggregated.length === 0 ? (
+        {!hasAnyData ? (
           <div className="card-surface p-12 rounded-xl border border-white/5 text-center">
             <span className="text-gray-500 font-medium italic">Henüz yeterli istatistik verisi bulunmuyor veya EA hesapları eşleşmemiş.</span>
           </div>

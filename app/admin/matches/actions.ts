@@ -3,7 +3,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { slugify } from '@/app/lig/utils';
 import { logAdminAudit } from '@/lib/audit';
 import { buildProfilesOrFilter } from '@/lib/ea/roster-validator';
@@ -78,6 +78,11 @@ export async function revalidateMatchDependencies(supabase: any, matchId: string
   revalidatePath('/oyuncular');
   revalidatePath('/istatistikler');
   revalidatePath(`/mac/${matchId}`);
+  try {
+    revalidateTag('player-rankings', 'max');
+    revalidateTag('public-statistics', 'max');
+    revalidateTag('public-team-page', 'max');
+  } catch {}
 
   let match = matchData;
   if (!match) {
@@ -108,6 +113,9 @@ export async function revalidateMatchDependencies(supabase: any, matchId: string
     for (const tm of matchTeams || []) {
       if (tm.slug) {
         revalidatePath(`/takim/${tm.slug}`);
+        try {
+          revalidateTag(`team-${tm.slug}`, 'max');
+        } catch {}
       }
     }
   }
@@ -390,6 +398,11 @@ export async function assignPlayerStatsProfileAction(
     revalidatePath(`/mac/${matchId}`);
     revalidatePath('/istatistikler');
     revalidatePath('/oyuncular');
+    try {
+      revalidateTag('player-rankings', 'max');
+      revalidateTag('public-statistics', 'max');
+      revalidateTag('public-team-page', 'max');
+    } catch {}
   }
 
   return {

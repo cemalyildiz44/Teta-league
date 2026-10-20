@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { logAdminAudit } from '@/lib/audit';
 
 async function checkAdmin(supabase: any, user: any) {
@@ -251,7 +251,14 @@ export async function editTeam(formData: FormData) {
   revalidatePath(`/takim/${slug}`);
   if (currentTeam.slug && currentTeam.slug !== slug) {
     revalidatePath(`/takim/${currentTeam.slug}`);
+    try {
+      revalidateTag(`team-${currentTeam.slug}`, 'max');
+    } catch {}
   }
+  try {
+    revalidateTag('public-team-page', 'max');
+    revalidateTag(`team-${slug}`, 'max');
+  } catch {}
   revalidatePath('/', 'layout');
   return { success: 'Takım başarıyla güncellendi.' };
 }
@@ -483,6 +490,10 @@ export async function uploadTeamLogoAction(formData: FormData) {
   revalidatePath('/takimlar');
   if (oldTeam?.slug) {
     revalidatePath(`/takim/${oldTeam.slug}`);
+    try {
+      revalidateTag(`team-${oldTeam.slug}`, 'max');
+      revalidateTag('public-team-page', 'max');
+    } catch {}
   }
   revalidatePath('/', 'layout');
   return { success: 'Logo başarıyla güncellendi.' };
@@ -630,6 +641,10 @@ export async function deleteTeamAction(teamId: string) {
   revalidatePath('/takimlar');
   revalidatePath('/oyuncular');
   revalidatePath('/profil');
+  try {
+    revalidateTag('public-team-page', 'max');
+    revalidateTag('player-rankings', 'max');
+  } catch {}
   revalidatePath('/', 'layout');
 
   for (const uname of affectedUsernames) {

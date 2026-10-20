@@ -1,377 +1,54 @@
-import { createClient } from '@/utils/supabase/server';
-import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Calendar, ChevronRight } from 'lucide-react';
 import TeamRosterCarousel from '../TeamRosterCarousel';
 import TeamLogo from '@/components/TeamLogo';
-import { calculateMarketValue } from '@/app/utils/marketValueCalculator';
-
-import { getTeamBySlug, getAllTeams } from '@/lib/fetchers';
+import { getCachedTeamPageData } from './team-page-data';
 
 interface Props {
   params: Promise<{ slug: string }>;
 }
 
+export const revalidate = 60; // 1 min public cache
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const team = await getTeamBySlug(slug);
+  const pageData = await getCachedTeamPageData(slug);
+  const team = pageData?.team;
 
   if (!team) return { title: 'Takım Bulunamadı' };
 
   return {
     title: `${team.name} | TETA League`,
-    description: `${team.name} takımının aktif kadrosu, güncel lig durumu ve kaptanlık detayları. TETA League e-spor platformu.`,
+    description: `${team.name} takımının aktif kadrosu, güncel lig durumu ve detayları. TETA League e-spor platformu.`,
   };
 }
 
 export default async function TeamPage({ params }: Props) {
   const { slug } = await params;
-  const team = await getTeamBySlug(slug);
+  const pageData = await getCachedTeamPageData(slug);
 
-  if (!team) {
+  if (!pageData || !pageData.team) {
     notFound();
   }
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const {
+    team,
+    activeLeague,
+    activeSeason,
+    teamTrophies,
+    allTimeWins,
+    allTimeDraws,
+    allTimeLosses,
+    roster,
+    recentMatches,
+    upcomingMatches,
+    transferSlots,
+    totalTeamValue,
+    stats
+  } = pageData;
 
-  // 1. Stage 2 Parallel: Fetch LeagueTeam, Captain Role, All-Time Matches, All Teams
-  const [
-    { data: leagueTeamData },
-    { data: roles },
-    { data: allTimeMatches },
-    allTeamsData,
-    { data: teamTrophiesData }
-  ] = await Promise.all([
-    supabase
-      .from('league_teams')
-      .select(`
-        season_id,
-        league_id,
-        leagues!inner (
-          name,
-          level,
-          seasons!inner ( id, name, status )
-        )
-      `)
-      .eq('team_id', team.id)
-      .in('leagues.seasons.status', ['UPCOMING', 'ACTIVE'])
-      .limit(1)
-      .single(),
-    supabase
-      .from('user_roles')
-      .select('user_id, role, profiles ( id, username, avatar_url, current_ea_player_id )')
-      .eq('team_id', team.id)
-      .eq('role', 'CAPTAIN')
-      .eq('is_active', true),
-    supabase
-      .from('matches')
-      .select('id, home_team_id, away_team_id, home_score, away_score')
-      .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
-      .eq('status', 'APPROVED'),
-    getAllTeams(),
-    supabase
-      .from('trophy_winners')
-      .select(`
-        id,
-        awarded_at,
-        notes,
-        trophy:trophies (
-          id,
-          title,
-          description,
-          image_url,
-          category,
-          season_name,
-          season:seasons ( name )
-        )
-      `)
-      .eq('team_id', team.id)
-      .order('awarded_at', { ascending: false })
-  ]);
-
-  const teamTrophies = ((teamTrophiesData || []) as any[]).filter((t: any) => t && t.trophy);
-  const activeLeague: any = Array.isArray(leagueTeamData?.leagues) ? leagueTeamData.leagues[0] : leagueTeamData?.leagues;
-  const activeSeason: any = Array.isArray(activeLeague?.seasons) ? activeLeague.seasons[0] : activeLeague?.seasons;
-  const captainRolesList = Array.isArray(roles) ? roles : roles ? [roles] : [];
-  const captainIds = new Set(captainRolesList.map((r: any) => r.user_id));
-  const captains = captainRolesList.map((r: any) => Array.isArray(r.profiles) ? r.profiles[0] : r.profiles).filter(Boolean);
-  const captain: any = captains[0] || null;
-  const teamMap = new Map((allTeamsData || []).map((t: any) => [t.id, t]));
-
-  // 2. All-Time match record calculation
-  let allTimeWins = 0;
-  let allTimeDraws = 0;
-  let allTimeLosses = 0;
-
-  if (allTimeMatches) {
-    for (const m of allTimeMatches) {
-      const isHome = m.home_team_id === team.id;
-      const teamScore = isHome ? (m.home_score ?? 0) : (m.away_score ?? 0);
-      const oppScore = isHome ? (m.away_score ?? 0) : (m.home_score ?? 0);
-
-      if (teamScore > oppScore) {
-        allTimeWins++;
-      } else if (teamScore === oppScore) {
-        allTimeDraws++;
-      } else {
-        allTimeLosses++;
-      }
-    }
-  }
-
-  // 3. Stage 3 Parallel: Active Season-dependent queries
-  let roster: any[] = [];
-  let recentMatches: any[] = [];
-  let upcomingMatches: any[] = [];
-  let stats: any = null;
-  let slotRows: any = null;
-  let approvedMatchIds: string[] = [];
-
-  if (activeSeason) {
-    const [
-      { data: slotRowsData },
-      { data: memberships },
-      { data: s },
-      { data: teamFixtures },
-      { data: seasonApprovedMatches }
-    ] = await Promise.all([
-      supabase.rpc('get_team_transfer_slots', {
-        p_team_id: team.id,
-        p_season_id: activeSeason.id
-      }),
-      supabase
-        .from('team_memberships')
-        .select(`
-          joined_at,
-          profiles ( id, username, full_name, avatar_url, primary_position, alternative_positions, current_ea_player_id )
-        `)
-        .eq('team_id', team.id)
-        .eq('season_id', activeSeason.id)
-        .is('left_at', null)
-        .order('joined_at', { ascending: true }),
-      supabase
-        .from('team_season_stats')
-        .select('matches_played, wins, draws, losses, points, goals_for, goals_against, goal_difference')
-        .eq('team_id', team.id)
-        .eq('season_id', activeSeason.id)
-        .maybeSingle(),
-      supabase
-        .from('fixtures')
-        .select(`
-          id,
-          week_number,
-          scheduled_at,
-          status,
-          home_team_id,
-          away_team_id,
-          matches (
-            id,
-            home_score,
-            away_score,
-            status,
-            played_at
-          )
-        `)
-        .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
-        .eq('season_id', activeSeason.id)
-        .order('week_number', { ascending: true }),
-      supabase
-        .from('matches')
-        .select('id')
-        .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
-        .eq('season_id', activeSeason.id)
-        .eq('status', 'APPROVED')
-    ]);
-
-    slotRows = slotRowsData;
-    stats = s;
-    approvedMatchIds = (seasonApprovedMatches || []).map((m: any) => m.id);
-
-    if (memberships) {
-      roster = memberships.map((m: any) => ({
-        joined_at: m.joined_at,
-        ...m.profiles,
-        role: captainIds.has(m.profiles?.id || m.player_id) ? 'CAPTAIN' : 'PLAYER',
-        stats: { matches: 0, goals: 0, assists: 0, avgRating: "0.00" }
-      }));
-    }
-
-    if (teamFixtures && teamFixtures.length > 0) {
-      const completed: any[] = [];
-      const upcoming: any[] = [];
-
-      teamFixtures.forEach((f: any) => {
-        const isHome = f.home_team_id === team.id;
-        const opponentId = isHome ? f.away_team_id : f.home_team_id;
-        const opponent = teamMap.get(opponentId);
-        const matchesList = Array.isArray(f.matches) ? f.matches : f.matches ? [f.matches] : [];
-        const appMatch = matchesList.find((m: any) => m.status === 'APPROVED');
-        const pendingMatch = matchesList.find((m: any) => m.status === 'PENDING_REVIEW');
-
-        if (appMatch) {
-          completed.push({
-            id: appMatch.id,
-            fixture_id: f.id,
-            date: appMatch.played_at || f.scheduled_at,
-            isHome,
-            opponent,
-            myScore: isHome ? (appMatch.home_score ?? 0) : (appMatch.away_score ?? 0),
-            oppScore: isHome ? (appMatch.away_score ?? 0) : (appMatch.home_score ?? 0),
-            status: 'APPROVED',
-            week_number: f.week_number,
-          });
-        } else if (f.status !== 'CANCELLED') {
-          upcoming.push({
-            id: pendingMatch ? pendingMatch.id : f.id,
-            fixture_id: f.id,
-            date: f.scheduled_at,
-            isHome,
-            opponent,
-            status: pendingMatch ? 'PENDING_REVIEW' : f.status || 'SCHEDULED',
-            week_number: f.week_number,
-          });
-        }
-      });
-
-      completed.sort((a, b) => {
-        if (a.date && b.date) return new Date(b.date).getTime() - new Date(a.date).getTime();
-        return b.week_number - a.week_number;
-      });
-      recentMatches = completed.slice(0, 5);
-
-      upcoming.sort((a, b) => {
-        if (a.date && b.date) return new Date(a.date).getTime() - new Date(b.date).getTime();
-        return a.week_number - b.week_number;
-      });
-      upcomingMatches = upcoming.slice(0, 5);
-    }
-  } else {
-    const { data: slotRowsData } = await supabase.rpc('get_team_transfer_slots', {
-      p_team_id: team.id,
-      p_season_id: null
-    });
-    slotRows = slotRowsData;
-  }
-
-  const slotData = Array.isArray(slotRows) && slotRows.length > 0 ? slotRows[0] : null;
-  const isUnlimited = (slotData as any)?.is_unlimited ?? ((slotData?.total_slots ?? 0) >= 999);
-  const transferSlots = {
-    remaining: slotData?.remaining_slots ?? 5,
-    total: slotData?.total_slots ?? 5,
-    isUnlimited
-  };
-
-  // 4. Stage 4 Parallel: Roster Stats & Market Value Bulk Fetch
-  let totalTeamValue = 0;
-  if (roster.length > 0) {
-    const profileIds = roster.map((r: any) => r.id).filter(Boolean);
-
-    const shouldFetchRosterStats = approvedMatchIds.length > 0 && profileIds.length > 0;
-
-    const [pStatsRes, bulkStatsRes, bulkAchievementsRes] = await Promise.all([
-      shouldFetchRosterStats
-        ? supabase
-            .from('match_player_stats')
-            .select('player_id, goals, assists, rating')
-            .in('match_id', approvedMatchIds)
-            .in('player_id', profileIds)
-        : Promise.resolve({ data: null }),
-      profileIds.length > 0
-        ? supabase
-            .from('match_player_stats')
-            .select('player_id, team_id, goals, assists, rating, cleansheets_gk, cleansheets_def, red_cards, matches!inner(home_team_id, away_team_id, home_score, away_score, status, season_id)')
-            .in('player_id', profileIds)
-            .eq('matches.status', 'APPROVED')
-        : Promise.resolve({ data: [] }),
-      supabase
-        .from('player_achievements')
-        .select('player_id, achievement_type, season_id')
-        .in('player_id', profileIds)
-    ]);
-
-    const pStats = pStatsRes.data;
-    if (pStats && pStats.length > 0) {
-      roster = roster.map((r: any) => {
-        const myStats = pStats.filter((s: any) => s.player_id === r.id);
-        if (myStats.length > 0) {
-          const matchesCount = myStats.length;
-          const goals = myStats.reduce((sum: number, s: any) => sum + (s.goals || 0), 0);
-          const assists = myStats.reduce((sum: number, s: any) => sum + (s.assists || 0), 0);
-          const totalRating = myStats.reduce((sum: number, s: any) => sum + (parseFloat(s.rating) || 0), 0);
-          return {
-            ...r,
-            stats: {
-              matches: matchesCount,
-              goals,
-              assists,
-              avgRating: (totalRating / matchesCount).toFixed(2)
-            }
-          };
-        }
-        return r;
-      });
-    }
-
-    const bulkStats = bulkStatsRes.data;
-    const bulkAchievements = bulkAchievementsRes.data;
-
-    const achByProfile = new Map();
-    if (bulkAchievements) {
-      bulkAchievements.forEach(a => {
-        if (!achByProfile.has(a.player_id)) achByProfile.set(a.player_id, []);
-        achByProfile.get(a.player_id).push(a);
-      });
-    }
-
-    const statsByPlayerId = new Map();
-    if (bulkStats) {
-      bulkStats.forEach(s => {
-        if (s.player_id) {
-          if (!statsByPlayerId.has(s.player_id)) statsByPlayerId.set(s.player_id, []);
-          statsByPlayerId.get(s.player_id).push(s);
-        }
-      });
-    }
-
-    roster.forEach(r => {
-      let tM=0, tW=0, tD=0, tL=0, tG=0, tA=0, tCGK=0, tCDEF=0, tRC=0;
-      const sMap = new Map();
-      const pStatsList = r.id ? statsByPlayerId.get(r.id) || [] : [];
-
-      pStatsList.forEach((s: any) => {
-        tM++; tG += s.goals || 0; tA += s.assists || 0; tRC += s.red_cards || 0;
-        tCGK += s.cleansheets_gk || 0; tCDEF += s.cleansheets_def || 0;
-
-        const m = s.matches;
-        const isHome = s.team_id === m.home_team_id;
-        const my = isHome ? m.home_score : m.away_score;
-        const opp = isHome ? m.away_score : m.home_score;
-        if (my > opp) tW++; else if (my < opp) tL++; else tD++;
-
-        const sid = m.season_id;
-        if (!sMap.has(sid)) sMap.set(sid, { season_id: sid, rating_sum: 0, rating_count: 0 });
-        const p = sMap.get(sid);
-        p.rating_sum += parseFloat(s.rating) || 0;
-        p.rating_count++;
-      });
-
-      const mvInput = {
-        profile: { primary_position: r.primary_position },
-        careerStats: { matches_played: tM, wins: tW, draws: tD, losses: tL, goals: tG, assists: tA, cleansheets_gk: tCGK, cleansheets_def: tCDEF, red_cards: tRC },
-        seasonStats: Array.from(sMap.values()),
-        achievements: achByProfile.get(r.id) || []
-      };
-
-      const res = calculateMarketValue(mvInput);
-      r.marketValue = res.totalValue;
-      totalTeamValue += res.totalValue;
-    });
-  }
-
-  const shortTag = `#${(team.ea_club_name || team.slug.substring(0,3)).toUpperCase()}`;
+  const shortTag = `#${(team.ea_club_name || team.slug.substring(0, 3)).toUpperCase()}`;
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 lg:px-6 py-12 md:py-16 page-enter">
