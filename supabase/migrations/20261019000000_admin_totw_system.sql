@@ -133,7 +133,7 @@ GRANT INSERT, UPDATE, DELETE ON TABLE public.totw_selections TO authenticated;
 
 -- 5. Atomic Submit & Lock RPC
 -- Runs in a single transaction: creates totw_weeks, inserts 11 totw_selections,
--- awards the selected trophy in trophy_winners (and records TOTW in player_achievements), and locks the week.
+-- awards the selected trophy in trophy_winners, and locks the week.
 -- If any step fails, the entire transaction rolls back cleanly.
 CREATE OR REPLACE FUNCTION public.submit_and_lock_totw(
     p_season_id UUID,
@@ -166,6 +166,9 @@ DECLARE
     v_score NUMERIC(6,2);
     v_note TEXT;
     v_count INTEGER := 0;
+    v_unique_players INTEGER;
+    v_unique_slot_keys INTEGER;
+    v_unique_slot_indices INTEGER;
 BEGIN
     -- 1. Admin authorization check
     IF v_actor IS NULL OR NOT EXISTS (
@@ -178,8 +181,8 @@ BEGIN
         RAISE EXCEPTION 'FORBIDDEN: Bu işlemi yalnızca yetkili adminler gerçekleştirebilir.' USING ERRCODE = '42501';
     END IF;
 
-    -- 2. Serialize concurrent submissions for the same league + week
-    PERFORM pg_advisory_xact_lock(hashtextextended('totw:' || COALESCE(p_league_id::text, '') || ':' || COALESCE(p_week_number::text, ''), 0));
+    -- 2. Serialize concurrent submissions for the same season + league + week
+    PERFORM pg_advisory_xact_lock(hashtextextended('totw:' || COALESCE(p_season_id::text, '') || ':' || COALESCE(p_league_id::text, '') || ':' || COALESCE(p_week_number::text, ''), 0));
 
     -- 3. Validate season & league relationship
     SELECT s.name, l.name INTO v_season_name, v_league_name
@@ -199,10 +202,13 @@ BEGIN
         RAISE EXCEPTION 'INVALID_FORMATION: Desteklenmeyen formasyon (%).', p_formation;
     END IF;
 
-    -- 4. Ensure week is not already submitted/locked
+    -- 4. Ensure week is not already locked (drafts will be cleaned up in step 7)
     IF EXISTS (
         SELECT 1 FROM public.totw_weeks
-        WHERE season_id = p_season_id AND league_id = p_league_id AND week_number = p_week_number
+        WHERE season_id = p_season_id
+          AND league_id = p_league_id
+          AND week_number = p_week_number
+          AND is_locked = true
     ) THEN
         RAISE EXCEPTION 'ALREADY_LOCKED: Bu sezon, lig ve hafta için TOTW zaten gönderilmiş ve kilitlenmiş.' USING ERRCODE = '23505';
     END IF;
@@ -229,7 +235,46 @@ BEGIN
         RAISE EXCEPTION 'INCOMPLETE_SQUAD: TOTW göndermek için 11 pozisyonun tamamı dolu olmalıdır.';
     END IF;
 
-    -- 7. Insert locked TOTW week header
+    -- Duplicate player, slot_key, or slot_index controls
+    SELECT
+        COUNT(DISTINCT (elem->>'player_id')::uuid),
+        COUNT(DISTINCT (elem->>'slot_key')),
+        COUNT(DISTINCT (elem->>'slot_index')::int)
+    INTO v_unique_players, v_unique_slot_keys, v_unique_slot_indices
+    FROM jsonb_array_elements(p_selections) elem;
+
+    IF v_unique_players <> 11 THEN
+        RAISE EXCEPTION 'DUPLICATE_PLAYER: Kadroda aynı oyuncu birden fazla pozisyona seçilemez.';
+    END IF;
+
+    IF v_unique_slot_keys <> 11 THEN
+        RAISE EXCEPTION 'DUPLICATE_SLOT_KEY: Kadroda aynı slot_key değeri birden fazla kez kullanılamaz.';
+    END IF;
+
+    IF v_unique_slot_indices <> 11 THEN
+        RAISE EXCEPTION 'DUPLICATE_SLOT_INDEX: Kadroda aynı slot_index değeri birden fazla kez kullanılamaz.';
+    END IF;
+
+    -- Ensure all 11 players exist in profiles
+    IF (
+        SELECT COUNT(*)
+        FROM public.profiles
+        WHERE id IN (
+            SELECT (elem->>'player_id')::uuid
+            FROM jsonb_array_elements(p_selections) elem
+        )
+    ) <> 11 THEN
+        RAISE EXCEPTION 'INVALID_PLAYER: Kadrodaki oyunculardan biri veya birkaçı sistemde kayıtlı geçerli bir oyuncu değil.';
+    END IF;
+
+    -- 7. Clean up any unlocked draft for this week
+    DELETE FROM public.totw_weeks
+    WHERE season_id = p_season_id
+      AND league_id = p_league_id
+      AND week_number = p_week_number
+      AND is_locked = false;
+
+    -- 8. Insert locked TOTW week header
     INSERT INTO public.totw_weeks (
         season_id, league_id, week_number, formation, trophy_id, is_locked, submitted_by, submitted_at
     ) VALUES (
@@ -270,14 +315,6 @@ BEGIN
         ) VALUES (
             p_trophy_id, 'PLAYER', v_player_id, NULL, v_totw_week_id, v_note, v_actor, now()
         );
-
-        -- Keep player_achievements TOTW badge in sync as well
-        INSERT INTO public.player_achievements (
-            player_id, achievement_type, season_id, season_name, week_number, awarded_by
-        ) VALUES (
-            v_player_id, 'TOTW', p_season_id, v_season_name, p_week_number, v_actor
-        )
-        ON CONFLICT (player_id, season_id, week_number) WHERE achievement_type = 'TOTW' DO NOTHING;
 
         v_count := v_count + 1;
     END LOOP;

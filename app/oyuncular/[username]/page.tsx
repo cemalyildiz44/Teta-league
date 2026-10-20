@@ -480,7 +480,12 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     });
   }
 
-  if (achievementCounts.TOTW > 0) {
+  if (
+    achievementCounts.TOTW > 0 &&
+    !Array.from(dynamicBadgeMap.values()).some((b) =>
+      /haftan[ıi]n\s+tak[ıi]m[ıi]|totw/i.test(b.label)
+    )
+  ) {
     earnedTrophies.push({
       id: 'legacy_totw',
       label: 'Haftanın Takımı',
