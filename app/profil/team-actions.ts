@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag, updateTag } from 'next/cache';
 
 export async function sendTeamInviteAction(playerId: string) {
   try {
@@ -103,6 +103,19 @@ export async function acceptTeamInviteAction(transferId: string) {
       return { error: 'Hesabınız askıya alındığı için transfer teklifini kabul edemezsiniz.' };
     }
 
+    // Fetch transfer team details and user username for targeted public cache invalidation
+    const { data: transfer } = await supabase
+      .from('transfers')
+      .select('to_team_id, from_team_id, to_team:to_team_id(slug), from_team:from_team_id(slug)')
+      .eq('id', transferId)
+      .maybeSingle();
+
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', user.id)
+      .maybeSingle();
+
     const { error: rpcError } = await supabase.rpc('accept_team_invite', {
       p_transfer_id: transferId
     });
@@ -112,8 +125,32 @@ export async function acceptTeamInviteAction(transferId: string) {
       return { error: 'Kabul işlemi başarısız: ' + rpcError.message };
     }
 
+    const toTeamSlug = (transfer?.to_team as any)?.slug;
+    const fromTeamSlug = (transfer?.from_team as any)?.slug;
+
     revalidatePath('/profil');
     revalidatePath('/bildirimler');
+    revalidatePath('/oyuncular');
+    revalidatePath('/takim/yonet');
+    if (userProfile?.username) {
+      revalidatePath('/oyuncular/' + encodeURIComponent(userProfile.username));
+    }
+
+    try {
+      revalidateTag('player-rankings', 'max');
+      updateTag('public-team-page');
+      if (toTeamSlug) {
+        revalidatePath('/takim/' + toTeamSlug);
+        updateTag('team-' + toTeamSlug);
+      }
+      if (fromTeamSlug) {
+        revalidatePath('/takim/' + fromTeamSlug);
+        updateTag('team-' + fromTeamSlug);
+      }
+    } catch (invalidationErr) {
+      console.error('Cache invalidation error in acceptTeamInviteAction:', invalidationErr);
+    }
+
     return { success: 'Daveti kabul ettiniz ve takıma katıldınız.' };
   } catch (error: any) {
     console.error('acceptTeamInviteAction unexpected error:', error);

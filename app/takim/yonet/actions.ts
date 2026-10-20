@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag, updateTag } from 'next/cache';
 import { isValidHttpUrl } from '@/app/utils/urlValidator';
 
 export async function invitePlayer(formData: FormData) {
@@ -97,6 +97,15 @@ export async function kickPlayerAction(formData: FormData) {
 
   if (!playerId || !seasonId) return { error: 'Missing required fields' };
 
+  // Fetch team slug and player username before kicking to revalidate public caches
+  const { data: membership } = await supabase
+    .from('team_memberships')
+    .select('team_id, teams:team_id(slug), profiles:player_id(username)')
+    .eq('player_id', playerId)
+    .eq('season_id', seasonId)
+    .is('left_at', null)
+    .maybeSingle();
+
   // Call the new RPC kick_player
   const { error } = await supabase.rpc('kick_player', {
     p_player_id: playerId,
@@ -107,7 +116,27 @@ export async function kickPlayerAction(formData: FormData) {
     return { error: error.message };
   }
 
+  const teamSlug = (membership?.teams as any)?.slug;
+  const playerUsername = (membership?.profiles as any)?.username;
+
   revalidatePath('/takim/yonet');
+  revalidatePath('/oyuncular');
+  if (playerUsername) {
+    revalidatePath('/oyuncular/' + encodeURIComponent(playerUsername));
+    revalidatePath('/profil');
+  }
+
+  try {
+    revalidateTag('player-rankings', 'max');
+    updateTag('public-team-page');
+    if (teamSlug) {
+      revalidatePath('/takim/' + teamSlug);
+      updateTag('team-' + teamSlug);
+    }
+  } catch (invalidationErr) {
+    console.error('Cache invalidation error in kickPlayerAction:', invalidationErr);
+  }
+
   return { success: true };
 }
 

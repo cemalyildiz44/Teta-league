@@ -2,10 +2,11 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { slugify } from '@/app/lig/utils';
 import { getScopeNames } from '@/lib/admin-scope';
 import { logAdminAudit } from '@/lib/audit';
+import { revalidateMatchDependencies } from '@/app/admin/matches/actions';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -494,19 +495,15 @@ export async function updateFixtureScoreAction(
       actor_id: user.id
     });
 
-    // If match was APPROVED, trigger recalculation will run automatically in Postgres
+    // If match was APPROVED, trigger full revalidation of match, standings, team pages, rankings, and player profiles
     if (existingMatch.status === 'APPROVED') {
-      revalidatePath('/');
-      revalidatePath('/ligler');
-      revalidatePath('/oyuncular');
-      revalidatePath(`/mac/${existingMatch.id}`);
-      const { seasonSlug, leagueName } = await getScopeNames(supabase, fixture);
-      if (seasonSlug && leagueName) {
-        const leagueSlug = slugify(leagueName);
-        revalidatePath(`/lig/${seasonSlug}/${leagueSlug}`);
-        revalidatePath(`/lig/${seasonSlug}/${leagueSlug}/istatistikler`);
-        revalidatePath(`/lig/${seasonSlug}/${leagueSlug}/fikstur`);
-      }
+      await revalidateMatchDependencies(supabase, existingMatch.id, {
+        ...existingMatch,
+        season_id: fixture.season_id,
+        league_id: fixture.league_id,
+        home_team_id: fixture.home_team_id,
+        away_team_id: fixture.away_team_id
+      });
     }
   } else {
     // Create new match in PENDING_REVIEW status (does not auto-approve!)

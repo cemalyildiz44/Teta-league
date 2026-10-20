@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { revalidatePath, revalidateTag, updateTag } from 'next/cache';
 import { logAdminAudit } from '@/lib/audit';
 
 async function checkAdmin(supabase: any, user: any) {
@@ -113,7 +113,10 @@ export async function createTeam(formData: FormData) {
 
   revalidatePath('/admin/teams');
   revalidatePath('/takimlar');
-  revalidatePath('/', 'layout');
+  revalidatePath('/');
+  try {
+    revalidateTag('public-team-page', 'max');
+  } catch {}
   return { success: 'Takım başarıyla oluşturuldu.' };
 }
 
@@ -259,7 +262,7 @@ export async function editTeam(formData: FormData) {
     revalidateTag('public-team-page', 'max');
     revalidateTag(`team-${slug}`, 'max');
   } catch {}
-  revalidatePath('/', 'layout');
+  revalidatePath('/');
   return { success: 'Takım başarıyla güncellendi.' };
 }
 
@@ -376,7 +379,7 @@ export async function addPlayerToTeam(team_id: string, player_id: string, league
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
   const { data: { user } } = await supabase.auth.getUser();
-  if (!(await checkAdmin(supabase, user))) return { error: 'Yetkisiz erişim.' };
+  if (!user || !(await checkAdmin(supabase, user))) return { error: 'Yetkisiz erişim.' };
 
   if (!team_id || !player_id || !league_id || !season_id) return { error: 'Eksik bilgi (Oyuncu, Lig, Sezon).' };
 
@@ -392,23 +395,46 @@ export async function addPlayerToTeam(team_id: string, player_id: string, league
 
   const { data: team } = await supabase
     .from('teams')
-    .select('slug')
+    .select('slug, name')
     .eq('id', team_id)
     .maybeSingle();
+
+  const { data: playerProf } = await supabase
+    .from('profiles')
+    .select('username')
+    .eq('id', player_id)
+    .maybeSingle();
+
+  await logAdminAudit({
+    action: 'ADD_PLAYER_TO_TEAM',
+    entity_type: 'team_memberships',
+    entity_id: `${team_id}_${player_id}`,
+    entity_label: `${playerProf?.username ? '@' + playerProf.username : 'Oyuncu'} -> ${team?.name || 'Takım'}`,
+    new_data: { team_id, player_id, league_id, season_id, team_name: team?.name, username: playerProf?.username },
+    description: `@${playerProf?.username || player_id} adlı oyuncu "${team?.name || team_id}" takımına eklendi.`,
+    actor_id: user.id
+  });
 
   revalidatePath('/admin/teams');
   revalidatePath('/oyuncular');
   revalidatePath('/');
+  if (playerProf?.username) {
+    revalidatePath(`/oyuncular/${encodeURIComponent(playerProf.username)}`);
+  }
   if (team?.slug) {
     revalidatePath(`/takim/${team.slug}`);
     try {
-      revalidateTag(`team-${team.slug}`, 'max');
-    } catch {}
+      updateTag(`team-${team.slug}`);
+    } catch (invalidationErr) {
+      console.error('Cache invalidation error in addPlayerToTeam (team tag):', invalidationErr);
+    }
   }
   try {
+    updateTag('public-team-page');
     revalidateTag('player-rankings', 'max');
-    revalidateTag('public-team-page', 'max');
-  } catch {}
+  } catch (invalidationErr) {
+    console.error('Cache invalidation error in addPlayerToTeam:', invalidationErr);
+  }
   return { success: 'Oyuncu başarıyla takıma eklendi.' };
 }
 
@@ -416,24 +442,18 @@ export async function removePlayerFromTeam(membership_id: string) {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
   const { data: { user } } = await supabase.auth.getUser();
-  if (!(await checkAdmin(supabase, user))) return { error: 'Yetkisiz erişim.' };
+  if (!user || !(await checkAdmin(supabase, user))) return { error: 'Yetkisiz erişim.' };
 
-  // Fetch membership to retrieve team_id for targeted cache invalidation
+  // Fetch membership to retrieve team_id, team details and player username
   const { data: mem } = await supabase
     .from('team_memberships')
-    .select('team_id')
+    .select('team_id, player_id, teams:team_id(name, slug), profiles:player_id(username)')
     .eq('id', membership_id)
     .maybeSingle();
 
-  let teamSlug: string | null = null;
-  if (mem?.team_id) {
-    const { data: team } = await supabase
-      .from('teams')
-      .select('slug')
-      .eq('id', mem.team_id)
-      .maybeSingle();
-    teamSlug = team?.slug || null;
-  }
+  let teamSlug: string | null = (mem?.teams as any)?.slug || null;
+  let teamName: string = (mem?.teams as any)?.name || 'Takım';
+  let playerUsername: string | null = (mem?.profiles as any)?.username || null;
 
   // Update left_at instead of deleting to preserve historical records
   const { error } = await supabase.from('team_memberships')
@@ -442,19 +462,36 @@ export async function removePlayerFromTeam(membership_id: string) {
 
   if (error) return { error: 'Oyuncu çıkarılamadı: ' + error.message };
 
+  await logAdminAudit({
+    action: 'REMOVE_PLAYER_FROM_TEAM',
+    entity_type: 'team_memberships',
+    entity_id: membership_id,
+    entity_label: `${playerUsername ? '@' + playerUsername : 'Oyuncu'} - ${teamName}`,
+    old_data: { membership_id, team_id: mem?.team_id, player_id: mem?.player_id, team_name: teamName, username: playerUsername },
+    description: `@${playerUsername || 'Oyuncu'} adlı oyuncu "${teamName}" takımından çıkarıldı.`,
+    actor_id: user.id
+  });
+
   revalidatePath('/admin/teams');
   revalidatePath('/oyuncular');
   revalidatePath('/');
+  if (playerUsername) {
+    revalidatePath(`/oyuncular/${encodeURIComponent(playerUsername)}`);
+  }
   if (teamSlug) {
     revalidatePath(`/takim/${teamSlug}`);
     try {
-      revalidateTag(`team-${teamSlug}`, 'max');
-    } catch {}
+      updateTag(`team-${teamSlug}`);
+    } catch (invalidationErr) {
+      console.error('Cache invalidation error in removePlayerFromTeam (team tag):', invalidationErr);
+    }
   }
   try {
+    updateTag('public-team-page');
     revalidateTag('player-rankings', 'max');
-    revalidateTag('public-team-page', 'max');
-  } catch {}
+  } catch (invalidationErr) {
+    console.error('Cache invalidation error in removePlayerFromTeam:', invalidationErr);
+  }
   return { success: 'Oyuncu başarıyla takımdan çıkarıldı.' };
 }
 
@@ -538,7 +575,11 @@ export async function uploadTeamLogoAction(formData: FormData) {
       revalidateTag('public-team-page', 'max');
     } catch {}
   }
-  revalidatePath('/', 'layout');
+  revalidatePath('/');
+  revalidatePath('/oyuncular');
+  try {
+    revalidateTag('player-rankings', 'max');
+  } catch {}
   return { success: 'Logo başarıyla güncellendi.' };
 }
 
@@ -688,7 +729,7 @@ export async function deleteTeamAction(teamId: string) {
     revalidateTag('public-team-page', 'max');
     revalidateTag('player-rankings', 'max');
   } catch {}
-  revalidatePath('/', 'layout');
+  revalidatePath('/');
 
   for (const uname of affectedUsernames) {
     revalidatePath(`/oyuncular/${uname}`);
@@ -773,7 +814,11 @@ export async function forceDeleteTestTeamAction(teamId: string) {
   revalidatePath('/takimlar');
   revalidatePath('/oyuncular');
   revalidatePath('/profil');
-  revalidatePath('/', 'layout');
+  revalidatePath('/');
+  try {
+    revalidateTag('public-team-page', 'max');
+    revalidateTag('player-rankings', 'max');
+  } catch {}
 
   for (const uname of affectedUsernames) {
     revalidatePath(`/oyuncular/${uname}`);

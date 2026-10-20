@@ -48,7 +48,7 @@ export default async function AdminAuditLogsPage({ searchParams }: PageProps) {
 
   // 2. Ana sorguyu oluştur
   // Kolon varlık toleransı için sorgu yapısı
-  const buildQuery = (selectCols: string) => {
+  const buildQuery = (selectCols: string, hasEntityLabelCol: boolean = true) => {
     let q = supabase
       .from('audit_logs')
       .select(selectCols, { count: 'exact' })
@@ -82,7 +82,11 @@ export default async function AdminAuditLogsPage({ searchParams }: PageProps) {
     }
 
     if (searchQuery) {
-      q = q.or(`description.ilike.%${searchQuery}%,action.ilike.%${searchQuery}%,entity_type.ilike.%${searchQuery}%,entity_label.ilike.%${searchQuery}%`);
+      if (hasEntityLabelCol) {
+        q = q.or(`description.ilike.%${searchQuery}%,action.ilike.%${searchQuery}%,entity_type.ilike.%${searchQuery}%,entity_label.ilike.%${searchQuery}%`);
+      } else {
+        q = q.or(`description.ilike.%${searchQuery}%,action.ilike.%${searchQuery}%,entity_type.ilike.%${searchQuery}%`);
+      }
     }
 
     return q;
@@ -112,35 +116,46 @@ export default async function AdminAuditLogsPage({ searchParams }: PageProps) {
   let logsData: any[] = [];
   let totalCount = 0;
 
-  const { data: primaryResult, count: primaryCount, error: primaryErr } = await buildQuery(primaryCols);
+  const { data: primaryResult, count: primaryCount, error: primaryErr } = await buildQuery(primaryCols, true);
 
   if (primaryErr) {
-    // Migration henüz prod veritabanına uygulanmamışsa tolerans göster ve temel kolonlarla tekrar dene
-    const fallbackCols = `
-      id,
-      actor_id,
-      action,
-      entity_type,
-      entity_id,
-      description,
-      old_data,
-      new_data,
-      ip_address,
-      created_at,
-      profiles:actor_id (
-        username,
-        full_name,
-        avatar_url
-      )
-    `;
+    const errorMsg = primaryErr.message?.toLowerCase() || '';
+    const isColumnMissing =
+      errorMsg.includes('entity_label') ||
+      errorMsg.includes('user_agent') ||
+      primaryErr.code === 'PGRST204' ||
+      primaryErr.code === '42703';
 
-    const { data: fallbackResult, count: fallbackCount, error: fallbackErr } = await buildQuery(fallbackCols);
+    if (isColumnMissing) {
+      // Migration henüz prod veritabanına uygulanmamışsa tolerans göster ve temel kolonlarla tekrar dene
+      const fallbackCols = `
+        id,
+        actor_id,
+        action,
+        entity_type,
+        entity_id,
+        description,
+        old_data,
+        new_data,
+        ip_address,
+        created_at,
+        profiles:actor_id (
+          username,
+          full_name,
+          avatar_url
+        )
+      `;
 
-    if (fallbackErr) {
-      console.error('[AUDIT_LOG_QUERY_ERROR] Both primary and fallback queries failed:', fallbackErr);
+      const { data: fallbackResult, count: fallbackCount, error: fallbackErr } = await buildQuery(fallbackCols, false);
+
+      if (fallbackErr) {
+        console.error('[AUDIT_LOG_QUERY_ERROR] Both primary and fallback queries failed:', fallbackErr);
+      } else {
+        logsData = fallbackResult || [];
+        totalCount = fallbackCount || 0;
+      }
     } else {
-      logsData = fallbackResult || [];
-      totalCount = fallbackCount || 0;
+      console.error('[AUDIT_LOG_QUERY_ERROR] Primary audit log query failed:', primaryErr);
     }
   } else {
     logsData = primaryResult || [];

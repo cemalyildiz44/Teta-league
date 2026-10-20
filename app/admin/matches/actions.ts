@@ -70,7 +70,7 @@ export async function reviewMatchAction(matchId: string, status: 'APPROVED' | 'R
   return { success: 'Maç durumu güncellendi.' };
 }
 
-export async function revalidateMatchDependencies(supabase: any, matchId: string, matchData?: any) {
+export async function revalidateMatchDependencies(supabase: any, matchId: string, matchData?: any, extraPlayerUsernames?: string[]) {
   revalidatePath('/admin/matches');
   revalidatePath('/admin/players');
   revalidatePath('/');
@@ -135,6 +135,14 @@ export async function revalidateMatchDependencies(supabase: any, matchId: string
       }
     }
   }
+
+  if (extraPlayerUsernames && extraPlayerUsernames.length > 0) {
+    for (const uname of extraPlayerUsernames) {
+      if (uname) {
+        revalidatePath(`/oyuncular/${encodeURIComponent(uname)}`);
+      }
+    }
+  }
 }
 
 export async function deleteMatchAction(matchId: string) {
@@ -156,6 +164,25 @@ export async function deleteMatchAction(matchId: string) {
 
   if (!existingMatch) return { error: 'Maç bulunamadı.' };
 
+  // Collect player usernames before deleting stats to ensure profile pages can be revalidated
+  let preDeletePlayerUsernames: string[] = [];
+  if (existingMatch.status === 'APPROVED') {
+    const { data: matchPlayerRows } = await supabase
+      .from('match_player_stats')
+      .select('profiles!match_player_stats_player_id_fkey(username)')
+      .eq('match_id', matchId)
+      .not('player_id', 'is', null);
+
+    if (matchPlayerRows) {
+      for (const row of matchPlayerRows) {
+        const prof = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+        if (prof?.username) {
+          preDeletePlayerUsernames.push(prof.username);
+        }
+      }
+    }
+  }
+
   // First delete player stats if any exist to respect FK (no cascade)
   const { error: statsError } = await supabase.from('match_player_stats').delete().eq('match_id', matchId);
   if (statsError) return { error: 'İlişkili oyuncu istatistikleri silinemedi: ' + statsError.message };
@@ -174,7 +201,7 @@ export async function deleteMatchAction(matchId: string) {
   });
 
   if (existingMatch.status === 'APPROVED') {
-    await revalidateMatchDependencies(supabase, matchId, existingMatch);
+    await revalidateMatchDependencies(supabase, matchId, existingMatch, preDeletePlayerUsernames);
   } else {
     revalidatePath('/admin/matches');
   }
@@ -394,6 +421,20 @@ export async function assignPlayerStatsProfileAction(
 
   // 5. Invalidate caches
   revalidatePath('/admin/matches');
+  if (profile?.username) {
+    revalidatePath(`/oyuncular/${encodeURIComponent(profile.username)}`);
+  }
+  if (oldPlayerId && oldPlayerId !== playerId) {
+    const { data: oldProf } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', oldPlayerId)
+      .maybeSingle();
+    if (oldProf?.username) {
+      revalidatePath(`/oyuncular/${encodeURIComponent(oldProf.username)}`);
+    }
+  }
+
   if ((stat.matches as any)?.status === 'APPROVED') {
     revalidatePath(`/mac/${matchId}`);
     revalidatePath('/istatistikler');

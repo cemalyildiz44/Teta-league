@@ -4,7 +4,6 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { PlayerStatsForm } from './PlayerStatsForm';
 import { MatchEditForm } from './MatchEditForm';
-import { MatchAuditHistory } from './MatchAuditHistory';
 import { getCachedUser } from '@/lib/fetchers';
 
 export default async function MatchDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -61,18 +60,6 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
     .eq('match_id', matchId)
     .eq('team_id', teamId);
 
-  // Fetch audit logs for this match
-  const { data: rawAuditLogs } = await supabase
-    .from('audit_logs')
-    .select('id, actor_id, action, entity_type, entity_id, old_data, new_data, created_at, profiles:actor_id(username, avatar_url)')
-    .eq('entity_type', 'matches')
-    .eq('entity_id', matchId)
-    .order('created_at', { ascending: false });
-
-  const auditLogs = (rawAuditLogs || []).map((log: any) => ({
-    ...log,
-    actor: Array.isArray(log.profiles) ? log.profiles[0] : log.profiles
-  }));
 
   return (
     <main className="min-h-screen bg-[#060d18] pt-24 pb-12">
@@ -158,8 +145,6 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
           </div>
         )}
 
-        {/* 6C: Match Audit History */}
-        <MatchAuditHistory logs={auditLogs} />
 
         {/* Player Stats Form */}
         {match.status === 'PENDING_REVIEW' ? (

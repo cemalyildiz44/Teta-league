@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { logAdminAudit } from '@/lib/audit';
 import {
   foldCase,
@@ -765,6 +765,11 @@ export async function updatePlayerAccountAdminAction(formData: FormData) {
     if (targetProfile.username && targetProfile.username !== rawUsername) {
       revalidatePath(`/oyuncular/${encodeURIComponent(targetProfile.username)}`);
     }
+
+    try {
+      revalidateTag('player-rankings', 'max');
+      revalidateTag('public-statistics', 'max');
+    } catch {}
 
     return {
       success: 'Oyuncu hesap bilgileri başarıyla güncellendi.',

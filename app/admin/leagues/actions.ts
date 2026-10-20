@@ -3,7 +3,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { logAdminAudit } from '@/lib/audit';
 
 async function checkAdmin(supabase: any, user: any) {
@@ -97,7 +97,7 @@ export async function createLeague(formData: FormData) {
 
   revalidatePath('/admin/leagues');
   revalidatePath('/ligler');
-  revalidatePath('/', 'layout');
+  revalidatePath('/');
   return { success: 'Lig başarıyla oluşturuldu.' };
 }
 
@@ -202,7 +202,7 @@ export async function editLeague(formData: FormData) {
 
   revalidatePath('/admin/leagues');
   revalidatePath('/ligler');
-  revalidatePath('/', 'layout');
+  revalidatePath('/');
   return { success: 'Lig başarıyla güncellendi.' };
 }
 
@@ -283,7 +283,17 @@ export async function assignTeamToLeague(league_id: string, season_id: string, t
     revalidatePath('/admin/teams');
     revalidatePath('/admin/fixtures');
     revalidatePath('/ligler');
-    revalidatePath('/', 'layout');
+    revalidatePath('/');
+    const { data: teamRow } = await supabase.from('teams').select('slug').eq('id', team_id).maybeSingle();
+    if (teamRow?.slug) {
+      revalidatePath(`/takim/${teamRow.slug}`);
+      try {
+        revalidateTag(`team-${teamRow.slug}`, 'max');
+      } catch {}
+    }
+    try {
+      revalidateTag('public-team-page', 'max');
+    } catch {}
     return { success: 'Takım lige başarıyla eklendi.' };
   }
 
@@ -314,7 +324,17 @@ export async function assignTeamToLeague(league_id: string, season_id: string, t
   revalidatePath('/admin/teams');
   revalidatePath('/admin/fixtures');
   revalidatePath('/ligler');
-  revalidatePath('/', 'layout');
+  revalidatePath('/');
+  const { data: teamRow2 } = await supabase.from('teams').select('slug').eq('id', team_id).maybeSingle();
+  if (teamRow2?.slug) {
+    revalidatePath(`/takim/${teamRow2.slug}`);
+    try {
+      revalidateTag(`team-${teamRow2.slug}`, 'max');
+    } catch {}
+  }
+  try {
+    revalidateTag('public-team-page', 'max');
+  } catch {}
   return { success: 'Takım lige başarıyla eklendi.' };
 }
 
@@ -392,7 +412,17 @@ export async function removeTeamFromLeague(league_id: string, team_id: string) {
   revalidatePath('/admin/teams');
   revalidatePath('/admin/fixtures');
   revalidatePath('/ligler');
-  revalidatePath('/', 'layout');
+  revalidatePath('/');
+  const { data: teamRowDel } = await supabase.from('teams').select('slug').eq('id', team_id).maybeSingle();
+  if (teamRowDel?.slug) {
+    revalidatePath(`/takim/${teamRowDel.slug}`);
+    try {
+      revalidateTag(`team-${teamRowDel.slug}`, 'max');
+    } catch {}
+  }
+  try {
+    revalidateTag('public-team-page', 'max');
+  } catch {}
   return { success: 'Takım ligden başarıyla çıkarıldı.' };
 }
 
@@ -419,7 +449,7 @@ export async function saveLeagueRulesAction(league_id: string, rules: any) {
   revalidatePath('/admin/leagues');
   revalidatePath('/ligler');
   revalidatePath('/lig', 'layout');
-  revalidatePath('/', 'layout');
+  revalidatePath('/');
   return { success: 'Lig kuralları başarıyla güncellendi.' };
 }
 
