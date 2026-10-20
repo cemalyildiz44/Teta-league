@@ -438,7 +438,7 @@ export async function adminAddPlayerToNightCupSquadAction(application_id: string
   // 1. Verify player profile exists
   const { data: playerProfile, error: profileErr } = await supabase
     .from('profiles')
-    .select('id, username')
+    .select('id, username, status, is_active')
     .eq('id', profile_id)
     .maybeSingle();
 
@@ -446,14 +446,25 @@ export async function adminAddPlayerToNightCupSquadAction(application_id: string
     return { error: 'Seçilen oyuncu profili bulunamadı.' };
   }
 
+  if (playerProfile.status === 'BANNED') {
+    return { error: 'Bu oyuncu sistemden yasaklı olduğu için kadroya eklenemez.' };
+  }
+  if (playerProfile.status === 'SUSPENDED' || playerProfile.is_active === false) {
+    return { error: 'Bu oyuncunun hesabı askıya alınmıştır.' };
+  }
+
   // 2. Verify application exists
   const { data: appData, error: appErr } = await supabase
     .from('tournament_applications')
-    .select('id, team_name, tournament_id')
+    .select('id, team_name, tournament_id, applicant_id')
     .eq('id', application_id)
     .maybeSingle();
 
   if (appErr || !appData) return { error: 'Başvuru bulunamadı.' };
+
+  if (appData.applicant_id === profile_id) {
+    return { error: 'Takım kaptanı zaten takım temsilcisidir, kadroya ayrıca eklenemez.' };
+  }
 
   // 3. Check duplicate player in squad
   const { data: existingPlayer } = await supabase
@@ -465,6 +476,16 @@ export async function adminAddPlayerToNightCupSquadAction(application_id: string
 
   if (existingPlayer) {
     return { error: 'Bu oyuncu zaten bu takımın turnuva kadrosunda yer alıyor.' };
+  }
+
+  // 3.1 Check maximum squad size (20 players)
+  const { count: squadCount } = await supabase
+    .from('tournament_application_players')
+    .select('id', { count: 'exact', head: true })
+    .eq('application_id', application_id);
+
+  if (squadCount !== null && squadCount >= 20) {
+    return { error: 'Bu takımın kadrosu maksimum kapasiteye (20 oyuncu) ulaşmıştır.' };
   }
 
   const { error: insertError } = await supabase
@@ -1929,4 +1950,41 @@ export async function updateTournamentStatusAction(formData: FormData) {
   revalidatePath(`/turnuvalar/${tournament_id}`);
 
   return { success: `Turnuva durumu "${status}" olarak güncellendi.` };
+}
+
+export async function adminSearchTournamentPlayersAction(query: string) {
+  try {
+    const cookieStore = await cookies();
+    const supabase = createClient(cookieStore);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !(await checkAdmin(supabase, user))) {
+      return { error: 'Yetkisiz erişim.', players: [] };
+    }
+
+    const trimmed = (query || '').trim();
+    if (!trimmed) {
+      return { players: [] };
+    }
+
+    const cleanQ = trimmed.replace(/[%_]/g, '');
+    if (!cleanQ) {
+      return { players: [] };
+    }
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, username, full_name, avatar_url, status, is_active')
+      .or(`username.ilike.%${cleanQ}%,full_name.ilike.%${cleanQ}%`)
+      .order('username', { ascending: true })
+      .limit(50);
+
+    if (error) {
+      console.error('[adminSearchTournamentPlayersAction] Error:', error.message);
+      return { error: 'Oyuncu araması sırasında hata oluştu.', players: [] };
+    }
+
+    return { players: data || [] };
+  } catch (err: any) {
+    return { error: err.message, players: [] };
+  }
 }

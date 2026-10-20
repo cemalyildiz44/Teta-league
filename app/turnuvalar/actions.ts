@@ -506,6 +506,11 @@ export async function captainAddPlayerToSquadAction(application_id: string, prof
     return { error: 'Bu takımın kadrosunu düzenleme yetkiniz yok.' };
   }
 
+  // 2.1 Prevent captain from adding themselves as a regular squad player
+  if (app.applicant_id === profile_id) {
+    return { error: 'Takım kaptanı zaten takım temsilcisidir, kadroya ayrıca eklenemez.' };
+  }
+
   if (app.status === 'CANCELLED' || app.status === 'REJECTED') {
     return { error: 'İptal edilmiş veya reddedilmiş başvuruların kadrosu düzenlenemez.' };
   }
@@ -553,6 +558,16 @@ export async function captainAddPlayerToSquadAction(application_id: string, prof
 
   if (existing) {
     return { error: 'Bu oyuncu zaten kadroda yer alıyor.' };
+  }
+
+  // 5.1 Check maximum squad size (20 players)
+  const { count: squadCount } = await supabase
+    .from('tournament_application_players')
+    .select('id', { count: 'exact', head: true })
+    .eq('application_id', application_id);
+
+  if (squadCount !== null && squadCount >= 20) {
+    return { error: 'Kadroya en fazla 20 oyuncu ekleyebilirsiniz.' };
   }
 
   // 6. Insert player into tournament_application_players only
@@ -656,3 +671,38 @@ export async function captainRemovePlayerFromSquadAction(application_id: string,
   return { success: 'Oyuncu kadrodan çıkarıldı.' };
 }
 
+export async function searchEligibleTournamentPlayersAction(query: string) {
+  try {
+    const trimmed = (query || '').trim();
+    if (!trimmed) {
+      return { players: [] };
+    }
+    const cookieStore = await cookies();
+    const supabase = createClient(cookieStore);
+
+    // Sanitize query for ilike to prevent pattern syntax injection
+    const cleanQ = trimmed.replace(/[%_]/g, '');
+    if (!cleanQ) {
+      return { players: [] };
+    }
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, username, full_name, avatar_url, status, is_active')
+      .or(`username.ilike.%${cleanQ}%,full_name.ilike.%${cleanQ}%`)
+      .neq('status', 'BANNED')
+      .neq('status', 'SUSPENDED')
+      .neq('is_active', false)
+      .order('username', { ascending: true })
+      .limit(50);
+
+    if (error) {
+      console.error('[searchEligibleTournamentPlayersAction] Error:', error.message);
+      return { error: 'Oyuncu araması sırasında hata oluştu.', players: [] };
+    }
+
+    return { players: data || [] };
+  } catch (err: any) {
+    return { error: err.message, players: [] };
+  }
+}

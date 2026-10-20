@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -33,6 +33,7 @@ import {
   cancelMyApplicationAction,
   captainAddPlayerToSquadAction,
   captainRemovePlayerFromSquadAction,
+  searchEligibleTournamentPlayersAction,
 } from '../actions';
 import TeamLogo from '@/components/TeamLogo';
 import TournamentScoreReportModal from './TournamentScoreReportModal';
@@ -84,10 +85,41 @@ export default function TournamentDetailClient({
   const [captainActionLoading, setCaptainActionLoading] = useState(false);
   const [captainFeedback, setCaptainFeedback] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
+  const [serverSearchProfiles, setServerSearchProfiles] = useState<any[]>([]);
+  const [isSearchingServer, setIsSearchingServer] = useState(false);
+
+  useEffect(() => {
+    const q = (searchTerm || captainSearch || '').trim();
+    if (!q || q.length < 2) {
+      setServerSearchProfiles([]);
+      setIsSearchingServer(false);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearchingServer(true);
+      try {
+        const res = await searchEligibleTournamentPlayersAction(q);
+        if (res?.players) {
+          setServerSearchProfiles(res.players);
+        }
+      } catch (err) {
+        console.error('Server search error:', err);
+      } finally {
+        setIsSearchingServer(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm, captainSearch]);
+
   const showFeedback = (msg: string, type: 'success' | 'error') => {
     setFeedback({ msg, type });
     setTimeout(() => setFeedback(null), 5000);
   };
+
+  const mergedProfilesMap = new Map();
+  profiles.forEach((p: any) => mergedProfilesMap.set(p.id, p));
+  serverSearchProfiles.forEach((p: any) => mergedProfilesMap.set(p.id, p));
+  const allKnownProfiles = Array.from(mergedProfilesMap.values());
 
   const handleCaptainAddPlayer = async (profileId: string) => {
     if (!captainEditApp) return;
@@ -99,7 +131,7 @@ export default function TournamentDetailClient({
         setCaptainFeedback({ msg: res.error, type: 'error' });
       } else {
         setCaptainFeedback({ msg: res.success || 'Oyuncu kadroya eklendi.', type: 'success' });
-        const targetProf = profiles.find((p) => p.id === profileId);
+        const targetProf = allKnownProfiles.find((p) => p.id === profileId);
         const newPlayer = {
           id: 'temp-' + Date.now(),
           profile_id: profileId,
@@ -256,9 +288,23 @@ export default function TournamentDetailClient({
     }
   };
 
-  const searchProfiles = profiles
-    .filter((p) => p.username.toLowerCase().includes(searchTerm.toLowerCase()))
-    .slice(0, 25);
+  const searchProfiles = allKnownProfiles
+    .filter((p: any) => {
+      if (currentUser && p.id === currentUser.id) return false;
+      if (p.status === 'BANNED' || p.status === 'SUSPENDED' || p.is_active === false) return false;
+      if (!searchTerm.trim()) return true;
+      const q = searchTerm.toLowerCase().trim();
+      const un = (p.username || '').toLowerCase();
+      const fn = (p.full_name || '').toLowerCase();
+      return un.includes(q) || fn.includes(q);
+    })
+    .sort((a: any, b: any) => {
+      const aSel = selectedSquad.includes(a.id) ? 1 : 0;
+      const bSel = selectedSquad.includes(b.id) ? 1 : 0;
+      if (aSel !== bSel) return bSel - aSel;
+      return (a.username || '').localeCompare(b.username || '');
+    })
+    .slice(0, 50);
 
   const bannerImg = tournament.banner_url || tournament.image_url;
 
@@ -1640,14 +1686,33 @@ export default function TournamentDetailClient({
                             }`}
                           >
                             {p.avatar_url ? (
-                              <img src={p.avatar_url} className="w-5 h-5 rounded-full object-cover shrink-0" />
+                              <img src={p.avatar_url} className="w-6 h-6 rounded-full object-cover shrink-0" />
                             ) : (
-                              <User className="w-5 h-5 p-1 bg-black/50 rounded-full shrink-0" />
+                              <User className="w-6 h-6 p-1 bg-black/50 rounded-full shrink-0" />
                             )}
-                            <span className="truncate">@{p.username}</span>
+                            <div className="flex flex-col min-w-0">
+                              <span className="truncate leading-tight">@{p.username}</span>
+                              {p.full_name && (
+                                <span className="text-[10px] text-zinc-500 font-normal truncate leading-tight">
+                                  {p.full_name}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
+                      {searchProfiles.length === 0 && (
+                        <div className="col-span-2 py-8 text-center text-xs text-zinc-500">
+                          {isSearchingServer ? (
+                            <span className="flex items-center justify-center gap-1.5 text-zinc-400">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#00e5ff]" />
+                              Oyuncular aranıyor...
+                            </span>
+                          ) : (
+                            'Aramanıza uygun oyuncu bulunamadı.'
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1922,89 +1987,107 @@ export default function TournamentDetailClient({
                   </div>
 
                   {/* Filtered Profile List */}
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                    {profiles
-                      .filter((prof: any) => {
-                        if (prof.id === captainEditApp.applicant_id) return false;
-                        if (prof.status === 'BANNED' || prof.status === 'SUSPENDED' || prof.is_active === false) return false;
-                        const alreadyInSquad = (captainEditApp.players || []).some(
-                          (p: any) => p.profile_id === prof.id
-                        );
-                        if (alreadyInSquad) return false;
-                        if (!captainSearch.trim()) return false;
-                        const q = captainSearch.toLowerCase();
-                        const un = (prof.username || '').toLowerCase();
-                        const fn = (prof.full_name || '').toLowerCase();
-                        return un.includes(q) || fn.includes(q);
-                      })
-                      .slice(0, 6)
-                      .map((prof: any) => (
-                        <div
-                          key={prof.id}
-                          className="p-2.5 rounded-xl bg-black/40 border border-white/5 hover:border-cyan-500/20 flex items-center justify-between transition-colors"
-                        >
-                          <div className="flex items-center gap-2.5">
-                            {prof.avatar_url ? (
-                              <img
-                                src={prof.avatar_url}
-                                className="w-7 h-7 rounded-full object-cover border border-white/10"
-                              />
-                            ) : (
-                              <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-zinc-400">
-                                <User className="w-3.5 h-3.5" />
-                              </div>
-                            )}
-                            <div>
-                              <span className="text-xs font-bold text-white block">
-                                @{prof.username}
-                              </span>
-                              {prof.full_name && (
-                                <span className="text-[10px] text-zinc-400 block">
-                                  {prof.full_name}
-                                </span>
-                              )}
-                            </div>
-                          </div>
+                  <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                    {captainSearch.trim().length > 0 &&
+                      allKnownProfiles
+                        .filter((prof: any) => {
+                          if (prof.status === 'BANNED' || prof.status === 'SUSPENDED' || prof.is_active === false) return false;
+                          const q = captainSearch.toLowerCase().trim();
+                          const un = (prof.username || '').toLowerCase();
+                          const fn = (prof.full_name || '').toLowerCase();
+                          return un.includes(q) || fn.includes(q);
+                        })
+                        .slice(0, 10)
+                        .map((prof: any) => {
+                          const isCaptain = prof.id === captainEditApp.applicant_id;
+                          const alreadyInSquad = (captainEditApp.players || []).some(
+                            (p: any) => p.profile_id === prof.id
+                          );
+                          const squadFull = (captainEditApp.players || []).length >= 20;
 
-                          <button
-                            type="button"
-                            disabled={captainActionLoading}
-                            onClick={() => handleCaptainAddPlayer(prof.id)}
-                            className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1"
-                          >
-                            {captainActionLoading ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <>
-                                <UserPlus className="w-3 h-3" />
-                                Ekle
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      ))}
+                          return (
+                            <div
+                              key={prof.id}
+                              className="p-2.5 rounded-xl bg-black/40 border border-white/5 hover:border-cyan-500/20 flex items-center justify-between transition-colors"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                {prof.avatar_url ? (
+                                  <img
+                                    src={prof.avatar_url}
+                                    className="w-7 h-7 rounded-full object-cover border border-white/10 shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-zinc-400 shrink-0">
+                                    <User className="w-3.5 h-3.5" />
+                                  </div>
+                                )}
+                                <div className="min-w-0 truncate">
+                                  <span className="text-xs font-bold text-white block truncate">
+                                    @{prof.username}
+                                  </span>
+                                  {prof.full_name && (
+                                    <span className="text-[10px] text-zinc-400 block truncate">
+                                      {prof.full_name}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="shrink-0 flex items-center gap-1.5 ml-2">
+                                {isCaptain ? (
+                                  <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                                    👑 Kaptan
+                                  </span>
+                                ) : alreadyInSquad ? (
+                                  <span className="px-2.5 py-1 rounded-lg bg-cyan-500/10 text-[#00e5ff] border border-[#00e5ff]/20 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                                    ✓ Kadroda
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled={captainActionLoading || squadFull}
+                                    onClick={() => handleCaptainAddPlayer(prof.id)}
+                                    className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1"
+                                    title={squadFull ? 'Kadro dolu (Maks 20)' : 'Kadroya Ekle'}
+                                  >
+                                    {captainActionLoading ? (
+                                      <Loader2 className="w-3 h-3 animate-spin" />
+                                    ) : (
+                                      <>
+                                        <UserPlus className="w-3 h-3" />
+                                        Ekle
+                                      </>
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
 
                     {captainSearch.trim().length > 0 &&
-                      profiles.filter((prof: any) => {
-                        if (prof.id === captainEditApp.applicant_id) return false;
+                      allKnownProfiles.filter((prof: any) => {
                         if (prof.status === 'BANNED' || prof.status === 'SUSPENDED' || prof.is_active === false) return false;
-                        const alreadyInSquad = (captainEditApp.players || []).some(
-                          (p: any) => p.profile_id === prof.id
-                        );
-                        if (alreadyInSquad) return false;
-                        const q = captainSearch.toLowerCase();
+                        const q = captainSearch.toLowerCase().trim();
                         const un = (prof.username || '').toLowerCase();
                         const fn = (prof.full_name || '').toLowerCase();
                         return un.includes(q) || fn.includes(q);
                       }).length === 0 && (
                         <p className="text-center py-4 text-xs text-zinc-500">
-                          Aramanıza uygun eklenebilir oyuncu bulunamadı.
+                          {isSearchingServer ? (
+                            <span className="flex items-center justify-center gap-1.5 text-zinc-400">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#00e5ff]" />
+                              Oyuncular aranıyor...
+                            </span>
+                          ) : (
+                            'Aramanıza uygun oyuncu bulunamadı.'
+                          )}
                         </p>
                       )}
 
                     {!captainSearch.trim() && (
                       <p className="text-center py-3 text-[11px] text-zinc-600">
-                        Kadroya oyuncu eklemek için yukarıdaki arama kutusuna oyuncu adı yazın.
+                        Kadroya oyuncu eklemek için yukarıdaki arama kutusuna kullanıcı adı veya isim yazın.
                       </p>
                     )}
                   </div>

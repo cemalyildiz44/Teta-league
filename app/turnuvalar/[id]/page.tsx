@@ -132,12 +132,11 @@ export default async function TournamentDetailPage({
     currentUserProfile = prof || { id: user.id, email: user.email };
   }
 
-  // 6. Fetch profiles for search in squad selection modal
+  // 6. Fetch profiles for search in squad selection modal (complete active player directory)
   const { data: searchProfilesData } = await supabase
     .from('profiles')
-    .select('id, username, avatar_url')
-    .order('username', { ascending: true })
-    .limit(300);
+    .select('id, username, full_name, avatar_url, status, is_active')
+    .order('username', { ascending: true });
 
   // 7. Fetch tournament groups (Phase 2)
   const { data: groupsData } = await supabase

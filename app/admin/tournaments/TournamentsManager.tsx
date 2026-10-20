@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -12,7 +12,8 @@ import {
   create1V1WinnerAction, createKarmaWinnerAction,
   deleteTournamentAction, updateNightCupApplicationStatusAction, assignNightCupWinnerAction,
   updateNightCupDetailsAction, approveTournamentMatchSubmissionAction, rejectTournamentMatchSubmissionAction,
-  adminUpdateNightCupTeamAction, adminAddPlayerToNightCupSquadAction, adminRemovePlayerFromNightCupSquadAction, adminDeleteNightCupApplicationAction
+  adminUpdateNightCupTeamAction, adminAddPlayerToNightCupSquadAction, adminRemovePlayerFromNightCupSquadAction, adminDeleteNightCupApplicationAction,
+  adminSearchTournamentPlayersAction
 } from './actions';
 import TeamLogo from '@/components/TeamLogo';
 import TournamentGroupsAdminModal from './TournamentGroupsAdminModal';
@@ -53,9 +54,34 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
   const [editTeamLogoPreview, setEditTeamLogoPreview] = useState<string | null>(null);
   const [selectedSquadPlayerToAdd, setSelectedSquadPlayerToAdd] = useState<string>('');
   const [playerSearchQuery, setPlayerSearchQuery] = useState<string>('');
+  const [serverSearchResults, setServerSearchResults] = useState<any[]>([]);
+  const [isSearchingServer, setIsSearchingServer] = useState<boolean>(false);
   const [nightCupAppFilter, setNightCupAppFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'>('ALL');
   const [nightCupAppSearch, setNightCupAppSearch] = useState<string>('');
   const [teamActionLoading, setTeamActionLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    const q = playerSearchQuery.trim();
+    if (!q || q.length < 2) {
+      setServerSearchResults([]);
+      setIsSearchingServer(false);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearchingServer(true);
+      try {
+        const res = await adminSearchTournamentPlayersAction(q);
+        if (res?.players) {
+          setServerSearchResults(res.players);
+        }
+      } catch (err) {
+        console.error('Server search error:', err);
+      } finally {
+        setIsSearchingServer(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [playerSearchQuery]);
 
   const showFeedback = (msg: string, type: 'success' | 'error') => {
     setFeedback({ msg, type });
@@ -80,19 +106,21 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
     }
   };
 
-  const handleAddSquadPlayer = async (applicationId: string) => {
-    if (!selectedSquadPlayerToAdd) {
+  const handleAddSquadPlayer = async (applicationId: string, playerProfileId?: string) => {
+    const targetPlayerId = playerProfileId || selectedSquadPlayerToAdd;
+    if (!targetPlayerId) {
       showFeedback('Lütfen eklenecek bir oyuncu seçin.', 'error');
       return;
     }
     setTeamActionLoading(true);
-    const res = await adminAddPlayerToNightCupSquadAction(applicationId, selectedSquadPlayerToAdd);
+    const res = await adminAddPlayerToNightCupSquadAction(applicationId, targetPlayerId);
     setTeamActionLoading(false);
     if (res.error) {
       showFeedback(res.error, 'error');
     } else {
       showFeedback(res.success || 'Oyuncu kadroya eklendi.', 'success');
       setSelectedSquadPlayerToAdd('');
+      setPlayerSearchQuery('');
       router.refresh();
     }
   };
@@ -1579,11 +1607,25 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
         const currentApp = applications.find((a: any) => a.id === editingNightCupTeam.id) || editingNightCupTeam;
         const squadPlayers = currentApp.tournament_application_players || [];
         const squadProfileIds = new Set(squadPlayers.map((p: any) => p.profile_id));
-        const availableProfiles = profiles.filter((p: any) => !squadProfileIds.has(p.id) && p.id !== currentApp.applicant_id);
-        const filteredAvailableProfiles = availableProfiles.filter((p: any) => {
-          const q = playerSearchQuery.toLowerCase().trim();
-          return !q || p.username?.toLowerCase().includes(q) || p.full_name?.toLowerCase().includes(q);
-        });
+
+        // Merge initial server-loaded profiles with any dynamic server search results
+        const mergedProfilesMap = new Map();
+        profiles.forEach((p: any) => mergedProfilesMap.set(p.id, p));
+        serverSearchResults.forEach((p: any) => mergedProfilesMap.set(p.id, p));
+        const allKnownProfiles = Array.from(mergedProfilesMap.values());
+
+        const availableProfiles = allKnownProfiles.filter(
+          (p: any) => !squadProfileIds.has(p.id) && p.id !== currentApp.applicant_id
+        );
+
+        const searchTrimmed = playerSearchQuery.toLowerCase().trim();
+        const searchMatchedProfiles = searchTrimmed
+          ? allKnownProfiles.filter((p: any) => {
+              const uMatch = p.username?.toLowerCase().includes(searchTrimmed);
+              const fMatch = p.full_name?.toLowerCase().includes(searchTrimmed);
+              return uMatch || fMatch;
+            })
+          : [];
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
@@ -1760,36 +1802,115 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
                   </div>
 
                   {/* Add Player to Squad */}
-                  <div className="pt-2 border-t border-white/5 space-y-2">
-                    <label className="block text-[10px] font-black text-cyan-400 uppercase tracking-widest">
-                      KADROYA OYUNCU EKLE
-                    </label>
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                      <div className="flex-1 relative">
-                        <select
-                          value={selectedSquadPlayerToAdd}
-                          onChange={(e) => setSelectedSquadPlayerToAdd(e.target.value)}
-                          className="w-full bg-[#060d18] border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-cyan-500/50"
-                        >
-                          <option value="">Oyuncu Seçin ({filteredAvailableProfiles.length} Uygun Oyuncu)...</option>
-                          {filteredAvailableProfiles.slice(0, 100).map((p: any) => (
-                            <option key={p.id} value={p.id}>
-                              @{p.username} {p.full_name ? `(${p.full_name})` : ''}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <button
-                        type="button"
-                        disabled={!selectedSquadPlayerToAdd || teamActionLoading}
-                        onClick={() => handleAddSquadPlayer(currentApp.id)}
-                        className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl text-xs font-black uppercase tracking-wider transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 shrink-0"
-                      >
-                        {teamActionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                        Kadroya Ekle
-                      </button>
+                  <div className="pt-2 border-t border-white/5 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[10px] font-black text-cyan-400 uppercase tracking-widest">
+                        KADROYA OYUNCU EKLE
+                      </label>
+                      <span className="text-[10px] text-zinc-500 font-bold">
+                        {availableProfiles.length} Uygun Oyuncu {isSearchingServer && <span className="text-cyan-400 font-normal">• Sunucuda aranıyor...</span>}
+                      </span>
                     </div>
+
+                    {/* Writable Case-Insensitive Search Input */}
+                    <div className="relative">
+                      <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={playerSearchQuery}
+                        onChange={(e) => setPlayerSearchQuery(e.target.value)}
+                        placeholder="Oyuncu ara (kullanıcı adı veya isim)..."
+                        className="w-full pl-9 pr-9 py-2 bg-[#060d18] border border-white/10 rounded-xl text-xs text-white placeholder:text-zinc-600 outline-none focus:border-cyan-500/50 transition-colors"
+                      />
+                      {playerSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setPlayerSearchQuery('')}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white p-1 transition-colors"
+                          title="Aramayı Temizle"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Search Results Display */}
+                    {searchTrimmed ? (
+                      <div className="max-h-48 overflow-y-auto space-y-1.5 p-2 bg-[#060d18] rounded-xl border border-white/10">
+                        {searchMatchedProfiles.length === 0 ? (
+                          <div className="text-center py-4 text-xs text-zinc-500">
+                            {isSearchingServer ? 'Oyuncu aranıyor...' : `"${playerSearchQuery}" ile eşleşen oyuncu bulunamadı.`}
+                          </div>
+                        ) : (
+                          searchMatchedProfiles.map((p: any) => {
+                            const isCaptain = p.id === currentApp.applicant_id;
+                            const isInSquad = squadProfileIds.has(p.id);
+                            const isBanned = p.status === 'BANNED';
+                            const isSuspended = p.status === 'SUSPENDED' || p.is_active === false;
+                            const isSquadFull = squadPlayers.length >= 20;
+
+                            return (
+                              <div
+                                key={p.id}
+                                className="p-2 rounded-lg bg-black/40 border border-white/5 flex items-center justify-between gap-3 hover:border-white/10 transition-colors"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  {p.avatar_url ? (
+                                    <img src={p.avatar_url} className="w-6 h-6 rounded-full object-cover shrink-0" />
+                                  ) : (
+                                    <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-zinc-400 shrink-0">
+                                      <User className="w-3 h-3" />
+                                    </div>
+                                  )}
+                                  <div className="min-w-0 truncate">
+                                    <span className="text-xs font-bold text-white block truncate">@{p.username}</span>
+                                    {p.full_name && <span className="text-[10px] text-zinc-400 block truncate">{p.full_name}</span>}
+                                  </div>
+                                </div>
+
+                                <div className="shrink-0 flex items-center gap-1.5">
+                                  {isCaptain ? (
+                                    <span className="px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 text-[10px] font-bold">
+                                      👑 Kaptan
+                                    </span>
+                                  ) : isInSquad ? (
+                                    <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[10px] font-bold">
+                                      ✓ Kadroda
+                                    </span>
+                                  ) : isBanned ? (
+                                    <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-[10px] font-bold">
+                                      Yasaklı
+                                    </span>
+                                  ) : isSuspended ? (
+                                    <span className="px-2 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20 text-[10px] font-bold">
+                                      Askıda
+                                    </span>
+                                  ) : isSquadFull ? (
+                                    <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-500 text-[10px] font-bold">
+                                      Kadro Dolu (20/20)
+                                    </span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      disabled={teamActionLoading}
+                                      onClick={() => handleAddSquadPlayer(currentApp.id, p.id)}
+                                      className="px-3 py-1 bg-emerald-500 hover:bg-emerald-400 text-black rounded-lg text-xs font-black uppercase tracking-wider transition-colors disabled:opacity-50 flex items-center gap-1 cursor-pointer"
+                                    >
+                                      {teamActionLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                                      Ekle
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-zinc-500 italic">
+                        Kadroya oyuncu eklemek için kullanıcı adı (@kullanici_adi) veya isim yazarak arayın.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

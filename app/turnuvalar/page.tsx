@@ -26,7 +26,7 @@ export default async function TurnuvalarPage() {
     supabase.from('tournaments').select('*, seasons(name)').order('created_at', { ascending: false }),
     supabase.from('tournament_winners').select('*, profiles(username, avatar_url), teams(name, logo_url), tournament_applications(team_name, logo_url)').order('placement', { ascending: true }),
     supabase.from('tournament_applications').select('id, tournament_id, applicant_id, status').neq('status', 'REJECTED'),
-    supabase.from('profiles').select('id, username, avatar_url').order('username', { ascending: true })
+    supabase.from('profiles').select('id, username, full_name, avatar_url, status, is_active').order('username', { ascending: true })
   ]);
 
   const tData = tournamentsData || [];

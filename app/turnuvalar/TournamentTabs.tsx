@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Trophy, Medal, User, Users, Calendar, ShieldAlert, X, Loader2, Info, Image as ImageIcon, AlertCircle } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
-import { submitNightCupApplicationAction } from './actions';
+import { submitNightCupApplicationAction, searchEligibleTournamentPlayersAction } from './actions';
 import TeamLogo from '@/components/TeamLogo';
 import { formatTournamentDate } from '@/lib/date-utils';
 
@@ -28,6 +28,31 @@ export default function TournamentTabs({
   const [isCompressing, setIsCompressing] = useState(false);
   const [ncProfiles, setNcProfiles] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [serverSearchProfiles, setServerSearchProfiles] = useState<any[]>([]);
+  const [isSearchingServer, setIsSearchingServer] = useState(false);
+
+  useEffect(() => {
+    const q = searchTerm.trim();
+    if (!q || q.length < 2) {
+      setServerSearchProfiles([]);
+      setIsSearchingServer(false);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearchingServer(true);
+      try {
+        const res = await searchEligibleTournamentPlayersAction(q);
+        if (res?.players) {
+          setServerSearchProfiles(res.players);
+        }
+      } catch (err) {
+        console.error('Server search error:', err);
+      } finally {
+        setIsSearchingServer(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const showFeedback = (msg: string, type: 'success' | 'error') => {
     setFeedback({ msg, type });
@@ -204,7 +229,28 @@ export default function TournamentTabs({
     }
   };
 
-  const searchProfiles = profiles.filter((p: any) => p.username.toLowerCase().includes(searchTerm.toLowerCase())).slice(0, 20);
+  const mergedProfilesMap = new Map();
+  (profiles || []).forEach((p: any) => mergedProfilesMap.set(p.id, p));
+  serverSearchProfiles.forEach((p: any) => mergedProfilesMap.set(p.id, p));
+  const allKnownProfiles = Array.from(mergedProfilesMap.values());
+
+  const searchProfiles = allKnownProfiles
+    .filter((p: any) => {
+      if (currentUser && p.id === currentUser.id) return false;
+      if (p.status === 'BANNED' || p.status === 'SUSPENDED' || p.is_active === false) return false;
+      if (!searchTerm.trim()) return true;
+      const q = searchTerm.toLowerCase().trim();
+      const un = (p.username || '').toLowerCase();
+      const fn = (p.full_name || '').toLowerCase();
+      return un.includes(q) || fn.includes(q);
+    })
+    .sort((a: any, b: any) => {
+      const aSel = ncProfiles.includes(a.id) ? 1 : 0;
+      const bSel = ncProfiles.includes(b.id) ? 1 : 0;
+      if (aSel !== bSel) return bSel - aSel;
+      return (a.username || '').localeCompare(b.username || '');
+    })
+    .slice(0, 50);
 
   return (
     <div className='w-full relative'>
@@ -567,10 +613,33 @@ export default function TournamentTabs({
                           onClick={() => toggleNcProfile(p.id)}
                           className={`p-2 rounded-lg border text-[11px] cursor-pointer flex items-center gap-2 transition-all ${ncProfiles.includes(p.id) ? 'bg-[#00e5ff]/20 border-[#00e5ff]/50 text-[#00e5ff] font-black' : 'bg-white/5 border-transparent text-zinc-400 font-bold hover:bg-white/10'}`}
                         >
-                          {p.avatar_url ? <img src={p.avatar_url} className='w-5 h-5 rounded-full'/> : <User className='w-5 h-5 p-1 bg-black/50 rounded-full'/>}
-                          <span className='truncate'>@{p.username}</span>
+                          {p.avatar_url ? (
+                            <img src={p.avatar_url} className='w-6 h-6 rounded-full object-cover shrink-0'/>
+                          ) : (
+                            <User className='w-6 h-6 p-1 bg-black/50 rounded-full shrink-0'/>
+                          )}
+                          <div className='flex flex-col min-w-0'>
+                            <span className='truncate leading-tight'>@{p.username}</span>
+                            {p.full_name && (
+                              <span className='text-[10px] text-zinc-500 font-normal truncate leading-tight'>
+                                {p.full_name}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       ))}
+                      {searchProfiles.length === 0 && (
+                        <div className="col-span-2 py-8 text-center text-xs text-zinc-500">
+                          {isSearchingServer ? (
+                            <span className="flex items-center justify-center gap-1.5 text-zinc-400">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#00e5ff]" />
+                              Oyuncular aranıyor...
+                            </span>
+                          ) : (
+                            'Aramanıza uygun oyuncu bulunamadı.'
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

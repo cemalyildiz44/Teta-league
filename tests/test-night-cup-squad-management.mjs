@@ -471,6 +471,132 @@ test('18. Official league player career stats and standings untouched by Night C
   );
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Scenario 19: Elimination of hardcoded .limit(300) and .slice(0, 100)
+// ─────────────────────────────────────────────────────────────────────────────
+test('19. Elimination of hardcoded player query limits across all tournament pages', () => {
+  const tourPage = fs.readFileSync('app/turnuvalar/[id]/page.tsx', 'utf8');
+  const adminManager = fs.readFileSync('app/admin/tournaments/TournamentsManager.tsx', 'utf8');
+
+  assert.ok(
+    !tourPage.includes('.limit(300)'),
+    'app/turnuvalar/[id]/page.tsx must NOT have .limit(300) cutting off registered players'
+  );
+  assert.ok(
+    tourPage.includes('full_name'),
+    'app/turnuvalar/[id]/page.tsx must query full_name for name searches'
+  );
+  assert.ok(
+    !adminManager.includes('availableProfiles.slice(0, 100)'),
+    'TournamentsManager.tsx must NOT truncate player options with slice(0, 100)'
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scenario 20: Server actions search both username and full_name, excluding banned
+// ─────────────────────────────────────────────────────────────────────────────
+test('20. Live player search actions support case-insensitive username & full_name search', () => {
+  const turnuvalarActions = fs.readFileSync('app/turnuvalar/actions.ts', 'utf8');
+  const adminActions = fs.readFileSync('app/admin/tournaments/actions.ts', 'utf8');
+
+  assert.ok(
+    turnuvalarActions.includes('searchEligibleTournamentPlayersAction'),
+    'app/turnuvalar/actions.ts must export searchEligibleTournamentPlayersAction'
+  );
+  assert.ok(
+    turnuvalarActions.includes('ilike'),
+    'searchEligibleTournamentPlayersAction must use case-insensitive ilike'
+  );
+  assert.ok(
+    turnuvalarActions.includes("status', 'BANNED'"),
+    'searchEligibleTournamentPlayersAction must exclude BANNED accounts'
+  );
+
+  assert.ok(
+    adminActions.includes('adminSearchTournamentPlayersAction'),
+    'app/admin/tournaments/actions.ts must export adminSearchTournamentPlayersAction'
+  );
+  assert.ok(
+    adminActions.includes('ilike'),
+    'adminSearchTournamentPlayersAction must use case-insensitive ilike'
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scenario 21: Squad size cap (20 players) enforced in server actions
+// ─────────────────────────────────────────────────────────────────────────────
+test('21. Strict 20-player squad limit enforced in both admin and captain actions', () => {
+  const turnuvalarActions = fs.readFileSync('app/turnuvalar/actions.ts', 'utf8');
+  const adminActions = fs.readFileSync('app/admin/tournaments/actions.ts', 'utf8');
+
+  assert.ok(
+    turnuvalarActions.includes('squadCount >= 20'),
+    'captainAddPlayerToSquadAction must enforce maximum 20 players'
+  );
+  assert.ok(
+    adminActions.includes('squadCount >= 20'),
+    'adminAddPlayerToNightCupSquadAction must enforce maximum 20 players'
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scenario 22: Captain cannot be added as duplicate regular squad player
+// ─────────────────────────────────────────────────────────────────────────────
+test('22. Captain is excluded from regular squad addition across actions', () => {
+  const turnuvalarActions = fs.readFileSync('app/turnuvalar/actions.ts', 'utf8');
+  const adminActions = fs.readFileSync('app/admin/tournaments/actions.ts', 'utf8');
+
+  assert.ok(
+    turnuvalarActions.includes('app.applicant_id === profile_id'),
+    'captainAddPlayerToSquadAction must block captain self-addition'
+  );
+  assert.ok(
+    adminActions.includes('appData.applicant_id === profile_id'),
+    'adminAddPlayerToNightCupSquadAction must block captain addition to squad'
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scenario 23: In-squad and captain status badges prevent double-add confusion
+// ─────────────────────────────────────────────────────────────────────────────
+test('23. In-squad and captain badges clearly rendered, preventing double additions', () => {
+  const adminManager = fs.readFileSync('app/admin/tournaments/TournamentsManager.tsx', 'utf8');
+  const clientDetail = fs.readFileSync('app/turnuvalar/[id]/TournamentDetailClient.tsx', 'utf8');
+
+  assert.ok(
+    adminManager.includes('✓ Kadroda'),
+    'TournamentsManager.tsx must display [✓ Kadroda] badge for existing players'
+  );
+  assert.ok(
+    adminManager.includes('👑 Kaptan'),
+    'TournamentsManager.tsx must display [👑 Kaptan] badge for team captain'
+  );
+  assert.ok(
+    clientDetail.includes('✓ Kadroda') || clientDetail.includes('✓ Zaten Kadroda'),
+    'TournamentDetailClient.tsx must display [✓ Kadroda] badge in captain edit modal'
+  );
+  assert.ok(
+    clientDetail.includes('👑 Kaptan'),
+    'TournamentDetailClient.tsx must display [👑 Kaptan] badge in captain edit modal'
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scenario 24: Admin modal features writable search input with debouncing
+// ─────────────────────────────────────────────────────────────────────────────
+test('24. Admin modal has writable search input with live search integration', () => {
+  const adminManager = fs.readFileSync('app/admin/tournaments/TournamentsManager.tsx', 'utf8');
+
+  assert.ok(
+    adminManager.includes('playerSearchQuery'),
+    'TournamentsManager.tsx must bind playerSearchQuery state'
+  );
+  assert.ok(
+    adminManager.includes('adminSearchTournamentPlayersAction'),
+    'TournamentsManager.tsx must trigger adminSearchTournamentPlayersAction on search'
+  );
+});
+
 console.log('================================================================');
 console.log(`SUMMARY: ${passedTests} PASSED, ${failedTests} FAILED`);
 console.log('================================================================');
