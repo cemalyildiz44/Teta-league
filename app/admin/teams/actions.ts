@@ -390,9 +390,25 @@ export async function addPlayerToTeam(team_id: string, player_id: string, league
 
   if (error) return { error: 'Oyuncu eklenemedi: ' + error.message };
 
+  const { data: team } = await supabase
+    .from('teams')
+    .select('slug')
+    .eq('id', team_id)
+    .maybeSingle();
+
   revalidatePath('/admin/teams');
   revalidatePath('/oyuncular');
   revalidatePath('/');
+  if (team?.slug) {
+    revalidatePath(`/takim/${team.slug}`);
+    try {
+      revalidateTag(`team-${team.slug}`, 'max');
+    } catch {}
+  }
+  try {
+    revalidateTag('player-rankings', 'max');
+    revalidateTag('public-team-page', 'max');
+  } catch {}
   return { success: 'Oyuncu başarıyla takıma eklendi.' };
 }
 
@@ -401,6 +417,23 @@ export async function removePlayerFromTeam(membership_id: string) {
   const supabase = createClient(cookieStore);
   const { data: { user } } = await supabase.auth.getUser();
   if (!(await checkAdmin(supabase, user))) return { error: 'Yetkisiz erişim.' };
+
+  // Fetch membership to retrieve team_id for targeted cache invalidation
+  const { data: mem } = await supabase
+    .from('team_memberships')
+    .select('team_id')
+    .eq('id', membership_id)
+    .maybeSingle();
+
+  let teamSlug: string | null = null;
+  if (mem?.team_id) {
+    const { data: team } = await supabase
+      .from('teams')
+      .select('slug')
+      .eq('id', mem.team_id)
+      .maybeSingle();
+    teamSlug = team?.slug || null;
+  }
 
   // Update left_at instead of deleting to preserve historical records
   const { error } = await supabase.from('team_memberships')
@@ -412,6 +445,16 @@ export async function removePlayerFromTeam(membership_id: string) {
   revalidatePath('/admin/teams');
   revalidatePath('/oyuncular');
   revalidatePath('/');
+  if (teamSlug) {
+    revalidatePath(`/takim/${teamSlug}`);
+    try {
+      revalidateTag(`team-${teamSlug}`, 'max');
+    } catch {}
+  }
+  try {
+    revalidateTag('player-rankings', 'max');
+    revalidateTag('public-team-page', 'max');
+  } catch {}
   return { success: 'Oyuncu başarıyla takımdan çıkarıldı.' };
 }
 
