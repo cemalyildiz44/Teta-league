@@ -9,8 +9,11 @@ export default async function GlobalStatsPage({ searchParams }: { searchParams: 
   const supabase = createClient(cookieStore);
 
   // 1. Fetch seasons and leagues
-  const { data: seasons } = await supabase.from("seasons").select("id, name, status").order("created_at", { ascending: false });
-  const { data: leagues } = await supabase.from("leagues").select("id, name, season_id").order("name");
+  const [{ data: seasons }, { data: leagues }] = await Promise.all([
+    supabase.from("seasons").select("id, name, status").order("created_at", { ascending: false }),
+    supabase.from("leagues").select("id, name, season_id").order("name")
+  ]);
+
 
   const activeSeason = seasons?.find(s => s.status === "ACTIVE") || seasons?.[0];
   const selectedSeasonId = resolvedParams.season || activeSeason?.id;
@@ -34,40 +37,44 @@ export default async function GlobalStatsPage({ searchParams }: { searchParams: 
   if (matchIds.length > 0) {
     const { data: stats } = await supabase
       .from("match_player_stats")
-      .select("*")
+      .select("ea_player_id, team_id, position, goals, assists, rating, saves, goals_conceded")
       .in("match_id", matchIds);
     rawStats = stats || [];
   }
 
   // 4. MİMARİ B SEÇENEĞİ: Yalnızca EA hesabı bağlı ve kayıtlı "gerçek" oyuncuları filtrele
-  // Önce istatistiklerdeki tüm ea_player_id'leri bul
+  // Önce istatistiklerdeki tüm ea_player_id'leri ve team_id'leri bul
   const eaPlayerIds = Array.from(new Set(rawStats.map(s => s.ea_player_id).filter(Boolean)));
-  
+  const teamIds = Array.from(new Set(rawStats.map(s => s.team_id).filter(Boolean)));
+
   let validProfiles: any[] = [];
   let eaToProfileMap = new Map();
-  
-  if (eaPlayerIds.length > 0) {
-    // Sadece current_ea_player_id dolu olan profilleri çek
-    const { data: profilesData } = await supabase
-      .from("profiles")
-      .select("id, username, current_ea_player_id")
-      .in("current_ea_player_id", eaPlayerIds)
-      .not("current_ea_player_id", "is", null);
-      
-    validProfiles = profilesData || [];
-    eaToProfileMap = new Map(validProfiles.map(p => [p.current_ea_player_id, p]));
+  let teamMap = new Map();
+
+  if (eaPlayerIds.length > 0 || teamIds.length > 0) {
+    const [profilesRes, teamsRes] = await Promise.all([
+      eaPlayerIds.length > 0
+        ? supabase
+            .from("profiles")
+            .select("id, username, current_ea_player_id")
+            .in("current_ea_player_id", eaPlayerIds)
+            .not("current_ea_player_id", "is", null)
+        : Promise.resolve({ data: [] }),
+      teamIds.length > 0
+        ? supabase
+            .from("teams")
+            .select("id, name, slug, logo_url")
+            .in("id", teamIds)
+        : Promise.resolve({ data: [] })
+    ]);
+
+    validProfiles = profilesRes.data || [];
+    eaToProfileMap = new Map(validProfiles.map((p: any) => [p.current_ea_player_id, p]));
+    teamMap = new Map((teamsRes.data || []).map((t: any) => [t.id, t]));
   }
 
   // Filtrelenmiş rawStats: Yalnızca ea_player_id'si bir profile bağlı olanları al.
   const filteredStats = rawStats.filter(s => s.ea_player_id && eaToProfileMap.has(s.ea_player_id));
-
-  // Teams mapping
-  const teamIds = Array.from(new Set(filteredStats.map(s => s.team_id).filter(Boolean)));
-  let teamMap = new Map();
-  if (teamIds.length > 0) {
-    const { data: teamsData } = await supabase.from("teams").select("id, name, slug, logo_url").in("id", teamIds);
-    teamMap = new Map((teamsData || []).map(t => [t.id, t]));
-  }
 
   // 5. Aggregate stats per VALID player
   const playerStatsMap = new Map<string, any>();
