@@ -861,6 +861,18 @@ export async function submitAndLockTotwAction(payload: SubmitTotwPayload): Promi
       if (rpcErr.code === '23505' || rpcErr.message?.includes('ALREADY_LOCKED')) {
         return { ok: false, error: `Bu dönem (${periodLabel}) için TOTW zaten gönderilmiş ve kilitlenmiş.` };
       }
+      if (
+        rpcErr.code === 'PGRST202' ||
+        rpcErr.code === '42883' ||
+        rpcErr.message?.includes('schema cache') ||
+        rpcErr.message?.includes('submit_and_lock_totw')
+      ) {
+        return {
+          ok: false,
+          error:
+            "TOTW veritabanı fonksiyonu (submit_and_lock_totw) veritabanında henüz tanımlı değil. Lütfen '20261019000000_admin_totw_system.sql' migration dosyasını Supabase SQL Editor üzerinden uygulayın.",
+        };
+      }
       return { ok: false, error: 'TOTW gönderilirken hata oluştu: ' + rpcErr.message };
     }
 

@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS public.totw_weeks (
     season_id UUID NOT NULL REFERENCES public.seasons(id) ON DELETE CASCADE,
     league_id UUID NOT NULL REFERENCES public.leagues(id) ON DELETE CASCADE,
     week_number INTEGER NOT NULL CHECK (week_number >= 1),
-    formation TEXT NOT NULL CHECK (formation IN ('4-3-3', '4-4-2', '4-2-3-1', '3-5-2')),
+    formation TEXT NOT NULL DEFAULT '3-5-2' CHECK (formation IN ('4-3-3', '4-4-2', '4-2-3-1', '3-5-2')),
     trophy_id UUID NOT NULL REFERENCES public.trophies(id) ON DELETE RESTRICT,
     is_locked BOOLEAN NOT NULL DEFAULT true,
     submitted_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
@@ -45,22 +45,38 @@ CREATE INDEX IF NOT EXISTS idx_totw_selections_player_id ON public.totw_selectio
 ALTER TABLE public.trophy_winners
 ADD COLUMN IF NOT EXISTS totw_week_id UUID REFERENCES public.totw_weeks(id) ON DELETE CASCADE;
 
+-- Drop legacy unqualified index if present
 DROP INDEX IF EXISTS public.unique_trophy_player_winner;
 
--- Manual (non-TOTW) trophy assignments remain unique per (trophy_id, player_id)
-CREATE UNIQUE INDEX IF NOT EXISTS unique_trophy_player_winner
+-- Manual (non-TOTW) trophy assignments remain unique per (trophy_id, player_id) where totw_week_id IS NULL
+CREATE UNIQUE INDEX IF NOT EXISTS unique_trophy_player_general_winner
 ON public.trophy_winners (trophy_id, player_id)
 WHERE player_id IS NOT NULL AND totw_week_id IS NULL;
 
--- TOTW trophy assignments are unique per (totw_week_id, player_id)
+-- TOTW trophy assignments are unique per (totw_week_id, player_id) where totw_week_id IS NOT NULL
 CREATE UNIQUE INDEX IF NOT EXISTS unique_totw_week_player_winner
 ON public.trophy_winners (totw_week_id, player_id)
 WHERE totw_week_id IS NOT NULL;
 
--- 4. RLS Policies (Admin-only for TOTW management tables)
+-- 4. RLS Policies (Public view for locked records, Admin management)
 ALTER TABLE public.totw_weeks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.totw_selections ENABLE ROW LEVEL SECURITY;
 
+-- Anyone can view locked TOTW weeks
+DROP POLICY IF EXISTS "Anyone can view locked totw_weeks" ON public.totw_weeks;
+CREATE POLICY "Anyone can view locked totw_weeks"
+ON public.totw_weeks
+FOR SELECT
+USING (is_locked = true);
+
+-- Anyone can view TOTW selections
+DROP POLICY IF EXISTS "Anyone can view totw_selections" ON public.totw_selections;
+CREATE POLICY "Anyone can view totw_selections"
+ON public.totw_selections
+FOR SELECT
+USING (true);
+
+-- Admins can manage all totw_weeks
 DROP POLICY IF EXISTS "Admins can manage totw_weeks" ON public.totw_weeks;
 CREATE POLICY "Admins can manage totw_weeks"
 ON public.totw_weeks
@@ -85,6 +101,7 @@ WITH CHECK (
     )
 );
 
+-- Admins can manage all totw_selections
 DROP POLICY IF EXISTS "Admins can manage totw_selections" ON public.totw_selections;
 CREATE POLICY "Admins can manage totw_selections"
 ON public.totw_selections
@@ -109,10 +126,10 @@ WITH CHECK (
     )
 );
 
-REVOKE ALL ON TABLE public.totw_weeks FROM anon, PUBLIC;
-REVOKE ALL ON TABLE public.totw_selections FROM anon, PUBLIC;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.totw_weeks TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.totw_selections TO authenticated;
+GRANT SELECT ON TABLE public.totw_weeks TO anon, authenticated;
+GRANT SELECT ON TABLE public.totw_selections TO anon, authenticated;
+GRANT INSERT, UPDATE, DELETE ON TABLE public.totw_weeks TO authenticated;
+GRANT INSERT, UPDATE, DELETE ON TABLE public.totw_selections TO authenticated;
 
 -- 5. Atomic Submit & Lock RPC
 -- Runs in a single transaction: creates totw_weeks, inserts 11 totw_selections,
@@ -129,7 +146,7 @@ CREATE OR REPLACE FUNCTION public.submit_and_lock_totw(
 )
 RETURNS JSONB
 LANGUAGE plpgsql
-SECURITY INVOKER
+SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
@@ -245,7 +262,7 @@ BEGIN
 
         v_note := COALESCE(
             NULLIF(trim(p_notes_prefix), ''),
-            v_season_name || ' • ' || v_league_name || ' • ' || p_week_number || '. Hafta TOTW'
+            v_season_name || ' • ' || v_league_name || ' • ' || p_week_number || '. Dönem TOTW'
         ) || ' (' || v_pos_label || ')';
 
         INSERT INTO public.trophy_winners (
@@ -256,9 +273,9 @@ BEGIN
 
         -- Keep player_achievements TOTW badge in sync as well
         INSERT INTO public.player_achievements (
-            player_id, achievement_type, season_id, week_number, awarded_by
+            player_id, achievement_type, season_id, season_name, week_number, awarded_by
         ) VALUES (
-            v_player_id, 'TOTW', p_season_id, p_week_number, v_actor
+            v_player_id, 'TOTW', p_season_id, v_season_name, p_week_number, v_actor
         )
         ON CONFLICT (player_id, season_id, week_number) WHERE achievement_type = 'TOTW' DO NOTHING;
 
@@ -277,3 +294,10 @@ BEGIN
     );
 END;
 $$;
+
+-- Grant execution permissions on the RPC to authenticated users (role checked inside function)
+REVOKE ALL ON FUNCTION public.submit_and_lock_totw(UUID, UUID, INTEGER, TEXT, UUID, JSONB, TEXT) FROM anon, PUBLIC;
+GRANT EXECUTE ON FUNCTION public.submit_and_lock_totw(UUID, UUID, INTEGER, TEXT, UUID, JSONB, TEXT) TO authenticated;
+
+-- Notify PostgREST to reload its schema cache immediately
+NOTIFY pgrst, 'reload schema';

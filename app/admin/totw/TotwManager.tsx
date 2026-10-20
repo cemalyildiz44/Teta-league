@@ -456,10 +456,13 @@ export default function TotwManager({
     return trophies.find((t) => t.id === selectedTrophyId) || null;
   }, [trophies, selectedTrophyId, weekData?.lockedTotw, selectedSeasonId, selectedSeasonObj]);
 
+  const isDatabaseSchemaPending = Boolean(initialSchemaPending || weekData?.isSchemaPending);
+
   const canSubmitTotw =
     hasValidFilterSelection &&
     !isLocked &&
     !isLoadingWeek &&
+    !isDatabaseSchemaPending &&
     lineupSlots.length === 11 &&
     missingSlotsCount === 0 &&
     Boolean(selectedTrophyId);
@@ -1134,8 +1137,13 @@ export default function TotwManager({
               </div>
 
               {/* Validation Helper Line */}
-              {!isLocked && (!selectedTrophyId || missingSlotsCount > 0) && (
+              {!isLocked && (isDatabaseSchemaPending || !selectedTrophyId || missingSlotsCount > 0) && (
                 <div className="mt-2.5 flex flex-wrap items-center gap-4 text-[11px] text-amber-400 font-semibold">
+                  {isDatabaseSchemaPending && (
+                    <span>
+                      • Ödülleri göndermek için <code>20261019000000_admin_totw_system.sql</code> migration'ının uygulanması gereklidir.
+                    </span>
+                  )}
                   {missingSlotsCount > 0 && (
                     <span>
                       • Ödülleri göndermek için 11 pozisyonun tamamı dolu olmalıdır ({missingSlotsCount} pozisyon boş).
