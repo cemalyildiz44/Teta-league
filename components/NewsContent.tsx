@@ -29,9 +29,6 @@ export default function NewsContent({
               key={index}
               href={`/oyuncular/${token.username}`}
               className="text-[#00e5ff] font-bold hover:underline hover:text-white transition-colors cursor-pointer inline-flex items-baseline break-all"
-              onClick={(e) => {
-                e.stopPropagation();
-              }}
             >
               @{token.username}
             </Link>
