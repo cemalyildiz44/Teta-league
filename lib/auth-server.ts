@@ -19,6 +19,9 @@ const FORBIDDEN_CLIENT_HEADERS = [
 
 const INTERNAL_SECRET_SALT = 'teta_proxy_sig_v1';
 
+// Maximum encoded length (ASCII chars) of the metadata header value (4 KB).
+const MAX_META_HEADER_LENGTH = 4096;
+
 /**
  * Returns a server-only HMAC key.
  * Prefers server-only secrets (INTERNAL_AUTH_SECRET or SUPABASE_SERVICE_ROLE_KEY)
@@ -90,12 +93,33 @@ export function createVerifiedAuthHeaders(user: {
   }
   if (user.user_metadata && typeof user.user_metadata === 'object') {
     try {
-      headers[HEADER_VERIFIED_USER_META] = JSON.stringify(user.user_metadata);
+      // HTTP header values must be ByteString (<= 255). Encode UTF-8 JSON as base64url so only
+      // ASCII reaches Headers.set(). Oversized metadata is omitted (never truncated); consumers
+      // then see empty metadata while the signed id/email identity stays intact.
+      const encoded = Buffer.from(JSON.stringify(user.user_metadata), 'utf8').toString('base64url');
+      if (encoded.length <= MAX_META_HEADER_LENGTH) {
+        headers[HEADER_VERIFIED_USER_META] = encoded;
+      }
     } catch {
       // ignore serialization error
     }
   }
   return headers;
+}
+
+/**
+ * Decodes the metadata header. Supports the current base64url(UTF-8 JSON) format and,
+ * for in-flight requests during rollout, the legacy plain JSON format (starts with '{').
+ * Any malformed value yields an empty object; identity is never derived from metadata.
+ */
+function decodeUserMetadata(raw: string): Record<string, any> {
+  try {
+    const json = raw.startsWith('{') ? raw : Buffer.from(raw, 'base64url').toString('utf8');
+    const parsed = JSON.parse(json);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
 }
 
 /**
@@ -119,11 +143,7 @@ export function verifyVerifiedUserHeaders(headers: { get(name: string): string |
   let userMetadata: Record<string, any> = {};
   const metaRaw = headers.get(HEADER_VERIFIED_USER_META);
   if (metaRaw) {
-    try {
-      userMetadata = JSON.parse(metaRaw);
-    } catch {
-      userMetadata = {};
-    }
+    userMetadata = decodeUserMetadata(metaRaw);
   }
 
   const emailConfirmedAt = headers.get(HEADER_VERIFIED_USER_CONFIRMED);
