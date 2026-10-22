@@ -58,7 +58,10 @@ export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   stripClientAuthHeaders(requestHeaders);
 
-  const { supabase, supabaseResponse } = createClient(request);
+  // NOTE: do NOT destructure `supabaseResponse` here. setAll() inside createClient reassigns it
+  // when tokens are refreshed; destructuring would keep a stale response and drop refreshed cookies.
+  const supabaseClient = createClient(request);
+  const supabase = supabaseClient.supabase;
 
   // Check if any active Supabase SSR session cookies are present (standard or chunked).
   // PKCE verifiers alone or unrelated cookies will not trigger an unnecessary session refresh.
@@ -90,6 +93,13 @@ export async function proxy(request: NextRequest) {
     }
   }
 
+  // If the session was refreshed, setAll() updated request.cookies. Forward the refreshed cookie
+  // header so Server Components in this same request reuse the new tokens instead of re-refreshing.
+  const refreshedCookieHeader = request.headers.get("cookie");
+  if (refreshedCookieHeader) {
+    requestHeaders.set("cookie", refreshedCookieHeader);
+  }
+
   // Forward the modified request headers down to Next.js App Router (Server Components)
   // while preserving any updated/refreshed cookies (Set-Cookie headers) from createServerClient
   const response = NextResponse.next({
@@ -98,7 +108,7 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  supabaseResponse.cookies.getAll().forEach((cookie) => {
+  supabaseClient.supabaseResponse.cookies.getAll().forEach((cookie) => {
     response.cookies.set(cookie.name, cookie.value, cookie);
   });
 

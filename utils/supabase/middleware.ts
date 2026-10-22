@@ -35,5 +35,11 @@ export const createClient = (request: NextRequest) => {
     }
   );
 
-  return { supabase, supabaseResponse };
+  // Getter: setAll() reassigns supabaseResponse on token refresh, so callers must read it lazily.
+  return {
+    supabase,
+    get supabaseResponse() {
+      return supabaseResponse;
+    },
+  };
 };
