@@ -8,40 +8,100 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 
 const publicSupabase = createClient(supabaseUrl, supabaseKey);
 
+// Supabase/PostgREST returns at most 1000 rows per request; larger results are silently truncated.
+const PAGE_SIZE = 1000;
+// Keeps `.in(...)` request URLs short (hundreds of UUIDs in one URL are fragile).
+const ID_CHUNK_SIZE = 100;
+
+type PageResult = { data: any[] | null; error: { message: string } | null };
+
+/**
+ * Reads every page of a query (ordered deterministically by the caller) until a short page is returned.
+ * Throws on any query error so partial data is never used for market value calculation.
+ */
+async function fetchAllPages(
+  label: string,
+  buildQuery: (from: number, to: number) => PromiseLike<PageResult>
+): Promise<any[]> {
+  const rows: any[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await buildQuery(from, from + PAGE_SIZE - 1);
+    if (error) {
+      throw new Error(`[player-rankings] "${label}" sorgusu başarısız oldu: ${error.message}`);
+    }
+    const page = data || [];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) break;
+  }
+  return rows;
+}
+
+/** Same as fetchAllPages, but splits a large id list into chunks. */
+async function fetchAllPagesByIds(
+  label: string,
+  ids: string[],
+  buildQuery: (chunk: string[], from: number, to: number) => PromiseLike<PageResult>
+): Promise<any[]> {
+  const rows: any[] = [];
+  for (let i = 0; i < ids.length; i += ID_CHUNK_SIZE) {
+    const chunk = ids.slice(i, i + ID_CHUNK_SIZE);
+    rows.push(...(await fetchAllPages(label, (from, to) => buildQuery(chunk, from, to))));
+  }
+  return rows;
+}
+
 /**
  * Pure public data fetcher and calculation engine for player rankings.
  * Free of request-time APIs (no request cookies, headers, or session state).
  * Reads strictly public tables with anonymous access.
+ * Throws if any required query fails, so incomplete data never produces wrong market values.
  */
 export async function fetchRawPlayerRankings(): Promise<PlayerRanking[]> {
   // 1. Fetch profiles (only required columns, pre-filtering non-banned profiles)
-  const { data: profiles } = await publicSupabase
-    .from('profiles')
-    .select('id, username, avatar_url, platform, primary_position, alternative_positions, status')
-    .or('status.neq.BANNED,status.is.null');
+  const profiles = await fetchAllPages('profiles', (from, to) =>
+    publicSupabase
+      .from('profiles')
+      .select('id, username, avatar_url, platform, primary_position, alternative_positions, status')
+      .or('status.neq.BANNED,status.is.null')
+      .order('id')
+      .range(from, to)
+  );
 
   const validProfiles = (profiles || []).filter((p: any) => p.status !== 'BANNED');
   const profileIds = validProfiles.map((p: any) => p.id);
 
   // 2. Concurrently fetch memberships, stats, achievements, active teams
-  const [ { data: memData }, { data: bulkStats }, { data: bulkAchievements }, { data: activeTeamsData } ] = await Promise.all([
-    profileIds.length > 0
-      ? publicSupabase.from('team_memberships').select('player_id, team_id').in('player_id', profileIds).is('left_at', null)
-      : Promise.resolve({ data: [] }),
-    profileIds.length > 0
-      ? publicSupabase
-          .from('match_player_stats')
-          .select('player_id, team_id, goals, assists, rating, cleansheets_gk, cleansheets_def, red_cards, matches!inner(home_team_id, away_team_id, home_score, away_score, status, season_id)')
-          .in('player_id', profileIds)
-          .eq('matches.status', 'APPROVED')
-      : Promise.resolve({ data: [] }),
-    profileIds.length > 0
-      ? publicSupabase
-          .from('player_achievements')
-          .select('player_id, achievement_type, season_id')
-          .in('player_id', profileIds)
-      : Promise.resolve({ data: [] }),
-    publicSupabase.from('teams').select('id, name').eq('is_active', true)
+  const [ memData, bulkStats, bulkAchievements, activeTeamsData ] = await Promise.all([
+    fetchAllPagesByIds('team_memberships', profileIds, (chunk, from, to) =>
+      publicSupabase
+        .from('team_memberships')
+        .select('player_id, team_id')
+        .in('player_id', chunk)
+        .is('left_at', null)
+        .order('player_id')
+        .order('team_id')
+        .range(from, to)
+    ),
+    fetchAllPagesByIds('match_player_stats', profileIds, (chunk, from, to) =>
+      publicSupabase
+        .from('match_player_stats')
+        .select('id, player_id, team_id, goals, assists, rating, cleansheets_gk, cleansheets_def, red_cards, matches!inner(home_team_id, away_team_id, home_score, away_score, status, season_id)')
+        .in('player_id', chunk)
+        .eq('matches.status', 'APPROVED')
+        .order('id')
+        .range(from, to)
+    ),
+    fetchAllPagesByIds('player_achievements', profileIds, (chunk, from, to) =>
+      publicSupabase
+        .from('player_achievements')
+        .select('id, player_id, achievement_type, season_id')
+        .in('player_id', chunk)
+        .order('id')
+        .range(from, to)
+    ),
+    fetchAllPages('teams', (from, to) =>
+      publicSupabase.from('teams').select('id, name').eq('is_active', true).order('id').range(from, to)
+    ),
   ]);
 
   const memberships = memData || [];
@@ -98,13 +158,17 @@ export async function fetchRawPlayerRankings(): Promise<PlayerRanking[]> {
         else tD++;
 
         if (m.season_id) {
-          const sid = m.season_id;
-          if (!sMap.has(sid)) {
-            sMap.set(sid, { season_id: sid, rating_sum: 0, rating_count: 0 });
+          // NULL (or non-numeric) ratings are skipped: they must not count as 0 in the season average.
+          const ratingValue = parseFloat(s.rating);
+          if (Number.isFinite(ratingValue)) {
+            const sid = m.season_id;
+            if (!sMap.has(sid)) {
+              sMap.set(sid, { season_id: sid, rating_sum: 0, rating_count: 0 });
+            }
+            const item = sMap.get(sid)!;
+            item.rating_sum += ratingValue;
+            item.rating_count++;
           }
-          const item = sMap.get(sid)!;
-          item.rating_sum += parseFloat(s.rating) || 0;
-          item.rating_count++;
         }
       }
     });

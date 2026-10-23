@@ -7,6 +7,30 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 
 const publicSupabase = createClient(supabaseUrl, supabaseKey);
 
+// PostgREST returns at most 1000 rows per request; larger results would be silently truncated.
+const MARKET_VALUE_PAGE_SIZE = 1000;
+
+/**
+ * Reads every page of an ordered query. Throws on query errors so market values are never
+ * computed from partial data.
+ */
+async function fetchAllPagesOrThrow(
+  label: string,
+  buildQuery: (from: number, to: number) => PromiseLike<{ data: any[] | null; error: { message: string } | null }>
+): Promise<any[]> {
+  const rows: any[] = [];
+  for (let from = 0; ; from += MARKET_VALUE_PAGE_SIZE) {
+    const { data, error } = await buildQuery(from, from + MARKET_VALUE_PAGE_SIZE - 1);
+    if (error) {
+      throw new Error(`[team-page-data] "${label}" sorgusu başarısız oldu: ${error.message}`);
+    }
+    const page = data || [];
+    rows.push(...page);
+    if (page.length < MARKET_VALUE_PAGE_SIZE) break;
+  }
+  return rows;
+}
+
 export interface PublicTeamDetail {
   id: string;
   name: string;
@@ -392,18 +416,26 @@ export async function fetchRawTeamPageData(slug: string): Promise<TeamPageData |
             .in('player_id', profileIds)
         : Promise.resolve({ data: null }),
       profileIds.length > 0
-        ? publicSupabase
-            .from('match_player_stats')
-            .select('player_id, team_id, goals, assists, rating, cleansheets_gk, cleansheets_def, red_cards, matches!inner(home_team_id, away_team_id, home_score, away_score, status, season_id)')
-            .in('player_id', profileIds)
-            .eq('matches.status', 'APPROVED')
-        : Promise.resolve({ data: [] }),
+        ? fetchAllPagesOrThrow('match_player_stats (market value)', (from, to) =>
+            publicSupabase
+              .from('match_player_stats')
+              .select('id, player_id, team_id, goals, assists, rating, cleansheets_gk, cleansheets_def, red_cards, matches!inner(home_team_id, away_team_id, home_score, away_score, status, season_id)')
+              .in('player_id', profileIds)
+              .eq('matches.status', 'APPROVED')
+              .order('id')
+              .range(from, to)
+          ).then((data) => ({ data }))
+        : Promise.resolve({ data: [] as any[] }),
       profileIds.length > 0
-        ? publicSupabase
-            .from('player_achievements')
-            .select('player_id, achievement_type, season_id')
-            .in('player_id', profileIds)
-        : Promise.resolve({ data: [] })
+        ? fetchAllPagesOrThrow('player_achievements (market value)', (from, to) =>
+            publicSupabase
+              .from('player_achievements')
+              .select('id, player_id, achievement_type, season_id')
+              .in('player_id', profileIds)
+              .order('id')
+              .range(from, to)
+          ).then((data) => ({ data }))
+        : Promise.resolve({ data: [] as any[] })
     ]);
 
     const pStats = pStatsRes.data;
@@ -414,14 +446,15 @@ export async function fetchRawTeamPageData(slug: string): Promise<TeamPageData |
           const matchesCount = myStats.length;
           const goals = myStats.reduce((sum: number, s: any) => sum + (s.goals || 0), 0);
           const assists = myStats.reduce((sum: number, s: any) => sum + (s.assists || 0), 0);
-          const totalRating = myStats.reduce((sum: number, s: any) => sum + (parseFloat(s.rating) || 0), 0);
+          const ratedStats = myStats.filter((s: any) => Number.isFinite(parseFloat(s.rating)));
+          const totalRating = ratedStats.reduce((sum: number, s: any) => sum + parseFloat(s.rating), 0);
           return {
             ...r,
             stats: {
               matches: matchesCount,
               goals,
               assists,
-              avgRating: (totalRating / matchesCount).toFixed(2)
+              avgRating: ratedStats.length > 0 ? (totalRating / ratedStats.length).toFixed(2) : '0.00'
             }
           };
         }
@@ -474,10 +507,14 @@ export async function fetchRawTeamPageData(slug: string): Promise<TeamPageData |
 
           const sid = m.season_id;
           if (sid) {
-            if (!sMap.has(sid)) sMap.set(sid, { season_id: sid, rating_sum: 0, rating_count: 0 });
-            const item = sMap.get(sid)!;
-            item.rating_sum += parseFloat(s.rating) || 0;
-            item.rating_count++;
+            // NULL (or non-numeric) ratings are skipped so they do not count as 0 in the season average.
+            const ratingValue = parseFloat(s.rating);
+            if (Number.isFinite(ratingValue)) {
+              if (!sMap.has(sid)) sMap.set(sid, { season_id: sid, rating_sum: 0, rating_count: 0 });
+              const item = sMap.get(sid)!;
+              item.rating_sum += ratingValue;
+              item.rating_count++;
+            }
           }
         }
       });

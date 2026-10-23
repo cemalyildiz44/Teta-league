@@ -115,14 +115,19 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   const activeTeam = (activeTeamRaw && activeTeamRaw.is_active !== false) ? activeTeamRaw : null;
 
   // ── 4. Aggregate ───────────────────────────────────────────────────
-  let tM = 0, tG = 0, tA = 0, tR = 0, tW = 0, tD = 0, tL = 0, tSh = 0, tPM = 0, tPA = 0, tTM = 0, tTA = 0, tSv = 0, tGC = 0, tMOM = 0, tRC = 0, tCGK = 0, tCDEF = 0;
+  let tM = 0, tG = 0, tA = 0, tR = 0, tRatedMatches = 0, tW = 0, tD = 0, tL = 0, tSh = 0, tPM = 0, tPA = 0, tTM = 0, tTA = 0, tSv = 0, tGC = 0, tMOM = 0, tRC = 0, tCGK = 0, tCDEF = 0;
   const slMap = new Map<string, any>();
   const matchLevel: any[] = [];
 
   for (const s of playerStats) {
     const m = matchMap.get(s.match_id);
     if (!m) continue;
-    tM++; tG += s.goals || 0; tA += s.assists || 0; tR += parseFloat(s.rating) || 0;
+    tM++; tG += s.goals || 0; tA += s.assists || 0;
+    const rNum = parseFloat(s.rating);
+    if (Number.isFinite(rNum)) {
+      tR += rNum;
+      tRatedMatches++;
+    }
     tSh += s.shots || 0; tPM += s.passes_made || 0; tPA += s.pass_attempts || 0;
     tTM += s.tackles_made || 0; tTA += s.tackle_attempts || 0; tSv += s.saves || 0;
     tGC += s.goals_conceded || 0; tMOM += s.is_mom ? 1 : 0; tRC += s.red_cards || 0;
@@ -137,7 +142,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     else { res = "D"; tD++; }
 
     matchLevel.push({
-      matchId: m.id, playedAt: m.played_at, rating: parseFloat(s.rating) || 0,
+      matchId: m.id, playedAt: m.played_at, rating: Number.isFinite(rNum) ? rNum : 0,
       goals: s.goals || 0, assists: s.assists || 0, result: res,
       myScore: my, oppScore: opp, teamId: s.team_id,
       opponentId: isHome ? m.away_team_id : m.home_team_id,
@@ -150,10 +155,14 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
       if (!slMap.has(k)) {
         const sn = seasonsMap.get(m.season_id) || (m.seasons as any);
         const ln = leaguesMap.get(m.league_id) || (m.leagues as any);
-        slMap.set(k, { seasonId: m.season_id, seasonName: sn?.name || "?", leagueId: m.league_id, leagueName: ln?.name || "?", teamId: s.team_id, matches: 0, goals: 0, assists: 0, wins: 0, ratingSum: 0 });
+        slMap.set(k, { seasonId: m.season_id, seasonName: sn?.name || "?", leagueId: m.league_id, leagueName: ln?.name || "?", teamId: s.team_id, matches: 0, goals: 0, assists: 0, wins: 0, ratingSum: 0, ratingCount: 0 });
       }
       const p = slMap.get(k)!;
-      p.matches++; p.goals += s.goals || 0; p.assists += s.assists || 0; p.ratingSum += parseFloat(s.rating) || 0;
+      p.matches++; p.goals += s.goals || 0; p.assists += s.assists || 0;
+      if (Number.isFinite(rNum)) {
+        p.ratingSum += rNum;
+        p.ratingCount++;
+      }
       if (res === "W") p.wins++;
     }
   }
@@ -161,14 +170,20 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   // Market Value Calculation
   // We aggregate ratings strictly by season_id to prevent double counting
   // for players who played in multiple teams/leagues in the same season.
+  // NULL (or non-numeric) ratings are skipped so they do not count as 0 in the season average.
   const mvSeasonStatsMap = new Map<string, { season_id: string, rating_sum: number, rating_count: number }>();
-  for (const s of slMap.values()) {
-    if (!mvSeasonStatsMap.has(s.seasonId)) {
-      mvSeasonStatsMap.set(s.seasonId, { season_id: s.seasonId, rating_sum: 0, rating_count: 0 });
+  for (const s of playerStats) {
+    const m = matchMap.get(s.match_id);
+    if (!m || !m.season_id) continue;
+    const ratingValue = parseFloat(s.rating);
+    if (Number.isFinite(ratingValue)) {
+      if (!mvSeasonStatsMap.has(m.season_id)) {
+        mvSeasonStatsMap.set(m.season_id, { season_id: m.season_id, rating_sum: 0, rating_count: 0 });
+      }
+      const mvS = mvSeasonStatsMap.get(m.season_id)!;
+      mvS.rating_sum += ratingValue;
+      mvS.rating_count++;
     }
-    const mvS = mvSeasonStatsMap.get(s.seasonId)!;
-    mvS.rating_sum += s.ratingSum;
-    mvS.rating_count += s.matches;
   }
 
   const mvInput: MarketValueInput = {
@@ -179,7 +194,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   };
   const marketValue = calculateMarketValue(mvInput);
 
-  const avgRating = tM > 0 ? (tR / tM).toFixed(2) : "0.00";
+  const avgRating = tRatedMatches > 0 ? (tR / tRatedMatches).toFixed(2) : "0.00";
   const passAcc = tPA > 0 ? ((tPM / tPA) * 100).toFixed(0) : "0";
   const tackleAcc = tTA > 0 ? ((tTM / tTA) * 100).toFixed(0) : "0";
 
@@ -248,7 +263,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
       matches: p.matches,
       goals: p.goals,
       assists: p.assists,
-      avgRating: p.matches > 0 ? p.ratingSum / p.matches : 0,
+      avgRating: (p.ratingCount ?? p.matches) > 0 ? p.ratingSum / (p.ratingCount ?? p.matches) : 0,
       wins: p.wins
     };
   });

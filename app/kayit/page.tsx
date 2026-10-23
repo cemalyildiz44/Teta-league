@@ -104,7 +104,7 @@ export default function RegisterPage() {
                   className="mt-1 w-4 h-4 bg-[#060d18] border border-white/20 rounded focus:ring-2 focus:ring-[#00e5ff]/50 text-[#00e5ff] cursor-pointer"
                 />
                 <label htmlFor="beta_registered" className="text-xs text-gray-400 hover:text-gray-300 leading-relaxed cursor-pointer select-none">
-                  BETA Websitesinde kaydım var. İstatistik ve piyasa değerimin TETA League sistemine aktarılmasına izin veriyorum.
+                  BETA Websitesinde kaydım var. İstatistik ve geçmiş kariyer verilerimin TETA League sistemine aktarılmasına izin veriyorum.
                 </label>
               </div>
             </div>
