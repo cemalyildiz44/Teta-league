@@ -11,7 +11,7 @@ export default function Footer() {
           <div className="space-y-6">
             <div className="space-y-4">
               <Link href="/" className="flex items-center gap-3">
-                <Image src="/logo.jpg" alt="TETA League" width={32} height={32} className="rounded" />
+                <Image src="/logo.jpg" alt="TETA League" width={32} height={40} className="rounded w-8 h-10" />
                 <span className="text-sm font-black tracking-widest text-white">
                   TETA<span className="text-[#00e5ff]"> LEAGUE</span>
                 </span>
@@ -67,7 +67,7 @@ export default function Footer() {
             <ul className="space-y-2.5">
               {footerLinks.platform.map((link) => (
                 <li key={link.href}>
-                  <Link href={link.href} className="text-sm text-gray-500 hover:text-[#00e5ff] transition-colors">
+                  <Link href={link.href} className="text-sm text-gray-500 hover:text-[#00e5ff] transition-colors max-sm:inline-block max-sm:py-2 max-sm:-my-2">
                     {link.label}
                   </Link>
                 </li>
@@ -80,7 +80,7 @@ export default function Footer() {
             <h4 className="text-[13px] font-[700] tracking-widest text-gray-400 uppercase mb-4">Ekip</h4>
             <ul className="space-y-2.5">
               <li>
-                <Link href="/ekip" className="text-sm text-gray-500 hover:text-[#00e5ff] transition-colors">
+                <Link href="/ekip" className="text-sm text-gray-500 hover:text-[#00e5ff] transition-colors max-sm:inline-block max-sm:py-2 max-sm:-my-2">
                   Ekip
                 </Link>
               </li>
@@ -89,7 +89,7 @@ export default function Footer() {
                   href="https://discord.gg/Cd9b4jpcAZ" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="text-sm text-gray-500 hover:text-[#00e5ff] transition-colors"
+                  className="text-sm text-gray-500 hover:text-[#00e5ff] transition-colors max-sm:inline-block max-sm:py-2 max-sm:-my-2"
                 >
                   İletişim
                 </a>
@@ -103,7 +103,7 @@ export default function Footer() {
             <ul className="space-y-2.5">
               {footerLinks.legal.map((link) => (
                 <li key={link.href}>
-                  <Link href={link.href} className="text-sm text-gray-500 hover:text-[#00e5ff] transition-colors">
+                  <Link href={link.href} className="text-sm text-gray-500 hover:text-[#00e5ff] transition-colors max-sm:inline-block max-sm:py-2 max-sm:-my-2">
                     {link.label}
                   </Link>
                 </li>

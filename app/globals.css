@@ -30,6 +30,28 @@ body {
   font-size: 15px;
   line-height: 1.6;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: rgba(0, 229, 255, 0.28);
+  color: #ffffff;
+}
+
+/* Typography: balanced heading wraps; faster taps (no double-tap-zoom delay) on interactive elements */
+h1, h2, h3 {
+  text-wrap: balance;
+}
+a, button, summary, [role="button"], [role="tab"] {
+  touch-action: manipulation;
+}
+
+/* Accessibility: visible keyboard focus in the brand colour (mouse/touch clicks do not show it) */
+:where(a, button, summary, [role="button"], [role="tab"], [tabindex="0"]):focus-visible {
+  outline: 2px solid #00E5FF;
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 /* Scrollbar */
@@ -54,7 +76,7 @@ body {
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(255,255,255,0.06);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   border-radius: 16px;
   transition: border-color 0.22s ease, background 0.22s ease;
 }
@@ -64,28 +86,32 @@ body {
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(255,255,255,0.06);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   border-radius: 16px;
   transition: border-color 0.22s ease, background 0.22s ease;
 }
 
-.card-surface:hover {
-  background: rgba(10, 20, 30, 0.45);
-  border-color: rgba(0, 229, 255, 0.15);
+@media (hover: hover) and (pointer: fine) {
+  .card-surface:hover {
+    background-color: rgba(10, 20, 30, 0.45);
+    border-color: rgba(0, 229, 255, 0.15);
+  }
 }
 
 .client-glass-interactive,
 .card-hover-lift {
   transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.22s ease, background 0.22s ease;
-  will-change: transform, box-shadow;
 }
 
-.client-glass-interactive:hover,
-.card-hover-lift:hover {
-  background: rgba(10, 20, 30, 0.55);
-  box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.72), 0 0 22px -2px rgba(0, 229, 255, 0.22);
-  border-color: rgba(0, 229, 255, 0.35);
-  transform: translateY(-2.5px);
+@media (hover: hover) and (pointer: fine) {
+  .client-glass-interactive:hover,
+  .card-hover-lift:hover {
+    will-change: transform, box-shadow;
+    background-color: rgba(10, 20, 30, 0.55);
+    box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.72), 0 0 22px -2px rgba(0, 229, 255, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    border-color: rgba(0, 229, 255, 0.35);
+    transform: translateY(-2.5px);
+  }
 }
 
 .client-glass-interactive:active,
@@ -128,22 +154,32 @@ body {
   transform: skewX(-25deg);
 }
 
-.flat-button:hover::after {
-  left: 200%;
-  transition: left 0.6s ease-in-out;
+@media (hover: hover) and (pointer: fine) {
+  .flat-button:not(:disabled):hover::after {
+    left: 200%;
+    transition: left 0.6s ease-in-out;
+  }
+
+  .flat-button:not(:disabled):hover {
+    box-shadow: 0 0 20px var(--brand-glow);
+    transform: translateY(-1px);
+  }
 }
 
-.flat-button:hover {
-  box-shadow: 0 0 20px var(--brand-glow);
-  transform: translateY(-1px);
+.flat-button:disabled,
+.flat-button[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
-.flat-button:active {
+.flat-button:not(:disabled):active {
   transform: scale(0.97);
   box-shadow: 0 0 10px var(--brand-glow);
 }
-.flat-button-solid:hover {
-  background: #00cfeb;
-  transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+  .flat-button-solid:not(:disabled):hover {
+    background: #00cfeb;
+    transform: translateY(-1px);
+  }
 }
 .flat-button-solid:active {
   transform: scale(0.97);
@@ -245,5 +281,11 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  .client-glass-interactive:hover,
+  .card-hover-lift:hover,
+  .flat-button:hover,
+  .flat-button:active {
+    transform: none !important;
   }
 }

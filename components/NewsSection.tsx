@@ -28,7 +28,7 @@ export default async function NewsSection() {
     <div className="space-y-4 sm:space-y-5">
       <div className="flex items-center justify-between">
         <h2 className="text-[24px] sm:text-[28px] font-[800] tracking-wide text-white">HABERLER</h2>
-        <Link href="/haberler" className="text-xs sm:text-[13px] font-[800] text-[#00E5FF] hover:text-white transition-colors tracking-widest uppercase">
+        <Link href="/haberler" className="text-xs sm:text-[13px] font-[800] text-[#00E5FF] hover:text-white transition-colors tracking-widest uppercase max-sm:py-2.5 max-sm:-my-2.5">
           TÜM HABERLER &rarr;
         </Link>
       </div>
