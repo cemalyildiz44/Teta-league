@@ -21,8 +21,10 @@ export interface MondaySessionSlot {
 /**
  * Official TETA League Monday Match Night Schedule Configuration:
  * 12 teams, 22 match weeks, played across 8 Monday sessions.
- * Sessions 1-4: Weeks 1-12 (3 matches per Monday: 22:30, 23:00, 23:30 TRT).
- * Devre Arası (Mid-Season Break): Offset 4 weeks (1 full Monday skipped, no fixtures).
+ * Session 1: Weeks 1-3 (3 matches: 22:30, 23:00, 23:30 TRT on 19.10.2026).
+ * Postponement: Offset 1 week (26.10.2026 skipped due to postponement).
+ * Sessions 2-4: Weeks 4-12 (3 matches per Monday: 22:30, 23:00, 23:30 TRT).
+ * Devre Arası (Mid-Season Break): Offset 5 weeks (23.11.2026, 1 full Monday skipped, no fixtures).
  * Sessions 5-6: Weeks 13-18 (3 matches per Monday: 22:30, 23:00, 23:30 TRT).
  * Sessions 7-8: Weeks 19-22 (2 matches per Monday: 22:30, 23:00 TRT).
  *
@@ -39,33 +41,33 @@ export const MONDAY_SESSIONS_CONFIG: Record<
   2:  { session: 1, offsetWeeks: 0, timeTRT: '23:00', utcHour: 20, utcMinute: 0 },
   3:  { session: 1, offsetWeeks: 0, timeTRT: '23:30', utcHour: 20, utcMinute: 30 },
 
-  4:  { session: 2, offsetWeeks: 1, timeTRT: '22:30', utcHour: 19, utcMinute: 30 },
-  5:  { session: 2, offsetWeeks: 1, timeTRT: '23:00', utcHour: 20, utcMinute: 0 },
-  6:  { session: 2, offsetWeeks: 1, timeTRT: '23:30', utcHour: 20, utcMinute: 30 },
+  4:  { session: 2, offsetWeeks: 2, timeTRT: '22:30', utcHour: 19, utcMinute: 30 },
+  5:  { session: 2, offsetWeeks: 2, timeTRT: '23:00', utcHour: 20, utcMinute: 0 },
+  6:  { session: 2, offsetWeeks: 2, timeTRT: '23:30', utcHour: 20, utcMinute: 30 },
 
-  7:  { session: 3, offsetWeeks: 2, timeTRT: '22:30', utcHour: 19, utcMinute: 30 },
-  8:  { session: 3, offsetWeeks: 2, timeTRT: '23:00', utcHour: 20, utcMinute: 0 },
-  9:  { session: 3, offsetWeeks: 2, timeTRT: '23:30', utcHour: 20, utcMinute: 30 },
+  7:  { session: 3, offsetWeeks: 3, timeTRT: '22:30', utcHour: 19, utcMinute: 30 },
+  8:  { session: 3, offsetWeeks: 3, timeTRT: '23:00', utcHour: 20, utcMinute: 0 },
+  9:  { session: 3, offsetWeeks: 3, timeTRT: '23:30', utcHour: 20, utcMinute: 30 },
 
-  10: { session: 4, offsetWeeks: 3, timeTRT: '22:30', utcHour: 19, utcMinute: 30 },
-  11: { session: 4, offsetWeeks: 3, timeTRT: '23:00', utcHour: 20, utcMinute: 0 },
-  12: { session: 4, offsetWeeks: 3, timeTRT: '23:30', utcHour: 20, utcMinute: 30 },
+  10: { session: 4, offsetWeeks: 4, timeTRT: '22:30', utcHour: 19, utcMinute: 30 },
+  11: { session: 4, offsetWeeks: 4, timeTRT: '23:00', utcHour: 20, utcMinute: 0 },
+  12: { session: 4, offsetWeeks: 4, timeTRT: '23:30', utcHour: 20, utcMinute: 30 },
 
-  // Offset 4 weeks (Day 28) = DEVRE ARASI / Mid-Season Break (Skipped Monday, no fixtures)
+  // Offset 5 weeks (23.11.2026) = DEVRE ARASI / Mid-Season Break (Skipped Monday, no fixtures)
 
-  13: { session: 5, offsetWeeks: 5, timeTRT: '22:30', utcHour: 19, utcMinute: 30 },
-  14: { session: 5, offsetWeeks: 5, timeTRT: '23:00', utcHour: 20, utcMinute: 0 },
-  15: { session: 5, offsetWeeks: 5, timeTRT: '23:30', utcHour: 20, utcMinute: 30 },
+  13: { session: 5, offsetWeeks: 6, timeTRT: '22:30', utcHour: 19, utcMinute: 30 },
+  14: { session: 5, offsetWeeks: 6, timeTRT: '23:00', utcHour: 20, utcMinute: 0 },
+  15: { session: 5, offsetWeeks: 6, timeTRT: '23:30', utcHour: 20, utcMinute: 30 },
 
-  16: { session: 6, offsetWeeks: 6, timeTRT: '22:30', utcHour: 19, utcMinute: 30 },
-  17: { session: 6, offsetWeeks: 6, timeTRT: '23:00', utcHour: 20, utcMinute: 0 },
-  18: { session: 6, offsetWeeks: 6, timeTRT: '23:30', utcHour: 20, utcMinute: 30 },
+  16: { session: 6, offsetWeeks: 7, timeTRT: '22:30', utcHour: 19, utcMinute: 30 },
+  17: { session: 6, offsetWeeks: 7, timeTRT: '23:00', utcHour: 20, utcMinute: 0 },
+  18: { session: 6, offsetWeeks: 7, timeTRT: '23:30', utcHour: 20, utcMinute: 30 },
 
-  19: { session: 7, offsetWeeks: 7, timeTRT: '22:30', utcHour: 19, utcMinute: 30 },
-  20: { session: 7, offsetWeeks: 7, timeTRT: '23:00', utcHour: 20, utcMinute: 0 },
+  19: { session: 7, offsetWeeks: 8, timeTRT: '22:30', utcHour: 19, utcMinute: 30 },
+  20: { session: 7, offsetWeeks: 8, timeTRT: '23:00', utcHour: 20, utcMinute: 0 },
 
-  21: { session: 8, offsetWeeks: 8, timeTRT: '22:30', utcHour: 19, utcMinute: 30 },
-  22: { session: 8, offsetWeeks: 8, timeTRT: '23:00', utcHour: 20, utcMinute: 0 },
+  21: { session: 8, offsetWeeks: 9, timeTRT: '22:30', utcHour: 19, utcMinute: 30 },
+  22: { session: 8, offsetWeeks: 9, timeTRT: '23:00', utcHour: 20, utcMinute: 0 },
 };
 
 /**
@@ -85,7 +87,7 @@ export function getMondaySessionDetails(weekNumber: number): {
   const extraWeeks = weekNumber - 22;
   const extraSessions = Math.floor((extraWeeks - 1) / 2) + 1;
   const session = 8 + extraSessions;
-  const offsetWeeks = 8 + extraSessions;
+  const offsetWeeks = 9 + extraSessions;
   const slotInSession = (extraWeeks - 1) % 2;
   const timeTRT = slotInSession === 0 ? '22:30' : '23:00';
   const utcHour = slotInSession === 0 ? 19 : 20;
@@ -156,8 +158,8 @@ export function getMidSeasonBreakInfo(startDateStr: string): {
 } {
   const baseMonday = getFirstMondayDate(startDateStr);
   const breakMonday = new Date(baseMonday.getTime());
-  // Devre arası is offset 4 weeks from base Monday
-  breakMonday.setUTCDate(breakMonday.getUTCDate() + 4 * 7);
+  // Devre arası is offset 5 weeks from base Monday (23.11.2026 after week 12 on 16.11.2026)
+  breakMonday.setUTCDate(breakMonday.getUTCDate() + 5 * 7);
   return {
     breakMondayDate: breakMonday.toISOString().split('T')[0],
     weekBefore: 12,
