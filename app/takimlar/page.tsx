@@ -6,6 +6,7 @@ import TeamRankingsClient, { TeamRanking } from './TeamRankingsClient';
 export const metadata: Metadata = {
   title: 'Takımlar Sıralaması | TETA League',
   description: 'TETA League tarihindeki en başarılı takımlar. Tüm zamanlar başarı sıralaması.',
+  alternates: { canonical: '/takimlar' },
 };
 
 export const revalidate = 60; // Cache for 1 min

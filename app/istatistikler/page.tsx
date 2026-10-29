@@ -1,6 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import TeamLogo from "@/components/TeamLogo";
 import { getCachedFilterOptions, getCachedStatsData, PublicPlayerStatItem } from "./stats";
+
+export const metadata: Metadata = {
+  title: 'İstatistikler | TETA League',
+  description: 'TETA League EA FC Pro Clubs oyuncu istatistikleri: sezon ve lig bazında gol, asist, reyting ve performans sıralamaları.',
+  alternates: { canonical: '/istatistikler' },
+};
 
 export const revalidate = 60;
 

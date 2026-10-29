@@ -1,6 +1,11 @@
 import { getLeagueBySlugs } from "@/app/lig/utils";
 import { notFound } from "next/navigation";
 import LeagueRulesViewer from "@/components/LeagueRulesViewer";
+import { buildLeagueMetadata } from "../league-metadata";
+
+export function generateMetadata({ params }: { params: Promise<{ seasonSlug: string; leagueSlug: string }> }) {
+  return buildLeagueMetadata(params, "rules");
+}
 
 export default async function LeagueRulesPage({
   params,

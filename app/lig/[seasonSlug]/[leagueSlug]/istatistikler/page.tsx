@@ -5,6 +5,11 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import TeamLogo from "@/components/TeamLogo";
 import { isDefenderPosition, isGoalkeeperPosition } from "@/app/utils/positions";
+import { buildLeagueMetadata } from "../league-metadata";
+
+export function generateMetadata({ params }: { params: Promise<{ seasonSlug: string; leagueSlug: string }> }) {
+  return buildLeagueMetadata(params, "stats");
+}
 
 export default async function LeagueStatsPage({ params }: { params: Promise<{ seasonSlug: string; leagueSlug: string }> }) {
   const resolvedParams = await params;

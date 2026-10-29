@@ -5,6 +5,11 @@ import { getLeagueBySlugs, compareTeamStats } from "../../utils";
 import { notFound } from "next/navigation";
 import TeamLogo from "@/components/TeamLogo";
 import { getStandingsZone } from "@/lib/standingsZones";
+import { buildLeagueMetadata } from "./league-metadata";
+
+export function generateMetadata({ params }: { params: Promise<{ seasonSlug: string; leagueSlug: string }> }) {
+  return buildLeagueMetadata(params, "standings");
+}
 
 export default async function LeagueStandingsPage({
   params,

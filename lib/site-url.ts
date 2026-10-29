@@ -37,6 +37,25 @@ export function getSiteUrl(): string {
   return 'http://localhost:3000';
 }
 
+/** Public SEO origin: Vercel redirects the apex domain to www, so search engines must see www. */
+export const CANONICAL_SITE_URL = 'https://www.tetaleague.com';
+
+/**
+ * Base URL for SEO output only (metadataBase, canonical, sitemap, robots, JSON-LD).
+ * Auth keeps using getSiteUrl(); this only maps the apex production domain to www,
+ * so localhost and other explicitly configured hosts are left as they are.
+ */
+export function getCanonicalSiteUrl(): string {
+  const siteUrl = getSiteUrl();
+  try {
+    const { hostname } = new URL(siteUrl);
+    if (hostname === 'tetaleague.com' || hostname === 'www.tetaleague.com') return CANONICAL_SITE_URL;
+  } catch {
+    return CANONICAL_SITE_URL;
+  }
+  return siteUrl;
+}
+
 /**
  * Returns the full callback URL for Supabase Auth redirect flows.
  * e.g. https://tetaleague.com/auth/callback?next=/sifre-yenile

@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { Calendar } from 'lucide-react';
 import FixtureWeekBrowser, { type FixtureTeamView, type FixtureView } from './FixtureWeekBrowser';
+import { buildLeagueMetadata } from "../league-metadata";
 
 const dateFormatter = new Intl.DateTimeFormat('tr-TR', {
   timeZone: 'Europe/Istanbul',
@@ -25,6 +26,10 @@ function toTeamView(team: { name?: string | null; slug?: string | null; logo_url
     slug: team.slug ?? null,
     logo_url: team.logo_url ?? null,
   };
+}
+
+export function generateMetadata({ params }: { params: Promise<{ seasonSlug: string; leagueSlug: string }> }) {
+  return buildLeagueMetadata(params, "fixtures");
 }
 
 export default async function LeagueFixturesPage({

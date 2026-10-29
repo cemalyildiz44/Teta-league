@@ -7,7 +7,8 @@ import { slugify } from "@/app/lig/utils";
 
 export const metadata = {
   title: "Ligler | TETA League",
-  description: "TETA League resmi ligleri ve güncel sezon bilgileri.",
+  description: "TETA League EA FC Pro Clubs ligleri: Süper Lig ve ECL 1. Lig. Güncel sezon, takım ve oyuncu sayıları, puan durumu ve lig kuralları.",
+  alternates: { canonical: "/ligler" },
 };
 
 export default async function LiglerPage() {

@@ -10,6 +10,7 @@ import { extractMentionCandidates, getValidMentionUsernames } from '@/utils/ment
 export const metadata = {
   title: 'Haberler & Duyurular | TETA League',
   description: 'TETA League en son lig haberleri, transfer gelişmeleri, turnuva duyuruları ve resmi açıklamalar.',
+  alternates: { canonical: '/haberler' },
 };
 
 export const revalidate = 60; // ISR cache revalidation every 60s

@@ -545,7 +545,7 @@ export default function Hero() {
 
         {/* Subtitle */}
         <p className="text-gray-400 text-base sm:text-lg lg:text-xl font-medium tracking-wide max-w-2xl mb-10 md:mb-12">
-          Takımını kur, liglere kat ve rekabetin bir parçası ol.
+          Türkiye&apos;nin EA FC Pro Clubs ligi. Takımını kur, liglere katıl ve rekabetin bir parçası ol.
         </p>
 
         {/* Action Buttons */}

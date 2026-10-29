@@ -126,7 +126,7 @@ export interface TeamTransferSlotsItem {
 export interface TeamPageData {
   team: PublicTeamDetail;
   activeLeague: { name: string; level: number } | null;
-  activeSeason: { id: string; name: string; status: string } | null;
+  activeSeason: { id: string; name: string; slug: string | null; status: string } | null;
   teamTrophies: TeamTrophyItem[];
   allTimeWins: number;
   allTimeDraws: number;
@@ -170,7 +170,7 @@ export async function fetchRawTeamPageData(slug: string): Promise<TeamPageData |
         leagues!inner (
           name,
           level,
-          seasons!inner ( id, name, status )
+          seasons!inner ( id, name, slug, status )
         )
       `)
       .eq('team_id', team.id)
@@ -545,7 +545,7 @@ export async function fetchRawTeamPageData(slug: string): Promise<TeamPageData |
   return {
     team,
     activeLeague: activeLeagueObj ? { name: activeLeagueObj.name, level: activeLeagueObj.level } : null,
-    activeSeason: activeSeasonObj ? { id: activeSeasonObj.id, name: activeSeasonObj.name, status: activeSeasonObj.status } : null,
+    activeSeason: activeSeasonObj ? { id: activeSeasonObj.id, name: activeSeasonObj.name, slug: activeSeasonObj.slug ?? null, status: activeSeasonObj.status } : null,
     teamTrophies,
     allTimeWins,
     allTimeDraws,

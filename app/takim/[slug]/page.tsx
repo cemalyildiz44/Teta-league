@@ -4,6 +4,8 @@ import Link from 'next/link';
 import TeamRosterCarousel from '../TeamRosterCarousel';
 import TeamLogo from '@/components/TeamLogo';
 import { getCachedTeamPageData } from './team-page-data';
+import { slugify } from '@/app/lig/utils';
+import { buildOpenGraph } from '@/lib/seo';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -18,9 +20,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (!team) return { title: 'Takım Bulunamadı' };
 
+  const title = `${team.name} | TETA League`;
+  const description = `${team.name} takımının aktif kadrosu, güncel lig durumu ve detayları. TETA League EA FC Pro Clubs ligi.`;
   return {
-    title: `${team.name} | TETA League`,
-    description: `${team.name} takımının aktif kadrosu, güncel lig durumu ve detayları. TETA League e-spor platformu.`,
+    title,
+    description,
+    alternates: { canonical: `/takim/${team.slug}` },
+    openGraph: buildOpenGraph({ title, description, path: `/takim/${team.slug}` }),
   };
 }
 
@@ -123,7 +129,13 @@ export default async function TeamPage({ params }: Props) {
                 <>
                   <div className="px-5 py-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-xl flex flex-col">
                     <span className="text-[10px] text-gray-500 font-[900] uppercase tracking-[0.2em] mb-1">Aktif Lig</span>
-                    <span className="text-[14px] text-white font-[800] tracking-widest uppercase">{activeLeague.name}</span>
+                    {activeSeason.slug ? (
+                      <Link href={`/lig/${activeSeason.slug}/${slugify(activeLeague.name)}`} className="text-[14px] text-white font-[800] tracking-widest uppercase hover:text-[#00e5ff] transition-colors">
+                        {activeLeague.name}
+                      </Link>
+                    ) : (
+                      <span className="text-[14px] text-white font-[800] tracking-widest uppercase">{activeLeague.name}</span>
+                    )}
                   </div>
                   <div className="px-5 py-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-xl flex flex-col">
                     <span className="text-[10px] text-gray-500 font-[900] uppercase tracking-[0.2em] mb-1">Sezon</span>

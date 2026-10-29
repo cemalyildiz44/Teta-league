@@ -5,6 +5,7 @@ import { getCachedPlayerRankings } from './rankings';
 export const metadata: Metadata = {
   title: 'Oyuncular Sıralaması | TETA League',
   description: 'TETA League tarihindeki en değerli oyuncular. Oyuncu piyasa değeri sıralaması.',
+  alternates: { canonical: '/oyuncular' },
 };
 
 export const revalidate = 60; // 1 min cache

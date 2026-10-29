@@ -8,6 +8,7 @@ import NewsImage from '@/components/NewsImage';
 import NewsContent from '@/components/NewsContent';
 import { extractMentionCandidates, getValidMentionUsernames } from '@/utils/mentions';
 import { getCachedUser } from '@/lib/fetchers';
+import { buildOpenGraph } from '@/lib/seo';
 
 interface NewsDetailPageProps {
   params: Promise<{ slug: string }>;
@@ -33,11 +34,13 @@ export async function generateMetadata({ params }: NewsDetailPageProps): Promise
   return {
     title: `${news.title} | TETA League`,
     description: news.summary || `${news.title} haber detayları`,
-    openGraph: {
+    alternates: { canonical: `/haberler/${slug}` },
+    openGraph: buildOpenGraph({
       title: `${news.title} | TETA League`,
-      description: news.summary || '',
+      description: news.summary || `${news.title} haber detayları`,
+      path: `/haberler/${slug}`,
       images: news.image_url ? [news.image_url] : [],
-    },
+    }),
   };
 }
 

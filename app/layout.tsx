@@ -6,6 +6,8 @@ import Footer from "@/components/Footer";
 import CookieBanner from "@/components/CookieBanner";
 
 import { getCachedUser, getCachedHeaderData } from "@/lib/fetchers";
+import { getCanonicalSiteUrl } from "@/lib/site-url";
+import { DEFAULT_OG_IMAGE, HOME_DESCRIPTION, HOME_TITLE, SITE_NAME } from "@/lib/seo";
 
 const exo2 = localFont({
   src: "./fonts/Exo2-VariableFont_wght.ttf",
@@ -14,9 +16,19 @@ const exo2 = localFont({
   weight: "300 900",
 });
 
+// No canonical here: alternates are inherited, so a root canonical would point every page to "/".
 export const metadata: Metadata = {
-  title: "TETA League",
-  description: "TETA League - EA FC Pro Clubs rekabetinin yeni adresi. Ligler, takımlar, istatistikler ve daha fazlası.",
+  metadataBase: new URL(getCanonicalSiteUrl()),
+  title: HOME_TITLE,
+  description: HOME_DESCRIPTION,
+  applicationName: SITE_NAME,
+  openGraph: {
+    siteName: SITE_NAME,
+    locale: "tr_TR",
+    type: "website",
+    images: [DEFAULT_OG_IMAGE],
+  },
+  twitter: { card: "summary" },
   icons: {
     icon: [
       { url: "/favicon.ico" },
