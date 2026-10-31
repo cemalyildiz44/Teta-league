@@ -8,6 +8,7 @@ import { slugify } from '@/app/lig/utils';
 import { logAdminAudit } from '@/lib/audit';
 import { buildProfilesOrFilter } from '@/lib/ea/roster-validator';
 import { attachTeamNames, getScopeNames } from '@/lib/admin-scope';
+import { detectReportScoreMismatch } from '@/lib/match-reporting';
 
 async function checkAdmin(supabase: any, user: any) {
   if (!user) return false;
@@ -33,7 +34,7 @@ export async function reviewMatchAction(matchId: string, status: 'APPROVED' | 'R
   // Fetch current match to guard against re-approval and collect route info for revalidation
   const { data: existingMatch } = await supabase
     .from('matches')
-    .select('id, status, season_id, league_id, home_team_id, away_team_id')
+    .select('id, fixture_id, source, status, season_id, league_id, home_team_id, away_team_id')
     .eq('id', matchId)
     .single();
 
@@ -42,6 +43,25 @@ export async function reviewMatchAction(matchId: string, status: 'APPROVED' | 'R
   // 2. Re-Approve Protection: Guard against re-approving an already approved match
   if (existingMatch.status === 'APPROVED' && status === 'APPROVED') {
     return { error: 'Bu maç zaten onaylanmış.' };
+  }
+
+  // Guard: If this match has pending dual-sided captain reports in match_team_reports, require approving via approveTeamMatchReportAction so player stats and score mismatch checks are never bypassed
+  if (status === 'APPROVED' && existingMatch.fixture_id) {
+    const { data: activeTeamReports } = await supabase
+      .from('match_team_reports')
+      .select('id, team_id, home_score, away_score, status, is_stats_applied')
+      .eq('fixture_id', existingMatch.fixture_id)
+      .in('status', ['PENDING_REVIEW', 'APPROVED']);
+
+    if (activeTeamReports && activeTeamReports.length > 0) {
+      const pendingReports = activeTeamReports.filter((r: any) => r.status === 'PENDING_REVIEW');
+      if (pendingReports.length > 0) {
+        return {
+          error:
+            'Bu maç için bekleyen çift taraflı kaptan raporu bulunmaktadır. Oyuncu istatistiklerinin ve skor uyuşmazlığı kontrolünün eksiksiz işlenmesi için lütfen üstteki "Çift Taraflı Kaptan Maç Raporları" bölümünden takım raporunu onaylayın.',
+        };
+      }
+    }
   }
 
   const { error } = await supabase.from('matches').update({
@@ -88,7 +108,7 @@ export async function revalidateMatchDependencies(supabase: any, matchId: string
   if (!match) {
     const { data } = await supabase
       .from('matches')
-      .select('id, status, season_id, league_id, home_team_id, away_team_id')
+      .select('id, fixture_id, source, status, season_id, league_id, home_team_id, away_team_id')
       .eq('id', matchId)
       .maybeSingle();
     match = data;
@@ -158,7 +178,7 @@ export async function deleteMatchAction(matchId: string) {
   // Fetch match details to know if public caches need revalidation
   const { data: existingMatch } = await supabase
     .from('matches')
-    .select('id, status, season_id, league_id, home_team_id, away_team_id')
+    .select('id, fixture_id, source, status, season_id, league_id, home_team_id, away_team_id')
     .eq('id', matchId)
     .maybeSingle();
 
@@ -798,3 +818,327 @@ export async function updateApprovedMatchDetailsAction(
   return { success: 'Maç ve oyuncu istatistikleri başarıyla güncellendi.' };
 }
 
+
+/**
+ * Approves a single team's captain match report independently.
+ * - First approved report processes the official match score/result and saves the first team's player stats.
+ * - Second approved report preserves the first report's approved match score and saves ONLY the second team's player stats.
+ * - Enforces idempotency so player stats can never be processed twice.
+ * - Blocks automatic approval on score mismatch unless allowScoreMismatch=true is explicitly passed by admin.
+ */
+export async function approveTeamMatchReportAction(
+  reportId: string,
+  options?: { allowScoreMismatch?: boolean }
+) {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!(await checkAdmin(supabase, user)) || !user) {
+    return { error: 'Yetkisiz erişim.' };
+  }
+
+  if (!reportId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reportId)) {
+    return { error: 'Geçersiz rapor kimliği.' };
+  }
+
+  const allowScoreMismatch = Boolean(options?.allowScoreMismatch);
+
+  // Fetch target report with its players
+  const { data: report, error: reportErr } = await supabase
+    .from('match_team_reports')
+    .select(
+      '*, report_players:match_team_report_players(*, profiles!match_team_report_players_player_id_fkey(id, username, current_ea_player_id))'
+    )
+    .eq('id', reportId)
+    .maybeSingle();
+
+  if (reportErr || !report) {
+    return { error: 'Onaylanacak takım raporu bulunamadı.' };
+  }
+
+  // Idempotency guard: prevent double approval or double stats processing
+  if (report.status === 'APPROVED' || report.is_stats_applied) {
+    return { error: 'Bu rapor zaten onaylanmış ve oyuncu istatistikleri işlenmiş.' };
+  }
+
+  // Fetch opponent's active report and parent match
+  const [{ data: otherReport }, { data: currentMatch }] = await Promise.all([
+    supabase
+      .from('match_team_reports')
+      .select('id, team_id, home_score, away_score, status, is_stats_applied')
+      .eq('fixture_id', report.fixture_id)
+      .neq('team_id', report.team_id)
+      .in('status', ['PENDING_REVIEW', 'APPROVED'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('matches')
+      .select('id, fixture_id, season_id, league_id, home_team_id, away_team_id, home_score, away_score, status, screenshot_url, notes')
+      .eq('fixture_id', report.fixture_id)
+      .maybeSingle(),
+  ]);
+
+  const mismatch = detectReportScoreMismatch({
+    targetReport: {
+      home_score: report.home_score,
+      away_score: report.away_score,
+      team_id: report.team_id,
+    },
+    otherReport: otherReport || null,
+    currentMatch: currentMatch || null,
+  });
+
+  if (mismatch.hasMismatch && !allowScoreMismatch) {
+    return {
+      error: `SKOR UYUŞMAZLIĞI: ${mismatch.reason} İkinci rapor otomatik onaylanamaz; lütfen kanıtları inceleyerek manuel onay verin.`,
+      requiresMismatchConfirmation: true,
+      mismatch,
+    };
+  }
+
+  // Call atomic RPC approve_match_team_report
+  const { data: rpcResult, error: rpcError } = await supabase.rpc('approve_match_team_report', {
+    p_report_id: reportId,
+    p_allow_score_mismatch: allowScoreMismatch,
+  });
+
+  let targetMatchId = rpcResult?.match_id || currentMatch?.id || report.match_id;
+  let isFirstApproval = rpcResult?.is_first_approval ?? (!currentMatch || currentMatch.status !== 'APPROVED');
+
+  const isMissingRpc =
+    rpcError &&
+    (rpcError.code === 'PGRST202' || rpcError.message?.includes('approve_match_team_report'));
+
+  if (rpcError && !isMissingRpc) {
+    return { error: rpcError.message };
+  }
+
+  // Fallback if RPC not yet deployed
+  if (isMissingRpc) {
+    if (!currentMatch) {
+      return { error: 'İlgili maç kaydı bulunamadı.' };
+    }
+    targetMatchId = currentMatch.id;
+    isFirstApproval = currentMatch.status !== 'APPROVED';
+
+    if (isFirstApproval) {
+      const { error: mErr } = await supabase
+        .from('matches')
+        .update({
+          home_score: report.home_score,
+          away_score: report.away_score,
+          played_at: report.played_at,
+          status: 'APPROVED',
+          approved_by: user.id,
+          approved_at: new Date().toISOString(),
+          rejection_reason: null,
+          screenshot_url: currentMatch.screenshot_url || report.screenshot_url,
+          notes: currentMatch.notes || report.notes,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', currentMatch.id);
+      if (mErr) return { error: mErr.message };
+    }
+
+    // Replace match_player_stats ONLY for report.team_id
+    await supabase
+      .from('match_player_stats')
+      .delete()
+      .eq('match_id', currentMatch.id)
+      .eq('team_id', report.team_id);
+
+    const reportPlayers = report.report_players || [];
+    if (reportPlayers.length > 0) {
+      const statsRows = reportPlayers.map((rp: any) => {
+        const prof = Array.isArray(rp.profiles) ? rp.profiles[0] : rp.profiles;
+        return {
+          match_id: currentMatch.id,
+          player_id: rp.player_id,
+          ea_player_id: prof?.current_ea_player_id || null,
+          ea_player_name: prof?.username || null,
+          team_id: report.team_id,
+          position: rp.position,
+          goals: rp.goals,
+          assists: rp.assists,
+          rating: rp.rating,
+          shots: rp.shots,
+          passes_made: rp.passes_made,
+          pass_attempts: rp.pass_attempts,
+          tackles_made: rp.tackles_made,
+          tackle_attempts: rp.tackle_attempts,
+          saves: rp.saves,
+          goals_conceded: rp.goals_conceded,
+          cleansheets_gk: rp.cleansheets_gk,
+          cleansheets_def: rp.cleansheets_def,
+          yellow_cards: rp.yellow_cards ?? 0,
+          red_cards: rp.red_cards,
+          minutes_played: rp.minutes_played ?? 90,
+          is_mom: rp.is_mom,
+          extra_stats: {
+            roster_status: 'VALID',
+            match_team_id: report.team_id,
+            source: 'CAPTAIN_REPORT',
+          },
+        };
+      });
+
+      const { error: insErr } = await supabase.from('match_player_stats').insert(statsRows);
+      if (insErr) {
+        if (insErr.message?.includes('uq_single_mom_per_match')) {
+          const safeRows = statsRows.map((r: any) => ({ ...r, is_mom: false }));
+          const { error: retryErr } = await supabase.from('match_player_stats').insert(safeRows);
+          if (retryErr) return { error: retryErr.message };
+        } else {
+          return { error: insErr.message };
+        }
+      }
+    }
+
+    const { error: repUpdateErr } = await supabase
+      .from('match_team_reports')
+      .update({
+        status: 'APPROVED',
+        is_stats_applied: true,
+        match_id: currentMatch.id,
+        reviewed_by: user.id,
+        reviewed_at: new Date().toISOString(),
+        rejection_reason: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', reportId);
+
+    if (repUpdateErr) return { error: repUpdateErr.message };
+  }
+
+  await logAdminAudit({
+    action: 'APPROVE_TEAM_MATCH_REPORT',
+    entity_type: 'match_team_reports',
+    entity_id: reportId,
+    entity_label: `Takım Raporu #${reportId.substring(0, 8)}`,
+    old_data: { status: report.status, is_stats_applied: report.is_stats_applied },
+    new_data: {
+      status: 'APPROVED',
+      is_stats_applied: true,
+      is_first_approval: isFirstApproval,
+      reported_score: `${report.home_score}-${report.away_score}`,
+      score_mismatch_overridden: mismatch.hasMismatch && allowScoreMismatch,
+    },
+    description: isFirstApproval
+      ? `İlk takım raporu (#${reportId.substring(0, 8)}) onaylandı: Resmi maç skoru ${report.home_score}-${report.away_score} olarak işlendi ve ilk takımın oyuncu istatistikleri kaydedildi.`
+      : `İkinci takım raporu (#${reportId.substring(0, 8)}) onaylandı: İlk raporda onaylanmış resmi maç skoru korundu ve yalnızca ikinci takımın oyuncu istatistikleri kaydedildi.`,
+    actor_id: user.id,
+  });
+
+  if (targetMatchId) {
+    await revalidateMatchDependencies(supabase, targetMatchId);
+  } else {
+    revalidatePath('/admin/matches');
+  }
+  revalidatePath('/takim/yonet/maclar');
+
+  return {
+    success: isFirstApproval
+      ? 'İlk takım raporu onaylandı. Maç skoru işlendi ve ilk takımın oyuncu istatistikleri kaydedildi. İkinci takımın raporu beklenmeye devam ediyor.'
+      : 'İkinci takım raporu onaylandı. İlk raporda onaylanan maç skoru korundu ve ikinci takımın oyuncu istatistikleri eklendi.',
+    isFirstApproval,
+  };
+}
+
+/**
+ * Rejects a single team's captain match report independently.
+ */
+export async function rejectTeamMatchReportAction(
+  reportId: string,
+  rejectionReason?: string
+) {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!(await checkAdmin(supabase, user)) || !user) {
+    return { error: 'Yetkisiz erişim.' };
+  }
+
+  if (!reportId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reportId)) {
+    return { error: 'Geçersiz rapor kimliği.' };
+  }
+
+  const { data: report } = await supabase
+    .from('match_team_reports')
+    .select('id, fixture_id, match_id, team_id, status, is_stats_applied')
+    .eq('id', reportId)
+    .maybeSingle();
+
+  if (!report) {
+    return { error: 'Reddedilecek takım raporu bulunamadı.' };
+  }
+
+  const cleanReason = rejectionReason?.trim() || 'Yönetici tarafından reddedildi.';
+
+  const { data: rpcResult, error: rpcError } = await supabase.rpc('reject_match_team_report', {
+    p_report_id: reportId,
+    p_rejection_reason: cleanReason,
+  });
+
+  const isMissingRpc =
+    rpcError &&
+    (rpcError.code === 'PGRST202' || rpcError.message?.includes('reject_match_team_report'));
+
+  if (rpcError && !isMissingRpc) {
+    return { error: rpcError.message };
+  }
+
+  if (isMissingRpc) {
+    if (report.is_stats_applied && report.match_id) {
+      await supabase
+        .from('match_player_stats')
+        .delete()
+        .eq('match_id', report.match_id)
+        .eq('team_id', report.team_id);
+    }
+
+    const { error: updErr } = await supabase
+      .from('match_team_reports')
+      .update({
+        status: 'REJECTED',
+        is_stats_applied: false,
+        rejection_reason: cleanReason,
+        reviewed_by: user.id,
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', reportId);
+
+    if (updErr) return { error: updErr.message };
+  }
+
+  const targetMatchId = rpcResult?.match_id || report.match_id;
+
+  await logAdminAudit({
+    action: 'REJECT_TEAM_MATCH_REPORT',
+    entity_type: 'match_team_reports',
+    entity_id: reportId,
+    entity_label: `Takım Raporu #${reportId.substring(0, 8)}`,
+    old_data: { status: report.status },
+    new_data: { status: 'REJECTED', rejection_reason: cleanReason },
+    description: `Takım raporu (#${reportId.substring(0, 8)}) reddedildi. Gerekçe: ${cleanReason}`,
+    actor_id: user.id,
+  });
+
+  if (targetMatchId) {
+    await revalidateMatchDependencies(supabase, targetMatchId);
+  } else {
+    revalidatePath('/admin/matches');
+  }
+  revalidatePath('/takim/yonet/maclar');
+
+  return {
+    success: 'Takım raporu reddedildi. İlgili takım kaptanı raporunu düzelterek yeniden gönderebilir.',
+  };
+}

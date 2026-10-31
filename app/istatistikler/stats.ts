@@ -117,7 +117,7 @@ export async function fetchRawStatsData(seasonId?: string, leagueId?: string): P
   // 2. Fetch raw match_player_stats for those matches
   const { data: stats } = await publicSupabase
     .from('match_player_stats')
-    .select('ea_player_id, team_id, position, goals, assists, rating, saves, goals_conceded')
+    .select('player_id, ea_player_id, team_id, position, goals, assists, rating, saves, goals_conceded')
     .in('match_id', matchIds);
 
   const rawStats = stats || [];
@@ -126,10 +126,17 @@ export async function fetchRawStatsData(seasonId?: string, leagueId?: string): P
   }
 
   // 3. Filter only verified EA players with existing profiles
+  const directPlayerIds = Array.from(new Set(rawStats.map((s: any) => s.player_id).filter(Boolean)));
   const eaPlayerIds = Array.from(new Set(rawStats.map((s: any) => s.ea_player_id).filter(Boolean)));
   const teamIds = Array.from(new Set(rawStats.map((s: any) => s.team_id).filter(Boolean)));
 
-  const [profilesRes, teamsRes] = await Promise.all([
+  const [directProfilesRes, profilesRes, teamsRes] = await Promise.all([
+    directPlayerIds.length > 0
+      ? publicSupabase
+          .from('profiles')
+          .select('id, username, current_ea_player_id')
+          .in('id', directPlayerIds)
+      : Promise.resolve({ data: [] }),
     eaPlayerIds.length > 0
       ? publicSupabase
           .from('profiles')
@@ -145,16 +152,17 @@ export async function fetchRawStatsData(seasonId?: string, leagueId?: string): P
       : Promise.resolve({ data: [] })
   ]);
 
-  const validProfiles = profilesRes.data || [];
-  const eaToProfileMap = new Map(validProfiles.map((p: any) => [p.current_ea_player_id, p]));
+  const validProfiles = [...(directProfilesRes.data || []), ...(profilesRes.data || [])];
+  const idToProfileMap = new Map(validProfiles.map((p: any) => [p.id, p]));
+  const eaToProfileMap = new Map(validProfiles.filter((p: any) => p.current_ea_player_id).map((p: any) => [p.current_ea_player_id, p]));
   const teamMap = new Map((teamsRes.data || []).map((t: any) => [t.id, t]));
 
-  const filteredStats = rawStats.filter((s: any) => s.ea_player_id && eaToProfileMap.has(s.ea_player_id));
+  const filteredStats = rawStats.filter((s: any) => (s.player_id && idToProfileMap.has(s.player_id)) || (s.ea_player_id && eaToProfileMap.has(s.ea_player_id)));
 
   // 4. Aggregate stats per profile
   const playerStatsMap = new Map<string, any>();
   for (const s of filteredStats) {
-    const profile = eaToProfileMap.get(s.ea_player_id);
+    const profile = (s.player_id && idToProfileMap.get(s.player_id)) || eaToProfileMap.get(s.ea_player_id);
     const key = profile.id;
 
     if (!playerStatsMap.has(key)) {

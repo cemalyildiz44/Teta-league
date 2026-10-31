@@ -49,7 +49,7 @@ async function loadContext(supabase: Supa, p: { seasonId: string; leagueId: stri
   const fixtures = f.data ?? [];
   const teamIds = [...new Set<string>(fixtures.flatMap((x: any) => [x.home_team_id, x.away_team_id]))];
 
-  const [t, mf, me, h, fi, pr, ms] = await Promise.all([
+  const [t, mf, me, h, fi, pr, ms, mtr] = await Promise.all([
     teamIds.length ? supabase.from('teams').select('id, name, ea_club_id').in('id', teamIds) : Promise.resolve({ data: [], error: null }),
     p.fixtureIds.length ? supabase.from('matches').select('id, fixture_id, status').in('fixture_id', p.fixtureIds) : Promise.resolve({ data: [], error: null }),
     p.eaMatchIds.length ? supabase.from('matches').select('id, fixture_id, ea_match_id, status').in('ea_match_id', p.eaMatchIds) : Promise.resolve({ data: [], error: null }),
@@ -58,6 +58,7 @@ async function loadContext(supabase: Supa, p: { seasonId: string; leagueId: stri
     supabase.from('profiles').select('id, username, full_name, current_ea_player_id, is_active, status').limit(5000),
     // No embedded teams(...): team_memberships references league_teams (composite FK), so PostgREST has no direct relationship to teams.
     supabase.from('team_memberships').select('id, player_id, team_id, season_id, left_at').eq('season_id', p.seasonId).is('left_at', null).limit(5000),
+    p.fixtureIds.length ? supabase.from('match_team_reports').select('id, fixture_id, status').in('fixture_id', p.fixtureIds).in('status', ['PENDING_REVIEW', 'APPROVED']) : Promise.resolve({ data: [], error: null }),
   ]);
   const e2 = t.error || mf.error || me.error || pr.error || ms.error;
   if (e2) return { error: 'Veri okunamadı: ' + e2.message };
@@ -79,6 +80,8 @@ async function loadContext(supabase: Supa, p: { seasonId: string; leagueId: stri
 
   const matchesByFixture: MatchLiveContext['matchesByFixture'] = {};
   for (const m of mf.data ?? []) if (m.fixture_id) (matchesByFixture[m.fixture_id] ??= []).push({ id: m.id, status: m.status });
+  const captainReportsByFixture: NonNullable<MatchLiveContext['captainReportsByFixture']> = {};
+  for (const r of (mtr.error ? [] : mtr.data ?? [])) if (r.fixture_id) (captainReportsByFixture[r.fixture_id] ??= []).push({ id: r.id, status: r.status });
   const usedEaMatchIds: MatchLiveContext['usedEaMatchIds'] = {};
   for (const m of me.data ?? []) usedEaMatchIds[m.ea_match_id] = { id: m.id, fixture_id: m.fixture_id, status: m.status };
 
@@ -89,6 +92,7 @@ async function loadContext(supabase: Supa, p: { seasonId: string; leagueId: stri
       fixtures,
       teams: t.data ?? [],
       matchesByFixture,
+      captainReportsByFixture,
       usedEaMatchIds,
       history: h.data ?? [],
       fixtureImports: fi.error ? [] : fi.data ?? [],

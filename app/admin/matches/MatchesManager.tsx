@@ -15,6 +15,7 @@ import {
   updateApprovedMatchDetailsAction, type UpdateApprovedMatchPayload
 } from './actions';
 import TeamLogo from '@/components/TeamLogo';
+import { DualTeamReportsSection } from './DualTeamReportsSection';
 
 type StatsRow = { id: string; ea_player_name?: string | null; ea_player_id?: string | null; profiles?: { username?: string | null } | null; rating?: number | null; is_mom?: boolean | null; [k: string]: unknown };
 interface DetailStat {
@@ -130,7 +131,10 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
     return initialMatches.filter((m: any) => {
       if (filterSeason && m.season_id !== filterSeason) return false;
       if (filterLeague !== 'ALL' && m.league_id !== filterLeague) return false;
-      if (filterStatus !== 'ALL' && m.status !== filterStatus) return false;
+      if (filterStatus === 'PENDING_REVIEW') {
+        const hasPendingReport = m.status === 'PENDING_REVIEW' || m.home_report?.status === 'PENDING_REVIEW' || m.away_report?.status === 'PENDING_REVIEW';
+        if (!hasPendingReport) return false;
+      } else if (filterStatus !== 'ALL' && m.status !== filterStatus) return false;
       if (search) {
         const s = search.toLowerCase();
         if (!m.home?.name?.toLowerCase().includes(s) && !m.away?.name?.toLowerCase().includes(s)) return false;
@@ -140,7 +144,7 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
   }, [initialMatches, filterSeason, filterLeague, filterStatus, search]);
 
   const total = initialMatches.length;
-  const pending = initialMatches.filter((m:any) => m.status === 'PENDING_REVIEW').length;
+  const pending = initialMatches.filter((m:any) => m.status === 'PENDING_REVIEW' || m.home_report?.status === 'PENDING_REVIEW' || m.away_report?.status === 'PENDING_REVIEW').length;
   const approved = initialMatches.filter((m:any) => m.status === 'APPROVED').length;
   const rejected = initialMatches.filter((m:any) => ['REJECTED', 'CANCELLED'].includes(m.status)).length;
 
@@ -674,7 +678,20 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                     </div>
                   </td>
                   <td className='px-4 py-3'>
-                    <StatusBadge status={m.status} />
+                    <div className='flex flex-col gap-1'>
+                      <StatusBadge status={m.status} />
+                      {(m.home_report || m.away_report) && (
+                        <div className='flex items-center gap-1 text-[9px] font-bold'>
+                          <span className={m.home_report?.status === 'APPROVED' ? 'text-emerald-400' : m.home_report?.status === 'PENDING_REVIEW' ? 'text-amber-400' : 'text-zinc-500'}>
+                            Ev: {m.home_report ? m.home_report.status : 'Yok'}
+                          </span>
+                          <span className='text-zinc-600'>•</span>
+                          <span className={m.away_report?.status === 'APPROVED' ? 'text-emerald-400' : m.away_report?.status === 'PENDING_REVIEW' ? 'text-amber-400' : 'text-zinc-500'}>
+                            Dep: {m.away_report ? m.away_report.status : 'Yok'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </td>
                   <td className='px-4 py-3 text-right'>
                     <button onClick={(e) => { e.stopPropagation(); setDetailModal(m); }} className='px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white text-[10px] font-bold rounded transition-colors'>
@@ -1272,6 +1289,13 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                     )}
                   </div>
                 )}
+
+                {/* 3B. Dual-Sided Captain Match Reports */}
+                <DualTeamReportsSection
+                  match={detailModal}
+                  onUpdated={() => router.refresh()}
+                  showFeedback={showFeedback}
+                />
 
                 {/* 4. Player Stats: Two Columns (Home & Away) */}
                 <div>

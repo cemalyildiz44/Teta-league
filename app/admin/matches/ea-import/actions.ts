@@ -27,7 +27,7 @@ async function checkAdmin(supabase: any, user: any) {
 
 export interface EAPreviewMatch extends NormalizedMatch {
   fixture_id?: string;
-  match_status: 'READY' | 'DUPLICATE_EA_MATCH' | 'FIXTURE_ALREADY_HAS_MATCH' | 'UNMATCHED' | 'AMBIGUOUS';
+  match_status: 'READY' | 'DUPLICATE_EA_MATCH' | 'FIXTURE_ALREADY_HAS_MATCH' | 'DRAW_REQUIRES_CAPTAIN_REPORT' | 'UNMATCHED' | 'AMBIGUOUS';
   home_team_id?: string;
   away_team_id?: string;
   is_reversed?: boolean;
@@ -119,10 +119,11 @@ export async function fetchEaPreviewAction(leagueId: string, weekNumber: number)
           match_status = 'DUPLICATE_EA_MATCH';
         } else {
           const { data: dupFix } = await supabase.from('matches').select('id').eq('fixture_id', matchRes.fixture_id).maybeSingle();
-          if (dupFix) {
+          const { data: dupCaptainReport } = await supabase.from('match_team_reports').select('id').eq('fixture_id', matchRes.fixture_id).in('status', ['PENDING_REVIEW', 'APPROVED']).limit(1).maybeSingle();
+          if (dupFix || dupCaptainReport) {
             match_status = 'FIXTURE_ALREADY_HAS_MATCH';
           } else {
-            match_status = 'READY';
+            match_status = normalized.home_team.score === normalized.away_team.score ? 'DRAW_REQUIRES_CAPTAIN_REPORT' : 'READY';
           }
         }
       } else {
@@ -160,6 +161,12 @@ export async function importEaMatchAction(matchData: EAPreviewMatch, seasonId: s
     return { error: 'Sezon ve Lig ID parametreleri zorunludur.' };
   }
 
+  if (matchData.match_status === 'DRAW_REQUIRES_CAPTAIN_REPORT' || matchData.home_team.score === matchData.away_team.score) {
+    return {
+      error:
+        'Beraberlikle sonuçlanan maçlar EA API üzerinden otomatik içe aktarılamaz; bu maçlar kaptanların manuel raporlamasına bırakılmalıdır.',
+    };
+  }
   if (matchData.match_status !== 'READY') {
     return { error: 'Maç READY statüsünde değil.' };
   }
@@ -174,6 +181,29 @@ export async function importEaMatchAction(matchData: EAPreviewMatch, seasonId: s
 
   const homeTeamId = matchData.home_team_id;
   const awayTeamId = matchData.away_team_id;
+
+  // 0. Guard: Never overwrite an existing match or approved/pending captain report for this fixture
+  const [{ data: existingFixtureMatch }, { data: existingCaptainReport }] = await Promise.all([
+    supabase
+      .from('matches')
+      .select('id, status, source')
+      .eq('fixture_id', matchData.fixture_id)
+      .maybeSingle(),
+    supabase
+      .from('match_team_reports')
+      .select('id, status')
+      .eq('fixture_id', matchData.fixture_id)
+      .in('status', ['PENDING_REVIEW', 'APPROVED'])
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  if (existingFixtureMatch || existingCaptainReport) {
+    return {
+      error:
+        'Bu fikstür için sistemde zaten bir maç kaydı veya kaptan raporu mevcut. Onaylanmış veya bekleyen kaptan raporları EA senkronizasyonu ile ezilemez.',
+    };
+  }
 
   // 1. Insert Match
   const { data: newMatch, error: matchErr } = await supabase.from('matches').insert({

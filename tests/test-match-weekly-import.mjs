@@ -674,4 +674,84 @@ const codes = (plan, i = 0) => plan.matches[i].errors.map((e) => e.code);
   assert.match(approvedRes.error, /APPROVED/);
 }
 
+// ------------------------------------------------------------------ 15. draw matches routed to captain reporting & captain reports protected from EA overwrite
+{
+  // 15a. Any EA draw score (0-0, 1-1, 2-2) is blocked from automatic EA import with DRAW_REQUIRES_CAPTAIN_REPORT
+  for (const [hScore, aScore] of [[0, 0], [1, 1], [2, 2]]) {
+    const db = makeDb();
+    const drawMatch = mkMatch(1, {
+      home: { teamId: T[1], eaClubId: EA(1), score: hScore },
+      away: { teamId: T[2], eaClubId: EA(2), score: aScore },
+    });
+    const drawDoc = makeDoc({ matches: [drawMatch] });
+    const pv = await preview(db, [upload(drawDoc)]);
+    assert.equal(pv.canApply, false, `draw ${hScore}-${aScore} must not be auto-applicable`);
+    const plan = first(pv);
+    assert.equal(plan.status, 'BLOCKED');
+    assert.equal(plan.rpc, null);
+    assert.ok(codes(plan, 0).includes('DRAW_REQUIRES_CAPTAIN_REPORT'), `draw ${hScore}-${aScore} must emit DRAW_REQUIRES_CAPTAIN_REPORT`);
+
+    const applyRes = await applyMatchImport(db.client, {
+      ...SEL,
+      files: [upload(drawDoc)],
+      expectedHashes: { 'sonuc.json': plan.planHash },
+    });
+    assert.equal(applyRes.ok, false);
+    assert.equal(db.rpcCalls.length, 0);
+  }
+
+  // 15b. Mixed weekly file (Match 1 = 2-1 non-draw, Match 2 = 1-1 draw):
+  //      Match 2 (draw) is blocked for captain reporting, while Match 1 (non-draw) can still be sent individually via onlyEaMatchId
+  {
+    const db = makeDb();
+    const nonDrawM1 = mkMatch(1); // 2-1
+    const drawM2 = mkMatch(2, {
+      home: { teamId: T[3], eaClubId: EA(3), score: 1 },
+      away: { teamId: T[4], eaClubId: EA(4), score: 1 },
+    });
+    const mixedDoc = makeDoc({ matches: [nonDrawM1, drawM2] });
+    const pv = await preview(db, [upload(mixedDoc)], { weekNumber: 1 });
+    const plan = first(pv);
+    assert.equal(plan.status, 'BLOCKED', 'whole file is blocked because Match 2 is a draw');
+    assert.equal(plan.matches[0].errors.length, 0, 'Match 1 (2-1) has no errors');
+    assert.ok(codes(plan, 1).includes('DRAW_REQUIRES_CAPTAIN_REPORT'), 'Match 2 (1-1) is blocked as draw');
+
+    // Sending Match 2 (draw) individually via onlyEaMatchId is also blocked
+    const sendDraw = await applyMatchImport(db.client, {
+      ...SEL,
+      weekNumber: 1,
+      files: [upload(mixedDoc)],
+      onlyEaMatchId: drawM2.eaMatchId,
+      expectedHashes: { 'sonuc.json': plan.matches[1].sendHash },
+    });
+    assert.equal(sendDraw.ok, false);
+    assert.equal(db.rpcCalls.length, 0);
+
+    // Sending Match 1 (non-draw 2-1) individually via onlyEaMatchId succeeds
+    const sendNonDraw = await applyMatchImport(db.client, {
+      ...SEL,
+      weekNumber: 1,
+      files: [upload(mixedDoc)],
+      onlyEaMatchId: nonDrawM1.eaMatchId,
+      expectedHashes: { 'sonuc.json': plan.matches[0].sendHash },
+    });
+    assert.equal(sendNonDraw.ok, true, sendNonDraw.error);
+    assert.equal(db.rpcCalls.length, 1);
+    assert.equal(db.rpcCalls[0].args.p_files[0].matches[0].ea_match_id, nonDrawM1.eaMatchId);
+  }
+
+  // 15c. Fixture with an existing captain report (PENDING_REVIEW or APPROVED) is blocked with FIXTURE_HAS_CAPTAIN_REPORT
+  for (const reportStatus of ['PENDING_REVIEW', 'APPROVED']) {
+    const db = makeDb({
+      match_team_reports: [{ id: U(880), fixture_id: FX[1], status: reportStatus }],
+    });
+    const doc = makeDoc({ matches: [mkMatch(1)] });
+    const pv = await preview(db, [upload(doc)]);
+    assert.equal(pv.canApply, false);
+    const plan = first(pv);
+    assert.equal(plan.status, 'BLOCKED');
+    assert.ok(codes(plan, 0).includes('FIXTURE_HAS_CAPTAIN_REPORT'), `captain report (${reportStatus}) must block EA import`);
+  }
+}
+
 console.log('match-weekly-import tests passed');

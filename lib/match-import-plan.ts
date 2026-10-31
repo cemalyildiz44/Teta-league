@@ -38,6 +38,8 @@ export interface MatchLiveContext {
   fixtures: LiveFixtureLite[];
   teams: { id: string; name: string; ea_club_id: number | string | null }[];
   matchesByFixture: Record<string, { id: string; status: string }[]>;
+  /** active captain reports (PENDING_REVIEW or APPROVED) keyed by fixture_id */
+  captainReportsByFixture?: Record<string, { id: string; status: string }[]>;
   /** matches that already carry one of the file's ea_match_id values */
   usedEaMatchIds: Record<string, { id: string; fixture_id: string | null; status?: string }>;
   history: MatchHistoryRow[];
@@ -232,6 +234,7 @@ export function planMatchImport(args: {
       if (f.status !== 'SCHEDULED') bad('FIXTURE_NOT_SCHEDULED', `Fikstür durumu ${f.status}; yalnızca SCHEDULED fikstüre maç eklenebilir.`);
       if (toMs(f.updated_at) !== toMs(m.fixtureUpdatedAt)) bad('FIXTURE_CHANGED', 'Fikstür dosya üretildikten sonra canlıda değişmiş; fikstür dosyasını ve sonuçları yeniden üretin.');
       if ((live.matchesByFixture[f.id]?.length ?? 0) > 0) bad('FIXTURE_HAS_MATCH', 'Bu fikstüre bağlı bir maç zaten var; ikinci maç eklenemez.');
+      if ((live.captainReportsByFixture?.[f.id]?.length ?? 0) > 0) bad('FIXTURE_HAS_CAPTAIN_REPORT', 'Bu fikstür için kaptan raporu bulunmaktadır; EA import ile ezilemez.');
       if (f.home_team_id !== m.home.teamId || f.away_team_id !== m.away.teamId) bad('TEAM_MISMATCH', 'Dosyadaki ev/deplasman takımları canlı fikstürle uyuşmuyor.');
       const eaOf = (id: string) => {
         const t = teamById.get(id);
@@ -249,6 +252,9 @@ export function planMatchImport(args: {
     if (outOfWindow) {
       if (oowOk.has(m.eaMatchId)) mw.push({ code: 'OUT_OF_WINDOW_ACCEPTED', message: 'Maç fikstürün EA zaman aralığı dışında; yönetici onayıyla alınacak.' });
       else mw.push({ code: 'OUT_OF_WINDOW', message: 'Maç fikstürün EA zaman aralığı (UTC 17:00–23:00) dışında; açık yönetici kararı gerekir.' });
+    }
+    if (m.home.score === m.away.score) {
+      bad('DRAW_REQUIRES_CAPTAIN_REPORT', 'Beraberlikle biten maçlar EA üzerinden otomatik içe aktarılamaz; kaptanların manuel raporlamasına bırakılmalıdır.');
     }
     if (m.home.score === 0 && m.away.score === 0) mw.push({ code: 'ZERO_ZERO', message: '0-0 sonuç (şüpheli).' });
     if (m.players.length === 0) mw.push({ code: 'NO_PLAYERS', message: 'Oyuncu verisi yok.' });
