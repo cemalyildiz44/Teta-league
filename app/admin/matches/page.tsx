@@ -18,7 +18,7 @@ export default async function AdminMatchesPage() {
     supabase
       .from('matches')
       .select(
-        '*, fixtures(id, matchday), stats:match_player_stats(*, profiles!match_player_stats_player_id_fkey(id, username, full_name, current_ea_player_id)), match_raw_ea_data(id, ea_match_id, raw_data, fetched_at)'
+        '*, fixtures(id, week_number), stats:match_player_stats(*, profiles!match_player_stats_player_id_fkey(id, username, full_name, current_ea_player_id)), match_raw_ea_data(id, ea_match_id, raw_data, fetched_at)'
       )
       .order('played_at', { ascending: false })
       .limit(500),
@@ -63,7 +63,7 @@ export default async function AdminMatchesPage() {
     const fixtureObj = m.fixtures
       ? {
           ...m.fixtures,
-          week_number: m.fixtures.matchday ?? m.fixtures.week_number,
+          week_number: m.fixtures.week_number ?? m.fixtures.matchday ?? null,
         }
       : null;
 

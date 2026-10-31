@@ -365,9 +365,9 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
           <h2 className="text-sm font-black text-white uppercase tracking-widest">
             1. MAÇ SKORU VE KANIT BİLGİLERİ
           </h2>
-          {fixture.matchday && (
+          {(fixture.week_number ?? fixture.matchday) && (
             <span className="text-[10px] font-black text-[#00e5ff] uppercase tracking-widest px-2.5 py-1 bg-[#00e5ff]/10 rounded">
-              {fixture.matchday}. HAFTA
+              {fixture.week_number ?? fixture.matchday}. HAFTA
             </span>
           )}
         </div>

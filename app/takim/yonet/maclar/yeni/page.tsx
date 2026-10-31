@@ -36,7 +36,7 @@ export default async function NewMatchPage({ searchParams }: { searchParams: Pro
 
   const { data: fixture } = await supabase
     .from('fixtures')
-    .select('id, season_id, league_id, matchday, home_team_id, away_team_id, scheduled_at, status')
+    .select('id, season_id, league_id, week_number, home_team_id, away_team_id, scheduled_at, status')
     .eq('id', fixtureId)
     .maybeSingle();
 
@@ -65,8 +65,8 @@ export default async function NewMatchPage({ searchParams }: { searchParams: Pro
   }
 
   const [{ data: homeTeam }, { data: awayTeam }] = await Promise.all([
-    supabase.from('teams').select('id, name, short_name, logo_url').eq('id', fixture.home_team_id).maybeSingle(),
-    supabase.from('teams').select('id, name, short_name, logo_url').eq('id', fixture.away_team_id).maybeSingle()
+    supabase.from('teams').select('id, name, logo_url').eq('id', fixture.home_team_id).maybeSingle(),
+    supabase.from('teams').select('id, name, logo_url').eq('id', fixture.away_team_id).maybeSingle()
   ]);
 
   const [
@@ -179,6 +179,7 @@ export default async function NewMatchPage({ searchParams }: { searchParams: Pro
 
   // Attach roster and dual-report context onto fixture object for SubmitMatchForm
   Object.assign(fixture, {
+    matchday: (fixture as any).week_number,
     teamRoster,
     myLatestReport,
     opponentReport,

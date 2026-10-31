@@ -32,7 +32,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
 
   const { data: match } = await supabase
     .from('matches')
-    .select('*, fixtures(matchday, week_number, status)')
+    .select('*, fixtures(week_number, status)')
     .eq('id', matchId)
     .single();
 
@@ -114,7 +114,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
   const displayScreenshot = myTeamReport?.screenshot_url ?? match.screenshot_url;
   const displayHomeScore = myTeamReport?.home_score ?? match.home_score;
   const displayAwayScore = myTeamReport?.away_score ?? match.away_score;
-  const weekNo = fixtureObj?.matchday ?? fixtureObj?.week_number ?? '-';
+  const weekNo = fixtureObj?.week_number ?? fixtureObj?.matchday ?? '-';
 
   return (
     <main className="min-h-screen bg-[#060d18] pt-24 pb-12">
