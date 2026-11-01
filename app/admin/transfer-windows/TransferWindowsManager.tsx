@@ -1,5 +1,6 @@
 'use client';
 
+import { formatForDateTimeLocal, TURKEY_TIMEZONE } from '@/lib/date-utils';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
@@ -42,11 +43,7 @@ interface Props {
 }
 
 function toLocalDatetimeInput(isoStr: string) {
-  if (!isoStr) return '';
-  const d = new Date(isoStr);
-  if (isNaN(d.getTime())) return '';
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return formatForDateTimeLocal(isoStr);
 }
 
 function formatDateTimeTR(dateStr: string) {
@@ -54,6 +51,7 @@ function formatDateTimeTR(dateStr: string) {
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return '-';
   return new Intl.DateTimeFormat('tr-TR', {
+    timeZone: TURKEY_TIMEZONE,
     day: '2-digit',
     month: 'short',
     year: 'numeric',

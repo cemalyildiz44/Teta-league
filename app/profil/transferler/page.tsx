@@ -52,14 +52,20 @@ export default async function PlayerTransfersPage() {
     .eq('season_id', activeSeason.id)
     .order('created_at', { ascending: false });
 
-  // Transfer Window status
+  // Active Transfer Window status
+  const nowIso = new Date().toISOString();
   const { data: window } = await supabase
     .from('transfer_windows')
-    .select('is_open')
+    .select('id, is_open, start_date, end_date')
     .eq('season_id', activeSeason.id)
+    .eq('is_open', true)
+    .lte('start_date', nowIso)
+    .gte('end_date', nowIso)
+    .order('start_date', { ascending: false })
+    .limit(1)
     .maybeSingle();
 
-  const isWindowOpen = window?.is_open ?? false;
+  const isWindowOpen = !!window;
 
   return (
     <main className="min-h-screen bg-[#060d18] pt-24 pb-12">
@@ -71,18 +77,18 @@ export default async function PlayerTransfersPage() {
         </div>
 
         {membership && (() => {
-          const mTeam = Array.isArray(membership.teams) ? membership.teams[0] : membership.teams;
+          const mTeam = (Array.isArray(membership.teams) ? membership.teams[0] : membership.teams) as { name?: string; logo_url?: string } | null;
           return (
             <div className="card-surface p-6 rounded-xl border border-white/5 mb-8 flex items-center justify-between">
               <div>
                 <div className="text-[10px] font-bold text-gray-500 tracking-widest uppercase mb-1">Mevcut Takımın</div>
                 <div className="flex items-center gap-3">
                   <TeamLogo
-                    src={(mTeam as any)?.logo_url}
-                    name={(mTeam as any)?.name}
+                    src={mTeam?.logo_url}
+                    name={mTeam?.name}
                     size="sm"
                   />
-                  <span className="font-bold text-white text-lg">{(mTeam as any)?.name}</span>
+                  <span className="font-bold text-white text-lg">{mTeam?.name}</span>
                 </div>
               </div>
             </div>

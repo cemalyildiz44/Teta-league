@@ -4,8 +4,9 @@ import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { logAdminAudit } from '@/lib/audit';
+import { parseToTurkeyISO } from '@/lib/date-utils';
 
-async function checkAdmin(supabase: any, user: any) {
+async function checkAdmin(supabase: ReturnType<typeof createClient>, user: { id: string } | null) {
   if (!user) return false;
   const { data } = await supabase
     .from('user_roles')
@@ -34,12 +35,15 @@ export async function createTransferWindow(formData: FormData) {
   if (!season_id) return { error: 'Sezon seçilmelidir.' };
   if (!start_date_raw || !end_date_raw) return { error: 'Başlangıç ve bitiş tarihleri zorunludur.' };
 
-  const startDate = new Date(start_date_raw);
-  const endDate = new Date(end_date_raw);
+  const startDateIso = parseToTurkeyISO(start_date_raw);
+  const endDateIso = parseToTurkeyISO(end_date_raw);
 
-  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+  if (!startDateIso || !endDateIso) {
     return { error: 'Geçersiz tarih formatı.' };
   }
+
+  const startDate = new Date(startDateIso);
+  const endDate = new Date(endDateIso);
 
   if (endDate <= startDate) {
     return { error: 'Bitiş tarihi, başlangıç tarihinden sonra olmalıdır.' };
@@ -52,8 +56,8 @@ export async function createTransferWindow(formData: FormData) {
   const { error } = await supabase.from('transfer_windows').insert({
     season_id,
     name,
-    start_date: startDate.toISOString(),
-    end_date: endDate.toISOString(),
+    start_date: startDateIso,
+    end_date: endDateIso,
     is_open,
     is_unlimited,
     created_by: user.id
@@ -69,7 +73,7 @@ export async function createTransferWindow(formData: FormData) {
     entity_type: 'transfer_windows',
     entity_id: season_id,
     entity_label: name,
-    new_data: { season_id, name, start_date: startDate.toISOString(), end_date: endDate.toISOString(), is_open, is_unlimited },
+    new_data: { season_id, name, start_date: startDateIso, end_date: endDateIso, is_open, is_unlimited },
     description: `"${name}" transfer penceresi oluşturuldu.`,
     actor_id: user.id
   });
@@ -99,12 +103,15 @@ export async function updateTransferWindow(formData: FormData) {
   if (!season_id) return { error: 'Sezon seçilmelidir.' };
   if (!start_date_raw || !end_date_raw) return { error: 'Başlangıç ve bitiş tarihleri zorunludur.' };
 
-  const startDate = new Date(start_date_raw);
-  const endDate = new Date(end_date_raw);
+  const startDateIso = parseToTurkeyISO(start_date_raw);
+  const endDateIso = parseToTurkeyISO(end_date_raw);
 
-  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+  if (!startDateIso || !endDateIso) {
     return { error: 'Geçersiz tarih formatı.' };
   }
+
+  const startDate = new Date(startDateIso);
+  const endDate = new Date(endDateIso);
 
   if (endDate <= startDate) {
     return { error: 'Bitiş tarihi, başlangıç tarihinden sonra olmalıdır.' };
@@ -113,8 +120,8 @@ export async function updateTransferWindow(formData: FormData) {
   const { error } = await supabase.from('transfer_windows').update({
     season_id,
     name,
-    start_date: startDate.toISOString(),
-    end_date: endDate.toISOString(),
+    start_date: startDateIso,
+    end_date: endDateIso,
     is_open,
     is_unlimited,
     updated_at: new Date().toISOString()
@@ -130,7 +137,7 @@ export async function updateTransferWindow(formData: FormData) {
     entity_type: 'transfer_windows',
     entity_id: id,
     entity_label: name,
-    new_data: { season_id, name, start_date: startDate.toISOString(), end_date: endDate.toISOString(), is_open, is_unlimited },
+    new_data: { season_id, name, start_date: startDateIso, end_date: endDateIso, is_open, is_unlimited },
     description: `"${name}" transfer penceresi güncellendi.`,
     actor_id: user?.id
   });

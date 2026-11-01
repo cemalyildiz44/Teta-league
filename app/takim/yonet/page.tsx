@@ -65,14 +65,20 @@ export default async function TeamManagementPage() {
     .eq('id', teamId)
     .single();
 
-  // Transfer Window
+  // Active Transfer Window (currently open and within valid start/end range)
+  const nowIso = new Date().toISOString();
   const { data: window } = await supabase
     .from('transfer_windows')
-    .select('id, is_open')
+    .select('id, is_open, start_date, end_date')
     .eq('season_id', activeSeason.id)
+    .eq('is_open', true)
+    .lte('start_date', nowIso)
+    .gte('end_date', nowIso)
+    .order('start_date', { ascending: false })
+    .limit(1)
     .maybeSingle();
     
-  const isWindowOpen = window?.is_open ?? false;
+  const isWindowOpen = !!window;
   const transferWindowId = window?.id || null;
 
   // Transfer Slots (Option B)
@@ -80,8 +86,9 @@ export default async function TeamManagementPage() {
     p_team_id: teamId,
     p_season_id: activeSeason.id
   });
-  const slotData = Array.isArray(slotRows) && slotRows.length > 0 ? slotRows[0] : null;
-  const isUnlimited = (slotData as any)?.is_unlimited ?? ((slotData?.total_slots ?? 0) >= 999);
+  type SlotRow = { total_slots: number; used_slots: number; remaining_slots: number; is_unlimited?: boolean };
+  const slotData = (Array.isArray(slotRows) && slotRows.length > 0 ? slotRows[0] : null) as SlotRow | null;
+  const isUnlimited = slotData?.is_unlimited ?? ((slotData?.total_slots ?? 0) >= 999);
   const transferSlots = {
     remaining: slotData?.remaining_slots ?? 5,
     total: slotData?.total_slots ?? 5,
@@ -105,7 +112,7 @@ export default async function TeamManagementPage() {
     .eq('role', 'CAPTAIN')
     .eq('is_active', true);
 
-  const captainIds = (teamCaptains || []).map((c: any) => c.user_id);
+  const captainIds = (teamCaptains || []).map((c: { user_id: string }) => c.user_id);
 
   // Pending Transfers (Outgoing)
   const { data: pendingTransfers } = await supabase
@@ -142,7 +149,7 @@ export default async function TeamManagementPage() {
                 {activeSeason.name}
               </span>
               <span className="text-sm font-medium text-gray-400">
-                {(Array.isArray(leagueTeam?.leagues) ? leagueTeam?.leagues[0] : leagueTeam?.leagues as any)?.name || 'Lig Atanmadı'}
+                {(Array.isArray(leagueTeam?.leagues) ? leagueTeam?.leagues[0] : leagueTeam?.leagues as unknown as { name?: string } | null)?.name || 'Lig Atanmadı'}
               </span>
             </div>
             
@@ -280,7 +287,7 @@ export default async function TeamManagementPage() {
                 <div className="divide-y divide-white/5 max-h-[600px] overflow-y-auto custom-scrollbar">
                   {pendingTransfers.map((tx) => (
                     <div key={tx.id} className="p-4 bg-[#060d18] hover:bg-[#0a1628] transition-colors">
-                      <div className="font-bold text-white text-sm mb-1">{(Array.isArray(tx.profiles) ? tx.profiles[0] : tx.profiles as any)?.username}</div>
+                      <div className="font-bold text-white text-sm mb-1">{(Array.isArray(tx.profiles) ? tx.profiles[0] : tx.profiles as { username?: string } | null)?.username}</div>
                       <div className="flex items-center justify-between mt-2">
                         {getStatusBadge(tx.status)}
                         <span className="text-[10px] text-gray-500 font-medium">{new Date(tx.created_at).toLocaleDateString('tr-TR')}</span>
