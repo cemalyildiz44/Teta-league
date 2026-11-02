@@ -29,7 +29,7 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
   const resolvedParams = await params;
   const matchId = resolvedParams.id;
   const resolvedSearchParams = await searchParams;
-  const activeTab = resolvedSearchParams.tab || 'genel';
+  const activeTab = resolvedSearchParams.tab === 'kadrolar' ? 'kadrolar' : 'genel';
 
   const match = await getMatchById(matchId);
   if (!match || match.status !== "APPROVED") notFound();
@@ -88,28 +88,7 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
   const tabs = [
     { id: 'genel', label: 'GENEL' },
     { id: 'kadrolar', label: 'KADROLAR' },
-    { id: 'istatistikler', label: 'İSTATİSTİKLER' },
   ];
-
-  const renderPlayerRow = (s: any) => {
-    const uname = (s.profiles as any)?.username || s.ea_player_name || "Bilinmiyor";
-    const avatar = (s.profiles as any)?.avatar_url;
-    return (
-      <Link key={s.id} href={(s.profiles as any)?.username ? `/oyuncular/${(s.profiles as any).username}` : "#"} prefetch={false} className="flex items-center gap-4 bg-white/[0.02] border border-white/5 p-4 rounded-xl hover:bg-white/[0.04] transition-colors group">
-        <div className="w-10 h-10 rounded-lg bg-black/40 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center">
-          {avatar ? <img src={avatar} className="w-full h-full object-cover" /> : <span className="text-[14px] font-[900] text-[#00e5ff] uppercase">{uname.substring(0, 2)}</span>}
-        </div>
-        <div className="flex flex-col flex-1 min-w-0">
-          <span className="text-[14px] font-[900] text-white truncate group-hover:text-[#00e5ff] transition-colors uppercase">{uname}</span>
-          <span className="text-[10px] font-[800] text-gray-500 uppercase tracking-widest mt-0.5">{s.position || "Belirtilmedi"}</span>
-        </div>
-        <div className="flex flex-col items-end">
-          <span className="text-[10px] font-[800] text-gray-500 uppercase tracking-widest mb-0.5">RATING</span>
-          <span className="text-[16px] font-[900] text-[#00e5ff]">{s.rating?.toFixed(1) || "-"}</span>
-        </div>
-      </Link>
-    );
-  };
 
   const renderStatsTable = (teamStats: any[]) => (
     <div className="overflow-x-auto custom-scrollbar">
@@ -130,12 +109,22 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
         <tbody className="divide-y divide-white/5">
           {teamStats.map(s => {
             const uname = (s.profiles as any)?.username || s.ea_player_name || "Bilinmiyor";
+            const avatar = (s.profiles as any)?.avatar_url;
             return (
               <tr key={s.id} className="hover:bg-white/[0.02] transition-colors group">
                 <td className="px-4 py-3">
-                  <Link href={(s.profiles as any)?.username ? `/oyuncular/${(s.profiles as any).username}` : "#"} prefetch={false} className="flex flex-col">
-                    <span className="font-[800] text-[13px] text-white group-hover:text-[#00e5ff] transition-colors uppercase">{uname}</span>
-                    <span className="text-[10px] font-[700] text-gray-600 uppercase mt-0.5">{s.position}</span>
+                  <Link href={(s.profiles as any)?.username ? `/oyuncular/${(s.profiles as any).username}` : "#"} prefetch={false} className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-black/40 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center">
+                      {avatar ? (
+                        <img src={avatar} alt={uname} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-[11px] font-[900] text-[#00e5ff] uppercase">{uname.substring(0, 2)}</span>
+                      )}
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-[800] text-[13px] text-white group-hover:text-[#00e5ff] transition-colors uppercase truncate">{uname}</span>
+                      <span className="text-[10px] font-[700] text-gray-500 uppercase mt-0.5">{s.position || "Belirtilmedi"}</span>
+                    </div>
                   </Link>
                 </td>
                 <td className="px-2 py-3 text-center font-[900] text-[14px] text-[#00E5FF]">{s.rating?.toFixed(1) || "-"}</td>
@@ -384,46 +373,21 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
                   </div>
                 </div>
               )}
-            </div>
-          )}
 
-          {/* KADROLAR TAB */}
-          {activeTab === 'kadrolar' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* HOME KADRO */}
-              <div className="space-y-4">
-                <h3 className="text-[12px] font-[900] text-gray-500 uppercase tracking-[0.2em] mb-4 text-center md:text-left">{homeTeam?.name} KADROSU</h3>
-                {homeStats.length > 0 ? (
-                  <div className="flex flex-col gap-3">
-                    {homeStats.map(renderPlayerRow)}
-                  </div>
-                ) : (
-                  <div className="bg-[#03070c] border border-white/5 rounded-2xl px-6 py-12 text-center text-[12px] font-[700] text-gray-600">Kadro verisi bulunmuyor.</div>
-                )}
-              </div>
-
-              {/* AWAY KADRO */}
-              <div className="space-y-4">
-                <h3 className="text-[12px] font-[900] text-gray-500 uppercase tracking-[0.2em] mb-4 text-center md:text-left">{awayTeam?.name} KADROSU</h3>
-                {awayStats.length > 0 ? (
-                  <div className="flex flex-col gap-3">
-                    {awayStats.map(renderPlayerRow)}
-                  </div>
-                ) : (
-                  <div className="bg-[#03070c] border border-white/5 rounded-2xl px-6 py-12 text-center text-[12px] font-[700] text-gray-600">Kadro verisi bulunmuyor.</div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* İSTATİSTİKLER TAB */}
-          {activeTab === 'istatistikler' && (
-            <div className="space-y-8">
-              
-              {/* TAKIM KARŞILAŞTIRMASI */}
+              {/* TAKIM İSTATİSTİKLERİ */}
               {stats.length > 0 && (
-                <div className="bg-[#03070c] border border-white/5 rounded-2xl p-6 md:p-10 mb-8">
-                  <h3 className="text-[12px] font-[900] text-gray-500 uppercase tracking-[0.2em] mb-8 text-center">TAKIM İSTATİSTİKLERİ</h3>
+                <div className="bg-[#03070c] border border-white/5 rounded-2xl p-6 md:p-10">
+                  <div className="flex items-center justify-between mb-8 max-w-2xl mx-auto">
+                    <div className="flex items-center gap-2.5">
+                      <TeamLogo src={homeTeam?.logo_url} name={homeTeam?.name} size="xs" />
+                      <span className="text-[12px] font-[900] text-white uppercase tracking-wider hidden sm:inline">{homeTeam?.name}</span>
+                    </div>
+                    <h3 className="text-[12px] font-[900] text-gray-500 uppercase tracking-[0.2em] text-center">TAKIM İSTATİSTİKLERİ</h3>
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-[12px] font-[900] text-white uppercase tracking-wider hidden sm:inline">{awayTeam?.name}</span>
+                      <TeamLogo src={awayTeam?.logo_url} name={awayTeam?.name} size="xs" />
+                    </div>
+                  </div>
                   <div className="flex flex-col gap-6 max-w-2xl mx-auto">
                     {[
                       { l: "RATING", h: hRating, a: aRating },
@@ -442,28 +406,33 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
                 </div>
               )}
 
-              {/* HOME TABLE */}
+            </div>
+          )}
+
+          {/* KADROLAR TAB */}
+          {activeTab === 'kadrolar' && (
+            <div className="space-y-8">
+              {/* HOME KADRO */}
               <div className="space-y-4">
                 <h3 className="text-[12px] font-[900] text-gray-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-3">
                   <TeamLogo src={homeTeam?.logo_url} name={homeTeam?.name} size="xs" />
-                  {homeTeam?.name} OYUNCU İSTATİSTİKLERİ
+                  {homeTeam?.name} KADROSU
                 </h3>
-                <div className="bg-[#03070c] border border-white/5 rounded-2xl overflow-hidden">
+                <div className="bg-[#03070c] border border-white/5 rounded-2xl overflow-hidden shadow-xl">
                   {renderStatsTable(homeStats)}
                 </div>
               </div>
 
-              {/* AWAY TABLE */}
+              {/* AWAY KADRO */}
               <div className="space-y-4 pt-4">
                 <h3 className="text-[12px] font-[900] text-gray-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-3">
                   <TeamLogo src={awayTeam?.logo_url} name={awayTeam?.name} size="xs" />
-                  {awayTeam?.name} OYUNCU İSTATİSTİKLERİ
+                  {awayTeam?.name} KADROSU
                 </h3>
-                <div className="bg-[#03070c] border border-white/5 rounded-2xl overflow-hidden">
+                <div className="bg-[#03070c] border border-white/5 rounded-2xl overflow-hidden shadow-xl">
                   {renderStatsTable(awayStats)}
                 </div>
               </div>
-
             </div>
           )}
 
