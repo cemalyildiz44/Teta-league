@@ -42,6 +42,7 @@ export default async function TeamPage({ params }: Props) {
     team,
     activeLeague,
     activeSeason,
+    captains,
     teamTrophies,
     allTimeWins,
     allTimeDraws,
@@ -147,6 +148,45 @@ export default async function TeamPage({ params }: Props) {
                   <span className="text-[13px] text-gray-500 font-bold uppercase tracking-widest">Kayıtlı Aktif Lig Yok</span>
                 </div>
               )}
+
+              {/* Kaptan(lar) */}
+              <div className="px-5 py-3 bg-gradient-to-br from-amber-500/10 to-transparent backdrop-blur-md border border-amber-500/30 rounded-xl flex flex-col shadow-[0_0_15px_rgba(245,158,11,0.08)]">
+                <span className="text-[10px] text-amber-400 font-[900] uppercase tracking-[0.2em] mb-1 flex items-center gap-1.5">
+                  <span className="text-amber-400">👑</span>
+                  <span>{captains && captains.length > 1 ? 'KAPTANLAR' : 'KAPTAN'}</span>
+                </span>
+                {captains && captains.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {captains.map((cap, idx) => (
+                      <div key={cap.id} className="flex items-center gap-2">
+                        {idx > 0 && <span className="text-white/20 text-[12px] font-bold">•</span>}
+                        <Link
+                          href={`/oyuncular/${encodeURIComponent(cap.username)}`}
+                          className="inline-flex items-center gap-1.5 text-[14px] text-white font-[800] tracking-wider uppercase hover:text-amber-400 transition-colors group/cap"
+                          title={`Kaptan Profili: ${cap.username}`}
+                        >
+                          <div className="w-5 h-5 rounded-full border border-amber-500/40 bg-black/60 flex items-center justify-center overflow-hidden shrink-0">
+                            {cap.avatar_url ? (
+                              <img src={cap.avatar_url} alt={cap.username} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-[9px] font-[900] text-amber-400">
+                                {cap.username.substring(0, 2).toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+                          <span className="group-hover/cap:underline underline-offset-2">
+                            {cap.username}
+                          </span>
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-[13px] text-gray-500 font-bold uppercase tracking-wider">
+                    ATANMADI
+                  </span>
+                )}
+              </div>
 
               {/* Transfer Slotu */}
               <div className="px-5 py-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-xl flex flex-col">

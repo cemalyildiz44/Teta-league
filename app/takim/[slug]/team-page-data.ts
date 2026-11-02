@@ -87,6 +87,13 @@ export interface TeamTrophyItem {
   };
 }
 
+export interface TeamCaptainItem {
+  id: string;
+  username: string;
+  full_name: string | null;
+  avatar_url: string | null;
+}
+
 export interface RosterPlayerItem {
   id: string;
   username: string;
@@ -127,6 +134,7 @@ export interface TeamPageData {
   team: PublicTeamDetail;
   activeLeague: { name: string; level: number } | null;
   activeSeason: { id: string; name: string; slug: string | null; status: string } | null;
+  captains: TeamCaptainItem[];
   teamTrophies: TeamTrophyItem[];
   allTimeWins: number;
   allTimeDraws: number;
@@ -160,7 +168,8 @@ export async function fetchRawTeamPageData(slug: string): Promise<TeamPageData |
     { data: leagueTeamData },
     { data: allTimeMatches },
     { data: allTeamsData },
-    { data: teamTrophiesData }
+    { data: teamTrophiesData },
+    { data: captainsData }
   ] = await Promise.all([
     publicSupabase
       .from('league_teams')
@@ -202,8 +211,17 @@ export async function fetchRawTeamPageData(slug: string): Promise<TeamPageData |
         )
       `)
       .eq('team_id', team.id)
-      .order('awarded_at', { ascending: false })
+      .order('awarded_at', { ascending: false }),
+    publicSupabase.rpc('get_team_captains', { p_team_id: team.id })
   ]);
+
+  const captains: TeamCaptainItem[] = ((captainsData || []) as any[]).map((c: any) => ({
+    id: c.user_id || c.id,
+    username: c.username || '',
+    full_name: c.full_name || null,
+    avatar_url: c.avatar_url || null,
+  }));
+  const captainUserIds = new Set(captains.map((c) => c.id));
 
   const teamTrophies: TeamTrophyItem[] = ((teamTrophiesData || []) as any[]).filter((t: any) => t && t.trophy);
   const activeLeagueObj: any = Array.isArray(leagueTeamData?.leagues) ? leagueTeamData.leagues[0] : leagueTeamData?.leagues;
@@ -313,6 +331,7 @@ export async function fetchRawTeamPageData(slug: string): Promise<TeamPageData |
     if (memberships) {
       roster = memberships.map((m: any) => {
         const prof = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+        const isCaptain = prof?.id && captainUserIds.has(prof.id);
         return {
           id: prof?.id || '',
           username: prof?.username || '',
@@ -322,10 +341,17 @@ export async function fetchRawTeamPageData(slug: string): Promise<TeamPageData |
           alternative_positions: prof?.alternative_positions || [],
           current_ea_player_id: prof?.current_ea_player_id || null,
           joined_at: m.joined_at,
-          role: 'PLAYER',
+          role: isCaptain ? 'CAPTAIN' : 'PLAYER',
           marketValue: 0,
           stats: { matches: 0, goals: 0, assists: 0, avgRating: '0.00' }
         };
+      });
+
+      // Show captains first in roster carousel, then sorted by joined_at
+      roster.sort((a, b) => {
+        if (a.role === 'CAPTAIN' && b.role !== 'CAPTAIN') return -1;
+        if (a.role !== 'CAPTAIN' && b.role === 'CAPTAIN') return 1;
+        return new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime();
       });
     }
 
@@ -546,6 +572,7 @@ export async function fetchRawTeamPageData(slug: string): Promise<TeamPageData |
     team,
     activeLeague: activeLeagueObj ? { name: activeLeagueObj.name, level: activeLeagueObj.level } : null,
     activeSeason: activeSeasonObj ? { id: activeSeasonObj.id, name: activeSeasonObj.name, slug: activeSeasonObj.slug ?? null, status: activeSeasonObj.status } : null,
+    captains,
     teamTrophies,
     allTimeWins,
     allTimeDraws,
