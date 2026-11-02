@@ -75,6 +75,48 @@ export async function invitePlayer(formData: FormData) {
   return { success: true };
 }
 
+export async function cancelInviteAction(formData: FormData) {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'Oturum açmanız gerekiyor.' };
+
+  const transferId = (formData.get('transferId') as string)?.trim();
+  if (!transferId) return { error: 'Transfer ID zorunludur.' };
+
+  const { data: callerProfile } = await supabase
+    .from('profiles')
+    .select('status')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (callerProfile?.status !== 'ACTIVE') {
+    return { error: 'Hesabınız aktif olmadığı için bu işlemi yapamazsınız.' };
+  }
+
+  const { error } = await supabase.rpc('cancel_team_invite', {
+    p_transfer_id: transferId
+  });
+
+  if (error) {
+    console.error('Cancel invite error:', error);
+    if (error.message.includes('Invite cannot be cancelled at this state')) {
+      return { error: 'Bu teklif artık bekleyen durumda değil veya yanıtlandı.' };
+    }
+    if (error.message.includes('Unauthorized')) {
+      return { error: 'Bu teklifi geri çekme yetkiniz bulunmuyor.' };
+    }
+    return { error: 'Teklif geri çekilemedi: ' + error.message };
+  }
+
+  revalidatePath('/takim/yonet');
+  revalidatePath('/profil/transferler');
+  revalidatePath('/profil');
+  return { success: true };
+}
+
+
 export async function kickPlayerAction(formData: FormData) {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
@@ -116,8 +158,8 @@ export async function kickPlayerAction(formData: FormData) {
     return { error: error.message };
   }
 
-  const teamSlug = (membership?.teams as any)?.slug;
-  const playerUsername = (membership?.profiles as any)?.username;
+  const teamSlug = (membership?.teams as { slug?: string } | null)?.slug;
+  const playerUsername = (membership?.profiles as { username?: string } | null)?.username;
 
   revalidatePath('/takim/yonet');
   revalidatePath('/oyuncular');

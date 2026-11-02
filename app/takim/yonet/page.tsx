@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { PlayerSearch } from './PlayerSearch';
 import { RosterManagement } from './RosterManagement';
 import { TeamSocialsForm } from './TeamSocialsForm';
+import { TeamTransfersSection, TransferRecord } from './TeamTransfersSection';
 import Link from 'next/link';
 import TeamLogo from '@/components/TeamLogo';
 import { getCachedUser } from '@/lib/fetchers';
@@ -114,23 +115,31 @@ export default async function TeamManagementPage() {
 
   const captainIds = (teamCaptains || []).map((c: { user_id: string }) => c.user_id);
 
-  // Pending Transfers (Outgoing)
-  const { data: pendingTransfers } = await supabase
+  // Outgoing Transfers for this team and season
+  const { data: teamTransfers } = await supabase
     .from('transfers')
-    .select('id, status, created_at, profiles:player_id(username)')
+    .select(`
+      id,
+      status,
+      created_at,
+      requested_by,
+      player_id,
+      profiles:player_id (
+        id,
+        username,
+        avatar_url,
+        current_ea_player_id,
+        primary_position
+      ),
+      from_team:from_team_id (
+        id,
+        name,
+        logo_url
+      )
+    `)
     .eq('to_team_id', teamId)
     .eq('season_id', activeSeason.id)
     .order('created_at', { ascending: false });
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'PENDING_PLAYER': return <span className="px-2 py-1 bg-yellow-500/10 text-yellow-500 border border-yellow-500/30 rounded text-[10px] font-bold">OYUNCU ONAYI BEKLİYOR</span>;
-      case 'PENDING_ADMIN': return <span className="px-2 py-1 bg-purple-500/10 text-purple-500 border border-purple-500/30 rounded text-[10px] font-bold">YÖNETİCİ ONAYI BEKLİYOR</span>;
-      case 'APPROVED': return <span className="px-2 py-1 bg-green-500/10 text-green-500 border border-green-500/30 rounded text-[10px] font-bold">TAMAMLANDI</span>;
-      case 'REJECTED': return <span className="px-2 py-1 bg-red-500/10 text-red-500 border border-red-500/30 rounded text-[10px] font-bold">REDDEDİLDİ</span>;
-      default: return <span className="px-2 py-1 bg-gray-500/10 text-gray-500 border border-gray-500/30 rounded text-[10px] font-bold">{status}</span>;
-    }
-  };
 
   return (
     <main className="min-h-screen bg-[#060d18] pt-24 pb-12">
@@ -275,28 +284,12 @@ export default async function TeamManagementPage() {
             />
           </div>
 
-          {/* Right Column: Pending Transfers */}
+          {/* Right Column: Transfers & Sent Offers */}
           <div className="space-y-4">
-            <h3 className="text-lg font-black text-white tracking-widest px-2">TRANSFER GEÇMİŞİ</h3>
-            <div className="card-surface rounded-xl border border-white/5 overflow-hidden">
-              {(!pendingTransfers || pendingTransfers.length === 0) ? (
-                <div className="p-6 text-center text-sm text-gray-500 italic font-medium">
-                  Hiç transfer kaydı yok.
-                </div>
-              ) : (
-                <div className="divide-y divide-white/5 max-h-[600px] overflow-y-auto custom-scrollbar">
-                  {pendingTransfers.map((tx) => (
-                    <div key={tx.id} className="p-4 bg-[#060d18] hover:bg-[#0a1628] transition-colors">
-                      <div className="font-bold text-white text-sm mb-1">{(Array.isArray(tx.profiles) ? tx.profiles[0] : tx.profiles as { username?: string } | null)?.username}</div>
-                      <div className="flex items-center justify-between mt-2">
-                        {getStatusBadge(tx.status)}
-                        <span className="text-[10px] text-gray-500 font-medium">{new Date(tx.created_at).toLocaleDateString('tr-TR')}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <TeamTransfersSection
+              transfers={(teamTransfers || []) as unknown as TransferRecord[]}
+              isWindowOpen={isWindowOpen}
+            />
           </div>
         </div>
 
