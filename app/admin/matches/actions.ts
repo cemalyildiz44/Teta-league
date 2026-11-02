@@ -73,6 +73,21 @@ export async function reviewMatchAction(matchId: string, status: 'APPROVED' | 'R
 
   if (error) return { error: error.message };
 
+  // If match was rejected or cancelled, also reject any associated pending captain reports
+  if (status === 'REJECTED' || status === 'CANCELLED') {
+    await supabase
+      .from('match_team_reports')
+      .update({
+        status: 'REJECTED',
+        rejection_reason: `İlişkili maç yönetici tarafından ${status === 'REJECTED' ? 'reddedildi' : 'iptal edildi'}.`,
+        reviewed_by: user.id,
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .or(`match_id.eq.${matchId}${existingMatch.fixture_id ? `,fixture_id.eq.${existingMatch.fixture_id}` : ''}`)
+      .eq('status', 'PENDING_REVIEW');
+  }
+
   await logAdminAudit({
     action: status === 'APPROVED' ? 'APPROVE_MATCH' : `REVIEW_MATCH_${status}`,
     entity_type: 'matches',
@@ -185,7 +200,7 @@ export async function deleteMatchAction(matchId: string) {
   if (!existingMatch) return { error: 'Maç bulunamadı.' };
 
   // Collect player usernames before deleting stats to ensure profile pages can be revalidated
-  let preDeletePlayerUsernames: string[] = [];
+  const preDeletePlayerUsernames: string[] = [];
   if (existingMatch.status === 'APPROVED') {
     const { data: matchPlayerRows } = await supabase
       .from('match_player_stats')
@@ -206,6 +221,20 @@ export async function deleteMatchAction(matchId: string) {
   // First delete player stats if any exist to respect FK (no cascade)
   const { error: statsError } = await supabase.from('match_player_stats').delete().eq('match_id', matchId);
   if (statsError) return { error: 'İlişkili oyuncu istatistikleri silinemedi: ' + statsError.message };
+
+
+  // Clean up any associated team reports so they don't remain as pending orphans blocking EA import
+  await supabase
+    .from('match_team_reports')
+    .update({
+      status: 'REJECTED',
+      rejection_reason: 'İlişkili maç yönetici tarafından silindi.',
+      reviewed_by: user.id,
+      reviewed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .or(`match_id.eq.${matchId}${existingMatch.fixture_id ? `,fixture_id.eq.${existingMatch.fixture_id}` : ''}`)
+    .eq('status', 'PENDING_REVIEW');
 
   const { error } = await supabase.from('matches').delete().eq('id', matchId);
   if (error) return { error: 'Maç silinemedi: ' + error.message };
