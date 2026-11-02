@@ -22,8 +22,15 @@ export function FixturesManager({ initialFixtures, seasons, leagues, leagueTeams
   const [fixtures, setFixtures] = useState(initialFixtures);
   useEffect(() => { setFixtures(initialFixtures); }, [initialFixtures]);
 
+  const defaultSeasonId = useMemo(() => {
+    const s6 = (seasons as { id: string; name?: string; status?: string }[]).find(
+      (s) => s.status === 'ACTIVE' || /season\s*6/i.test(s.name ?? '')
+    );
+    return s6?.id || (seasons as { id: string }[])[0]?.id || '';
+  }, [seasons]);
+
   // Filters
-  const [filterSeason, setFilterSeason] = useState(seasons[0]?.id || '');
+  const [filterSeason, setFilterSeason] = useState(defaultSeasonId);
   const [filterLeague, setFilterLeague] = useState('ALL');
   const [filterWeek, setFilterWeek] = useState('ALL');
   const [filterTeam, setFilterTeam] = useState('ALL');
@@ -36,8 +43,11 @@ export function FixturesManager({ initialFixtures, seasons, leagues, leagueTeams
   const [previewModal, setPreviewModal] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewData, setPreviewData] = useState<any>(null);
-  const [genSeason, setGenSeason] = useState(seasons[0]?.id || '');
-  const [genLeague, setGenLeague] = useState(leagues[0]?.id || '');
+  const [genSeason, setGenSeason] = useState(defaultSeasonId);
+  const [genLeague, setGenLeague] = useState(() => {
+    const firstInSeason = (leagues as { id: string; season_id?: string }[]).find((l) => l.season_id === defaultSeasonId);
+    return firstInSeason?.id || (leagues as { id: string }[])[0]?.id || '';
+  });
   const [genStartDate, setGenStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [genDoubleRound, setGenDoubleRound] = useState(true);
 

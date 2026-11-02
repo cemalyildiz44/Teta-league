@@ -21,7 +21,14 @@ const SUGGESTION_LABEL: Record<string, string> = { MATCHED: 'Öneri var', UNMATC
 
 export function MatchImportManager({ seasons, leagues, history }: { seasons: any[]; leagues: any[]; history: any[] }) {
   const router = useRouter();
-  const [seasonId, setSeasonId] = useState(seasons[0]?.id ?? '');
+  const defaultSeasonId = useMemo(() => {
+    const s6 = (seasons as { id: string; name?: string; status?: string }[]).find(
+      (s) => s.status === 'ACTIVE' || /season\s*6/i.test(s.name ?? '')
+    );
+    return s6?.id || (seasons as { id: string }[])[0]?.id || '';
+  }, [seasons]);
+
+  const [seasonId, setSeasonId] = useState(defaultSeasonId);
   const seasonLeagues = useMemo(() => leagues.filter((l) => l.season_id === seasonId), [leagues, seasonId]);
   const [leagueId, setLeagueId] = useState('');
   const [files, setFiles] = useState<File[]>([]);

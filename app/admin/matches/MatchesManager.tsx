@@ -82,7 +82,14 @@ function getMatchEaData(m: any) {
 export function MatchesManager({ initialMatches, seasons, leagues }: any) {
   const router = useRouter();
   
-  const [filterSeason, setFilterSeason] = useState(seasons[0]?.id || '');
+  const defaultSeasonId = useMemo(() => {
+    const s6 = (seasons as { id: string; name?: string; status?: string }[]).find(
+      (s) => s.status === 'ACTIVE' || /season\s*6/i.test(s.name ?? '')
+    );
+    return s6?.id || (seasons as { id: string }[])[0]?.id || '';
+  }, [seasons]);
+
+  const [filterSeason, setFilterSeason] = useState(defaultSeasonId);
   const [filterLeague, setFilterLeague] = useState('ALL');
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [search, setSearch] = useState('');

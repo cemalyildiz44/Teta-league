@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -22,6 +22,11 @@ import { formatTournamentDate, formatForDateTimeLocal } from '@/lib/date-utils';
 
 export function TournamentsManager({ tournaments, winners, applications, seasons, profiles, groups = [], matches = [], submissions = [], trophies = [] }: any) {
   const router = useRouter();
+
+  const defaultSeasonId = useMemo(() => {
+    const s6 = (seasons as any[])?.find((s) => s.status === 'ACTIVE' || /season\s*6/i.test(s.name ?? ''));
+    return s6?.id || (seasons as any[])?.[0]?.id || '';
+  }, [seasons]);
 
   const [tab, setTab] = useState<'1V1' | 'KARMA' | 'NIGHT_CUP' | 'SONUC_ONAYLARI'>('1V1');
   const [loading, setLoading] = useState(false);
@@ -1164,7 +1169,7 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
               <div><label className='block text-xs font-bold text-zinc-400 mb-1'>KUPA ADI</label><input required name='name' type='text' className='input-field'/></div>
               <div>
                 <label className='block text-xs font-bold text-zinc-400 mb-1'>SEZON</label>
-                <select required name='season_id' className='input-field'>
+                <select required name='season_id' defaultValue={defaultSeasonId} className='input-field'>
                   <option value=''>Seçiniz</option>
                   {seasons.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
@@ -1212,7 +1217,7 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
                 <div><label className='block text-xs font-bold text-zinc-400 mb-1'>TURNUVA ADI</label><input required name='name' type='text' className='input-field'/></div>
                 <div>
                   <label className='block text-xs font-bold text-zinc-400 mb-1'>SEZON</label>
-                  <select required name='season_id' className='input-field'>
+                  <select required name='season_id' defaultValue={defaultSeasonId} className='input-field'>
                     <option value=''>Seçiniz</option>
                     {seasons.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>

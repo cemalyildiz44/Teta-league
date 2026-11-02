@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
@@ -18,6 +18,7 @@ import TeamLogo from '@/components/TeamLogo';
 
 export function LeaguesManager({ initialLeagues, seasons, allTeams, initialLeagueTeams }: any) {
   const router = useRouter();
+  const defaultSeasonId = useMemo(() => (seasons as any[])?.find((s: any) => s.status === 'ACTIVE' || /season\s*6/i.test(s.name ?? ''))?.id || (seasons as any[])?.[0]?.id || '', [seasons]);
   const [leagues, setLeagues] = useState(initialLeagues);
   const [leagueTeams, setLeagueTeams] = useState(initialLeagueTeams);
   const [search, setSearch] = useState('');
@@ -394,7 +395,7 @@ export function LeaguesManager({ initialLeagues, seasons, allTeams, initialLeagu
               </div>
               <div>
                 <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>Sezon</label>
-                <select name='season_id' required className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm'>
+                <select name='season_id' defaultValue={defaultSeasonId} required className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm'>
                   <option value=''>Seçiniz...</option>
                   {seasons.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.status})</option>)}
                 </select>

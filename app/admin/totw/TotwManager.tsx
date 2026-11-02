@@ -92,7 +92,7 @@ export default function TotwManager({
   initialSchemaPending,
 }: TotwManagerProps) {
   const defaultSeasonId = useMemo(() => {
-    const active = seasons.find((s) => s.status === 'ACTIVE');
+    const active = seasons.find((s) => s.status === 'ACTIVE' || /season\s*6/i.test(s.name ?? ''));
     return active?.id || seasons[0]?.id || '';
   }, [seasons]);
 

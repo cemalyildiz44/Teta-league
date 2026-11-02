@@ -7,7 +7,7 @@ export default async function AdminFixtureTransferPage() {
   const supabase = createClient(await cookies());
 
   const [{ data: seasons }, { data: leagues }, { data: history }] = await Promise.all([
-    supabase.from('seasons').select('id, name').order('created_at', { ascending: false }),
+    supabase.from('seasons').select('id, name, status').order('created_at', { ascending: false }),
     supabase.from('leagues').select('id, name, season_id').order('level'),
     supabase
       .from('fixture_import_history')

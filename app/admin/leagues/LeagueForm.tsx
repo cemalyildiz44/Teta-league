@@ -4,6 +4,7 @@ import { createLeagueAction } from '../actions';
 
 export function LeagueForm({ seasons }: { seasons: any[] }) {
   const [state, formAction, isPending] = useActionState(createLeagueAction as any, { error: '', success: '' });
+  const defaultSeasonId = seasons.find((s: any) => s.status === 'ACTIVE' || /season\s*6/i.test(s.name ?? ''))?.id || seasons[0]?.id || '';
 
   return (
     <form action={formAction} className="card-surface p-6 rounded-xl border border-white/5 space-y-4 mb-8">
@@ -12,7 +13,7 @@ export function LeagueForm({ seasons }: { seasons: any[] }) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div>
           <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Sezon Seç</label>
-          <select name="season_id" required className="w-full bg-[#060d18] border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-[#00e5ff]/50 focus:outline-none">
+          <select name="season_id" defaultValue={defaultSeasonId} required className="w-full bg-[#060d18] border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-[#00e5ff]/50 focus:outline-none">
             <option value="">-- Seçiniz --</option>
             {seasons.map(s => <option key={s.id} value={s.id}>{s.name} ({s.status})</option>)}
           </select>

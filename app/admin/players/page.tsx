@@ -93,7 +93,7 @@ export default async function AdminPlayersPage() {
   }
 
   // Active season detection (Season 6)
-  const activeSeason = (allSeasons || []).find((s: any) => s.status === 'ACTIVE') || null;
+  const activeSeason = (allSeasons || []).find((s: any) => s.status === 'ACTIVE' || /season\s*6/i.test(s.name ?? '')) || null;
 
   // Build teams lookup
   const teamsById = new Map<string, { id: string; name: string; logo_url: string | null; is_active: boolean }>();

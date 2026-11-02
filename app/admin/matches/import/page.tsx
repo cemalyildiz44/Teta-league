@@ -7,7 +7,7 @@ export default async function AdminMatchImportPage() {
   const supabase = createClient(await cookies());
 
   const [{ data: seasons }, { data: leagues }, { data: history }] = await Promise.all([
-    supabase.from('seasons').select('id, name').order('created_at', { ascending: false }),
+    supabase.from('seasons').select('id, name, status').order('created_at', { ascending: false }),
     supabase.from('leagues').select('id, name, season_id').order('level'),
     supabase
       .from('match_import_history')

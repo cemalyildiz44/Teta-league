@@ -89,7 +89,10 @@ export default function NightCupCreateWizardModal({
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   // Initial active season or first season
-  const defaultSeasonId = seasons.find((s) => s.is_active)?.id || seasons[0]?.id || '';
+  const defaultSeasonId =
+    seasons.find((s) => s.is_active || (s as { status?: string }).status === 'ACTIVE' || /season\s*6/i.test(s.name ?? ''))?.id ||
+    seasons[0]?.id ||
+    '';
 
   const [formData, setFormData] = useState<FormState>({
     name: '',

@@ -1,7 +1,7 @@
 'use client';
 
 import { formatForDateTimeLocal, TURKEY_TIMEZONE } from '@/lib/date-utils';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Plus, Search, Edit2, Trash2, Calendar, Clock, 
@@ -99,7 +99,12 @@ function getWindowStatus(w: TransferWindow) {
 export function TransferWindowsManager({ initialWindows, seasons }: Props) {
   const router = useRouter();
   const [search, setSearch] = useState('');
-  const [filterSeason, setFilterSeason] = useState('ALL');
+  const defaultSeasonId = useMemo(() => {
+    const s6 = seasons.find((s) => s.status === 'ACTIVE' || /season\s*6/i.test(s.name ?? ''));
+    return s6?.id || 'ALL';
+  }, [seasons]);
+
+  const [filterSeason, setFilterSeason] = useState(defaultSeasonId);
   const [createModal, setCreateModal] = useState(false);
   const [editWindow, setEditWindow] = useState<TransferWindow | null>(null);
   const [loading, setLoading] = useState(false);
@@ -364,6 +369,7 @@ export function TransferWindowsManager({ initialWindows, seasons }: Props) {
                 <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Sezon</label>
                 <select
                   name="season_id"
+                  defaultValue={defaultSeasonId !== 'ALL' ? defaultSeasonId : ''}
                   required
                   className="w-full bg-[#03070c] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#00e5ff]"
                 >

@@ -50,11 +50,16 @@ export default function PenaltiesManager({ penalties, teams, leagues, seasons, p
 
   // Filter state
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'revoked'>('all');
-  const [filterSeasonId, setFilterSeasonId] = useState('');
+  const defaultSeasonId = useMemo(() => {
+    const s6 = seasons.find((s) => s.status === 'ACTIVE' || /season\s*6/i.test(s.name ?? ''));
+    return s6?.id || seasons[0]?.id || '';
+  }, [seasons]);
+
+  const [filterSeasonId, setFilterSeasonId] = useState(defaultSeasonId);
 
   // New penalty form state
   const [showForm, setShowForm] = useState(false);
-  const [formSeasonId, setFormSeasonId] = useState('');
+  const [formSeasonId, setFormSeasonId] = useState(defaultSeasonId);
   const [formLeagueId, setFormLeagueId] = useState('');
   const [formTeamId, setFormTeamId] = useState('');
   const [formMatchId, setFormMatchId] = useState('');

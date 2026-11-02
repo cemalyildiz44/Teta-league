@@ -22,7 +22,7 @@ export default async function AdminMatchesPage() {
       )
       .order('played_at', { ascending: false })
       .limit(500),
-    supabase.from('seasons').select('id, name').order('created_at', { ascending: false }),
+    supabase.from('seasons').select('id, name, status, slug').order('created_at', { ascending: false }),
     supabase.from('leagues').select('id, name, season_id'),
     supabase.from('teams').select('id, name, logo_url, ea_club_id'),
     supabase

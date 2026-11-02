@@ -741,7 +741,9 @@ export function EAImportManager({
   leagues: any[];
   weeksByLeague: Record<string, number[]>;
 }) {
-  const [seasonId, setSeasonId] = useState(seasons.find((s) => s.status === 'ACTIVE')?.id || seasons[0]?.id || '');
+  const [seasonId, setSeasonId] = useState(
+    seasons.find((s) => s.status === 'ACTIVE' || /season\s*6/i.test(s.name ?? ''))?.id || seasons[0]?.id || ''
+  );
   const [leagueId, setLeagueId] = useState('');
   const [week, setWeek] = useState('');
   const [file, setFile] = useState<File | null>(null);
