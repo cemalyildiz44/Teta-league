@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { updateProfileAction, changePasswordAction } from './actions';
+import { useState, useTransition, useEffect } from 'react';
+import { updateProfileAction, changePasswordAction, sendDeleteAccountOtpAction, confirmDeleteAccountAction } from './actions';
 import { logoutAction } from '@/app/auth/actions';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
-import { Crown } from 'lucide-react';
+import { Crown, Trash2, AlertTriangle, Mail, KeyRound, X, Loader2, CheckCircle2 } from 'lucide-react';
 import TeamLogo from '@/components/TeamLogo';
 import { acceptTeamInviteAction, rejectTeamInviteAction } from './team-actions';
 import { PLATFORM_OPTIONS, POSITION_FILTER_OPTIONS, getPositionLabel } from '@/app/utils/positions';
@@ -38,6 +38,78 @@ export default function ClientAccount({ profile, authUser, team, league, isCapta
 
   // Pending Invite State
   const [resolvingInvite, setResolvingInvite] = useState<string | null>(null);
+
+  // Account Deletion States
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteStep, setDeleteStep] = useState<'initial' | 'otp'>('initial');
+  const [deleteOtpCode, setDeleteOtpCode] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteSuccessMsg, setDeleteSuccessMsg] = useState<string | null>(null);
+  const [deleteMaskedEmail, setDeleteMaskedEmail] = useState<string>('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  const handleSendDeleteOtp = async () => {
+    try {
+      setDeleteLoading(true);
+      setDeleteError(null);
+      setDeleteSuccessMsg(null);
+      const res = await sendDeleteAccountOtpAction();
+      if (res.error) {
+        setDeleteError(res.error);
+      } else {
+        setDeleteMaskedEmail(res.maskedEmail || authUser?.email || '');
+        setDeleteStep('otp');
+        setResendCooldown(60);
+        setDeleteSuccessMsg('Doğrulama kodu e-posta adresinize gönderildi.');
+      }
+    } catch (err: any) {
+      setDeleteError('Doğrulama kodu gönderilirken bir hata oluştu.');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteOtpCode.trim()) {
+      setDeleteError('Lütfen doğrulama kodunu girin.');
+      return;
+    }
+    try {
+      setDeleteLoading(true);
+      setDeleteError(null);
+      const res = await confirmDeleteAccountAction(deleteOtpCode);
+      if (res.error) {
+        setDeleteError(res.error);
+        setDeleteLoading(false);
+      } else {
+        setDeleteSuccessMsg('Hesabınız başarıyla silindi. Yönlendiriliyorsunuz...');
+        setTimeout(() => {
+          window.location.href = '/giris?message=account_deleted';
+        }, 1200);
+      }
+    } catch (err: any) {
+      setDeleteError('Hesap silme işlemi sırasında bir hata oluştu.');
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleCloseDeleteModal = () => {
+    if (deleteLoading) return;
+    setIsDeleteModalOpen(false);
+    setDeleteStep('initial');
+    setDeleteOtpCode('');
+    setDeleteError(null);
+    setDeleteSuccessMsg(null);
+  };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
@@ -219,6 +291,19 @@ export default function ClientAccount({ profile, authUser, team, league, isCapta
               ÇIKIŞ YAP
             </button>
           </form>
+          <button
+            type="button"
+            onClick={() => {
+              setIsDeleteModalOpen(true);
+              setDeleteStep('initial');
+              setDeleteError(null);
+              setDeleteSuccessMsg(null);
+            }}
+            className="w-full px-6 py-2.5 bg-red-950/20 hover:bg-red-900/30 border border-red-500/20 hover:border-red-500/40 text-red-400/80 hover:text-red-300 text-[10px] font-[900] tracking-[0.2em] uppercase rounded-xl transition-all flex items-center justify-center gap-1.5"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            HESABI SİL
+          </button>
         </div>
       </section>
 
@@ -525,6 +610,175 @@ export default function ClientAccount({ profile, authUser, team, league, isCapta
         </div>
 
       </div>
+      {/* ── HESAP SİLME MODAL ─────────────────────────────────────── */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#03070c] border border-red-500/30 rounded-2xl w-full max-w-md p-6 relative shadow-[0_0_50px_rgba(239,68,68,0.15)] my-8">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-white/5 mb-5">
+              <h2 className="text-sm font-[900] text-red-400 tracking-[0.15em] uppercase flex items-center gap-2">
+                <Trash2 className="w-4 h-4 text-red-400" />
+                HESABI KALICI OLARAK SİL
+              </h2>
+              <button
+                type="button"
+                onClick={handleCloseDeleteModal}
+                disabled={deleteLoading}
+                className="text-zinc-500 hover:text-white transition-colors disabled:opacity-30"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Error & Success Messages */}
+            {deleteError && (
+              <div className="mb-4 bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-xs font-bold text-red-400 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{deleteError}</span>
+              </div>
+            )}
+            {deleteSuccessMsg && (
+              <div className="mb-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 text-xs font-bold text-emerald-400 flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{deleteSuccessMsg}</span>
+              </div>
+            )}
+
+            {/* Step 1: Initial Warning & Request Code */}
+            {deleteStep === 'initial' && (
+              <div className="space-y-4">
+                <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-4 text-xs text-zinc-300 space-y-2">
+                  <div className="font-black text-red-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    Bu işlem geri alınamaz!
+                  </div>
+                  <p className="text-zinc-400 text-[11px] leading-relaxed">
+                    Hesabınızı sildiğinizde aşağıdaki işlemler otomatik olarak gerçekleştirilir:
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 text-zinc-400 text-[11px] leading-relaxed pl-1">
+                    <li>Varsa takım üyeliğiniz ve kaptanlık yetkiniz sonlandırılır.</li>
+                    <li>Bekleyen tüm transfer talepleriniz ve davetleriniz iptal edilir.</li>
+                    <li>Kullanıcı adınız ve EA ID&apos;niz serbest bırakılır.</li>
+                    <li>Lig puan durumu ve geçmiş maç kayıtlarının bozulmaması adına oynanmış maç istatistikleriniz anonim olarak korunur.</li>
+                  </ul>
+                </div>
+
+                <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4 text-xs text-zinc-400 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0">
+                    <Mail className="w-4 h-4 text-cyan-400" />
+                  </div>
+                  <div className="text-[11px] leading-relaxed">
+                    Güvenliğiniz için kayıtlı e-posta adresinize (<span className="text-white font-medium">{authUser?.email}</span>) bir doğrulama kodu gönderilecektir.
+                  </div>
+                </div>
+
+                <div className="pt-2 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSendDeleteOtp}
+                    disabled={deleteLoading}
+                    className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-[900] text-xs tracking-wider uppercase rounded-xl transition-all shadow-[0_0_20px_rgba(239,68,68,0.25)] flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {deleteLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        KOD GÖNDERİLİYOR...
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="w-4 h-4" />
+                        DOĞRULAMA KODU GÖNDER
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCloseDeleteModal}
+                    disabled={deleteLoading}
+                    className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white font-bold text-xs tracking-wider uppercase rounded-xl transition-colors"
+                  >
+                    VAZGEÇ
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: OTP Verification & Final Deletion */}
+            {deleteStep === 'otp' && (
+              <div className="space-y-4">
+                <div className="text-center space-y-1">
+                  <div className="w-12 h-12 bg-red-500/10 border border-red-500/20 rounded-full flex items-center justify-center mx-auto mb-2 text-red-400">
+                    <KeyRound className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-sm font-[900] text-white tracking-wide uppercase">
+                    DOĞRULAMA KODUNU GİRİN
+                  </h3>
+                  <p className="text-zinc-400 text-xs">
+                    <span className="text-cyan-400 font-medium">{deleteMaskedEmail}</span> adresinize gelen kodu girin.
+                  </p>
+                </div>
+
+                <div>
+                  <input
+                    type="text"
+                    value={deleteOtpCode}
+                    onChange={(e) => setDeleteOtpCode(e.target.value)}
+                    placeholder="KODU GİRİN"
+                    maxLength={10}
+                    autoFocus
+                    disabled={deleteLoading}
+                    className="w-full bg-black/60 border border-red-500/30 focus:border-red-500 focus:ring-1 focus:ring-red-500 rounded-xl px-4 py-3 text-center text-lg font-mono font-black text-white tracking-[0.25em] uppercase placeholder:tracking-normal placeholder:font-sans placeholder:text-xs placeholder:text-zinc-600 transition-all outline-none"
+                  />
+                  <div className="mt-2 flex items-center justify-between text-[11px] text-zinc-500">
+                    <span>Mail gelmediyse spam kutusunu kontrol edin.</span>
+                    {resendCooldown > 0 ? (
+                      <span className="text-zinc-500 font-mono">({resendCooldown}s)</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleSendDeleteOtp}
+                        disabled={deleteLoading}
+                        className="text-cyan-400 hover:underline font-medium"
+                      >
+                        Tekrar Gönder
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-2 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={handleConfirmDelete}
+                    disabled={deleteLoading || !deleteOtpCode.trim()}
+                    className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-[900] text-xs tracking-wider uppercase rounded-xl transition-all shadow-[0_0_20px_rgba(239,68,68,0.3)] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {deleteLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        HESAP SİLİNİYOR...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-4 h-4" />
+                        HESABIMI KALICI OLARAK SİL
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCloseDeleteModal}
+                    disabled={deleteLoading}
+                    className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white font-bold text-xs tracking-wider uppercase rounded-xl transition-colors"
+                  >
+                    İPTAL
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

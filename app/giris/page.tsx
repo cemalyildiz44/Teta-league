@@ -13,6 +13,7 @@ function LoginForm() {
   const [state, formAction, isPending] = useActionState(loginAction as any, initialState);
   const searchParams = useSearchParams();
   const errorParam = searchParams.get('error');
+  const messageParam = searchParams.get('message');
   const redirectTo = searchParams.get('redirectTo') || searchParams.get('next') || '';
   let urlError = '';
   if (errorParam === 'invalid_link' || errorParam === 'expired_link') urlError = 'Şifre sıfırlama bağlantısı geçersiz veya süresi dolmuş.';
@@ -32,6 +33,12 @@ function LoginForm() {
         {urlError && (
           <div className="mb-6 bg-red-500/10 border border-red-500/50 rounded-lg p-3 text-center text-xs font-bold text-red-500">
             {urlError}
+          </div>
+        )}
+
+        {messageParam === 'account_deleted' && (
+          <div className="mb-6 bg-emerald-500/10 border border-emerald-500/40 rounded-lg p-3 text-center text-xs font-bold text-emerald-400">
+            Hesabınız kalıcı olarak silinmiştir.
           </div>
         )}
 

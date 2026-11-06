@@ -239,3 +239,113 @@ export async function changePasswordAction(prevState: any, formData: FormData) {
     return { error: 'Beklenmeyen bir hata oluştu.' };
   }
 }
+
+export async function sendDeleteAccountOtpAction() {
+  try {
+    const cookieStore = await cookies();
+    const supabase = createClient(cookieStore);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !user.email) {
+      return { error: 'Oturum açmış bir kullanıcı bulunamadı.' };
+    }
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: user.email,
+      options: {
+        shouldCreateUser: false,
+      },
+    });
+
+    if (error) {
+      if (error.status === 429) {
+        return { error: 'Çok fazla kod talebinde bulunuldu. Lütfen 1 dakika bekleyip tekrar deneyin.' };
+      }
+      return { error: 'Doğrulama kodu gönderilemedi: ' + error.message };
+    }
+
+    // Mask email for privacy (e.g. c***4@gmail.com)
+    const [name, domain] = user.email.split('@');
+    const maskedEmail = name.length > 2
+      ? `${name[0]}${'*'.repeat(name.length - 2)}${name[name.length - 1]}@${domain}`
+      : `${name[0]}***@${domain}`;
+
+    return { success: true, maskedEmail };
+  } catch (err: any) {
+    console.error('sendDeleteAccountOtpAction error:', err);
+    return { error: 'Beklenmeyen bir hata oluştu.' };
+  }
+}
+
+export async function confirmDeleteAccountAction(code: string) {
+  try {
+    const trimmedCode = code?.trim();
+    if (!trimmedCode) {
+      return { error: 'Lütfen e-posta adresinize gelen doğrulama kodunu girin.' };
+    }
+
+    const cookieStore = await cookies();
+    const supabase = createClient(cookieStore);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !user.email) {
+      return { error: 'Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.' };
+    }
+
+    // Verify OTP token with 'email', fallback to 'magiclink' if necessary
+    let { error: verifyError } = await supabase.auth.verifyOtp({
+      email: user.email,
+      token: trimmedCode,
+      type: 'email',
+    });
+
+    if (verifyError) {
+      const retry = await supabase.auth.verifyOtp({
+        email: user.email,
+        token: trimmedCode,
+        type: 'magiclink',
+      });
+      if (!retry.error) {
+        verifyError = null;
+      }
+    }
+
+    if (verifyError) {
+      return { error: 'Girdiğiniz doğrulama kodu geçersiz veya süresi dolmuş.' };
+    }
+
+    // Optional avatar cleanup from storage
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('avatar_url')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profile?.avatar_url) {
+        const parts = profile.avatar_url.split('/public/avatars/');
+        if (parts.length === 2) {
+          await supabase.storage.from('avatars').remove([parts[1]]);
+        }
+      }
+    } catch (avatarErr) {
+      console.error('Avatar cleanup error:', avatarErr);
+    }
+
+    // Execute atomic self-deletion RPC
+    const { error: rpcError } = await supabase.rpc('self_delete_account');
+    if (rpcError) {
+      console.error('self_delete_account RPC error:', rpcError);
+      return { error: 'Hesap silinirken bir veritabanı hatası oluştu: ' + rpcError.message };
+    }
+
+    // Terminate user session
+    await supabase.auth.signOut();
+
+    revalidatePath('/', 'layout');
+    return { success: true };
+  } catch (err: any) {
+    console.error('confirmDeleteAccountAction error:', err);
+    return { error: 'Hesap silinirken beklenmeyen bir hata oluştu.' };
+  }
+}
