@@ -2,6 +2,11 @@
 -- Description: Allows users to securely delete/anonymize their account with OTP email confirmation.
 -- Releases username, EA ID, and email while preserving historical match stats and standings.
 
+-- 0. Relax chk_profiles_status to allow 'DELETED' status
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS chk_profiles_status;
+ALTER TABLE public.profiles ADD CONSTRAINT chk_profiles_status 
+  CHECK (status = ANY (ARRAY['ACTIVE'::text, 'SUSPENDED'::text, 'BANNED'::text, 'DELETED'::text]));
+
 -- 1. Update enforce_user_role_management to allow users to deactivate their own role
 CREATE OR REPLACE FUNCTION public.enforce_user_role_management()
  RETURNS trigger
@@ -158,7 +163,7 @@ BEGIN
     -- 7. Scramble & disable auth user to release email and prevent further sign in
     DELETE FROM auth.identities WHERE user_id = v_user_id;
     DELETE FROM auth.one_time_tokens WHERE user_id = v_user_id;
-    DELETE FROM auth.refresh_tokens WHERE user_id = v_user_id;
+    DELETE FROM auth.refresh_tokens WHERE user_id = v_user_id::text;
     DELETE FROM auth.sessions WHERE user_id = v_user_id;
 
     UPDATE auth.users
