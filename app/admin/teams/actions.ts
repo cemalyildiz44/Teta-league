@@ -136,6 +136,7 @@ export async function editTeam(formData: FormData) {
   const slugInput = (formData.get('slug') as string || '').trim();
   const stream_url_input = (formData.get('stream_url') as string || '').trim();
   const instagram_url_input = (formData.get('instagram_url') as string || '').trim();
+  const goal_music_url_input = (formData.get('goal_music_url') as string || '').trim();
 
   if (!id) return { error: 'Takım ID zorunludur.' };
   if (!name) return { error: 'Takım adı zorunludur ve boş bırakılamaz.' };
@@ -197,6 +198,7 @@ export async function editTeam(formData: FormData) {
     ea_club_name,
     stream_url: stream_url_input || null,
     instagram_url: instagram_url_input || null,
+    goal_music_url: goal_music_url_input || null,
     updated_at: new Date().toISOString()
   };
 

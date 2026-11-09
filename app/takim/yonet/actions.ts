@@ -252,6 +252,7 @@ export async function updateTeamSocialsAction(formData: FormData) {
   const teamId = formData.get('teamId') as string;
   const streamUrl = (formData.get('stream_url') as string)?.trim() || null;
   const instagramUrl = (formData.get('instagram_url') as string)?.trim() || null;
+  const goalMusicUrl = (formData.get('goal_music_url') as string)?.trim() || null;
 
   if (!teamId) return { error: 'Takım ID zorunludur.' };
 
@@ -286,6 +287,10 @@ export async function updateTeamSocialsAction(formData: FormData) {
     return { error: 'Instagram linki geçerli bir http:// veya https:// bağlantısı olmalıdır.' };
   }
 
+  if (goalMusicUrl && !isValidHttpUrl(goalMusicUrl)) {
+    return { error: 'Gol müziği linki geçerli bir http:// veya https:// bağlantısı olmalıdır.' };
+  }
+
   // Fetch team slug for revalidation
   const { data: team } = await supabase
     .from('teams')
@@ -297,7 +302,8 @@ export async function updateTeamSocialsAction(formData: FormData) {
   const { data: rpcData, error: rpcError } = await supabase.rpc('update_team_socials', {
     p_team_id: teamId,
     p_stream_url: streamUrl,
-    p_instagram_url: instagramUrl
+    p_instagram_url: instagramUrl,
+    p_goal_music_url: goalMusicUrl
   });
 
   if (rpcError) {
@@ -307,6 +313,7 @@ export async function updateTeamSocialsAction(formData: FormData) {
       .update({
         stream_url: streamUrl,
         instagram_url: instagramUrl,
+        goal_music_url: goalMusicUrl,
         updated_at: new Date().toISOString()
       })
       .eq('id', teamId);
@@ -319,8 +326,16 @@ export async function updateTeamSocialsAction(formData: FormData) {
   }
 
   revalidatePath('/takim/yonet');
+  try {
+    revalidateTag('public-team-page', 'max');
+    updateTag('public-team-page');
+  } catch {}
   if (team?.slug) {
     revalidatePath(`/takim/${team.slug}`);
+    try {
+      revalidateTag(`team-${team.slug}`, 'max');
+      updateTag(`team-${team.slug}`);
+    } catch {}
   }
 
   return { success: true };

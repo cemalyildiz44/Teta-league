@@ -694,6 +694,15 @@ export function TeamsManager({
                 <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>EA Club ID</label>
                 <input name='ea_club_id' type='number' defaultValue={editData.ea_club_id || ''} className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm' />
               </div>
+              <div>
+                <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>Gol Müziği Linki</label>
+                <input
+                  name='goal_music_url'
+                  defaultValue={editData.goal_music_url || ''}
+                  placeholder='https://youtube.com/watch?v=... veya https://open.spotify.com/...'
+                  className='w-full bg-[#060d18] border border-white/10 rounded-lg px-3 py-2 text-white text-sm placeholder:text-zinc-600'
+                />
+              </div>
               <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
                 <div>
                   <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1'>Canlı Yayın Linki</label>

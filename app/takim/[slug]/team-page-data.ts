@@ -41,6 +41,7 @@ export interface PublicTeamDetail {
   is_active: boolean;
   stream_url: string | null;
   instagram_url: string | null;
+  goal_music_url: string | null;
 }
 
 export interface TeamOpponentSummary {
@@ -157,7 +158,7 @@ export async function fetchRawTeamPageData(slug: string): Promise<TeamPageData |
   // 1. Fetch team by slug
   const { data: team } = await publicSupabase
     .from('teams')
-    .select('id, name, slug, ea_club_id, ea_club_name, logo_url, is_active, stream_url, instagram_url')
+    .select('id, name, slug, ea_club_id, ea_club_name, logo_url, is_active, stream_url, instagram_url, goal_music_url')
     .eq('slug', slug)
     .maybeSingle();
 

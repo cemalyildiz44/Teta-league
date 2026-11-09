@@ -62,7 +62,7 @@ export default async function TeamManagementPage() {
   // Team Details
   const { data: team } = await supabase
     .from('teams')
-    .select('name, logo_url, stream_url, instagram_url')
+    .select('name, logo_url, stream_url, instagram_url, goal_music_url')
     .eq('id', teamId)
     .single();
 
@@ -267,6 +267,7 @@ export default async function TeamManagementPage() {
               teamId={teamId}
               initialStreamUrl={team?.stream_url}
               initialInstagramUrl={team?.instagram_url}
+              initialGoalMusicUrl={team?.goal_music_url}
             />
 
             <PlayerSearch 

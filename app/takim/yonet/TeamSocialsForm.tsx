@@ -7,11 +7,13 @@ interface Props {
   teamId: string;
   initialStreamUrl?: string | null;
   initialInstagramUrl?: string | null;
+  initialGoalMusicUrl?: string | null;
 }
 
-export function TeamSocialsForm({ teamId, initialStreamUrl, initialInstagramUrl }: Props) {
+export function TeamSocialsForm({ teamId, initialStreamUrl, initialInstagramUrl, initialGoalMusicUrl }: Props) {
   const [streamUrl, setStreamUrl] = useState(initialStreamUrl || '');
   const [instagramUrl, setInstagramUrl] = useState(initialInstagramUrl || '');
+  const [goalMusicUrl, setGoalMusicUrl] = useState(initialGoalMusicUrl || '');
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -23,6 +25,7 @@ export function TeamSocialsForm({ teamId, initialStreamUrl, initialInstagramUrl 
     formData.append('teamId', teamId);
     formData.append('stream_url', streamUrl);
     formData.append('instagram_url', instagramUrl);
+    formData.append('goal_music_url', goalMusicUrl);
 
     startTransition(async () => {
       const res = await updateTeamSocialsAction(formData);
@@ -43,7 +46,7 @@ export function TeamSocialsForm({ teamId, initialStreamUrl, initialInstagramUrl 
             SOSYAL MEDYA & YAYIN BAĞLANTILARI
           </h3>
           <p className="text-[11px] text-gray-500 mt-0.5">
-            Takım profilinde görünecek canlı yayın ve sosyal medya linklerini buradan yönetin.
+            Takım profilinde görünecek canlı yayın, sosyal medya ve gol müziği linklerini buradan yönetin.
           </p>
         </div>
       </div>
@@ -82,6 +85,24 @@ export function TeamSocialsForm({ teamId, initialStreamUrl, initialInstagramUrl 
           </div>
           <span className="text-[10px] text-gray-500 mt-1 block">
             Örnek: https://instagram.com/takimadi
+          </span>
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+            Gol Müziği Linki (YouTube / Spotify vb.)
+          </label>
+          <div className="relative">
+            <input
+              type="url"
+              value={goalMusicUrl}
+              onChange={(e) => setGoalMusicUrl(e.target.value)}
+              placeholder="https://youtube.com/watch?v=... veya https://open.spotify.com/..."
+              className="w-full bg-[#060d18] border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-[#00e5ff]/50 focus:ring-1 focus:ring-[#00e5ff]/50 transition-all text-xs placeholder:text-gray-600"
+            />
+          </div>
+          <span className="text-[10px] text-gray-500 mt-1 block">
+            Örnek: https://www.youtube.com/watch?v=... veya https://open.spotify.com/track/...
           </span>
         </div>
 
