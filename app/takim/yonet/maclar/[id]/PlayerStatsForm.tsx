@@ -3,7 +3,12 @@
 import { useState, useActionState } from 'react';
 import { submitPlayerStatsAction } from '../actions';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
-import { STARTING_LINEUP_COUNT, getRequiredLineupCount } from '@/lib/match-reporting';
+import {
+  MIN_STARTING_LINEUP_COUNT,
+  STARTING_LINEUP_COUNT,
+  getMinLineupCount,
+  getRequiredLineupCount,
+} from '@/lib/match-reporting';
 
 export function PlayerStatsForm({
   matchId,
@@ -83,6 +88,7 @@ export function PlayerStatsForm({
 
   const payload = Object.values(stats);
   const selectedCount = payload.filter((r: any) => r.played !== false).length;
+  const minLineupCount = getMinLineupCount(roster.length || MIN_STARTING_LINEUP_COUNT);
   const requiredLineupCount = getRequiredLineupCount(roster.length || STARTING_LINEUP_COUNT);
 
   if (!roster || roster.length === 0) {
@@ -98,21 +104,21 @@ export function PlayerStatsForm({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
         <div>
           <h3 className="text-[#00e5ff] text-sm font-black tracking-widest uppercase">
-            İlk 11 Oyuncu İstatistikleri Girişi
+            Maç Kadrosu ve Oyuncu İstatistikleri Girişi
           </h3>
           <p className="text-[11px] text-gray-400 mt-0.5">
-            Maçta ilk 11 oynayan tam {STARTING_LINEUP_COUNT} oyuncuyu işaretleyip istatistiklerini girin.
+            Maçta oynayan oyuncuları (en az {minLineupCount}, en fazla {requiredLineupCount} oyuncu) işaretleyip istatistiklerini girin.
           </p>
         </div>
         <div className="flex items-center gap-2 self-start">
           <span
             className={`text-[10px] font-black px-2.5 py-1 rounded border uppercase tracking-wider ${
-              selectedCount === requiredLineupCount
+              selectedCount >= minLineupCount && selectedCount <= requiredLineupCount
                 ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
                 : 'bg-yellow-500/10 border-yellow-500/40 text-yellow-400'
             }`}
           >
-            Seçilen İlk 11: {selectedCount} / {requiredLineupCount}
+            Seçilen Oyuncu: {selectedCount} / {requiredLineupCount} (Min. {minLineupCount})
           </span>
           <span className="text-[10px] font-bold text-gray-500 bg-[#0a1628] px-2.5 py-1 rounded border border-white/5">
             Kadro: {roster.length} Oyuncu

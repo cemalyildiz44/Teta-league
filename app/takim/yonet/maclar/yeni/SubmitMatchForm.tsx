@@ -13,7 +13,13 @@ import {
 } from 'lucide-react';
 import { submitMatchAction } from '../actions';
 import { MatchScreenshotUpload } from './MatchScreenshotUpload';
-import { STARTING_LINEUP_COUNT, getRequiredLineupCount, type ReportPosition } from '@/lib/match-reporting';
+import {
+  MIN_STARTING_LINEUP_COUNT,
+  STARTING_LINEUP_COUNT,
+  getMinLineupCount,
+  getRequiredLineupCount,
+  type ReportPosition,
+} from '@/lib/match-reporting';
 
 interface SubmitMatchFormProps {
   fixture: any;
@@ -56,26 +62,50 @@ function createDefaultSlots(
   previousReportPlayers?: any[]
 ): LineupSlotStat[] {
   const targetSlotCount = getRequiredLineupCount(roster.length || STARTING_LINEUP_COUNT);
-  if (Array.isArray(previousReportPlayers) && previousReportPlayers.length === targetSlotCount) {
-    return previousReportPlayers.map((rp, idx) => ({
-      slotIndex: idx,
-      player_id: rp.player_id || '',
-      position: (rp.position as ReportPosition) || 'MID',
-      rating: rp.rating !== null && rp.rating !== undefined ? String(rp.rating) : '',
-      goals: Number(rp.goals ?? 0),
-      assists: Number(rp.assists ?? 0),
-      shots: Number(rp.shots ?? 0),
-      passes_made: Number(rp.passes_made ?? 0),
-      pass_attempts: Number(rp.pass_attempts ?? 0),
-      tackles_made: Number(rp.tackles_made ?? 0),
-      tackle_attempts: Number(rp.tackle_attempts ?? 0),
-      saves: Number(rp.saves ?? 0),
-      goals_conceded: Number(rp.goals_conceded ?? 0),
-      cleansheets_gk: Number(rp.cleansheets_gk ?? 0),
-      cleansheets_def: Number(rp.cleansheets_def ?? 0),
-      red_cards: Number(rp.red_cards ?? 0),
-      is_mom: Boolean(rp.is_mom),
-    }));
+  if (Array.isArray(previousReportPlayers) && previousReportPlayers.length > 0) {
+    return Array.from({ length: targetSlotCount }, (_, idx) => {
+      const rp = previousReportPlayers[idx];
+      if (rp) {
+        return {
+          slotIndex: idx,
+          player_id: rp.player_id || '',
+          position: (rp.position as ReportPosition) || 'MID',
+          rating: rp.rating !== null && rp.rating !== undefined ? String(rp.rating) : '',
+          goals: Number(rp.goals ?? 0),
+          assists: Number(rp.assists ?? 0),
+          shots: Number(rp.shots ?? 0),
+          passes_made: Number(rp.passes_made ?? 0),
+          pass_attempts: Number(rp.pass_attempts ?? 0),
+          tackles_made: Number(rp.tackles_made ?? 0),
+          tackle_attempts: Number(rp.tackle_attempts ?? 0),
+          saves: Number(rp.saves ?? 0),
+          goals_conceded: Number(rp.goals_conceded ?? 0),
+          cleansheets_gk: Number(rp.cleansheets_gk ?? 0),
+          cleansheets_def: Number(rp.cleansheets_def ?? 0),
+          red_cards: Number(rp.red_cards ?? 0),
+          is_mom: Boolean(rp.is_mom),
+        };
+      }
+      return {
+        slotIndex: idx,
+        player_id: '',
+        position: idx === 0 ? 'GK' : idx < 5 ? 'DEF' : idx < 8 ? 'MID' : 'FWD',
+        rating: '',
+        goals: 0,
+        assists: 0,
+        shots: 0,
+        passes_made: 0,
+        pass_attempts: 0,
+        tackles_made: 0,
+        tackle_attempts: 0,
+        saves: 0,
+        goals_conceded: 0,
+        cleansheets_gk: 0,
+        cleansheets_def: 0,
+        red_cards: 0,
+        is_mom: false,
+      };
+    });
   }
 
   return Array.from({ length: targetSlotCount }, (_, idx) => {
@@ -157,6 +187,7 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
   }, [slots]);
 
   const selectedCount = selectedPlayerIds.size;
+  const minLineupCount = getMinLineupCount(roster.length || MIN_STARTING_LINEUP_COUNT);
   const requiredLineupCount = getRequiredLineupCount(roster.length || STARTING_LINEUP_COUNT);
 
   const totalEnteredGoals = useMemo(
@@ -180,11 +211,30 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
       const rosterPlayer = rosterMap.get(newPlayerId);
       return prev.map((s, i) =>
         i === slotIdx
-          ? {
-              ...s,
-              player_id: newPlayerId,
-              position: rosterPlayer?.primary_position || s.position,
-            }
+          ? newPlayerId
+            ? {
+                ...s,
+                player_id: newPlayerId,
+                position: rosterPlayer?.primary_position || s.position,
+              }
+            : {
+                ...s,
+                player_id: '',
+                rating: '',
+                goals: 0,
+                assists: 0,
+                shots: 0,
+                passes_made: 0,
+                pass_attempts: 0,
+                tackles_made: 0,
+                tackle_attempts: 0,
+                saves: 0,
+                goals_conceded: 0,
+                cleansheets_gk: 0,
+                cleansheets_def: 0,
+                red_cards: 0,
+                is_mom: false,
+              }
           : s
       );
     });
@@ -466,30 +516,30 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
         </div>
       </div>
 
-      {/* 2. Starting 11 Selection & Player Statistics */}
+      {/* 2. Starting Lineup Selection & Player Statistics */}
       <div className="card-surface p-6 rounded-xl border border-white/5 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
           <div>
             <div className="flex items-center gap-2">
               <Users className="w-4 h-4 text-[#00e5ff]" />
               <h2 className="text-sm font-black text-white uppercase tracking-widest">
-                2. İLK 11 SEÇİMİ VE OYUNCU İSTATİSTİKLERİ ({myTeamName})
+                2. MAÇ KADROSU VE OYUNCU İSTATİSTİKLERİ ({myTeamName})
               </h2>
             </div>
             <p className="text-xs font-bold text-gray-400 mt-1">
-              Takım kadronuzdan maçta oynayan 11 oyuncuyu seçin ve istatistiklerini girin. Aynı oyuncu birden fazla kez seçilemez.
+              Takım kadronuzdan maçta oynayan oyuncuları (en az {minLineupCount}, en fazla {requiredLineupCount} oyuncu) seçin ve sadece oynayanların istatistiklerini girin.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <span
               className={`px-3 py-1.5 rounded text-[11px] font-black uppercase tracking-wider border ${
-                selectedCount === requiredLineupCount
+                selectedCount >= minLineupCount
                   ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
                   : 'bg-yellow-500/10 border-yellow-500/40 text-yellow-400'
               }`}
             >
-              Seçilen İlk 11: {selectedCount} / {requiredLineupCount}
+              Seçilen Oyuncu: {selectedCount} / {requiredLineupCount} (Min. {minLineupCount})
             </span>
             {!Number.isNaN(myTargetTeamScore) && (
               <span
@@ -510,7 +560,7 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
           <div className="bg-[#0a1628] border border-white/5 rounded-xl p-4 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                HIZLI KADRO SEÇİMİ (AKTİF KADRO: {roster.length} OYUNCU)
+                HIZLI KADRO SEÇİMİ (AKTİF KADRO: {roster.length} OYUNCU — OYNAMAYANLARIN SEÇİMİNİ KALDIRABİLİRSİNİZ)
               </span>
               <div className="flex items-center gap-2">
                 <button
@@ -566,7 +616,7 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
           </div>
         )}
 
-        {/* 11 Starting Player Stat Cards (Mobile & Desktop Friendly) */}
+        {/* Starting Player Stat Cards (Mobile & Desktop Friendly) */}
         <div className="space-y-3">
           {slots.map((slot, idx) => {
             const selectedPlayer = rosterMap.get(slot.player_id);
@@ -580,7 +630,11 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
                 }`}
               >
                 {/* Top Row: Slot #, Player Select, Team Badge, Position, Rating, MOM */}
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center mb-3 pb-3 border-b border-white/5">
+                <div
+                  className={`grid grid-cols-1 sm:grid-cols-12 gap-3 items-center ${
+                    slot.player_id ? 'mb-3 pb-3 border-b border-white/5' : ''
+                  }`}
+                >
                   <div className="sm:col-span-5 flex items-center gap-2.5">
                     <span className="w-7 h-7 rounded-lg bg-[#00e5ff]/10 border border-[#00e5ff]/30 text-[#00e5ff] text-xs font-black flex items-center justify-center shrink-0">
                       {idx + 1}
@@ -594,7 +648,7 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
                         onChange={(e) => handlePlayerSelect(idx, e.target.value)}
                         className="w-full bg-[#060d18] border border-white/15 rounded-lg px-2.5 py-2 text-xs font-bold text-white focus:border-[#00e5ff] focus:outline-none"
                       >
-                        <option value="">-- {idx + 1}. Oyuncuyu Seçin --</option>
+                        <option value="">-- {idx + 1}. Oyuncuyu Seçin (Oynamadıysa Boş Bırakın) --</option>
                         {roster.map((rp) => {
                           const takenElsewhere =
                             selectedPlayerIds.has(rp.player_id) &&
@@ -615,70 +669,79 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
                     </div>
                   </div>
 
-                  <div className="sm:col-span-3 flex items-center gap-2">
-                    <div className="flex-1">
-                      <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">
-                        Mevki
-                      </label>
-                      <select
-                        value={slot.position}
-                        onChange={(e) =>
-                          handleStatChange(idx, 'position', e.target.value as ReportPosition)
-                        }
-                        className="w-full bg-[#060d18] border border-white/15 rounded-lg px-2.5 py-2 text-xs font-black text-[#00e5ff] focus:border-[#00e5ff] focus:outline-none"
-                      >
-                        {POSITIONS.map((pos) => (
-                          <option key={pos} value={pos}>
-                            {pos}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="w-24">
-                      <label className="block text-[9px] font-black text-yellow-400 uppercase tracking-widest mb-0.5">
-                        Reyting
-                      </label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        max="10"
-                        placeholder="7.5"
-                        value={slot.rating}
-                        onChange={(e) => handleStatChange(idx, 'rating', e.target.value)}
-                        className="w-full bg-[#060d18] border border-yellow-500/30 rounded-lg px-2 py-2 text-xs font-black text-center text-yellow-400 focus:border-yellow-400 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="sm:col-span-4 flex items-center justify-between sm:justify-end gap-3">
-                    {selectedPlayer && (
-                      <div className="text-left sm:text-right truncate">
-                        <div className="text-xs font-black text-white truncate">
-                          @{selectedPlayer.username}
+                  {slot.player_id ? (
+                    <>
+                      <div className="sm:col-span-3 flex items-center gap-2">
+                        <div className="flex-1">
+                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">
+                            Mevki
+                          </label>
+                          <select
+                            value={slot.position}
+                            onChange={(e) =>
+                              handleStatChange(idx, 'position', e.target.value as ReportPosition)
+                            }
+                            className="w-full bg-[#060d18] border border-white/15 rounded-lg px-2.5 py-2 text-xs font-black text-[#00e5ff] focus:border-[#00e5ff] focus:outline-none"
+                          >
+                            {POSITIONS.map((pos) => (
+                              <option key={pos} value={pos}>
+                                {pos}
+                              </option>
+                            ))}
+                          </select>
                         </div>
-                        <div className="text-[10px] font-bold text-[#20b2aa] truncate">
-                          {selectedPlayer.full_name || myTeamName}
+
+                        <div className="w-24">
+                          <label className="block text-[9px] font-black text-yellow-400 uppercase tracking-widest mb-0.5">
+                            Reyting
+                          </label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="10"
+                            placeholder="7.5"
+                            value={slot.rating}
+                            onChange={(e) => handleStatChange(idx, 'rating', e.target.value)}
+                            className="w-full bg-[#060d18] border border-yellow-500/30 rounded-lg px-2 py-2 text-xs font-black text-center text-yellow-400 focus:border-yellow-400 focus:outline-none"
+                          />
                         </div>
                       </div>
-                    )}
 
-                    <label className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-yellow-500/10 border border-yellow-500/30 cursor-pointer shrink-0">
-                      <input
-                        type="checkbox"
-                        checked={slot.is_mom}
-                        onChange={(e) => handleStatChange(idx, 'is_mom', e.target.checked)}
-                        className="w-3.5 h-3.5 accent-yellow-400"
-                      />
-                      <span className="text-[10px] font-black text-yellow-400 uppercase tracking-wider">
-                        ★ MOM
-                      </span>
-                    </label>
-                  </div>
+                      <div className="sm:col-span-4 flex items-center justify-between sm:justify-end gap-3">
+                        {selectedPlayer && (
+                          <div className="text-left sm:text-right truncate">
+                            <div className="text-xs font-black text-white truncate">
+                              @{selectedPlayer.username}
+                            </div>
+                            <div className="text-[10px] font-bold text-[#20b2aa] truncate">
+                              {selectedPlayer.full_name || myTeamName}
+                            </div>
+                          </div>
+                        )}
+
+                        <label className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-yellow-500/10 border border-yellow-500/30 cursor-pointer shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={slot.is_mom}
+                            onChange={(e) => handleStatChange(idx, 'is_mom', e.target.checked)}
+                            className="w-3.5 h-3.5 accent-yellow-400"
+                          />
+                          <span className="text-[10px] font-black text-yellow-400 uppercase tracking-wider">
+                            ★ MOM
+                          </span>
+                        </label>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="sm:col-span-7 text-[11px] font-bold text-gray-500">
+                      Bu slota oyuncu seçildiğinde istatistik giriş alanları açılır.
+                    </div>
+                  )}
                 </div>
 
-                {/* Bottom Row: All Existing match_player_stats Numeric Inputs */}
+                {/* Bottom Row: All Existing match_player_stats Numeric Inputs (Only shown if player selected) */}
+                {slot.player_id && (
                 <div className="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-12 gap-2">
                   <div>
                     <label className="block text-[9px] font-black text-emerald-400 uppercase tracking-wider mb-0.5">
@@ -839,6 +902,7 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
                     />
                   </div>
                 </div>
+                )}
               </div>
             );
           })}
@@ -879,13 +943,13 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
 
       <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="text-xs font-bold text-gray-400">
-          {selectedCount < requiredLineupCount ? (
+          {selectedCount < minLineupCount ? (
             <span className="text-yellow-400">
-              * Raporu göndermek için kadronuzdan tam {requiredLineupCount} oyuncu seçmelisiniz ({requiredLineupCount - selectedCount} eksik).
+              * Raporu göndermek için kadronuzdan en az {minLineupCount} oyuncu seçmelisiniz ({minLineupCount - selectedCount} eksik).
             </span>
           ) : (
             <span className="text-emerald-400">
-              ✓ İlk 11 kadrosu tamamlandı ({requiredLineupCount}/{requiredLineupCount}). Onaya göndermeye hazır.
+              ✓ Maç kadrosu hazır ({selectedCount} oyuncu seçildi). Onaya göndermeye hazır.
             </span>
           )}
         </div>

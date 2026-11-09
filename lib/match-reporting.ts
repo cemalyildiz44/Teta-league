@@ -1,13 +1,21 @@
+export const MIN_STARTING_LINEUP_COUNT = 8;
 export const STARTING_LINEUP_COUNT = 11;
 
 export type ReportPosition = 'GK' | 'DEF' | 'MID' | 'FWD';
 export type ReportStatus = 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
 
 /**
- * Computes the required starting lineup size for a team based on its active eligible roster size.
- * - Standard teams with >= 11 active players must select 11 unique starting players.
- * - Teams with < 11 active players in team_memberships (e.g. season roster_min = 7..10)
- *   must select all of their active eligible players without duplication.
+ * Computes the minimum required starting lineup size for a team based on its active eligible roster size.
+ * - Standard teams with >= 8 active players must select at least 8 unique starting players (8..11).
+ * - Teams with < 8 active players in team_memberships must select all of their active eligible players.
+ */
+export function getMinLineupCount(activeRosterCount: number): number {
+  if (activeRosterCount <= 0) return MIN_STARTING_LINEUP_COUNT;
+  return Math.min(MIN_STARTING_LINEUP_COUNT, activeRosterCount);
+}
+
+/**
+ * Computes the maximum starting lineup slot count (up to 11) for a team based on its active eligible roster size.
  */
 export function getRequiredLineupCount(activeRosterCount: number): number {
   if (activeRosterCount <= 0) return STARTING_LINEUP_COUNT;
@@ -115,6 +123,8 @@ export function validateStartingLineupAndStats(
   allowedRosterPlayerIds: string[],
   options?: {
     requiredCount?: number;
+    minCount?: number;
+    maxCount?: number;
     bannedOrSuspendedPlayerIds?: string[];
   }
 ): ValidationResult {
@@ -130,16 +140,23 @@ export function validateStartingLineupAndStats(
     };
   }
 
-  const requiredCount =
-    options?.requiredCount ?? getRequiredLineupCount(eligibleRosterIds.length);
+  const minCount =
+    options?.minCount ?? getMinLineupCount(eligibleRosterIds.length);
+  const maxCount =
+    options?.maxCount ?? options?.requiredCount ?? getRequiredLineupCount(eligibleRosterIds.length);
 
-  if (!Array.isArray(players) || players.length !== requiredCount) {
+  if (!Array.isArray(players) || players.length < minCount || players.length > maxCount) {
     return {
       valid: false,
       code: 'INVALID_PLAYER_COUNT',
-      error: `Maç raporunda tam ${requiredCount} ilk 11 oyuncusu seçilmelidir (Seçilen: ${
-        Array.isArray(players) ? players.length : 0
-      }).`,
+      error:
+        minCount === maxCount
+          ? `Maç raporunda tam ${minCount} oyuncu seçilmelidir (Seçilen: ${
+              Array.isArray(players) ? players.length : 0
+            }).`
+          : `Maç raporunda en az ${minCount}, en fazla ${maxCount} oyuncu seçilmelidir (Seçilen: ${
+              Array.isArray(players) ? players.length : 0
+            }).`,
     };
   }
 
