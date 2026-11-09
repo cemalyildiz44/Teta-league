@@ -22,11 +22,18 @@ export default async function LeagueStatsPage({ params }: { params: Promise<{ se
   // 1. OYNANAN APPROVED MAÇLARI AL
   const { data: matches } = await supabase
     .from("matches")
-    .select("id, home_team_id, away_team_id, home_score, away_score")
+    .select("id, home_team_id, away_team_id, home_score, away_score, played_at, created_at, fixtures(week_number)")
     .eq("league_id", league.id)
     .eq("status", "APPROVED");
 
   const matchIds = (matches || []).map(m => m.id);
+  const matchMap = new Map<string, any>();
+  for (const m of matches || []) {
+    const fix = Array.isArray((m as any).fixtures) ? (m as any).fixtures[0] : (m as any).fixtures;
+    const weekNum = Number(fix?.week_number || 0);
+    const timeMs = new Date((m as any).played_at || (m as any).created_at || 0).getTime() || 0;
+    matchMap.set(m.id, { ...m, rank: weekNum * 1e13 + timeMs });
+  }
 
   // 2. MATCH PLAYER STATS AL (boş olsa da hata vermez, [] döner)
   let rawStats: any[] = [];
@@ -38,6 +45,33 @@ export default async function LeagueStatsPage({ params }: { params: Promise<{ se
     rawStats = statsData || [];
   }
   const stats = rawStats;
+
+  // 2b. OYUNCULARIN AKTİF TAKIM ÜYELİKLERİNİ AL (Transfer olan oyuncuların güncel takımını göstermek için)
+  const profileIds = Array.from(new Set(stats.map(s => s.player_id).filter(Boolean)));
+  const activeTeamByPlayer = new Map<string, any>();
+  if (profileIds.length > 0) {
+    const { data: activeMemberships } = await supabase
+      .from("team_memberships")
+      .select("player_id, team_id, joined_at")
+      .in("player_id", profileIds)
+      .is("left_at", null)
+      .order("joined_at", { ascending: false });
+
+    const activeTeamIds = Array.from(new Set((activeMemberships || []).map((m: any) => m.team_id).filter(Boolean)));
+    if (activeTeamIds.length > 0) {
+      const { data: activeTeams } = await supabase
+        .from("teams")
+        .select("id, name, slug, logo_url")
+        .in("id", activeTeamIds);
+      const activeTeamLookup = new Map((activeTeams || []).map((t: any) => [t.id, t]));
+      for (const m of activeMemberships || []) {
+        if (m.player_id && m.team_id && !activeTeamByPlayer.has(m.player_id)) {
+          const tObj = activeTeamLookup.get(m.team_id);
+          if (tObj) activeTeamByPlayer.set(m.player_id, tObj);
+        }
+      }
+    }
+  }
 
   // ÜST ÖZET KARTLARI İÇİN HESAPLAMA
   const totalMatches = (matches || []).length;
@@ -55,17 +89,21 @@ export default async function LeagueStatsPage({ params }: { params: Promise<{ se
 
     const prof = s.profiles as any;
     const tm = s.teams as any;
+    const match = matchMap.get(s.match_id);
+    const matchRank = match?.rank ?? 0;
+    const activeTm = s.player_id ? activeTeamByPlayer.get(s.player_id) : null;
 
     if (!playerMap.has(pId)) {
       playerMap.set(pId, {
         id: pId,
         username: prof?.username || 'Bilinmiyor',
         hasProfile: !!prof?.id,
-        teamId: tm?.id,
-        teamName: tm?.name || 'Bilinmiyor',
-        teamSlug: tm?.slug,
-        teamLogo: tm?.logo_url,
+        teamId: activeTm?.id || tm?.id,
+        teamName: activeTm?.name || tm?.name || 'Bilinmiyor',
+        teamSlug: activeTm?.slug || tm?.slug,
+        teamLogo: activeTm?.logo_url ?? tm?.logo_url,
         position: s.position,
+        lastMatchRank: matchRank,
         matches: 0,
         goals: 0,
         assists: 0,
@@ -77,6 +115,23 @@ export default async function LeagueStatsPage({ params }: { params: Promise<{ se
     }
 
     const ps = playerMap.get(pId);
+    if (matchRank >= ps.lastMatchRank) {
+      ps.lastMatchRank = matchRank;
+      if (s.position) ps.position = s.position;
+      if (!activeTm && tm?.id) {
+        ps.teamId = tm.id;
+        ps.teamName = tm.name || 'Bilinmiyor';
+        ps.teamSlug = tm.slug;
+        ps.teamLogo = tm.logo_url;
+      }
+    }
+    if (activeTm) {
+      ps.teamId = activeTm.id;
+      ps.teamName = activeTm.name || 'Bilinmiyor';
+      ps.teamSlug = activeTm.slug;
+      ps.teamLogo = activeTm.logo_url;
+    }
+
     ps.matches += 1;
     ps.goals += (s.goals || 0);
     ps.assists += (s.assists || 0);
@@ -85,7 +140,6 @@ export default async function LeagueStatsPage({ params }: { params: Promise<{ se
     ps.ratingSum += (parseFloat(s.rating) || 0);
 
     // Galibiyet hesaplama
-    const match = (matches || []).find((m: any) => m.id === s.match_id);
     if (match) {
       if (s.team_id === match.home_team_id && match.home_score > match.away_score) {
         ps.wins += 1;

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { unstable_cache, revalidateTag, revalidatePath } from 'next/cache';
+import { isGoalkeeperPosition } from '@/app/utils/positions';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
@@ -104,7 +105,7 @@ export async function fetchRawStatsData(seasonId?: string, leagueId?: string): P
   // 1. Fetch APPROVED matches in selected season and league
   const { data: matches } = await publicSupabase
     .from('matches')
-    .select('id')
+    .select('id, played_at, created_at, fixtures(week_number)')
     .eq('season_id', seasonId)
     .eq('league_id', leagueId)
     .eq('status', 'APPROVED');
@@ -114,10 +115,18 @@ export async function fetchRawStatsData(seasonId?: string, leagueId?: string): P
     return emptyResult;
   }
 
+  const matchRankMap = new Map<string, number>();
+  for (const m of matches || []) {
+    const fix = Array.isArray((m as any).fixtures) ? (m as any).fixtures[0] : (m as any).fixtures;
+    const weekNum = Number(fix?.week_number || 0);
+    const timeMs = new Date((m as any).played_at || (m as any).created_at || 0).getTime() || 0;
+    matchRankMap.set(m.id, weekNum * 1e13 + timeMs);
+  }
+
   // 2. Fetch raw match_player_stats for those matches
   const { data: stats } = await publicSupabase
     .from('match_player_stats')
-    .select('player_id, ea_player_id, team_id, position, goals, assists, rating, saves, goals_conceded')
+    .select('match_id, player_id, ea_player_id, team_id, position, goals, assists, rating, saves, goals_conceded')
     .in('match_id', matchIds);
 
   const rawStats = stats || [];
@@ -157,6 +166,38 @@ export async function fetchRawStatsData(seasonId?: string, leagueId?: string): P
   const eaToProfileMap = new Map(validProfiles.filter((p: any) => p.current_ea_player_id).map((p: any) => [p.current_ea_player_id, p]));
   const teamMap = new Map((teamsRes.data || []).map((t: any) => [t.id, t]));
 
+  // 3b. Fetch active team_memberships so transferred players show their current team
+  const validProfileIds = Array.from(idToProfileMap.keys());
+  const activeTeamIdByProfile = new Map<string, string>();
+  if (validProfileIds.length > 0) {
+    const { data: activeMemberships } = await publicSupabase
+      .from('team_memberships')
+      .select('player_id, team_id, joined_at')
+      .in('player_id', validProfileIds)
+      .is('left_at', null)
+      .order('joined_at', { ascending: false });
+
+    const missingActiveTeamIds: string[] = [];
+    for (const m of activeMemberships || []) {
+      if (m.player_id && m.team_id && !activeTeamIdByProfile.has(m.player_id)) {
+        activeTeamIdByProfile.set(m.player_id, m.team_id);
+        if (!teamMap.has(m.team_id)) {
+          missingActiveTeamIds.push(m.team_id);
+        }
+      }
+    }
+
+    if (missingActiveTeamIds.length > 0) {
+      const { data: extraTeams } = await publicSupabase
+        .from('teams')
+        .select('id, name, slug, logo_url')
+        .in('id', Array.from(new Set(missingActiveTeamIds)));
+      for (const t of extraTeams || []) {
+        teamMap.set(t.id, t);
+      }
+    }
+  }
+
   const filteredStats = rawStats.filter((s: any) => (s.player_id && idToProfileMap.has(s.player_id)) || (s.ea_player_id && eaToProfileMap.has(s.ea_player_id)));
 
   // 4. Aggregate stats per profile
@@ -164,14 +205,17 @@ export async function fetchRawStatsData(seasonId?: string, leagueId?: string): P
   for (const s of filteredStats) {
     const profile = (s.player_id && idToProfileMap.get(s.player_id)) || eaToProfileMap.get(s.ea_player_id);
     const key = profile.id;
+    const matchRank = matchRankMap.get(s.match_id) ?? 0;
+    const activeTeamId = activeTeamIdByProfile.get(key);
 
     if (!playerStatsMap.has(key)) {
       playerStatsMap.set(key, {
         profile_id: profile.id,
         username: profile.username,
         ea_player_id: s.ea_player_id,
-        team_id: s.team_id,
+        team_id: activeTeamId || s.team_id,
         position: s.position,
+        last_match_rank: matchRank,
         matches_played: 0,
         goals: 0,
         assists: 0,
@@ -188,7 +232,14 @@ export async function fetchRawStatsData(seasonId?: string, leagueId?: string): P
     ps.rating_sum += (parseFloat(s.rating) || 0);
     ps.saves += (s.saves || 0);
     ps.goals_conceded += (s.goals_conceded || 0);
-    if (s.team_id) ps.team_id = s.team_id;
+    if (matchRank >= ps.last_match_rank) {
+      ps.last_match_rank = matchRank;
+      if (s.position) ps.position = s.position;
+      if (!activeTeamId && s.team_id) ps.team_id = s.team_id;
+    }
+    if (activeTeamId) {
+      ps.team_id = activeTeamId;
+    }
   }
 
   const aggregated: PublicPlayerStatItem[] = Array.from(playerStatsMap.values()).map(ps => {
@@ -219,7 +270,7 @@ export async function fetchRawStatsData(seasonId?: string, leagueId?: string): P
   const topAssisters = [...aggregated].sort((a, b) => b.assists - a.assists || a.matches_played - b.matches_played).filter(p => p.assists > 0).slice(0, 10);
   const topRatings = [...aggregated].sort((a, b) => parseFloat(b.avg_rating) - parseFloat(a.avg_rating) || b.matches_played - a.matches_played).filter(p => parseFloat(p.avg_rating) > 0).slice(0, 10);
   const mostMatches = [...aggregated].sort((a, b) => b.matches_played - a.matches_played).slice(0, 10);
-  const goalkeepers = aggregated.filter(p => p.position === 'goalkeeper' || p.saves > 0).sort((a, b) => b.saves - a.saves || a.goals_conceded - b.goals_conceded).slice(0, 10);
+  const goalkeepers = aggregated.filter(p => isGoalkeeperPosition(p.position) || p.saves > 0).sort((a, b) => b.saves - a.saves || a.goals_conceded - b.goals_conceded).slice(0, 10);
 
   return {
     topScorers,
