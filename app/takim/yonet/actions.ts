@@ -306,21 +306,9 @@ export async function updateTeamSocialsAction(formData: FormData) {
     p_goal_music_url: goalMusicUrl
   });
 
+  // Captains have no direct UPDATE on teams; update_team_socials() is the only write path.
   if (rpcError) {
-    // If RPC is not available yet (migration not yet applied to remote DB), fallback to direct update
-    const { error: directError } = await supabase
-      .from('teams')
-      .update({
-        stream_url: streamUrl,
-        instagram_url: instagramUrl,
-        goal_music_url: goalMusicUrl,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', teamId);
-
-    if (directError) {
-      return { error: 'Bağlantılar kaydedilemedi: ' + directError.message };
-    }
+    return { error: 'Bağlantılar kaydedilemedi: ' + rpcError.message };
   } else if (rpcData && !rpcData.success) {
     return { error: rpcData.error || 'Güncelleme yetkiniz yok.' };
   }

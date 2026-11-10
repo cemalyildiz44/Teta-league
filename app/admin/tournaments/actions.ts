@@ -1383,6 +1383,12 @@ export async function approveTournamentMatchSubmissionAction(input: string | For
     return { error: 'Bu bildirim zaten ' + (sub.status === 'APPROVED' ? 'onaylanmış' : 'reddedilmiş') + '.' };
   }
 
+  // A duplicate pending submission from the old flow must not overwrite an already approved result
+  const matchStatus = (sub.match as any)?.status;
+  if (matchStatus === 'APPROVED' || matchStatus === 'COMPLETED') {
+    return { error: 'Bu maçın sonucu zaten onaylanmış. Bu bildirimi reddedebilirsiniz.' };
+  }
+
   const nowIso = new Date().toISOString();
 
   // 2. Atomically update submission

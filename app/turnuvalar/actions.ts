@@ -310,17 +310,6 @@ export async function submitTournamentMatchScoreAction(formData: FormData) {
     return { error: 'Skor bildirimi yapabilmek için giriş yapmalısınız.' };
   }
 
-  // Check active profile status
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, status, is_active, username')
-    .eq('id', user.id)
-    .maybeSingle();
-
-  if (!profile || profile.status === 'SUSPENDED' || profile.status === 'BANNED' || profile.is_active === false) {
-    return { error: 'Hesabınız askıya alındığı veya kısıtlandığı için işlem yapamazsınız.' };
-  }
-
   // 2. Parse form data
   const match_id = (formData.get('match_id') as string)?.trim();
   const tournament_id = (formData.get('tournament_id') as string)?.trim();
@@ -352,109 +341,21 @@ export async function submitTournamentMatchScoreAction(formData: FormData) {
     return { error: 'Girilen skor geçerli bir futbol skoru aralığında olmalıdır (en fazla 50).' };
   }
 
-  // 3. Fetch match and verify authorization
-  const { data: match, error: matchError } = await supabase
-    .from('tournament_matches')
-    .select(`
-      id,
-      tournament_id,
-      home_application_id,
-      away_application_id,
-      status,
-      home:tournament_applications!home_application_id(id, team_name, applicant_id, status),
-      away:tournament_applications!away_application_id(id, team_name, applicant_id, status)
-    `)
-    .eq('id', match_id)
-    .maybeSingle();
+  // 3. Authorization, match/tournament state checks, rejected-submission cleanup, the submission insert and the
+  // match status update run atomically in one SECURITY DEFINER RPC. Representatives have no direct UPDATE on
+  // tournament_matches, so direct writes from here silently matched 0 rows.
+  const { error: rpcError } = await supabase.rpc('submit_tournament_match_score', {
+    p_tournament_id: tournament_id,
+    p_match_id: match_id,
+    p_home_score: home_score,
+    p_away_score: away_score,
+  });
 
-  if (matchError || !match) {
-    return { error: 'Maç bulunamadı.' };
-  }
-
-  if (match.tournament_id !== tournament_id) {
-    return { error: 'Maç turnuva ile eşleşmiyor.' };
-  }
-
-  // Verify tournament is active and not finished/archived
-  const { data: tour } = await supabase
-    .from('tournaments')
-    .select('id, status')
-    .eq('id', tournament_id)
-    .maybeSingle();
-
-  if (tour && (tour.status === 'COMPLETED' || tour.status === 'ARCHIVED')) {
-    return { error: 'Bu turnuva tamamlanmış veya arşivlenmiş olduğundan yeni skor bildirimi kabul edilmemektedir.' };
-  }
-
-  // Authorization: user must be the approved applicant of home or away team
-  const isHomeApplicant = (match.home as any)?.applicant_id === user.id;
-  const isAwayApplicant = (match.away as any)?.applicant_id === user.id;
-
-  if (!isHomeApplicant && !isAwayApplicant) {
-    return { error: 'Yalnızca bu maçta mücadele eden takımların onaylı temsilcileri sonuç bildirebilir.' };
-  }
-
-  const submitterTeamAppId = isHomeApplicant ? match.home_application_id : match.away_application_id;
-
-  // Status check: must be SCHEDULED or REJECTED
-  if (match.status === 'PENDING_REVIEW') {
-    return { error: 'Bu maç için zaten inceleme bekleyen bir skor bildirimi bulunmaktadır.' };
-  }
-
-  if (match.status === 'APPROVED' || match.status === 'COMPLETED') {
-    return { error: 'Bu maçın sonucu zaten onaylanmıştır. Yeni bildirim gönderilemez.' };
-  }
-
-  // 4. Clean up any old rejected submission for this match if re-submitting
-  await supabase
-    .from('tournament_match_submissions')
-    .delete()
-    .eq('match_id', match_id)
-    .eq('status', 'REJECTED');
-
-  // Also clean old goals if any exist from a rejected submission
-  await supabase
-    .from('tournament_match_goals')
-    .delete()
-    .eq('match_id', match_id);
-
-  // 5. Insert into tournament_match_submissions
-  // Note: screenshot_url has NOT NULL in DB schema, so 'MANUAL_ENTRY' satisfies constraint without requiring file upload
-  const { data: submission, error: subError } = await supabase
-    .from('tournament_match_submissions')
-    .insert({
-      tournament_id,
-      match_id,
-      submitted_by: user.id,
-      submitted_team_application_id: submitterTeamAppId,
-      home_score,
-      away_score,
-      screenshot_url: 'MANUAL_ENTRY',
-      notes: 'Kaptan tarafından doğrulanmış skor bildirimi.',
-      status: 'PENDING_REVIEW',
-    })
-    .select('id')
-    .maybeSingle();
-
-  if (subError || !submission) {
-    return { error: 'Maç bildirimi kaydedilemedi: ' + (subError?.message || 'Bilinmeyen hata') };
-  }
-
-  // 6. Update tournament_matches status to PENDING_REVIEW
-  const { error: matchUpdateErr } = await supabase
-    .from('tournament_matches')
-    .update({
-      status: 'PENDING_REVIEW',
-      home_score,
-      away_score,
-      screenshot_url: null,
-      rejection_reason: null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', match_id);
-
-  if (matchUpdateErr) {
-    return { error: 'Maç durumu güncellenemedi: ' + matchUpdateErr.message };
+  if (rpcError) {
+    if (rpcError.code === 'PGRST202') {
+      return { error: 'Skor bildirim sistemi şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.' };
+    }
+    return { error: rpcError.message || 'Maç bildirimi kaydedilemedi.' };
   }
 
   revalidatePath('/turnuvalar');
