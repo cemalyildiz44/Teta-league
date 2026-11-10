@@ -47,6 +47,10 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // The weekly post images read their backgrounds, fonts and week labels from disk at runtime
+  outputFileTracingIncludes: {
+    '/admin/paylasim/gorsel': ['./assets/social/**/*'],
+  },
   images: {
     remotePatterns,
   },

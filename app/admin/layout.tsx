@@ -82,6 +82,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/admin/totw" className="block px-4 py-3 rounded-lg text-sm font-bold text-gray-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors">
               TOTW
             </Link>
+            <Link href="/admin/paylasim" className="block px-4 py-3 rounded-lg text-sm font-bold text-gray-400 hover:text-pink-400 hover:bg-pink-500/10 transition-colors">
+              Haftalık Paylaşım
+            </Link>
           </div>
 
           <div className="pt-4 mt-4 border-t border-white/5">
