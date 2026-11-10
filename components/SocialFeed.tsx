@@ -1,10 +1,8 @@
-import { createClient } from '@/utils/supabase/server';
-import { cookies } from 'next/headers';
+import { createPublicClient } from '@/utils/supabase/public';
 import Link from 'next/link';
 
 export default async function SocialFeed() {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createPublicClient();
 
   const { data: posts } = await supabase
     .from('posts')

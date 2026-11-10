@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Trophy, Medal, Swords, Clock, CheckCircle2, Edit2, Sparkles, ChevronRight } from 'lucide-react';
+import { Trophy, Medal, CheckCircle2, Edit2, Sparkles } from 'lucide-react';
 import TeamLogo from '@/components/TeamLogo';
 import { getTournamentStageLabel } from '@/lib/tournament-engine';
 

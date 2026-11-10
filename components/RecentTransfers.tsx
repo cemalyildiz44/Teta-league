@@ -1,5 +1,4 @@
-import { createClient } from '@/utils/supabase/server';
-import { cookies } from 'next/headers';
+import { createPublicClient } from '@/utils/supabase/public';
 import Link from 'next/link';
 import { ArrowRight, ArrowRightLeft } from 'lucide-react';
 import TeamLogo from '@/components/TeamLogo';
@@ -13,8 +12,7 @@ export default async function RecentTransfers() {
   let formattedTransfers: any[] = [];
 
   if (activeSeason) {
-    const cookieStore = await cookies();
-    const supabase = createClient(cookieStore);
+    const supabase = createPublicClient();
 
     // 2 & 3. Fetch approved transfers and teams concurrently (teams is memoized)
     const [{ data: transfers }, teams] = await Promise.all([

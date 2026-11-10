@@ -1141,7 +1141,7 @@ export default function TotwManager({
                 <div className="mt-2.5 flex flex-wrap items-center gap-4 text-[11px] text-amber-400 font-semibold">
                   {isDatabaseSchemaPending && (
                     <span>
-                      • Ödülleri göndermek için <code>20261019000000_admin_totw_system.sql</code> migration'ının uygulanması gereklidir.
+                      • Ödülleri göndermek için <code>20261019000000_admin_totw_system.sql</code> migration&apos;ının uygulanması gereklidir.
                     </span>
                   )}
                   {missingSlotsCount > 0 && (

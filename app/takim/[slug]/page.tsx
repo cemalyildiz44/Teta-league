@@ -13,6 +13,11 @@ interface Props {
 
 export const revalidate = 60; // 1 min public cache
 
+// Render each path on its first visit and cache it (ISR); without this the route renders on every request.
+export async function generateStaticParams() {
+  return [];
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const pageData = await getCachedTeamPageData(slug);
@@ -389,7 +394,7 @@ export default async function TeamPage({ params }: Props) {
                       )}
                       {item.notes.length > 0 && (
                         <p className="text-[11px] font-medium text-gray-400 mt-2 line-clamp-2 italic" title={item.notes.join(' • ')}>
-                          "{item.notes.join(' • ')}"
+                          &quot;{item.notes.join(' • ')}&quot;
                         </p>
                       )}
                     </div>

@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
-const remotePatterns: any[] = [
+type RemotePattern = NonNullable<NonNullable<NextConfig["images"]>["remotePatterns"]>[number];
+
+const remotePatterns: RemotePattern[] = [
   {
     protocol: 'http',
     hostname: '127.0.0.1',
@@ -22,7 +24,7 @@ if (supabaseUrl) {
     const parsedUrl = new URL(supabaseUrl);
     if (parsedUrl.hostname !== '127.0.0.1' && parsedUrl.hostname !== 'localhost') {
       remotePatterns.push({
-        protocol: parsedUrl.protocol.replace(':', ''),
+        protocol: parsedUrl.protocol.replace(':', '') as 'http' | 'https',
         hostname: parsedUrl.hostname,
         port: parsedUrl.port || '',
         pathname: '/storage/v1/object/public/**',
@@ -33,9 +35,23 @@ if (supabaseUrl) {
   }
 }
 
+// Sent on every response. frame-ancestors / X-Frame-Options stop other sites from embedding the site in a
+// hidden frame (clickjacking); the site's own outgoing embeds (stream players) are not affected.
+const securityHeaders = [
+  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+  { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=()' },
+];
+
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   images: {
     remotePatterns,
+  },
+  async headers() {
+    return [{ source: '/:path*', headers: securityHeaders }];
   },
 };
 

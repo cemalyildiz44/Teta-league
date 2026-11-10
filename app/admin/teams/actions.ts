@@ -453,9 +453,9 @@ export async function removePlayerFromTeam(membership_id: string) {
     .eq('id', membership_id)
     .maybeSingle();
 
-  let teamSlug: string | null = (mem?.teams as any)?.slug || null;
-  let teamName: string = (mem?.teams as any)?.name || 'Takım';
-  let playerUsername: string | null = (mem?.profiles as any)?.username || null;
+  const teamSlug: string | null = (mem?.teams as any)?.slug || null;
+  const teamName: string = (mem?.teams as any)?.name || 'Takım';
+  const playerUsername: string | null = (mem?.profiles as any)?.username || null;
 
   // Update left_at instead of deleting to preserve historical records
   const { error } = await supabase.from('team_memberships')

@@ -2,9 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
-import { revalidatePath, revalidateTag } from 'next/cache';
-import { slugify } from '@/app/lig/utils';
-import { getScopeNames } from '@/lib/admin-scope';
+import { revalidatePath } from 'next/cache';
 import { logAdminAudit } from '@/lib/audit';
 import { revalidateMatchDependencies } from '@/lib/match-revalidation';
 

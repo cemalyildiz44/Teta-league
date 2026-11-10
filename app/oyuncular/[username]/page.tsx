@@ -1,10 +1,11 @@
-import { createClient } from "@/utils/supabase/server";
-import { cookies } from "next/headers";
+import { createPublicClient } from '@/utils/supabase/public';
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { Trophy, ShieldAlert } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 import { calculateMarketValue, formatEuro, MarketValueInput } from "@/app/utils/marketValueCalculator";
 import { getPositionLabel } from "@/app/utils/positions";
+
+export const revalidate = 60;
 import TeamLogo from "@/components/TeamLogo";
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }) {
@@ -23,8 +24,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   const resolvedSearchParams = await searchParams;
   const activeTab = resolvedSearchParams.tab || 'genel';
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createPublicClient();
 
   // Legacy UUID redirect
   const uuidRx = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -628,7 +628,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
             </div>
             {profile.bio && (
               <div className="mt-6 pt-5 border-t border-white/5 text-[13px] text-gray-400 leading-relaxed font-medium">
-                "{profile.bio}"
+                &quot;{profile.bio}&quot;
               </div>
             )}
             {((profile.discord_url || profile.social_links?.discord) || (profile.instagram_url || profile.social_links?.instagram)) && (

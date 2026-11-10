@@ -4,8 +4,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { logoutAction } from '@/app/auth/actions';
 import { Lock } from 'lucide-react';
+import { useHeaderSession } from './useHeaderSession';
 
 interface NavLink {
   label: string;
@@ -26,10 +26,12 @@ const rightLinks: NavLink[] = [
   { label: 'MAĞAZA', href: '/magaza', locked: true },
 ];
 
-export default function Header({ user, userProfile, activeTeam, unreadCount = 0 }: { user: any, userProfile?: any, activeTeam?: any, unreadCount?: number }) {
+export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
+  // Session data is loaded client-side so the root layout does not read cookies (keeps public pages cacheable)
+  const { user, userProfile, activeTeam, unreadCount, loading, signOut } = useHeaderSession(pathname);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -105,8 +107,8 @@ export default function Header({ user, userProfile, activeTeam, unreadCount = 0 
             );
           })}
 
-          {/* OYUNCUM */}
-          {user ? (
+          {/* OYUNCUM (while the session loads, link to /profil instead of flashing the locked state) */}
+          {user || loading ? (
             <Link
               href={userProfile?.username ? `/oyuncular/${userProfile.username}` : '/profil'}
               prefetch={false}
@@ -129,7 +131,9 @@ export default function Header({ user, userProfile, activeTeam, unreadCount = 0 
 
           {/* Action Buttons */}
           <div className="ml-4 flex items-center min-w-0">
-            {user && userProfile ? (
+            {loading ? (
+              <div className="h-[44px] w-[180px] rounded-full bg-white/5 border border-white/5 animate-pulse" aria-hidden="true" />
+            ) : user && userProfile ? (
               <div className="flex items-center gap-3">
                 <Link href="/bildirimler" className="relative p-2 text-gray-400 hover:text-[#00e5ff] transition-colors rounded-full hover:bg-white/5">
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
@@ -163,7 +167,7 @@ export default function Header({ user, userProfile, activeTeam, unreadCount = 0 
                   </div>
                 </Link>
                 <button
-                  onClick={() => logoutAction()}
+                  onClick={() => signOut()}
                   className="px-4 py-2 h-[44px] flex items-center text-[10px] font-[900] tracking-[0.1em] text-red-400 border border-red-500/20 bg-red-500/5 rounded-xl hover:bg-red-500/15 hover:border-red-500/40 hover:text-red-300 transition-all uppercase shrink-0"
                 >
                   ÇIKIŞ
@@ -175,7 +179,7 @@ export default function Header({ user, userProfile, activeTeam, unreadCount = 0 
                   {user.user_metadata?.username || user.email?.split('@')[0]}
                 </span>
                 <button
-                  onClick={() => logoutAction()}
+                  onClick={() => signOut()}
                   className="px-4 py-2 text-[12px] font-[800] tracking-wider text-red-400 border border-red-500/30 rounded-md hover:bg-red-500/10 transition-all"
                 >
                   ÇIKIŞ
@@ -272,8 +276,10 @@ export default function Header({ user, userProfile, activeTeam, unreadCount = 0 
             )}
 
             <div className="my-2 h-px bg-white/10" />
-            
-            {user && userProfile ? (
+
+            {loading ? (
+              <div className="h-[72px] rounded-xl bg-white/5 border border-white/5 animate-pulse" aria-hidden="true" />
+            ) : user && userProfile ? (
               <div className="flex flex-col gap-4">
                 <Link 
                   href="/profil"
@@ -303,7 +309,7 @@ export default function Header({ user, userProfile, activeTeam, unreadCount = 0 
                 </Link>
                 <button
                   onClick={() => {
-                    logoutAction();
+                    signOut();
                     setMobileOpen(false);
                   }}
                   className="w-full py-4 text-center text-[14px] font-[900] tracking-[0.1em] text-red-400 border border-red-500/20 bg-red-500/5 rounded-xl hover:bg-red-500/15 transition-all uppercase"
@@ -318,7 +324,7 @@ export default function Header({ user, userProfile, activeTeam, unreadCount = 0 
                 </span>
                 <button
                   onClick={() => {
-                    logoutAction();
+                    signOut();
                     setMobileOpen(false);
                   }}
                   className="w-full py-4 text-center text-[14px] font-[800] tracking-wider text-red-400 border border-red-500/30 rounded hover:bg-red-500/10 transition-all"

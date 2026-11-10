@@ -15,7 +15,6 @@ import {
   addPlayerToTeam, removePlayerFromTeam, uploadTeamLogoAction,
   deleteTeamAction, forceDeleteTestTeamAction
 } from './actions';
-import { formatTournamentDate } from '@/lib/date-utils';
 
 import imageCompression from 'browser-image-compression';
 import TeamLogo from '@/components/TeamLogo';
@@ -1061,7 +1060,7 @@ export function TeamsManager({
             <form onSubmit={handleUploadLogo} className='p-6 space-y-6'>
               <div className='flex flex-col items-center gap-4'>
                 <div className='w-24 h-24 rounded-2xl border-2 border-dashed border-white/20 bg-[#060d18] flex items-center justify-center overflow-hidden'>
-                  {logoModal.logo_url ? <img src={logoModal.logo_url} className='w-full h-full object-contain' /> : <Upload className='w-8 h-8 text-zinc-600' />}
+                  {logoModal.logo_url ? <img alt="" src={logoModal.logo_url} className='w-full h-full object-contain' /> : <Upload className='w-8 h-8 text-zinc-600' />}
                 </div>
                 <div className='w-full'>
                   <label className='block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2'>Yeni Logo (Max 5MB)</label>

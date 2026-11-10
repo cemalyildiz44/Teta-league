@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildWeeklyDocs, validateWeeklyDoc, computeWeeklyChecksum, weeklyFileName } from '../lib/fixture-weekly.ts';
+import { validateWeeklyDoc, computeWeeklyChecksum, weeklyFileName } from '../lib/fixture-weekly.ts';
 import { applyWeeklyImport, previewWeeklyImport, exportWeeklyFiles, requireAdmin } from '../lib/fixture-import-service.ts';
 import { createZip, crc32 } from '../lib/zip-store.ts';
 

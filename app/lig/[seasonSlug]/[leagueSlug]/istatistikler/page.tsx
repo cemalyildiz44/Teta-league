@@ -1,23 +1,103 @@
-import { createClient } from "@/utils/supabase/server";
+import { createPublicClient } from '@/utils/supabase/public';
 import { notFound } from "next/navigation";
 import { getLeagueBySlugs } from "../../../utils";
-import { cookies } from "next/headers";
 import Link from "next/link";
 import TeamLogo from "@/components/TeamLogo";
 import { isDefenderPosition, isGoalkeeperPosition } from "@/app/utils/positions";
+
+export const revalidate = 60;
+
+// Render each path on its first visit and cache it (ISR); without this the route renders on every request.
+export async function generateStaticParams() {
+  return [];
+}
 import { buildLeagueMetadata } from "../league-metadata";
 
 export function generateMetadata({ params }: { params: Promise<{ seasonSlug: string; leagueSlug: string }> }) {
   return buildLeagueMetadata(params, "stats");
 }
 
+// Helper components live at module scope so React does not re-create them on every render
+const StatCard = ({ title, value, delay }: { title: string, value: string | number, delay: string }) => (
+  <div className={`client-glass border border-white/5 p-6 rounded-xl relative overflow-hidden group hover:border-[#00e5ff]/30 transition-all ${delay}`}>
+    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-[#00e5ff]/5 to-transparent rounded-full -mr-10 -mt-10 group-hover:from-[#00e5ff]/10 transition-colors"></div>
+    <div className="text-[11px] font-[900] tracking-[0.2em] text-gray-500 mb-2 uppercase">{title}</div>
+    <div className="text-4xl font-black text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.2)] group-hover:text-[#00e5ff] transition-colors">{value}</div>
+  </div>
+);
+
+const PlayerRow = ({ player, idx, val, label }: { player: any, idx: number, val: number | string, label: string }) => (
+  <div className="flex items-center justify-between py-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors px-2 rounded-lg -mx-2 group">
+    <div className="flex items-center gap-4">
+      <span className={`text-[16px] font-[900] w-5 text-center ${idx === 0 ? 'text-[#00e5ff] drop-shadow-[0_0_5px_rgba(0,229,255,0.5)]' : 'text-gray-600'}`}>{idx + 1}</span>
+      <div className="flex items-center gap-3">
+        <Link href={`/takim/${player.teamSlug}`} className="shrink-0 group-hover:drop-shadow-[0_0_8px_rgba(0,229,255,0.4)] transition-all">
+          <TeamLogo src={player.teamLogo} name={player.teamName} size="sm" />
+        </Link>
+        <div className="flex flex-col">
+          <Link href={`/oyuncular/${player.username}`} className="text-[15px] font-[800] text-white hover:text-[#00e5ff] transition-colors tracking-wide">
+            {player.username}
+          </Link>
+          <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">{player.teamName}</span>
+        </div>
+      </div>
+    </div>
+    <div className="flex flex-col items-end">
+      <span className="text-[18px] font-black text-[#00e5ff]">{val}</span>
+      <span className="text-[9px] font-black tracking-widest text-gray-600 uppercase">{label}</span>
+    </div>
+  </div>
+);
+
+const TeamRow = ({ team, idx, val, label }: { team: any, idx: number, val: number, label: string }) => (
+  <div className="flex items-center justify-between py-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors px-2 rounded-lg -mx-2 group">
+    <div className="flex items-center gap-4">
+      <span className={`text-[16px] font-[900] w-5 text-center ${idx === 0 ? 'text-[#00e5ff] drop-shadow-[0_0_5px_rgba(0,229,255,0.5)]' : 'text-gray-600'}`}>{idx + 1}</span>
+      <div className="flex items-center gap-3">
+        <Link href={`/takim/${team.slug}`} className="shrink-0 flex items-center justify-center">
+          <TeamLogo src={team.logo} name={team.name} size="sm" />
+        </Link>
+        <div className="flex flex-col">
+          <Link href={`/takim/${team.slug}`} className="text-[15px] font-[800] text-white hover:text-[#00e5ff] transition-colors tracking-wide">
+            {team.name}
+          </Link>
+        </div>
+      </div>
+    </div>
+    <div className="flex flex-col items-end">
+      <span className="text-[18px] font-black text-[#00e5ff]">{val}</span>
+      <span className="text-[9px] font-black tracking-widest text-gray-600 uppercase">{label}</span>
+    </div>
+  </div>
+);
+
+const EmptyRow = ({ label }: { label: string }) => (
+  <div className="flex items-center justify-between py-3 border-b border-white/5 last:border-0 px-2 rounded-lg -mx-2 opacity-50">
+    <div className="flex items-center gap-4">
+      <span className="text-[16px] font-[900] w-5 text-center text-gray-700">—</span>
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-full bg-[#0a1628] border border-white/5 flex items-center justify-center shrink-0 overflow-hidden">
+          <span className="text-[10px] font-black text-gray-700">—</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-[15px] font-[800] text-gray-500 tracking-wide">Henüz veri yok</span>
+          <span className="text-[11px] font-bold text-gray-700 uppercase tracking-wider">—</span>
+        </div>
+      </div>
+    </div>
+    <div className="flex flex-col items-end">
+      <span className="text-[18px] font-black text-gray-700">—</span>
+      <span className="text-[9px] font-black tracking-widest text-gray-700 uppercase">{label}</span>
+    </div>
+  </div>
+);
+
 export default async function LeagueStatsPage({ params }: { params: Promise<{ seasonSlug: string; leagueSlug: string }> }) {
   const resolvedParams = await params;
   const league = await getLeagueBySlugs(resolvedParams.seasonSlug, resolvedParams.leagueSlug);
   if (!league) notFound();
   
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createPublicClient();
 
   // 1. OYNANAN APPROVED MAÇLARI AL
   const { data: matches } = await supabase
@@ -193,81 +273,6 @@ export default async function LeagueStatsPage({ params }: { params: Promise<{ se
   const mostWinsTeams = [...teamStats].filter(t => t.wins > 0).sort((a, b) => b.wins - a.wins).slice(0, 5);
   const mostGoalsTeams = [...teamStats].filter(t => t.goalsFor > 0).sort((a, b) => b.goalsFor - a.goalsFor).slice(0, 5);
   const leastConcededTeams = [...teamStats].filter(t => t.matches > 0).sort((a, b) => a.goalsAgainst - b.goalsAgainst).slice(0, 5);
-
-  // Helper Components
-  const StatCard = ({ title, value, delay }: { title: string, value: string | number, delay: string }) => (
-    <div className={`client-glass border border-white/5 p-6 rounded-xl relative overflow-hidden group hover:border-[#00e5ff]/30 transition-all ${delay}`}>
-      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-[#00e5ff]/5 to-transparent rounded-full -mr-10 -mt-10 group-hover:from-[#00e5ff]/10 transition-colors"></div>
-      <div className="text-[11px] font-[900] tracking-[0.2em] text-gray-500 mb-2 uppercase">{title}</div>
-      <div className="text-4xl font-black text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.2)] group-hover:text-[#00e5ff] transition-colors">{value}</div>
-    </div>
-  );
-
-  const PlayerRow = ({ player, idx, val, label }: { player: any, idx: number, val: number | string, label: string }) => (
-    <div className="flex items-center justify-between py-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors px-2 rounded-lg -mx-2 group">
-      <div className="flex items-center gap-4">
-        <span className={`text-[16px] font-[900] w-5 text-center ${idx === 0 ? 'text-[#00e5ff] drop-shadow-[0_0_5px_rgba(0,229,255,0.5)]' : 'text-gray-600'}`}>{idx + 1}</span>
-        <div className="flex items-center gap-3">
-          <Link href={`/takim/${player.teamSlug}`} className="shrink-0 group-hover:drop-shadow-[0_0_8px_rgba(0,229,255,0.4)] transition-all">
-            <TeamLogo src={player.teamLogo} name={player.teamName} size="sm" />
-          </Link>
-          <div className="flex flex-col">
-            <Link href={`/oyuncular/${player.username}`} className="text-[15px] font-[800] text-white hover:text-[#00e5ff] transition-colors tracking-wide">
-              {player.username}
-            </Link>
-            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">{player.teamName}</span>
-          </div>
-        </div>
-      </div>
-      <div className="flex flex-col items-end">
-        <span className="text-[18px] font-black text-[#00e5ff]">{val}</span>
-        <span className="text-[9px] font-black tracking-widest text-gray-600 uppercase">{label}</span>
-      </div>
-    </div>
-  );
-
-  const TeamRow = ({ team, idx, val, label }: { team: any, idx: number, val: number, label: string }) => (
-    <div className="flex items-center justify-between py-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors px-2 rounded-lg -mx-2 group">
-      <div className="flex items-center gap-4">
-        <span className={`text-[16px] font-[900] w-5 text-center ${idx === 0 ? 'text-[#00e5ff] drop-shadow-[0_0_5px_rgba(0,229,255,0.5)]' : 'text-gray-600'}`}>{idx + 1}</span>
-        <div className="flex items-center gap-3">
-          <Link href={`/takim/${team.slug}`} className="shrink-0 flex items-center justify-center">
-            <TeamLogo src={team.logo} name={team.name} size="sm" />
-          </Link>
-          <div className="flex flex-col">
-            <Link href={`/takim/${team.slug}`} className="text-[15px] font-[800] text-white hover:text-[#00e5ff] transition-colors tracking-wide">
-              {team.name}
-            </Link>
-          </div>
-        </div>
-      </div>
-      <div className="flex flex-col items-end">
-        <span className="text-[18px] font-black text-[#00e5ff]">{val}</span>
-        <span className="text-[9px] font-black tracking-widest text-gray-600 uppercase">{label}</span>
-      </div>
-    </div>
-  );
-
-  const EmptyRow = ({ label }: { label: string }) => (
-    <div className="flex items-center justify-between py-3 border-b border-white/5 last:border-0 px-2 rounded-lg -mx-2 opacity-50">
-      <div className="flex items-center gap-4">
-        <span className="text-[16px] font-[900] w-5 text-center text-gray-700">—</span>
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-[#0a1628] border border-white/5 flex items-center justify-center shrink-0 overflow-hidden">
-            <span className="text-[10px] font-black text-gray-700">—</span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-[15px] font-[800] text-gray-500 tracking-wide">Henüz veri yok</span>
-            <span className="text-[11px] font-bold text-gray-700 uppercase tracking-wider">—</span>
-          </div>
-        </div>
-      </div>
-      <div className="flex flex-col items-end">
-        <span className="text-[18px] font-black text-gray-700">—</span>
-        <span className="text-[9px] font-black tracking-widest text-gray-700 uppercase">{label}</span>
-      </div>
-    </div>
-  );
 
   return (
     <div className="space-y-12 pb-12">

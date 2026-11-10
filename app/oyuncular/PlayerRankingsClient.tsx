@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { formatEuro } from '@/app/utils/marketValueCalculator';
 import {
   PLATFORM_OPTIONS,

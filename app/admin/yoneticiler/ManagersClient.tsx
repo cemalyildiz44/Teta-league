@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from 'react';
 import { grantAdminRoleAction, revokeAdminRoleAction, searchUsersAction, ManagedUser } from './actions';
-import Image from 'next/image';
 
 interface ManagersClientProps {
   initialAdmins: ManagedUser[];

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Edit3, CheckCircle2, AlertCircle, Loader2, Save, X } from 'lucide-react';
+import { Edit3, CheckCircle2, AlertCircle, Loader2, Save } from 'lucide-react';
 import { MatchScreenshotUpload } from '../yeni/MatchScreenshotUpload';
 import { editMatchAction } from '../actions';
 

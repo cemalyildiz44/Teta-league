@@ -1873,7 +1873,7 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
                               >
                                 <div className="flex items-center gap-2.5 min-w-0">
                                   {p.avatar_url ? (
-                                    <img src={p.avatar_url} className="w-6 h-6 rounded-full object-cover shrink-0" />
+                                    <img alt="" src={p.avatar_url} className="w-6 h-6 rounded-full object-cover shrink-0" />
                                   ) : (
                                     <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-zinc-400 shrink-0">
                                       <User className="w-3 h-3" />

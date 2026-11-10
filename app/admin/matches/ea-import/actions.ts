@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { logAdminAudit } from '@/lib/audit';
 import { fetchClubMatches } from '@/lib/ea/client';
 import { normalizeMatch } from '@/lib/ea/normalizer';
-import { matchFixture, FixtureCandidate } from '@/lib/ea/matcher';
+import { matchFixture } from '@/lib/ea/matcher';
 import { NormalizedMatch } from '@/lib/ea/types';
 import { matchPlayerToProfile, validateRosterMembership } from '@/lib/ea/roster-validator';
 import { attachTeamNames } from '@/lib/admin-scope';
@@ -81,7 +81,7 @@ export async function fetchEaPreviewAction(leagueId: string, weekNumber: number)
     if (clubIds.size === 0) return { error: 'Bu haftadaki takımların EA Club ID kayıtları bulunamadı.' };
 
     // 4. Fetch EA matches
-    let allEaMatches: any[] = [];
+    const allEaMatches: any[] = [];
     for (const clubId of Array.from(clubIds)) {
       try {
         const matches = await fetchClubMatches(clubId);

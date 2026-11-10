@@ -264,7 +264,7 @@ class MockPostgresDb {
 const db = new MockPostgresDb();
 
 let passedCount = 0;
-let totalScenarios = 39;
+const totalScenarios = 39;
 
 function runScenario(num, name, fn) {
   try {

@@ -20,7 +20,7 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-[#00e5ff] text-lg font-bold tracking-widest uppercase mb-3">1. Veri Sorumlusu</h2>
             <p>
-              TETA League ("Platform"), elektronik sporlar ve sanal lig yönetimi alanında faaliyet gösteren bir hizmettir. 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında, kullanıcılarımızın ("Veri Sahibi") kişisel verilerinin güvenliğine ve hukuka uygun şekilde işlenmesine büyük önem veriyoruz. İşbu aydınlatma metni, hangi kişisel verilerinizin ne amaçla işlendiğini açıklamaktadır.
+              TETA League (&quot;Platform&quot;), elektronik sporlar ve sanal lig yönetimi alanında faaliyet gösteren bir hizmettir. 6698 sayılı Kişisel Verilerin Korunması Kanunu (&quot;KVKK&quot;) kapsamında, kullanıcılarımızın (&quot;Veri Sahibi&quot;) kişisel verilerinin güvenliğine ve hukuka uygun şekilde işlenmesine büyük önem veriyoruz. İşbu aydınlatma metni, hangi kişisel verilerinizin ne amaçla işlendiğini açıklamaktadır.
             </p>
           </section>
 
@@ -37,7 +37,7 @@ export default function PrivacyPolicyPage() {
 
           <section>
             <h2 className="text-[#00e5ff] text-lg font-bold tracking-widest uppercase mb-3">3. Kişisel Verilerin İşlenme Amaçları ve Hukuki Sebepleri</h2>
-            <p className="mb-3">Verileriniz, KVKK'nın 5/2 maddesindeki "Bir sözleşmenin kurulması veya ifasıyla doğrudan doğruya ilgili olması" ile "İlgili kişinin temel hak ve özgürlüklerine zarar vermemek kaydıyla veri sorumlusunun meşru menfaatleri için veri işlenmesinin zorunlu olması" hukuki şartlarına dayalı olarak şu amaçlarla işlenir:</p>
+            <p className="mb-3">Verileriniz, KVKK&apos;nın 5/2 maddesindeki &quot;Bir sözleşmenin kurulması veya ifasıyla doğrudan doğruya ilgili olması&quot; ile &quot;İlgili kişinin temel hak ve özgürlüklerine zarar vermemek kaydıyla veri sorumlusunun meşru menfaatleri için veri işlenmesinin zorunlu olması&quot; hukuki şartlarına dayalı olarak şu amaçlarla işlenir:</p>
             <ul className="list-disc list-inside space-y-2 ml-4">
               <li>Kullanıcı hesabı oluşturulması ve platforma güvenli giriş yapabilmeniz.</li>
               <li>Takım kurma, transfere katılma, maç girişleri gibi ana hizmetlerin sunulması.</li>
@@ -58,7 +58,7 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-[#00e5ff] text-lg font-bold tracking-widest uppercase mb-3">5. Veri Sahibinin Hakları</h2>
             <p>
-              KVKK'nın 11. maddesi uyarınca; verilerinizin işlenip işlenmediğini öğrenme, işlenmişse bilgi talep etme, eksik/yanlış işlenmişse düzeltilmesini isteme, kanuni şartlar çerçevesinde silinmesini veya yok edilmesini talep etme haklarına sahipsiniz. Taleplerinizi sitemizin destek kanalları veya resmi Discord sunucumuz üzerinden yetkililere iletebilirsiniz.
+              KVKK&apos;nın 11. maddesi uyarınca; verilerinizin işlenip işlenmediğini öğrenme, işlenmişse bilgi talep etme, eksik/yanlış işlenmişse düzeltilmesini isteme, kanuni şartlar çerçevesinde silinmesini veya yok edilmesini talep etme haklarına sahipsiniz. Taleplerinizi sitemizin destek kanalları veya resmi Discord sunucumuz üzerinden yetkililere iletebilirsiniz.
             </p>
           </section>
 

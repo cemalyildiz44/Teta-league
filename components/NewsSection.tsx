@@ -1,5 +1,4 @@
-import { createClient } from '@/utils/supabase/server';
-import { cookies } from 'next/headers';
+import { createPublicClient } from '@/utils/supabase/public';
 import Link from 'next/link';
 import { Newspaper } from 'lucide-react';
 import NewsImage from '@/components/NewsImage';
@@ -7,8 +6,7 @@ import NewsContent from '@/components/NewsContent';
 import { extractMentionCandidates, getValidMentionUsernames } from '@/utils/mentions';
 
 export default async function NewsSection() {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createPublicClient();
 
   const { data: newsList } = await supabase
     .from('news')

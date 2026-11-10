@@ -1,5 +1,4 @@
-import { createClient } from '@/utils/supabase/server';
-import { cookies } from 'next/headers';
+import { createPublicClient } from '@/utils/supabase/public';
 import { slugify, compareTeamStats } from '@/app/lig/utils';
 import StandingsClient, { StandingsLeagueInfo, StandingsTeamRow } from './StandingsClient';
 
@@ -65,8 +64,7 @@ export default async function Standings({ compact = false }: StandingsProps) {
   const targetLeagues = [superLigLeague, eclLeague].filter(Boolean) as any[];
   const targetLeagueIds = targetLeagues.map((l) => l.id);
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createPublicClient();
 
   // 4. Tüm takımları, aktif takım eşleşmelerini ve istatistikleri paralel ve tek seferde çek
   const [allTeams, { data: allLeagueTeams }, { data: allStats }] = await Promise.all([

@@ -1,10 +1,11 @@
 import { notFound } from 'next/navigation';
 import { getLeagueBySlugs } from '../../../utils';
-import { createClient } from '@/utils/supabase/server';
-import { cookies } from 'next/headers';
+import { createPublicClient } from '@/utils/supabase/public';
 import { Calendar } from 'lucide-react';
 import FixtureWeekBrowser, { type FixtureTeamView, type FixtureView } from './FixtureWeekBrowser';
 import { buildLeagueMetadata } from "../league-metadata";
+
+export const revalidate = 60;
 
 const dateFormatter = new Intl.DateTimeFormat('tr-TR', {
   timeZone: 'Europe/Istanbul',
@@ -44,8 +45,7 @@ export default async function LeagueFixturesPage({
   const league = await getLeagueBySlugs(resolvedParams.seasonSlug, resolvedParams.leagueSlug);
   if (!league) notFound();
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createPublicClient();
 
   // 1. Fetch fixtures and their associated matches for this league and season
   const { data: fixtures } = await supabase

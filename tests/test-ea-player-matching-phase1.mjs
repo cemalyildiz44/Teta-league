@@ -924,10 +924,11 @@ const week2Date = new Date(previewResult.preview.find(p => p.week === 2).schedul
 const diffMinutes = Math.round((week2Date - week1Date) / (1000 * 60));
 assert.equal(diffMinutes, 30, '15n Aynı oturumdaki haftalar (Hafta 1 ve Hafta 2) arası 30 dakika olmalı');
 
-// Oturumlar arası (Hafta 1 - Oturum 1 vs Hafta 4 - Oturum 2) tam 7 gün olmalı
+// Oturumlar arası (Hafta 1 - Oturum 1 vs Hafta 4 - Oturum 2) tam 14 gün olmalı:
+// 26.10.2026 Pazartesi erteleme nedeniyle atlandı (lib/fixture-generator.ts, offsetWeeks: 2)
 const week4Date = new Date(previewResult.preview.find(p => p.week === 4).scheduled_at);
 const diffDaysSessions = Math.round((week4Date - week1Date) / (1000 * 60 * 60 * 24));
-assert.equal(diffDaysSessions, 7, '15o 1. Oturum ile 2. Oturum arası tam 7 gün olmalı');
+assert.equal(diffDaysSessions, 14, '15o 1. Oturum ile 2. Oturum arası (erteleme dahil) tam 14 gün olmalı');
 
 console.log('  [PASS] Round-robin simülasyonu, hafta dağılımı ve mükerrer önizleme tespiti doğrulandı.\n');
 
@@ -1066,85 +1067,87 @@ assert.equal(getFirstMondayDate('2026-10-14').toISOString().split('T')[0], '2026
 assert.equal(getFirstMondayDate('2026-10-18').toISOString().split('T')[0], '2026-10-19', '18d Pazar -> Sonraki Pazartesi (19 Ekim)');
 
 // 18b: Oturum Dağılımı (8 Oturum, Her Hafta İçin Doğru Saat ve Oturum)
-// Oturum 1: Hafta 1, 2, 3 (22:00, 22:30, 23:00 TRT)
+// Güncel takvim (lib/fixture-generator.ts MONDAY_SESSIONS_CONFIG): maçlar 22:30 / 23:00 / 23:30 TRT
+// (19:30 / 20:00 / 20:30 UTC). 26.10.2026 erteleme nedeniyle 2. oturumdan itibaren her oturum 1 hafta kaydırıldı.
+// Oturum 1: Hafta 1, 2, 3 -> 12 Ekim
 const w1 = calculateWeekScheduledAt(baseMondayStr, 1);
 const w2 = calculateWeekScheduledAt(baseMondayStr, 2);
 const w3 = calculateWeekScheduledAt(baseMondayStr, 3);
 assert.equal(w1.sessionNumber, 1, '18e Hafta 1 -> Oturum 1');
 assert.equal(w2.sessionNumber, 1, '18f Hafta 2 -> Oturum 1');
 assert.equal(w3.sessionNumber, 1, '18g Hafta 3 -> Oturum 1');
-assert.equal(w1.scheduledAt, '2026-10-12T19:00:00.000Z', '18h Hafta 1 -> 22:00 TRT (19:00 UTC)');
-assert.equal(w2.scheduledAt, '2026-10-12T19:30:00.000Z', '18i Hafta 2 -> 22:30 TRT (19:30 UTC)');
-assert.equal(w3.scheduledAt, '2026-10-12T20:00:00.000Z', '18j Hafta 3 -> 23:00 TRT (20:00 UTC)');
+assert.equal(w1.scheduledAt, '2026-10-12T19:30:00.000Z', '18h Hafta 1 -> 22:30 TRT (19:30 UTC)');
+assert.equal(w2.scheduledAt, '2026-10-12T20:00:00.000Z', '18i Hafta 2 -> 23:00 TRT (20:00 UTC)');
+assert.equal(w3.scheduledAt, '2026-10-12T20:30:00.000Z', '18j Hafta 3 -> 23:30 TRT (20:30 UTC)');
 
-// Oturum 2: Hafta 4, 5, 6 (22:00, 22:30, 23:00 TRT) -> 19 Ekim
+// Erteleme: 19 Ekim (1. Pazartesi sonrası) boş geçilir. Oturum 2: Hafta 4, 5, 6 -> 26 Ekim
 const w4 = calculateWeekScheduledAt(baseMondayStr, 4);
 const w5 = calculateWeekScheduledAt(baseMondayStr, 5);
 const w6 = calculateWeekScheduledAt(baseMondayStr, 6);
 assert.equal(w4.sessionNumber, 2, '18k Hafta 4 -> Oturum 2');
-assert.equal(w4.scheduledAt, '2026-10-19T19:00:00.000Z', '18l Hafta 4 -> 19 Ekim 22:00 TRT');
-assert.equal(w5.scheduledAt, '2026-10-19T19:30:00.000Z', '18m Hafta 5 -> 19 Ekim 22:30 TRT');
-assert.equal(w6.scheduledAt, '2026-10-19T20:00:00.000Z', '18n Hafta 6 -> 19 Ekim 23:00 TRT');
+assert.equal(w4.scheduledAt, '2026-10-26T19:30:00.000Z', '18l Hafta 4 -> 26 Ekim 22:30 TRT');
+assert.equal(w5.scheduledAt, '2026-10-26T20:00:00.000Z', '18m Hafta 5 -> 26 Ekim 23:00 TRT');
+assert.equal(w6.scheduledAt, '2026-10-26T20:30:00.000Z', '18n Hafta 6 -> 26 Ekim 23:30 TRT');
 
-// Oturum 3: Hafta 7, 8, 9 -> 26 Ekim
+// Oturum 3: Hafta 7, 8, 9 -> 2 Kasım
 const w7 = calculateWeekScheduledAt(baseMondayStr, 7);
 assert.equal(w7.sessionNumber, 3, '18o Hafta 7 -> Oturum 3');
-assert.equal(w7.scheduledAt, '2026-10-26T19:00:00.000Z', '18p Hafta 7 -> 26 Ekim 22:00 TRT');
+assert.equal(w7.scheduledAt, '2026-11-02T19:30:00.000Z', '18p Hafta 7 -> 2 Kasım 22:30 TRT');
 
-// Oturum 4: Hafta 10, 11, 12 -> 2 Kasım
+// Oturum 4: Hafta 10, 11, 12 -> 9 Kasım
 const w10 = calculateWeekScheduledAt(baseMondayStr, 10);
 const w11 = calculateWeekScheduledAt(baseMondayStr, 11);
 const w12 = calculateWeekScheduledAt(baseMondayStr, 12);
 assert.equal(w10.sessionNumber, 4, '18q Hafta 10 -> Oturum 4');
-assert.equal(w11.scheduledAt, '2026-11-02T19:30:00.000Z', '18q2 Hafta 11 -> 2 Kasım 22:30 TRT');
-assert.equal(w12.scheduledAt, '2026-11-02T20:00:00.000Z', '18r Hafta 12 -> 2 Kasım 23:00 TRT');
+assert.equal(w11.scheduledAt, '2026-11-09T20:00:00.000Z', '18q2 Hafta 11 -> 9 Kasım 23:00 TRT');
+assert.equal(w12.scheduledAt, '2026-11-09T20:30:00.000Z', '18r Hafta 12 -> 9 Kasım 23:30 TRT');
 
 // 18c: DEVRE ARASI (Mid-Season Break) Atlama Kuralı:
-// 4. Pazartesi (2 Kasım) ile 5. Pazartesi (16 Kasım) arasında tam 1 Pazartesi (9 Kasım) BOŞ GEÇİLİR.
-// Hafta 12 ile Hafta 13 arasında tam 14 gün (2 hafta) fark olmalı!
+// 4. oturum (9 Kasım) ile 5. oturum (23 Kasım) arasında tam 1 Pazartesi (16 Kasım) BOŞ GEÇİLİR.
+// Hafta 12 ile Hafta 13 arasında yaklaşık 14 gün (2 hafta) fark olmalı!
 const w13 = calculateWeekScheduledAt(baseMondayStr, 13);
 const breakInfo = getMidSeasonBreakInfo(baseMondayStr);
-assert.equal(breakInfo.breakMondayDate, '2026-11-09', '18s Devre arası boş Pazartesi tarihi 9 Kasım 2026 olmalı');
+assert.equal(breakInfo.breakMondayDate, '2026-11-16', '18s Devre arası boş Pazartesi tarihi 16 Kasım 2026 olmalı');
 
 const diffDaysBreak = Math.round((new Date(w13.scheduledAt) - new Date(w12.scheduledAt)) / (1000 * 60 * 60 * 24));
 assert.equal(diffDaysBreak, 14, '18t Hafta 12 ile Hafta 13 arasında tam 14 gün (1 boş Pazartesi) olmalı');
 assert.equal(w13.sessionNumber, 5, '18u Hafta 13 -> Oturum 5');
-assert.equal(w13.scheduledAt, '2026-11-16T19:00:00.000Z', '18v Hafta 13 -> 16 Kasım 22:00 TRT');
+assert.equal(w13.scheduledAt, '2026-11-23T19:30:00.000Z', '18v Hafta 13 -> 23 Kasım 22:30 TRT');
 
-// Oturum 5: Hafta 13, 14, 15 -> 16 Kasım
+// Oturum 5: Hafta 13, 14, 15 -> 23 Kasım
 const w14 = calculateWeekScheduledAt(baseMondayStr, 14);
 const w15 = calculateWeekScheduledAt(baseMondayStr, 15);
-assert.equal(w14.scheduledAt, '2026-11-16T19:30:00.000Z', '18w Hafta 14 -> 16 Kasım 22:30 TRT');
-assert.equal(w15.scheduledAt, '2026-11-16T20:00:00.000Z', '18x Hafta 15 -> 16 Kasım 23:00 TRT');
+assert.equal(w14.scheduledAt, '2026-11-23T20:00:00.000Z', '18w Hafta 14 -> 23 Kasım 23:00 TRT');
+assert.equal(w15.scheduledAt, '2026-11-23T20:30:00.000Z', '18x Hafta 15 -> 23 Kasım 23:30 TRT');
 
-// Oturum 6: Hafta 16, 17, 18 -> 23 Kasım
+// Oturum 6: Hafta 16, 17, 18 -> 30 Kasım
 const w16 = calculateWeekScheduledAt(baseMondayStr, 16);
 const w17 = calculateWeekScheduledAt(baseMondayStr, 17);
 const w18 = calculateWeekScheduledAt(baseMondayStr, 18);
 assert.equal(w16.sessionNumber, 6, '18y Hafta 16 -> Oturum 6');
-assert.equal(w16.scheduledAt, '2026-11-23T19:00:00.000Z', '18z Hafta 16 -> 23 Kasım 22:00 TRT');
-assert.equal(w17.scheduledAt, '2026-11-23T19:30:00.000Z', '18z2 Hafta 17 -> 23 Kasım 22:30 TRT');
-assert.equal(w18.scheduledAt, '2026-11-23T20:00:00.000Z', '18aa Hafta 18 -> 23 Kasım 23:00 TRT');
+assert.equal(w16.scheduledAt, '2026-11-30T19:30:00.000Z', '18z Hafta 16 -> 30 Kasım 22:30 TRT');
+assert.equal(w17.scheduledAt, '2026-11-30T20:00:00.000Z', '18z2 Hafta 17 -> 30 Kasım 23:00 TRT');
+assert.equal(w18.scheduledAt, '2026-11-30T20:30:00.000Z', '18aa Hafta 18 -> 30 Kasım 23:30 TRT');
 
-// Oturum 7: Hafta 19, 20 (2 maç: 22:00, 22:30 TRT) -> 30 Kasım
+// Oturum 7: Hafta 19, 20 (2 maç: 22:30, 23:00 TRT) -> 7 Aralık
 const w19 = calculateWeekScheduledAt(baseMondayStr, 19);
 const w20 = calculateWeekScheduledAt(baseMondayStr, 20);
 assert.equal(w19.sessionNumber, 7, '18ab Hafta 19 -> Oturum 7');
 assert.equal(w20.sessionNumber, 7, '18ac Hafta 20 -> Oturum 7');
-assert.equal(w19.scheduledAt, '2026-11-30T19:00:00.000Z', '18ad Hafta 19 -> 30 Kasım 22:00 TRT');
-assert.equal(w20.scheduledAt, '2026-11-30T19:30:00.000Z', '18ae Hafta 20 -> 30 Kasım 22:30 TRT');
+assert.equal(w19.scheduledAt, '2026-12-07T19:30:00.000Z', '18ad Hafta 19 -> 7 Aralık 22:30 TRT');
+assert.equal(w20.scheduledAt, '2026-12-07T20:00:00.000Z', '18ae Hafta 20 -> 7 Aralık 23:00 TRT');
 
-// Oturum 8: Hafta 21, 22 (2 maç: 22:00, 22:30 TRT) -> 7 Aralık
+// Oturum 8: Hafta 21, 22 (2 maç: 22:30, 23:00 TRT) -> 14 Aralık
 const w21 = calculateWeekScheduledAt(baseMondayStr, 21);
 const w22 = calculateWeekScheduledAt(baseMondayStr, 22);
 assert.equal(w21.sessionNumber, 8, '18af Hafta 21 -> Oturum 8');
 assert.equal(w22.sessionNumber, 8, '18ag Hafta 22 -> Oturum 8');
-assert.equal(w21.scheduledAt, '2026-12-07T19:00:00.000Z', '18ah Hafta 21 -> 7 Aralık 22:00 TRT');
-assert.equal(w22.scheduledAt, '2026-12-07T19:30:00.000Z', '18ai Hafta 22 -> 7 Aralık 22:30 TRT');
+assert.equal(w21.scheduledAt, '2026-12-14T19:30:00.000Z', '18ah Hafta 21 -> 14 Aralık 22:30 TRT');
+assert.equal(w22.scheduledAt, '2026-12-14T20:00:00.000Z', '18ai Hafta 22 -> 14 Aralık 23:00 TRT');
 
-// 18d: Toplam Takvim Süresi (56 Gün = 8 Hafta Ara)
+// 18d: Toplam Takvim Süresi (63 Gün = 9 Hafta: 8 oturum + erteleme haftası + devre arası)
 const totalCalendarDays = Math.round((new Date(w22.scheduledAt) - new Date(w1.scheduledAt)) / (1000 * 60 * 60 * 24));
-assert.equal(totalCalendarDays, 56, '18aj 1. Oturumdan 8. Oturuma toplam takvim süresi tam 56 gün (8 hafta ara)');
+assert.equal(totalCalendarDays, 63, '18aj 1. Oturumdan 8. Oturuma toplam takvim süresi tam 63 gün (9 hafta)');
 
 // 18e: Aynı Lig Haftasındaki 6 Karşılaşmanın Tamamının Eş Zamanlı Oynanması
 // 12 takımlı lig için üretilen tüm fikstür incelenir
@@ -1167,14 +1170,14 @@ for (let w = 1; w <= 22; w++) {
 // 18f: Her Takımın Aynı Oturumdaki 3 Maçının Birbirinden Farklı Saatlerde Olması (Sıfır Çakışma)
 // 8 Oturumun haftaları:
 const sessionWeeksMap = [
-  { session: 1, weeks: [1, 2, 3], expectedKickoffs: ['22:00', '22:30', '23:00'] },
-  { session: 2, weeks: [4, 5, 6], expectedKickoffs: ['22:00', '22:30', '23:00'] },
-  { session: 3, weeks: [7, 8, 9], expectedKickoffs: ['22:00', '22:30', '23:00'] },
-  { session: 4, weeks: [10, 11, 12], expectedKickoffs: ['22:00', '22:30', '23:00'] },
-  { session: 5, weeks: [13, 14, 15], expectedKickoffs: ['22:00', '22:30', '23:00'] },
-  { session: 6, weeks: [16, 17, 18], expectedKickoffs: ['22:00', '22:30', '23:00'] },
-  { session: 7, weeks: [19, 20], expectedKickoffs: ['22:00', '22:30'] },
-  { session: 8, weeks: [21, 22], expectedKickoffs: ['22:00', '22:30'] }
+  { session: 1, weeks: [1, 2, 3], expectedKickoffs: ['22:30', '23:00', '23:30'] },
+  { session: 2, weeks: [4, 5, 6], expectedKickoffs: ['22:30', '23:00', '23:30'] },
+  { session: 3, weeks: [7, 8, 9], expectedKickoffs: ['22:30', '23:00', '23:30'] },
+  { session: 4, weeks: [10, 11, 12], expectedKickoffs: ['22:30', '23:00', '23:30'] },
+  { session: 5, weeks: [13, 14, 15], expectedKickoffs: ['22:30', '23:00', '23:30'] },
+  { session: 6, weeks: [16, 17, 18], expectedKickoffs: ['22:30', '23:00', '23:30'] },
+  { session: 7, weeks: [19, 20], expectedKickoffs: ['22:30', '23:00'] },
+  { session: 8, weeks: [21, 22], expectedKickoffs: ['22:30', '23:00'] }
 ];
 
 for (const sessionConfig of sessionWeeksMap) {
@@ -1238,7 +1241,7 @@ for (const match of fullPreview12.preview) {
     `18ar Maç ${match.week}. hafta Türkiye saatinde Pazartesi (Pzt) olmalı. Elde edilen: ${formatted}`
   );
 
-  // Saat match.time_trt ('22:00', '22:30' veya '23:00') ile tam uyuşmalı
+  // Saat match.time_trt ('22:30', '23:00' veya '23:30') ile tam uyuşmalı
   assert.ok(
     formatted.includes(match.time_trt),
     `18as Maç ${match.week}. hafta Türkiye saatinde ${match.time_trt} göstermeli. Elde edilen: ${formatted}`

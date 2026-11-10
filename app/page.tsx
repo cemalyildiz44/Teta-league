@@ -10,6 +10,8 @@ import type { Metadata } from "next";
 import { getCanonicalSiteUrl } from "@/lib/site-url";
 import { buildOpenGraph, HOME_DESCRIPTION, HOME_TITLE, SITE_NAME } from "@/lib/seo";
 
+export const revalidate = 60;
+
 export const metadata: Metadata = {
   title: HOME_TITLE,
   description: HOME_DESCRIPTION,

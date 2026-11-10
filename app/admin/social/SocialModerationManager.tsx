@@ -22,16 +22,6 @@ export function SocialModerationManager({ kpis, initialPosts, initialComments, t
   const [detailModal, setDetailModal] = useState<any>(null); // holds post/comment obj + type
   const [confirmModal, setConfirmModal] = useState<any>({ isOpen: false });
 
-  // Debounced search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchTerm !== currentParams.q) {
-        updateParams({ q: searchTerm, page: 1 }); // reset page on search
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
-
   const updateParams = (newParams: any) => {
     const params = new URLSearchParams();
     if (newParams.tab !== undefined) params.set('tab', newParams.tab);
@@ -49,6 +39,17 @@ export function SocialModerationManager({ kpis, initialPosts, initialComments, t
 
     router.push(`/admin/social?${params.toString()}`);
   };
+
+  // Debounced search. Only searchTerm should re-arm the timer; updateParams/currentParams are read fresh when it fires.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchTerm !== currentParams.q) {
+        updateParams({ q: searchTerm, page: 1 }); // reset page on search
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
 
   const handleAction = async (actionFn: any, id: string) => {
     setLoading(true);
@@ -171,7 +172,7 @@ export function SocialModerationManager({ kpis, initialPosts, initialComments, t
                     <div className='flex items-start justify-between gap-4'>
                       <div className='flex items-center gap-3'>
                         <div className='w-10 h-10 rounded-full bg-zinc-800 overflow-hidden shrink-0 border border-white/10'>
-                          {post.profiles?.avatar_url ? <img src={post.profiles.avatar_url} className='w-full h-full object-cover'/> : <User className='w-5 h-5 text-zinc-500 m-auto mt-2.5'/>}
+                          {post.profiles?.avatar_url ? <img alt="" src={post.profiles.avatar_url} className='w-full h-full object-cover'/> : <User className='w-5 h-5 text-zinc-500 m-auto mt-2.5'/>}
                         </div>
                         <div>
                           <div className='flex items-center gap-2'>
@@ -211,7 +212,7 @@ export function SocialModerationManager({ kpis, initialPosts, initialComments, t
                     <div className='flex items-start justify-between gap-4'>
                       <div className='flex items-center gap-3'>
                         <div className='w-8 h-8 rounded-full bg-zinc-800 overflow-hidden shrink-0 border border-white/10'>
-                          {comment.profiles?.avatar_url ? <img src={comment.profiles.avatar_url} className='w-full h-full object-cover'/> : <User className='w-4 h-4 text-zinc-500 m-auto mt-2'/>}
+                          {comment.profiles?.avatar_url ? <img alt="" src={comment.profiles.avatar_url} className='w-full h-full object-cover'/> : <User className='w-4 h-4 text-zinc-500 m-auto mt-2'/>}
                         </div>
                         <div>
                           <div className='flex items-center gap-2'>
@@ -299,7 +300,7 @@ export function SocialModerationManager({ kpis, initialPosts, initialComments, t
               {/* User Info */}
               <div className='flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/5'>
                 <div className='w-14 h-14 rounded-full bg-zinc-800 overflow-hidden shrink-0 border-2 border-white/10'>
-                  {detailModal.data.profiles?.avatar_url ? <img src={detailModal.data.profiles.avatar_url} className='w-full h-full object-cover'/> : <User className='w-6 h-6 text-zinc-500 m-auto mt-4'/>}
+                  {detailModal.data.profiles?.avatar_url ? <img alt="" src={detailModal.data.profiles.avatar_url} className='w-full h-full object-cover'/> : <User className='w-6 h-6 text-zinc-500 m-auto mt-4'/>}
                 </div>
                 <div>
                   <Link href={`/oyuncular/${detailModal.data.profiles?.username}`} target="_blank" className='text-base font-black text-white hover:text-cyan-400 transition-colors block'>@{detailModal.data.profiles?.username}</Link>
@@ -315,7 +316,7 @@ export function SocialModerationManager({ kpis, initialPosts, initialComments, t
                 <div className='space-y-2'>
                   <h4 className='text-[10px] font-black text-zinc-500 uppercase tracking-widest'>Bağlı Gönderi (Alıntı)</h4>
                   <div className='p-4 bg-white/5 rounded-xl border border-white/10 border-l-2 border-l-cyan-500 opacity-70'>
-                    <p className='text-sm text-zinc-300 italic line-clamp-2'>"{detailModal.data.posts.content}"</p>
+                    <p className='text-sm text-zinc-300 italic line-clamp-2'>&quot;{detailModal.data.posts.content}&quot;</p>
                   </div>
                 </div>
               )}

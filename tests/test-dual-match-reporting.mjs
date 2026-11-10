@@ -402,7 +402,7 @@ console.log(
 
 // SCENARIO 5: İki raporun skorlarının uyuşmaması
 console.log('SENARYO 5: İki kaptanın bildirdiği skorların uyuşmaması');
-let mismatchState = {
+const mismatchState = {
   matchStatus: 'APPROVED',
   homeScore: 1,
   awayScore: 1,

@@ -1,9 +1,7 @@
-import { createClient } from '@/utils/supabase/server';
-import { cookies } from 'next/headers';
+import { createPublicClient } from '@/utils/supabase/public';
 
 export default async function PopularPosts() {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createPublicClient();
 
   // Popular by most likes (limited to recent 50 posts to prevent unbounded queries)
   const { data: posts } = await supabase

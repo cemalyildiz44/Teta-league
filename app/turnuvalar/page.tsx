@@ -44,7 +44,7 @@ export default async function TurnuvalarPage() {
           TURNUVALAR
         </h1>
         <p className='text-[#a0b0c0] font-medium max-w-2xl mx-auto text-[15px] md:text-[17px] leading-relaxed'>
-          TETA League'in en prestijli turnuvalarını ve efsaneleşmiş kazananlarını keşfet.
+          TETA League&apos;in en prestijli turnuvalarını ve efsaneleşmiş kazananlarını keşfet.
         </p>
       </div>
 

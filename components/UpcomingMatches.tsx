@@ -1,5 +1,4 @@
-import { createClient } from '@/utils/supabase/server';
-import { cookies } from 'next/headers';
+import { createPublicClient } from '@/utils/supabase/public';
 import TeamLogo from '@/components/TeamLogo';
 
 function getShortName(name: string): string {
@@ -75,8 +74,7 @@ export default async function UpcomingMatches() {
   // 3. Her lig için yaklaşan fikstürleri çek (lig başına tek sorgu, paralel).
   //    fixtures -> league_teams ilişkisi home/away için iki ayrı FK kullanıyor
   //    Ambiguity önlemek için explicit FK isimleri zorunlu
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createPublicClient();
   const nowIso = new Date().toISOString();
 
   const leagueMatches = await Promise.all(

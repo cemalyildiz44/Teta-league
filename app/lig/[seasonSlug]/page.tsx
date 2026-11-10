@@ -1,6 +1,12 @@
-﻿import { createClient } from '@/utils/supabase/server';
-import { cookies } from 'next/headers';
+﻿import { createPublicClient } from '@/utils/supabase/public';
 import { redirect, notFound } from 'next/navigation';
+
+export const revalidate = 60;
+
+// Render each path on its first visit and cache it (ISR); without this the route renders on every request.
+export async function generateStaticParams() {
+  return [];
+}
 
 export default async function LegacyLeagueRedirect({ params }: { params: Promise<{ seasonSlug: string }> }) {
   const resolvedParams = await params;
@@ -11,8 +17,7 @@ export default async function LegacyLeagueRedirect({ params }: { params: Promise
     notFound();
   }
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createPublicClient();
 
   const { data: league } = await supabase
     .from('leagues')

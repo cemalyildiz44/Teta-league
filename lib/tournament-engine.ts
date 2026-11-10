@@ -323,13 +323,13 @@ export function generateCrossGroupPairings(
   const byes: AdvancingTeam[] = [];
 
   // If BYEs needed, give them to the best-ranked group winners
-  let poolWinners = [...winners].sort((a, b) => {
+  const poolWinners = [...winners].sort((a, b) => {
     if (b.points !== a.points) return b.points - a.points;
     if (b.goal_difference !== a.goal_difference) return b.goal_difference - a.goal_difference;
     return b.goals_for - a.goals_for;
   });
 
-  let poolRunnersUp = [...runnersUp, ...others];
+  const poolRunnersUp = [...runnersUp, ...others];
 
   if (byeCount > 0) {
     // Top winners get BYEs

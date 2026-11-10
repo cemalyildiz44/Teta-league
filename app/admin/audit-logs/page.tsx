@@ -165,6 +165,8 @@ export default async function AdminAuditLogsPage({ searchParams }: PageProps) {
   }
 
   // 3. İstatistikler (Son 24 saat ve genel özet)
+  // Server Component rendered once per request (force-dynamic), so reading the clock here is intended
+  // eslint-disable-next-line react-hooks/purity
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { count: last24hCount } = await supabase
     .from('audit_logs')

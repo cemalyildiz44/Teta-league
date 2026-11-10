@@ -36,7 +36,8 @@ console.log('  [PASS] app/oyuncular/[username]/page.tsx: player_id geçişi ve k
 
 // 2. app/takim/[slug]/page.tsx
 const teamDetailPagePath = path.resolve('app/takim/[slug]/page.tsx');
-const teamDetailPageContent = fs.readFileSync(teamDetailPagePath, 'utf8');
+// The team page's data loading lives in team-page-data.ts (cached, cookie-free); check both files
+const teamDetailPageContent = fs.readFileSync(teamDetailPagePath, 'utf8') + fs.readFileSync(path.resolve('app/takim/[slug]/team-page-data.ts'), 'utf8');
 
 const hasTeamRosterPlayerIdQuery = /\.from\(\s*['"]match_player_stats['"]\s*\)[\s\S]*?\.select\(\s*['"]player_id,\s*goals,\s*assists,\s*rating['"]\s*\)[\s\S]*?\.in\(\s*['"]player_id['"]\s*,\s*profileIds\s*\)/.test(teamDetailPageContent);
 assert.equal(hasTeamRosterPlayerIdQuery, true, 'HATA: app/takim/[slug]/page.tsx içinde kadro istatistikleri sorgusu player_id üzerinden profileIds ile filtrelenmelidir.');
@@ -44,7 +45,7 @@ assert.equal(hasTeamRosterPlayerIdQuery, true, 'HATA: app/takim/[slug]/page.tsx 
 const hasTeamRosterMapping = teamDetailPageContent.includes('const myStats = pStats.filter((s: any) => s.player_id === r.id);');
 assert.equal(hasTeamRosterMapping, true, 'HATA: app/takim/[slug]/page.tsx içinde kadro oyuncu eşleştirmesi s.player_id === r.id ile yapılmalıdır.');
 
-const hasTeamBulkStatsPlayerIdQuery = /\.from\(\s*['"]match_player_stats['"]\s*\)[\s\S]*?\.select\(\s*['"]player_id,\s*team_id[\s\S]*?\.in\(\s*['"]player_id['"]\s*,\s*profileIds\s*\)/.test(teamDetailPageContent);
+const hasTeamBulkStatsPlayerIdQuery = /\.from\(\s*['"]match_player_stats['"]\s*\)[\s\S]*?\.select\(\s*['"](?:id,\s*)?player_id,\s*team_id[\s\S]*?\.in\(\s*['"]player_id['"]\s*,\s*profileIds\s*\)/.test(teamDetailPageContent);
 assert.equal(hasTeamBulkStatsPlayerIdQuery, true, 'HATA: app/takim/[slug]/page.tsx içinde toplu piyasa değeri sorgusu player_id üzerinden profileIds ile filtrelenmelidir.');
 
 const hasTeamStatsByPlayerId = teamDetailPageContent.includes('statsByPlayerId') && teamDetailPageContent.includes('if (s.player_id)') && teamDetailPageContent.includes('statsByPlayerId.get(r.id)');
@@ -53,9 +54,10 @@ console.log('  [PASS] app/takim/[slug]/page.tsx: kadro ve piyasa değeri için p
 
 // 3. app/oyuncular/page.tsx
 const playersPagePath = path.resolve('app/oyuncular/page.tsx');
-const playersPageContent = fs.readFileSync(playersPagePath, 'utf8');
+// The players ranking data lives in rankings.ts (cached); check both files
+const playersPageContent = fs.readFileSync(playersPagePath, 'utf8') + fs.readFileSync(path.resolve('app/oyuncular/rankings.ts'), 'utf8');
 
-const hasPlayersBulkStatsPlayerIdQuery = /\.from\(\s*['"]match_player_stats['"]\s*\)[\s\S]*?\.select\(\s*['"]player_id,\s*team_id[\s\S]*?\.in\(\s*['"]player_id['"]\s*,\s*profileIds\s*\)/.test(playersPageContent);
+const hasPlayersBulkStatsPlayerIdQuery = /\.from\(\s*['"]match_player_stats['"]\s*\)[\s\S]*?\.select\(\s*['"](?:id,\s*)?player_id,\s*team_id[\s\S]*?\.in\(\s*['"]player_id['"]\s*,\s*(?:profileIds|chunk)\s*\)/.test(playersPageContent);
 assert.equal(hasPlayersBulkStatsPlayerIdQuery, true, 'HATA: app/oyuncular/page.tsx içinde toplu istatistik sorgusu player_id üzerinden profileIds ile filtrelenmelidir.');
 
 const hasPlayersStatsByPlayerId = playersPageContent.includes('statsByPlayerId') && playersPageContent.includes('if (s.player_id)') && playersPageContent.includes('statsByPlayerId.get(p.id)');
@@ -64,7 +66,8 @@ console.log('  [PASS] app/oyuncular/page.tsx: toplu sorgu ve sıralama için pla
 
 // 4. app/admin/matches/actions.ts
 const adminActionsPath = path.resolve('app/admin/matches/actions.ts');
-const adminActionsContent = fs.readFileSync(adminActionsPath, 'utf8');
+// Match cache invalidation is shared from lib/match-revalidation.ts; check both files
+const adminActionsContent = fs.readFileSync(adminActionsPath, 'utf8') + fs.readFileSync(path.resolve('lib/match-revalidation.ts'), 'utf8');
 
 const hasTeamRevalidate = adminActionsContent.includes('revalidatePath(`/takim/${tm.slug}`);');
 assert.equal(hasTeamRevalidate, true, 'HATA: reviewMatchAction içinde ilgili takım sayfaları revalidatePath ile yenilenmelidir.');

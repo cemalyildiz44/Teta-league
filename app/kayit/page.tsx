@@ -20,7 +20,7 @@ export default function RegisterPage() {
         <div className="card-surface rounded-2xl p-8 relative z-10 glow-cyan">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-black text-white tracking-widest">KAYIT OL</h1>
-            <p className="text-sm text-gray-400 mt-2">TETA League'e katıl</p>
+            <p className="text-sm text-gray-400 mt-2">TETA League&apos;e katıl</p>
           </div>
 
           <form action={formAction} className="space-y-4">
@@ -88,11 +88,11 @@ export default function RegisterPage() {
                   className="mt-1 w-4 h-4 bg-[#060d18] border border-white/20 rounded focus:ring-2 focus:ring-[#00e5ff]/50 text-[#00e5ff] cursor-pointer"
                 />
                 <label htmlFor="legalAccept" className="text-xs text-gray-400 leading-relaxed cursor-pointer select-none">
-                  <Link href="/kullanim-sartlari" target="_blank" className="text-[#00e5ff] hover:underline">Kullanım Koşulları</Link>'nı kabul ediyorum. *
+                  <Link href="/kullanim-sartlari" target="_blank" className="text-[#00e5ff] hover:underline">Kullanım Koşulları</Link>&apos;nı kabul ediyorum. *
                 </label>
               </div>
               <div className="text-[11px] text-gray-500 pl-7 leading-relaxed">
-                TETA League platformuna kayıt olarak <Link href="/gizlilik" target="_blank" className="text-[#00e5ff] hover:underline">Kişisel Verilerin İşlenmesine İlişkin Aydınlatma Metni</Link>'ni okuduğunuzu ve kişisel verilerinizin işlenmesi hakkında bilgilendirildiğinizi teyit etmiş olursunuz.
+                TETA League platformuna kayıt olarak <Link href="/gizlilik" target="_blank" className="text-[#00e5ff] hover:underline">Kişisel Verilerin İşlenmesine İlişkin Aydınlatma Metni</Link>&apos;ni okuduğunuzu ve kişisel verilerinizin işlenmesi hakkında bilgilendirildiğinizi teyit etmiş olursunuz.
               </div>
 
               <div className="flex items-start space-x-3 pt-2">

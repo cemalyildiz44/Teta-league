@@ -26,7 +26,6 @@ import {
   Layers,
   Sparkles
 } from 'lucide-react';
-import Image from 'next/image';
 
 interface TrophyItem {
   id: string;
@@ -61,6 +60,13 @@ const COMMON_CATEGORIES = [
   'Turnuva Şampiyonlukları',
   'Özel Başarılar'
 ];
+
+/** Idempotency key for a winner operation; only called from event handlers, never during render. */
+function newOperationId(): string {
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `op_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
 
 export default function AchievementsClient({
   trophies = [],
@@ -145,7 +151,7 @@ export default function AchievementsClient({
     setSelectedEntityId('');
     setWinnerNotes('');
     setWinnerType(trophy.target_type === 'TEAM' ? 'TEAM' : 'PLAYER');
-    setWinnerOperationId(typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `op_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
+    setWinnerOperationId(newOperationId());
   };
 
   // ── Dosya Seçim İşleyicisi ───────────────────────────────────────────────
@@ -324,7 +330,7 @@ export default function AchievementsClient({
         setWinnerNotes('');
         setEntitySearch('');
         // Bir sonraki bilinçli kupa verme işlemi için yeni benzersiz işlem anahtarı üret
-        setWinnerOperationId(typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `op_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
+        setWinnerOperationId(newOperationId());
       }
     });
   };
@@ -539,7 +545,7 @@ export default function AchievementsClient({
               : 'Henüz kupa veya başarı oluşturulmamış.'}
           </h3>
           <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-            Yukarıdaki "YENİ KUPA EKLE" butonunu kullanarak Ballon d'Or, Sezon Şampiyonu veya TOTS gibi dinamik kupalar oluşturabilirsiniz.
+            Yukarıdaki &quot;YENİ KUPA EKLE&quot; butonunu kullanarak Ballon d&apos;Or, Sezon Şampiyonu veya TOTS gibi dinamik kupalar oluşturabilirsiniz.
           </p>
         </div>
       )}
@@ -947,7 +953,7 @@ export default function AchievementsClient({
               KUPAYI SİLMEK İSTEDİĞİNİZE EMİN MİSİNİZ?
             </h3>
             <p className="text-xs text-zinc-400 text-center leading-relaxed mb-6">
-              <strong className="text-white">"{deletingTrophy.title}"</strong> kupası ve buna bağlı tüm kazanan atamaları kalıcı olarak silinecektir. Bu işlem geri alınamaz.
+              <strong className="text-white">&quot;{deletingTrophy.title}&quot;</strong> kupası ve buna bağlı tüm kazanan atamaları kalıcı olarak silinecektir. Bu işlem geri alınamaz.
             </p>
 
             <div className="flex items-center gap-3">

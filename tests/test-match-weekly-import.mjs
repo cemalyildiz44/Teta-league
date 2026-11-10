@@ -345,7 +345,7 @@ const codes = (plan, i = 0) => plan.matches[i].errors.map((e) => e.code);
   assert.equal(k.suggestion.profileId, PR(1));
   assert.equal(n.suggestion.status, 'MATCHED'); // by name: still only a suggestion
   assert.ok(p.matches[0].players.every((x) => x.linkedProfileId === null), 'nothing linked by default');
-  let out = await applyMatchImport(db.client, { ...SEL, files: [upload(doc)], expectedHashes: { 'sonuc.json': p.planHash } });
+  const out = await applyMatchImport(db.client, { ...SEL, files: [upload(doc)], expectedHashes: { 'sonuc.json': p.planHash } });
   assert.equal(out.ok, true);
   assert.ok(db.rpcCalls[0].args.p_files[0].matches[0].players.every((x) => x.player_id === null));
   assert.equal(db.rpcCalls[0].args.p_files[0].matches[0].players[0].extra_stats.suggested_profile_id, PR(1));

@@ -3,6 +3,13 @@ import { notFound } from "next/navigation";
 import LeagueRulesViewer from "@/components/LeagueRulesViewer";
 import { buildLeagueMetadata } from "../league-metadata";
 
+export const revalidate = 60;
+
+// Render each path on its first visit and cache it (ISR); without this the route renders on every request.
+export async function generateStaticParams() {
+  return [];
+}
+
 export function generateMetadata({ params }: { params: Promise<{ seasonSlug: string; leagueSlug: string }> }) {
   return buildLeagueMetadata(params, "rules");
 }

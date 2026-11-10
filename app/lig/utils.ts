@@ -1,6 +1,5 @@
 import { cache } from 'react';
-import { createClient } from "@/utils/supabase/server";
-import { cookies } from "next/headers";
+import { createPublicClient } from '@/utils/supabase/public';
 
 export function slugify(text: string) {
   if (!text) return 'lig';
@@ -16,8 +15,7 @@ export function slugify(text: string) {
 }
 
 export const getLeagueBySlugs = cache(async (seasonSlug: string, leagueSlug: string) => {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createPublicClient();
 
   const { data: season } = await supabase
     .from("seasons")

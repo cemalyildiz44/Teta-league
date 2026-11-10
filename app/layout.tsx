@@ -5,7 +5,6 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import CookieBanner from "@/components/CookieBanner";
 
-import { getCachedUser, getCachedHeaderData } from "@/lib/fetchers";
 import { getCanonicalSiteUrl } from "@/lib/site-url";
 import { DEFAULT_OG_IMAGE, HOME_DESCRIPTION, HOME_TITLE, SITE_NAME } from "@/lib/seo";
 
@@ -40,27 +39,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const user = await getCachedUser();
-
-  let userProfile = null;
-  let activeTeam = null;
-  let unreadCount = 0;
-
-  if (user) {
-    const headerData = await getCachedHeaderData(user.id);
-    userProfile = headerData.userProfile;
-    activeTeam = headerData.activeTeam;
-    unreadCount = headerData.unreadCount;
-  }
-
+// The layout must not read cookies or headers: that would make every page dynamic. The Header loads the
+// signed-in user's data client-side from /api/session.
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="tr"
       className={`${exo2.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
-        <Header user={user} userProfile={userProfile} activeTeam={activeTeam} unreadCount={unreadCount} />
+        <Header />
         <main className="flex-1">{children}</main>
         <Footer />
         <CookieBanner />

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { footerLinks } from '@/lib/mock-data';
+import { footerLinks } from '@/lib/navigation';
 
 export default function Footer() {
   return (

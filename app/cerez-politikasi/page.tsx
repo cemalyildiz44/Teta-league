@@ -48,7 +48,7 @@ export default function CookiePolicyPage() {
           <section>
             <h2 className="text-[#00e5ff] text-lg font-bold tracking-widest uppercase mb-3">4. Çerez Tercihleri ve Yönetimi</h2>
             <p>
-              Kullandığımız çerezler sitenin çalışması için kesinlikle gerekli olduğundan kapatılamaz. Çerez kullanımını tamamen reddetmek isterseniz, tarayıcınızın ayarlarından tüm çerezleri engelleyebilirsiniz, ancak bu durumda TETA League'e giriş yapamaz ve hesabınızı kullanamazsınız.
+              Kullandığımız çerezler sitenin çalışması için kesinlikle gerekli olduğundan kapatılamaz. Çerez kullanımını tamamen reddetmek isterseniz, tarayıcınızın ayarlarından tüm çerezleri engelleyebilirsiniz, ancak bu durumda TETA League&apos;e giriş yapamaz ve hesabınızı kullanamazsınız.
             </p>
           </section>
 

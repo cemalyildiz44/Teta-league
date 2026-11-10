@@ -1,5 +1,4 @@
-import { createClient } from '@/utils/supabase/server';
-import { cookies } from 'next/headers';
+import { createPublicClient } from '@/utils/supabase/public';
 import { Metadata } from 'next';
 import TeamRankingsClient, { TeamRanking } from './TeamRankingsClient';
 
@@ -12,8 +11,7 @@ export const metadata: Metadata = {
 export const revalidate = 60; // Cache for 1 min
 
 export default async function TeamsPage() {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createPublicClient();
 
   // 1 & 2. Fetch ALL teams and ALL approved matches concurrently
   const [ { data: teamsData }, { data: matches } ] = await Promise.all([

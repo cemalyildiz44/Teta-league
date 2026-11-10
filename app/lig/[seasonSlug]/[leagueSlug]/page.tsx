@@ -1,10 +1,16 @@
-import { createClient } from "@/utils/supabase/server";
-import { cookies } from "next/headers";
+import { createPublicClient } from '@/utils/supabase/public';
 import Link from "next/link";
 import { getLeagueBySlugs, compareTeamStats } from "../../utils";
 import { notFound } from "next/navigation";
 import TeamLogo from "@/components/TeamLogo";
 import { getStandingsZone } from "@/lib/standingsZones";
+
+export const revalidate = 60;
+
+// Render each path on its first visit and cache it (ISR); without this the route renders on every request.
+export async function generateStaticParams() {
+  return [];
+}
 import { buildLeagueMetadata } from "./league-metadata";
 
 export function generateMetadata({ params }: { params: Promise<{ seasonSlug: string; leagueSlug: string }> }) {
@@ -25,8 +31,7 @@ export default async function LeagueStandingsPage({
 
   const isLevel1 = league.level === 1 || resolvedParams.leagueSlug.includes("super") || league.name.toLowerCase().includes("süper");
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createPublicClient();
 
   // 1. Fetch assigned teams from league_teams
   const { data: leagueTeamsData } = await supabase

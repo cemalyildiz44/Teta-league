@@ -2,7 +2,7 @@
 
 import { useState, useRef, ChangeEvent } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { Upload, Image as ImageIcon, CheckCircle2, AlertCircle, Loader2, X, RefreshCw, ExternalLink } from 'lucide-react';
+import { Upload, CheckCircle2, AlertCircle, Loader2, X, RefreshCw, ExternalLink } from 'lucide-react';
 
 interface MatchScreenshotUploadProps {
   teamId: string;

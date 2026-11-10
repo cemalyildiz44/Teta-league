@@ -1,7 +1,7 @@
 // Public read-only API (/api/v1): auth, methods, rate limit, parameters, column allow-lists and response shapes.
 // Run: node --no-warnings tests/test-public-api.mjs
 import assert from 'node:assert/strict';
-import { authenticate, handleGet, hit, resetRateLimits, extractApiKey, secretsMatch, configuredKey, methodNotAllowed, pageParams, usernamePrefixParam, FAILED_AUTH_PER_MINUTE, RATE_LIMIT_PER_MINUTE, MAX_PER_PAGE } from '../lib/public-api.ts';
+import { handleGet, hit, resetRateLimits, extractApiKey, secretsMatch, configuredKey, methodNotAllowed, pageParams, usernamePrefixParam, FAILED_AUTH_PER_MINUTE, RATE_LIMIT_PER_MINUTE, MAX_PER_PAGE } from '../lib/public-api.ts';
 import { COLUMNS, getStandings, getTeams, getPlayers, getMatches, getTopScorers } from '../lib/public-api-routes.ts';
 
 const KEY = 'k'.repeat(10) + 'TestKey-0123456789abcdefghijkl'; // >= 32 chars, test value only
@@ -189,7 +189,7 @@ const hasForbidden = (v) => { const s = JSON.stringify(v); return FORBIDDEN.filt
   const allSelects = (log) => log.map((l) => `${l.table}: ${l.cols.join(',')}`);
 
   // standings: all league members (zeros when no stats), sorted, ranked, only public fields
-  let f1 = fake();
+  const f1 = fake();
   let out = await getStandings(f1, sp());
   assert.equal(out.data.length, 4);
   const l1 = out.data.filter((r) => r.league.id === L1);

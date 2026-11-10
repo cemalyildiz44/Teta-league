@@ -2,7 +2,7 @@ import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, User, Newspaper, Clock, Share2 } from 'lucide-react';
+import { ArrowLeft, Calendar, User } from 'lucide-react';
 import type { Metadata } from 'next';
 import NewsImage from '@/components/NewsImage';
 import NewsContent from '@/components/NewsContent';

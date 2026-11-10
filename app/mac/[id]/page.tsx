@@ -1,10 +1,11 @@
-import { createClient } from "@/utils/supabase/server";
-import { cookies } from "next/headers";
+import { createPublicClient } from '@/utils/supabase/public';
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Shield, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import TeamLogo from "@/components/TeamLogo";
 import { slugify } from "@/app/lig/utils";
+
+export const revalidate = 60;
 
 import { getMatchById, getTeamById } from "@/lib/fetchers";
 
@@ -34,8 +35,7 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
   const match = await getMatchById(matchId);
   if (!match || match.status !== "APPROVED") notFound();
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createPublicClient();
 
   // Parallel fetches for relations (homeTeam & awayTeam are memoized from generateMetadata)
   const [{ data: leagueData }, { data: seasonData }, homeTeam, awayTeam, { data: statsData }] = await Promise.all([

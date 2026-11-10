@@ -14,8 +14,28 @@ import {
   deleteFixtureAction, updateFixtureScoreAction, getFixtureDetailAction,
   FixturePreviewItem
 } from './actions';
-import { getMondaySessionDetails, getMidSeasonBreakInfo } from '@/lib/fixture-generator';
+import { getMondaySessionDetails } from '@/lib/fixture-generator';
 import TeamLogo from '@/components/TeamLogo';
+
+// Status badge helper (module scope so it is not re-created on every render)
+const StatusBadge = ({ fixtureStatus, matchStatus }: { fixtureStatus: string, matchStatus?: string }) => {
+  if (matchStatus === 'PENDING_REVIEW') {
+    return <span className='inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/30'>ONAY BEKLİYOR</span>;
+  }
+  if (matchStatus === 'APPROVED') {
+    return <span className='inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/30'>ONAYLANDI</span>;
+  }
+  if (fixtureStatus === 'COMPLETED') {
+    return <span className='inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/30'>TAMAMLANDI</span>;
+  }
+  if (fixtureStatus === 'CANCELLED') {
+    return <span className='inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/10 text-red-400 ring-1 ring-red-500/30'>İPTAL</span>;
+  }
+  if (fixtureStatus === 'POSTPONED') {
+    return <span className='inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-400 ring-1 ring-purple-500/30'>ERTELENDİ</span>;
+  }
+  return <span className='inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-400 ring-1 ring-cyan-500/30'>PLANLANDI</span>;
+};
 
 export function FixturesManager({ initialFixtures, seasons, leagues, leagueTeams, teams }: any) {
   const router = useRouter();
@@ -119,26 +139,6 @@ export function FixturesManager({ initialFixtures, seasons, leagues, leagueTeams
     const ws = Array.from(new Set(filteredFixtures.map((f: any) => f.week_number))) as number[];
     return ws.sort((a, b) => a - b);
   }, [filteredFixtures]);
-
-  // Status badge helper
-  const StatusBadge = ({ fixtureStatus, matchStatus }: { fixtureStatus: string, matchStatus?: string }) => {
-    if (matchStatus === 'PENDING_REVIEW') {
-      return <span className='inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/30'>ONAY BEKLİYOR</span>;
-    }
-    if (matchStatus === 'APPROVED') {
-      return <span className='inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/30'>ONAYLANDI</span>;
-    }
-    if (fixtureStatus === 'COMPLETED') {
-      return <span className='inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/30'>TAMAMLANDI</span>;
-    }
-    if (fixtureStatus === 'CANCELLED') {
-      return <span className='inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/10 text-red-400 ring-1 ring-red-500/30'>İPTAL</span>;
-    }
-    if (fixtureStatus === 'POSTPONED') {
-      return <span className='inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-400 ring-1 ring-purple-500/30'>ERTELENDİ</span>;
-    }
-    return <span className='inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-400 ring-1 ring-cyan-500/30'>PLANLANDI</span>;
-  };
 
   // Preview Handler
   const handleOpenPreview = async () => {
@@ -438,7 +438,7 @@ export function FixturesManager({ initialFixtures, seasons, leagues, leagueTeams
           <Calendar className='w-12 h-12 text-zinc-600 mx-auto mb-3' />
           <h3 className='text-sm font-bold text-white uppercase tracking-wider'>Fikstür Bulunamadı</h3>
           <p className='text-xs text-zinc-400 mt-1 max-w-sm mx-auto'>
-            Seçilen filtre kriterlerine uygun karşılaşma bulunamadı. Fikstür oluşturmak için yukarıdaki "Fikstür Üret" butonunu kullanabilirsiniz.
+            Seçilen filtre kriterlerine uygun karşılaşma bulunamadı. Fikstür oluşturmak için yukarıdaki &quot;Fikstür Üret&quot; butonunu kullanabilirsiniz.
           </p>
         </div>
       ) : groupByWeek ? (

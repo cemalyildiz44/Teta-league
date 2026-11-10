@@ -52,6 +52,17 @@ assert.equal(MONDAY_SESSIONS_CONFIG[22].offsetWeeks, 9, 'Hafta 22: offsetWeeks 9
 
 console.log('  [PASS] Tüm hafta oturumları, devre arası ve offset değerleri yeni ertelenen takvime %100 uyumlu.');
 
+// TEST 2-4 verify the live database right after the 25.10.2026 postponement migration. Fixture statuses and the
+// transfer window change as the season is played, so these snapshot checks only run when explicitly requested:
+//   RUN_LIVE_POSTPONEMENT_CHECK=1 node tests/test-fixture-postponement-schedule.mjs
+if (process.env.RUN_LIVE_POSTPONEMENT_CHECK !== '1') {
+  console.log('\n[TEST 2-4] Canlı veritabanı anlık görüntü kontrolleri atlandı (RUN_LIVE_POSTPONEMENT_CHECK=1 ile çalıştırın).');
+  console.log('\n================================================================');
+  console.log('TAKVİM HESAPLAMA TESTLERİ BAŞARIYLA TAMAMLANDI! (TEST 1 PASS)');
+  console.log('================================================================');
+  process.exit(0);
+}
+
 // 2. Database Live Fixtures Verification
 console.log('\n[TEST 2] Supabase Canlı Veritabanı Fikstür ve Saat Doğrulaması:');
 

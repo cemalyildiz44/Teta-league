@@ -1,6 +1,7 @@
 import { cache } from 'react';
 import { cookies, headers } from 'next/headers';
 import { createClient } from '@/utils/supabase/server';
+import { createPublicClient } from '@/utils/supabase/public';
 import { hasSupabaseAuthCookie } from '@/lib/auth-cookies';
 import { verifyVerifiedUserHeaders, HEADER_AUTH_ERROR } from '@/lib/auth-server';
 
@@ -8,6 +9,9 @@ import { verifyVerifiedUserHeaders, HEADER_AUTH_ERROR } from '@/lib/auth-server'
  * Request-level memoized server-side data fetchers.
  * Uses React.cache() to deduplicate queries within a single render request.
  * Does NOT persist across different requests or users.
+ *
+ * Public-data fetchers use the cookie-free client so pages that only use them stay cacheable;
+ * fetchers that depend on the signed-in user keep the cookie-based client.
  */
 
 export const getCachedUserProfile = cache(async (userId: string) => {
@@ -79,8 +83,7 @@ export const getCachedUser = cache(async () => {
 
 
 export const getActiveSeason = cache(async () => {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createPublicClient();
 
   const { data: activeSeason } = await supabase
     .from('seasons')
@@ -102,8 +105,7 @@ export const getActiveSeason = cache(async () => {
 
 export const getActiveLeagues = cache(async (seasonId: string) => {
   if (!seasonId) return [];
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createPublicClient();
 
   const { data: leagues } = await supabase
     .from('leagues')
@@ -115,8 +117,7 @@ export const getActiveLeagues = cache(async (seasonId: string) => {
 });
 
 export const getAllTeams = cache(async () => {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createPublicClient();
 
   const { data: teams } = await supabase
     .from('teams')
@@ -127,8 +128,7 @@ export const getAllTeams = cache(async () => {
 
 export const getTeamBySlug = cache(async (slug: string) => {
   if (!slug) return null;
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createPublicClient();
 
   const { data: team } = await supabase
     .from('teams')
@@ -141,8 +141,7 @@ export const getTeamBySlug = cache(async (slug: string) => {
 
 export const getTeamById = cache(async (id: string) => {
   if (!id) return null;
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createPublicClient();
 
   const { data: team } = await supabase
     .from('teams')
@@ -223,8 +222,7 @@ export const getCachedHeaderData = cache(async (userId: string): Promise<HeaderD
 
 export const getMatchById = cache(async (matchId: string) => {
   if (!matchId) return null;
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createPublicClient();
 
   const { data: match } = await supabase
     .from('matches')
@@ -237,8 +235,7 @@ export const getMatchById = cache(async (matchId: string) => {
 
 export const getProfileByUsername = cache(async (username: string) => {
   if (!username) return null;
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createPublicClient();
 
   const { data: profile } = await supabase
     .from('profiles')

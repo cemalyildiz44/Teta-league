@@ -1,8 +1,9 @@
-import { createClient } from "@/utils/supabase/server";
-import { cookies } from "next/headers";
+import { createPublicClient } from '@/utils/supabase/public';
 import Image from "next/image";
 import Link from "next/link";
 import LeagueRulesButton from "@/components/LeagueRulesButton";
+
+export const revalidate = 60;
 import { slugify } from "@/app/lig/utils";
 
 export const metadata = {
@@ -12,8 +13,7 @@ export const metadata = {
 };
 
 export default async function LiglerPage() {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createPublicClient();
 
   // Fetch Seasons and Leagues
   const { data: seasons } = await supabase
@@ -22,7 +22,7 @@ export default async function LiglerPage() {
     .order("created_at", { ascending: false });
     
   // Get all active/upcoming seasons and their active/upcoming leagues
-  let leaguesToDisplay: any[] = [];
+  const leaguesToDisplay: any[] = [];
   
   if (seasons) {
     const activeSeasons = seasons.filter(s => s.status === "ACTIVE" || s.status === "UPCOMING");
@@ -203,7 +203,7 @@ export default async function LiglerPage() {
         }) : (
           <div className="col-span-1 lg:col-span-2 empty-state !py-24 fade-in-up">
             <span className="empty-state-title text-[24px]">AKTİF LİG BULUNAMADI</span>
-            <span className="empty-state-desc">TETA League'de şu anda aktif bir lig bulunmuyor.</span>
+            <span className="empty-state-desc">TETA League&apos;de şu anda aktif bir lig bulunmuyor.</span>
           </div>
         )}
       </div>

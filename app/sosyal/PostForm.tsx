@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useState } from 'react';
 import { createPostAction } from './actions';
 
 export function PostForm({

@@ -1,5 +1,4 @@
-import { createClient } from '@/utils/supabase/server';
-import { cookies } from 'next/headers';
+import { createPublicClient } from '@/utils/supabase/public';
 import { MiniStatsClient } from './MiniStatsClient';
 import { getActiveSeason, getAllTeams } from '@/lib/fetchers';
 
@@ -13,8 +12,7 @@ export default async function MiniStats() {
   let topRatedPlayers: any[] = [];
 
   if (activeSeason) {
-    const cookieStore = await cookies();
-    const supabase = createClient(cookieStore);
+    const supabase = createPublicClient();
 
     // Fetch stats and teams concurrently (teams is memoized)
     const [ { data: stats }, teams ] = await Promise.all([

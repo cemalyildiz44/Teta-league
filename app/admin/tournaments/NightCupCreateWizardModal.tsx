@@ -599,7 +599,7 @@ export default function NightCupCreateWizardModal({
                     })() : (
                       <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/5 text-[11px] text-zinc-500 flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-cyan-400 shrink-0" />
-                        Özel bir kupa seçmezseniz standart "NIGHT_CUP_WINNER" başarımı verilir.
+                        Özel bir kupa seçmezseniz standart &quot;NIGHT_CUP_WINNER&quot; başarımı verilir.
                       </div>
                     )}
                   </div>
@@ -1026,7 +1026,7 @@ export default function NightCupCreateWizardModal({
                   className="w-full bg-[#050b14] border border-white/10 focus:border-cyan-500/80 rounded-xl p-4 text-xs font-mono text-zinc-200 placeholder:text-zinc-600 outline-none resize-y leading-relaxed"
                 />
                 <p className="text-[11px] text-zinc-500 mt-1">
-                  Turnuva detay sayfasındaki "Kurallar" sekmesinde yer alacaktır.
+                  Turnuva detay sayfasındaki &quot;Kurallar&quot; sekmesinde yer alacaktır.
                 </p>
               </div>
 
@@ -1049,7 +1049,7 @@ export default function NightCupCreateWizardModal({
                   className="w-full bg-[#050b14] border border-white/10 focus:border-cyan-500/80 rounded-xl p-4 text-xs font-mono text-zinc-200 placeholder:text-zinc-600 outline-none resize-y leading-relaxed"
                 />
                 <p className="text-[11px] text-zinc-500 mt-1">
-                  Turnuva detay sayfasındaki "Detaylar" sekmesinde takım kaptanlarına rehberlik eder.
+                  Turnuva detay sayfasındaki &quot;Detaylar&quot; sekmesinde takım kaptanlarına rehberlik eder.
                 </p>
               </div>
             </div>

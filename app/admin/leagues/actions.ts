@@ -74,7 +74,7 @@ export async function createLeague(formData: FormData) {
     insertPayload.image_url = image_url;
   }
 
-  let { data: insertedLeague, error } = await supabase.from('leagues').insert(insertPayload).select('id').maybeSingle();
+  const { data: insertedLeague, error } = await supabase.from('leagues').insert(insertPayload).select('id').maybeSingle();
 
   if (error) {
     // Clean up uploaded image if DB insert failed
@@ -167,7 +167,7 @@ export async function editLeague(formData: FormData) {
     updatePayload.image_url = null;
   }
 
-  let { error } = await supabase.from('leagues').update(updatePayload).eq('id', id);
+  const { error } = await supabase.from('leagues').update(updatePayload).eq('id', id);
 
   if (error) {
     if (uploadedFileName) {
