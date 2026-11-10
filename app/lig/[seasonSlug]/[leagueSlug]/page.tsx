@@ -148,23 +148,23 @@ export default async function LeagueStandingsPage({
 
       {/* FLAT TABLO (DIŞ PANEL / KUTU YOK, SAYFA YÜZEYİNDE DOĞRUDAN AKAR) */}
       <div className="w-full overflow-x-auto">
-        <table className="w-full min-w-[700px] text-left border-collapse">
+        <table className="w-full table-fixed sm:table-auto sm:min-w-[700px] text-left border-collapse">
           {/* KOLON BAŞLIKLARI */}
           <thead>
             <tr className="border-b border-white/[0.08] text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
-              <th className="py-2.5 px-2 w-12 text-center">#</th>
-              <th className="py-2.5 px-3">TAKIM</th>
-              <th className="py-2.5 px-2.5 w-12 text-center" title="Oynanan Maç">O</th>
-              <th className="py-2.5 px-2.5 w-12 text-center" title="Galibiyet">G</th>
-              <th className="py-2.5 px-2.5 w-12 text-center" title="Beraberlik">B</th>
-              <th className="py-2.5 px-2.5 w-12 text-center" title="Mağlubiyet">M</th>
+              <th className="py-2.5 px-1 sm:px-2 w-10 sm:w-12 text-center">#</th>
+              <th className="py-2.5 px-2 sm:px-3">TAKIM</th>
+              <th className="py-2.5 px-1 sm:px-2.5 w-9 sm:w-12 text-center" title="Oynanan Maç">O</th>
+              <th className="py-2.5 px-2.5 w-12 text-center hidden sm:table-cell" title="Galibiyet">G</th>
+              <th className="py-2.5 px-2.5 w-12 text-center hidden sm:table-cell" title="Beraberlik">B</th>
+              <th className="py-2.5 px-2.5 w-12 text-center hidden sm:table-cell" title="Mağlubiyet">M</th>
               <th className="py-2.5 px-2.5 w-12 text-center hidden md:table-cell" title="Atılan Gol">AG</th>
               <th className="py-2.5 px-2.5 w-12 text-center hidden md:table-cell" title="Yenilen Gol">YG</th>
-              <th className="py-2.5 px-2.5 w-12 text-center" title="Averaj">AV</th>
+              <th className="py-2.5 px-1 sm:px-2.5 w-10 sm:w-12 text-center" title="Averaj">AV</th>
               {hasPenalties && (
-                <th className="py-2.5 px-2.5 w-12 text-center text-rose-400" title="Ceza Puanı">CEZA</th>
+                <th className="py-2.5 px-1 sm:px-2.5 w-11 sm:w-12 text-center text-rose-400" title="Ceza Puanı">CEZA</th>
               )}
-              <th className="py-2.5 px-3 w-14 text-center font-bold text-zinc-300" title="Puan">P</th>
+              <th className="py-2.5 px-1 sm:px-3 w-10 sm:w-14 text-center font-bold text-zinc-300" title="Puan">P</th>
             </tr>
           </thead>
 
@@ -185,7 +185,7 @@ export default async function LeagueStandingsPage({
                   className="h-14 sm:h-[58px] hover:bg-white/[0.05] hover:shadow-[inset_3px_0_0_#00e5ff] transition-all duration-150 group"
                 >
                   {/* SIRA & SOL INCE ZONE INDICATOR */}
-                  <td className="py-3 px-2 text-center">
+                  <td className="py-3 px-1 sm:px-2 text-center">
                     <div className="flex items-center gap-1.5 justify-center">
                       <span
                         className={`w-[3px] h-5 rounded-full shrink-0 ${zone.barClass}`}
@@ -198,11 +198,11 @@ export default async function LeagueStandingsPage({
                   </td>
 
                   {/* TAKIM (LOGO + AD) */}
-                  <td className="py-3 px-3">
+                  <td className="py-3 px-2 sm:px-3">
                     <Link
                       href={`/takim/${team?.slug || ''}`}
                       prefetch={false}
-                      className="flex items-center gap-3.5 min-w-0 group/team"
+                      className="flex items-center gap-2 sm:gap-3.5 min-w-0 group/team"
                     >
                       <TeamLogo
                         src={team?.logo_url}
@@ -212,7 +212,7 @@ export default async function LeagueStandingsPage({
                       />
                       <div className="flex items-center gap-2 min-w-0">
                         <span
-                          className={`font-bold text-sm sm:text-[15px] uppercase tracking-wide truncate transition-colors ${
+                          className={`font-bold text-sm sm:text-[15px] uppercase tracking-wide leading-tight break-words sm:truncate transition-colors ${
                             isExpelled
                               ? 'text-rose-400 line-through'
                               : 'text-white group-hover/team:text-[#00e5ff]'
@@ -230,26 +230,26 @@ export default async function LeagueStandingsPage({
                   </td>
 
                   {/* O (Oynanan) */}
-                  <td className="py-3 px-2.5 text-center text-xs sm:text-sm text-zinc-400 font-medium font-mono">
+                  <td className="py-3 px-1 sm:px-2.5 text-center text-xs sm:text-sm text-zinc-400 font-medium font-mono">
                     {stat.matches_played}
                   </td>
 
                   {/* G (Galibiyet) */}
-                  <td className="py-3 px-2.5 text-center text-xs sm:text-sm font-medium font-mono">
+                  <td className="py-3 px-2.5 text-center text-xs sm:text-sm font-medium font-mono hidden sm:table-cell">
                     <span className={stat.wins > 0 ? 'text-zinc-200' : 'text-zinc-600'}>
                       {stat.wins}
                     </span>
                   </td>
 
                   {/* B (Beraberlik) */}
-                  <td className="py-3 px-2.5 text-center text-xs sm:text-sm font-medium font-mono">
+                  <td className="py-3 px-2.5 text-center text-xs sm:text-sm font-medium font-mono hidden sm:table-cell">
                     <span className={stat.draws > 0 ? 'text-zinc-200' : 'text-zinc-600'}>
                       {stat.draws}
                     </span>
                   </td>
 
                   {/* M (Mağlubiyet) */}
-                  <td className="py-3 px-2.5 text-center text-xs sm:text-sm font-medium font-mono">
+                  <td className="py-3 px-2.5 text-center text-xs sm:text-sm font-medium font-mono hidden sm:table-cell">
                     <span className={stat.losses > 0 ? 'text-zinc-200' : 'text-zinc-600'}>
                       {stat.losses}
                     </span>
@@ -270,7 +270,7 @@ export default async function LeagueStandingsPage({
                   </td>
 
                   {/* AV (Averaj) */}
-                  <td className="py-3 px-2.5 text-center text-xs sm:text-sm font-medium font-mono">
+                  <td className="py-3 px-1 sm:px-2.5 text-center text-xs sm:text-sm font-medium font-mono">
                     {gd > 0 ? (
                       <span className="text-zinc-200">+{gd}</span>
                     ) : gd < 0 ? (
@@ -282,7 +282,7 @@ export default async function LeagueStandingsPage({
 
                   {/* CEZA (VARSAYSA) */}
                   {hasPenalties && (
-                    <td className="py-3 px-2.5 text-center text-xs sm:text-sm font-bold font-mono">
+                    <td className="py-3 px-1 sm:px-2.5 text-center text-xs sm:text-sm font-bold font-mono">
                       {penaltyPoints > 0 ? (
                         <span className="text-rose-400">-{penaltyPoints}</span>
                       ) : (
@@ -292,7 +292,7 @@ export default async function LeagueStandingsPage({
                   )}
 
                   {/* P (Puan - TETA cyan, bold) */}
-                  <td className="py-3 px-3 text-center font-mono">
+                  <td className="py-3 px-1 sm:px-3 text-center font-mono">
                     {isExpelled ? (
                       <span className="text-zinc-600 font-bold text-sm">—</span>
                     ) : (

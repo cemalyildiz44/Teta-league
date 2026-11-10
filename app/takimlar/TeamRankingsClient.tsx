@@ -67,15 +67,15 @@ export default function TeamRankingsClient({ rankings }: { rankings: TeamRanking
       ) : (
         <div className="client-glass rounded-2xl border border-white/5 overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.5)]">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse whitespace-nowrap min-w-[600px]">
+            <table className="w-full text-left border-collapse sm:whitespace-nowrap sm:min-w-[600px]">
               <thead>
                 <tr className="bg-black/40 border-b border-white/5">
-                  <th className="py-5 px-6 text-[12px] font-[900] text-gray-500 tracking-[0.2em] uppercase text-center w-20">SIRA</th>
-                  <th className="py-5 px-6 text-[12px] font-[900] text-gray-500 tracking-[0.2em] uppercase">TAKIM</th>
-                  <th className="py-5 px-4 text-[12px] font-[900] text-gray-500 tracking-[0.2em] uppercase text-center w-16">G</th>
-                  <th className="py-5 px-4 text-[12px] font-[900] text-gray-500 tracking-[0.2em] uppercase text-center w-16">B</th>
-                  <th className="py-5 px-4 text-[12px] font-[900] text-gray-500 tracking-[0.2em] uppercase text-center w-16">M</th>
-                  <th className="py-5 px-6 text-[12px] font-[900] text-[#00e5ff] tracking-[0.2em] uppercase text-center w-24">PUAN</th>
+                  <th className="py-5 px-2 sm:px-6 text-[12px] font-[900] text-gray-500 tracking-[0.2em] uppercase text-center w-12 sm:w-20">SIRA</th>
+                  <th className="py-5 px-2 sm:px-6 text-[12px] font-[900] text-gray-500 tracking-[0.2em] uppercase">TAKIM</th>
+                  <th className="py-5 px-1 sm:px-4 text-[12px] font-[900] text-gray-500 tracking-[0.2em] uppercase text-center w-10 sm:w-16">G</th>
+                  <th className="py-5 px-4 text-[12px] font-[900] text-gray-500 tracking-[0.2em] uppercase text-center w-16 hidden sm:table-cell">B</th>
+                  <th className="py-5 px-4 text-[12px] font-[900] text-gray-500 tracking-[0.2em] uppercase text-center w-16 hidden sm:table-cell">M</th>
+                  <th className="py-5 px-2 sm:px-6 text-[12px] font-[900] text-[#00e5ff] tracking-[0.2em] uppercase text-center w-14 sm:w-24">PUAN</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -104,17 +104,17 @@ export default function TeamRankingsClient({ rankings }: { rankings: TeamRanking
                   return (
                     <tr key={team.id} className={`transition-colors duration-300 group ${rowStyle}`}>
                       {/* RANK */}
-                      <td className="py-4 px-6 text-center">
+                      <td className="py-4 px-2 sm:px-6 text-center">
                         <span className={`text-[16px] font-[800] ${rankStyle}`}>
                           {rank < 10 ? `0${rank}` : rank}
                         </span>
                       </td>
                       
                       {/* TEAM INFO */}
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-2 sm:px-6">
                         <Link 
                           href={`/takim/${team.slug}`}
-                          className="flex items-center gap-4 group-hover:drop-shadow-[0_0_10px_rgba(0,229,255,0.3)] transition-all"
+                          className="flex items-center gap-2.5 sm:gap-4 group-hover:drop-shadow-[0_0_10px_rgba(0,229,255,0.3)] transition-all"
                         >
                           <TeamLogo src={team.logoUrl} name={team.name} size="lg" />
                           <span className="text-[15px] font-[800] text-white group-hover:text-[#00e5ff] transition-colors min-w-0 break-words whitespace-normal leading-tight">
@@ -124,22 +124,22 @@ export default function TeamRankingsClient({ rankings }: { rankings: TeamRanking
                       </td>
                       
                       {/* WINS */}
-                      <td className="py-4 px-4 text-center">
+                      <td className="py-4 px-1 sm:px-4 text-center">
                         <span className="text-[14px] font-[700] text-gray-300">{team.wins}</span>
                       </td>
                       
                       {/* DRAWS */}
-                      <td className="py-4 px-4 text-center">
+                      <td className="py-4 px-4 text-center hidden sm:table-cell">
                         <span className="text-[14px] font-[700] text-gray-400">{team.draws}</span>
                       </td>
                       
                       {/* LOSSES */}
-                      <td className="py-4 px-4 text-center">
+                      <td className="py-4 px-4 text-center hidden sm:table-cell">
                         <span className="text-[14px] font-[700] text-gray-500">{team.losses}</span>
                       </td>
                       
                       {/* TOTAL POINTS */}
-                      <td className="py-4 px-6 text-center">
+                      <td className="py-4 px-2 sm:px-6 text-center">
                         <span className={`text-[18px] font-[900] ${pointsStyle}`}>
                           {team.points}
                         </span>

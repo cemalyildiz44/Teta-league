@@ -200,8 +200,9 @@ export default function Header() {
         {/* Mobile hamburger */}
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="xl:hidden flex flex-col gap-1.5 p-2 z-50"
+          className="xl:hidden flex flex-col items-center justify-center gap-1.5 w-11 h-11 z-50"
           aria-label="Menü"
+          aria-expanded={mobileOpen}
         >
           <span className={`block h-0.5 w-6 bg-white transition-transform ${mobileOpen ? 'rotate-45 translate-y-2' : ''}`} />
           <span className={`block h-0.5 w-6 bg-white transition-opacity ${mobileOpen ? 'opacity-0' : ''}`} />
