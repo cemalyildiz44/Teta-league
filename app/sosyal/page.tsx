@@ -11,10 +11,18 @@ export default async function SocialPage() {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  const user = await getCachedUser();
-  
+  // The user lookup runs in parallel with the public queries; only the two per-user queries wait for it
+  const userPromise = getCachedUser();
+  const userDataPromise = userPromise.then((u) =>
+    Promise.all([
+      u ? supabase.from('profiles').select('id, username, avatar_url, full_name, primary_position, platform').eq('id', u.id).single() : Promise.resolve({ data: null }),
+      u ? supabase.from('posts').select('id, likes(id)').eq('author_id', u.id).eq('is_deleted', false) : Promise.resolve({ data: [] as any[] }),
+    ])
+  );
+
   const [
-    { data: currentUserProfile },
+    user,
+    [{ data: currentUserProfile }, userStatsRes],
     initialFeedRes,
     { data: activePlayers },
     { data: allRecent },
@@ -23,9 +31,9 @@ export default async function SocialPage() {
     { count: totalLeagues },
     { count: totalPosts },
     { data: newMembers },
-    userStatsRes
   ] = await Promise.all([
-    user ? supabase.from('profiles').select('id, username, avatar_url, full_name, primary_position, platform').eq('id', user.id).single() : Promise.resolve({ data: null }),
+    userPromise,
+    userDataPromise,
     fetchSocialFeedAction(0, 20, '', 'son'),
     supabase.from('profiles').select('id, username, avatar_url, primary_position, platform').limit(5), // Simplified active players
     supabase.from('posts').select(`
@@ -38,7 +46,6 @@ export default async function SocialPage() {
     supabase.from('leagues').select('*', { count: 'exact', head: true }),
     supabase.from('posts').select('*', { count: 'exact', head: true }).eq('is_deleted', false),
     supabase.from('profiles').select('id, username, avatar_url, primary_position, platform, created_at').order('created_at', { ascending: false }).limit(5),
-    user ? supabase.from('posts').select('id, likes(id)').eq('author_id', user.id).eq('is_deleted', false) : Promise.resolve({ data: [] })
   ]);
 
   const initialPosts = initialFeedRes.data || [];
