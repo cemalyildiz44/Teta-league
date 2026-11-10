@@ -3,7 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { getSiteUrl, getAuthCallbackUrl } from '@/lib/site-url';
+import { getSiteUrl, getAuthCallbackUrl, sanitizeNextUrl } from '@/lib/site-url';
 
 export async function loginAction(prevState: any, formData: FormData) {
   const email = (formData.get('email') as string)?.trim();
@@ -46,9 +46,8 @@ export async function loginAction(prevState: any, formData: FormData) {
     return { error: 'Hesabınız sistem kurallarını ihlal ettiği gerekçesiyle yasaklanmıştır (BANLI).' };
   }
 
-  const redirectTo = (formData.get('redirectTo') as string)?.trim();
-  const safeRedirect = redirectTo && redirectTo.startsWith('/') && !redirectTo.startsWith('//') ? redirectTo : '/';
-  redirect(safeRedirect);
+  // sanitizeNextUrl also rejects backslash forms such as "/\evil.com", which browsers treat as "//evil.com"
+  redirect(sanitizeNextUrl(formData.get('redirectTo') as string | null));
 }
 
 export async function registerAction(prevState: any, formData: FormData) {

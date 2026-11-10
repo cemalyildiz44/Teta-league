@@ -3,6 +3,10 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { clampInt, sanitizeSearchTerm } from '@/lib/search-query';
+
+const FEED_MAX_LIMIT = 50;
+const FEED_MAX_PAGE = 500;
 
 export async function createPostAction(prevState: any, formData: FormData) {
   const cookieStore = await cookies();
@@ -189,9 +193,15 @@ export async function deleteCommentAction(commentId: string) {
 }
 
 
-export async function fetchSocialFeedAction(page: number = 0, limit: number = 20, searchQuery: string = '', tab: string = 'son') {
+export async function fetchSocialFeedAction(rawPage: number = 0, rawLimit: number = 20, rawSearchQuery: string = '', rawTab: string = 'son') {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
+
+  // Public, unauthenticated action: never trust the arguments a caller sends
+  const page = clampInt(rawPage, 0, FEED_MAX_PAGE, 0);
+  const limit = clampInt(rawLimit, 1, FEED_MAX_LIMIT, 20);
+  const searchQuery = sanitizeSearchTerm(rawSearchQuery);
+  const tab = rawTab === 'populer' ? 'populer' : 'son';
 
   let query = supabase
     .from('posts')
@@ -208,7 +218,7 @@ export async function fetchSocialFeedAction(page: number = 0, limit: number = 20
 
   if (searchQuery && searchQuery.trim().length > 0) {
     const q = searchQuery.trim();
-    const { data: users } = await supabase.from('profiles').select('id').ilike('username', `%${q}%`);
+    const { data: users } = await supabase.from('profiles').select('id').ilike('username', `%${q}%`).limit(50);
     let orStr = `content.ilike.%${q}%`;
     if (users && users.length > 0) {
       orStr += `,author_id.in.(${users.map(u => u.id).join(',')})`;

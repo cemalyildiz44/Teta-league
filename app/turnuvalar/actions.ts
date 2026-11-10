@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { formatTournamentDate } from '@/lib/date-utils';
+import { sanitizeSearchTerm } from '@/lib/search-query';
 
 const MAX_LOGO_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -582,7 +583,7 @@ export async function searchEligibleTournamentPlayersAction(query: string) {
     const supabase = createClient(cookieStore);
 
     // Sanitize query for ilike to prevent pattern syntax injection
-    const cleanQ = trimmed.replace(/[%_]/g, '');
+    const cleanQ = sanitizeSearchTerm(trimmed);
     if (!cleanQ) {
       return { players: [] };
     }

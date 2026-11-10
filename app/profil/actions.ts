@@ -7,6 +7,8 @@ import { revalidatePath } from 'next/cache';
 import { isValidHttpUrl } from '@/app/utils/urlValidator';
 import { POSITION_OPTIONS } from '@/app/utils/positions';
 
+const USERNAME_REGEX = /^[a-zA-Z0-9_.-]{3,30}$/;
+
 export async function updateProfileAction(prevState: any, formData: FormData) {
   try {
     const cookieStore = await cookies();
@@ -117,6 +119,11 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
 
     if (currentProfile?.status === 'BANNED') {
       return { error: 'Yasaklı hesaplar profil bilgilerini güncelleyemez.' };
+    }
+
+    // Same rule as registration. Usernames that predate the rule stay valid until their owner changes them.
+    if (username !== currentProfile?.username && !USERNAME_REGEX.test(username)) {
+      return { error: 'Kullanıcı adı 3-30 karakter arasında olmalı ve yalnızca harf, rakam, alt çizgi, nokta ve tire içerebilir.' };
     }
 
     const existingSocials = currentProfile?.social_links || {};

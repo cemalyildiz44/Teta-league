@@ -6,7 +6,7 @@ import { revalidatePath, revalidateTag } from 'next/cache';
 import { slugify } from '@/app/lig/utils';
 import { getScopeNames } from '@/lib/admin-scope';
 import { logAdminAudit } from '@/lib/audit';
-import { revalidateMatchDependencies } from '@/app/admin/matches/actions';
+import { revalidateMatchDependencies } from '@/lib/match-revalidation';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

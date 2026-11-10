@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getCachedUser } from '@/lib/fetchers';
+import { sanitizeSearchTerm } from '@/lib/search-query';
 import AuditLogsClient from './AuditLogsClient';
 import { AuditLogItem } from '@/types/audit';
 
@@ -81,11 +82,12 @@ export default async function AdminAuditLogsPage({ searchParams }: PageProps) {
       }
     }
 
-    if (searchQuery) {
+    const term = sanitizeSearchTerm(searchQuery, 100);
+    if (term) {
       if (hasEntityLabelCol) {
-        q = q.or(`description.ilike.%${searchQuery}%,action.ilike.%${searchQuery}%,entity_type.ilike.%${searchQuery}%,entity_label.ilike.%${searchQuery}%`);
+        q = q.or(`description.ilike.%${term}%,action.ilike.%${term}%,entity_type.ilike.%${term}%,entity_label.ilike.%${term}%`);
       } else {
-        q = q.or(`description.ilike.%${searchQuery}%,action.ilike.%${searchQuery}%,entity_type.ilike.%${searchQuery}%`);
+        q = q.or(`description.ilike.%${term}%,action.ilike.%${term}%,entity_type.ilike.%${term}%`);
       }
     }
 

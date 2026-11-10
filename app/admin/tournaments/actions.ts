@@ -12,6 +12,7 @@ import {
   buildFullKnockoutBracket,
 } from '@/lib/tournament-engine';
 import { parseToTurkeyISO } from '@/lib/date-utils';
+import { sanitizeSearchTerm } from '@/lib/search-query';
 
 async function checkAdmin(supabase: any, user: any) {
   if (!user) return false;
@@ -2092,7 +2093,7 @@ export async function adminSearchTournamentPlayersAction(query: string) {
       return { players: [] };
     }
 
-    const cleanQ = trimmed.replace(/[%_]/g, '');
+    const cleanQ = sanitizeSearchTerm(trimmed);
     if (!cleanQ) {
       return { players: [] };
     }

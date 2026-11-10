@@ -4,6 +4,9 @@ import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath, revalidateTag, updateTag } from 'next/cache';
 import { isValidHttpUrl } from '@/app/utils/urlValidator';
+import { sanitizeSearchTerm } from '@/lib/search-query';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function invitePlayer(formData: FormData) {
   const cookieStore = await cookies();
@@ -185,13 +188,17 @@ export async function kickPlayerAction(formData: FormData) {
 export async function searchPlayers(query: string, seasonId: string) {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
-  
-  if (!query || query.length < 3) return [];
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const term = sanitizeSearchTerm(query);
+  if (term.length < 3 || !UUID_RE.test(String(seasonId))) return [];
 
   const { data: profiles } = await supabase
     .from('profiles')
     .select('id, username, current_ea_player_id, primary_position, platform, avatar_url')
-    .or(`username.ilike.%${query}%,current_ea_player_id.ilike.%${query}%`)
+    .or(`username.ilike.%${term}%,current_ea_player_id.ilike.%${term}%`)
     .eq('is_active', true)
     .limit(10);
 
