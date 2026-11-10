@@ -92,6 +92,29 @@ export default function EkipPage() {
           Discord Sunucusu
         </a>
       </div>
+
+      {/* Site credit */}
+      <div className="mt-6 client-glass rounded-2xl p-6 sm:p-8 border border-white/5 bg-[#020813]/60 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+        <div>
+          <span className="text-xs sm:text-[12px] font-black tracking-wider text-[#00e5ff] uppercase block mb-1">
+            Tasarım &amp; Geliştirme
+          </span>
+          <h2 className="text-lg sm:text-xl font-black text-white tracking-wide uppercase">Cemal YILDIZ</h2>
+          <p className="mt-1 text-sm text-gray-400">
+            TETA League web sitesi baştan sona Cemal YILDIZ tarafından tasarlandı ve geliştirildi.
+          </p>
+        </div>
+        <ul className="flex flex-wrap gap-2 shrink-0" aria-label="Kullanılan teknolojiler">
+          {['Next.js', 'Supabase', 'Vercel'].map((tech) => (
+            <li
+              key={tech}
+              className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-[11px] font-bold tracking-wider uppercase text-gray-300"
+            >
+              {tech}
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }

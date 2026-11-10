@@ -115,6 +115,10 @@ export default function Footer() {
         {/* Bottom */}
         <div className="mt-10 pt-6 border-t border-white/5 text-center">
           <p className="text-xs text-gray-600">© 2026 TETA League. Tüm hakları saklıdır.</p>
+          <p className="mt-2 text-[11px] font-bold tracking-widest uppercase text-gray-600">
+            Tasarım &amp; Geliştirme <span className="text-gray-500">·</span>{' '}
+            <span className="text-gray-400 hover:text-[#00e5ff] transition-colors">Cemal YILDIZ</span>
+          </p>
         </div>
       </div>
     </footer>

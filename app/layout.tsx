@@ -24,6 +24,8 @@ export const metadata: Metadata = {
   title: HOME_TITLE,
   description: HOME_DESCRIPTION,
   applicationName: SITE_NAME,
+  authors: [{ name: "Cemal YILDIZ" }],
+  creator: "Cemal YILDIZ",
   openGraph: {
     siteName: SITE_NAME,
     locale: "tr_TR",
