@@ -104,16 +104,6 @@ export default function EkipPage() {
             TETA League web sitesi baştan sona Cemal YILDIZ tarafından tasarlandı ve geliştirildi.
           </p>
         </div>
-        <ul className="flex flex-wrap gap-2 shrink-0" aria-label="Kullanılan teknolojiler">
-          {['Next.js', 'Supabase', 'Vercel'].map((tech) => (
-            <li
-              key={tech}
-              className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-[11px] font-bold tracking-wider uppercase text-gray-300"
-            >
-              {tech}
-            </li>
-          ))}
-        </ul>
       </div>
     </div>
   );
