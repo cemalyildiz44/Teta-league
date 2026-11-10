@@ -64,6 +64,9 @@ const POST_TEAM_NAMES: Record<string, string> = {
   'BEYKOZ ESPOR': 'BEYKOZ ESP',
   'FROSTGARD FC': 'FROSTGARD FC',
   'ANADOLU ESPOR': 'ANADOLU ESP',
+  'PARADOX UNITED': 'PARADOX UTD',
+  'ATMACA ESPOR': 'ATMACA ESP',
+  'HARCHESTER UNITED': 'HARCHESTER UTD',
 };
 const postTeamName = (name: string) => POST_TEAM_NAMES[upper(name)] ?? upper(name);
 
@@ -81,7 +84,7 @@ const STANDINGS_LAYOUT: Record<
     numberY: [341.5, 412.5, 480.5, 555.5, 636.5, 710.5, 781.5, 855.5, 925.5, 997.5, 1069.5, 1137.5],
   },
   ecl: {
-    teamX: 300,
+    teamX: 298,
     teamMaxWidth: 262,
     teamSize: 27,
     columns: [596, 683, 765],
