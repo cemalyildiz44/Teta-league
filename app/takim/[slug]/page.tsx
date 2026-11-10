@@ -6,6 +6,7 @@ import TeamLogo from '@/components/TeamLogo';
 import { getCachedTeamPageData } from './team-page-data';
 import { slugify } from '@/app/lig/utils';
 import { buildOpenGraph } from '@/lib/seo';
+import { avatarSrc } from '@/lib/avatar';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -187,7 +188,7 @@ export default async function TeamPage({ params }: Props) {
                         >
                           <div className="w-5 h-5 rounded-full border border-amber-500/40 bg-black/60 flex items-center justify-center overflow-hidden shrink-0">
                             {cap.avatar_url ? (
-                              <img src={cap.avatar_url} alt={cap.username} className="w-full h-full object-cover" />
+                              <img loading="lazy" decoding="async" src={avatarSrc(cap.avatar_url)} alt={cap.username} className="w-full h-full object-cover" />
                             ) : (
                               <span className="text-[9px] font-[900] text-amber-400">
                                 {cap.username.substring(0, 2).toUpperCase()}

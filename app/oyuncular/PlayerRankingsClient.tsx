@@ -14,6 +14,7 @@ import {
   formatPosition,
   formatPlatform
 } from '@/app/utils/positions';
+import { avatarSrc } from '@/lib/avatar';
 
 export {
   PLATFORM_OPTIONS,
@@ -26,6 +27,8 @@ export {
   formatPosition,
   formatPlatform
 };
+
+const PAGE_SIZE = 50;
 
 export const STATUS_OPTIONS = [
   { value: 'FREE', label: 'SERBEST' },
@@ -84,6 +87,12 @@ export default function PlayerRankingsClient({ rankings }: { rankings: PlayerRan
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Render the list in pages: all 600+ rows at once made the page ~1 MB of HTML and 11k DOM nodes.
+  // Filters still search the full list; changing a filter starts again from the first page.
+  const filterKey = [searchTerm, platformFilter, positionFilter, secondaryPositionFilters.join(','), statusFilter].join('|');
+  const [shown, setShown] = useState({ key: filterKey, count: PAGE_SIZE });
+  const visibleCount = shown.key === filterKey ? shown.count : PAGE_SIZE;
 
   const filteredRankings = useMemo(() => {
     return rankings.filter(player => {
@@ -348,7 +357,7 @@ export default function PlayerRankingsClient({ rankings }: { rankings: PlayerRan
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {filteredRankings.map((player, index) => {
+                {filteredRankings.slice(0, visibleCount).map((player, index) => {
                   const rank = index + 1;
                   
                   // Top 3 specific styles
@@ -388,7 +397,7 @@ export default function PlayerRankingsClient({ rankings }: { rankings: PlayerRan
                         >
                           <div className="w-10 h-10 shrink-0 rounded-full bg-black border border-white/10 p-[2px] flex items-center justify-center overflow-hidden relative">
                             {player.avatarUrl ? (
-                              <img src={player.avatarUrl} alt={player.username} className="w-full h-full object-cover rounded-full" />
+                              <img loading="lazy" decoding="async" src={avatarSrc(player.avatarUrl)} alt={player.username} className="w-full h-full object-cover rounded-full" />
                             ) : (
                               <span className="text-[14px] font-bold text-gray-500">
                                 {player.username.substring(0, 2).toUpperCase()}
@@ -438,6 +447,20 @@ export default function PlayerRankingsClient({ rankings }: { rankings: PlayerRan
                 })}
               </tbody>
             </table>
+          </div>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-4 border-t border-white/5 bg-black/20">
+            <span className="text-[12px] font-bold text-gray-400 tracking-wider">
+              {Math.min(visibleCount, filteredRankings.length)} / {filteredRankings.length} oyuncu gösteriliyor
+            </span>
+            {visibleCount < filteredRankings.length && (
+              <button
+                type="button"
+                onClick={() => setShown({ key: filterKey, count: visibleCount + PAGE_SIZE })}
+                className="px-5 py-2.5 rounded-xl bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/30 text-xs font-bold uppercase tracking-wider hover:bg-[#00e5ff]/20 transition-all"
+              >
+                Daha Fazla Göster
+              </button>
+            )}
           </div>
         </div>
       )}

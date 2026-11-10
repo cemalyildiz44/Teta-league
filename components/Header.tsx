@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { Lock } from 'lucide-react';
 import { useHeaderSession } from './useHeaderSession';
+import { avatarSrc } from '@/lib/avatar';
 
 interface NavLink {
   label: string;
@@ -150,7 +151,7 @@ export default function Header() {
                 >
                   <div className="w-8 h-8 rounded-full overflow-hidden bg-black border border-white/10 shrink-0 group-hover:border-[#00e5ff]/30 transition-colors">
                     {userProfile.avatar_url ? (
-                      <img src={userProfile.avatar_url} alt="" className="w-full h-full object-cover" />
+                      <img src={avatarSrc(userProfile.avatar_url)} alt="" className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center font-bold text-[#00e5ff] text-[12px]">
                         {userProfile.username?.charAt(0)?.toUpperCase() || '?'}
@@ -289,7 +290,7 @@ export default function Header() {
                   <div className="flex items-center gap-4 min-w-0">
                     <div className="w-12 h-12 rounded-full overflow-hidden bg-black border border-white/10 shrink-0 group-hover:border-[#00e5ff]/30 transition-colors">
                       {userProfile.avatar_url ? (
-                        <img src={userProfile.avatar_url} alt="" className="w-full h-full object-cover" />
+                        <img src={avatarSrc(userProfile.avatar_url)} alt="" className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center font-bold text-[#00e5ff] text-[18px]">
                           {userProfile.username?.charAt(0)?.toUpperCase() || '?'}

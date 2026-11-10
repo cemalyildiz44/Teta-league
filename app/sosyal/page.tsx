@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { SocialFeed } from './SocialFeed';
 import { fetchSocialFeedAction } from './actions';
 import { getCachedUser } from '@/lib/fetchers';
+import { avatarSrc } from '@/lib/avatar';
 
 export const revalidate = 0;
 
@@ -195,7 +196,7 @@ export default async function SocialPage() {
                 <div className="flex flex-col items-center">
                   <Link href={`/oyuncular/${currentUserProfile.username}`} className="relative w-16 h-16 rounded-full overflow-hidden bg-black border border-white/10 group mb-3">
                     {currentUserProfile.avatar_url ? (
-                      <img src={currentUserProfile.avatar_url} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                      <img src={avatarSrc(currentUserProfile.avatar_url)} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center font-bold text-[#00e5ff] text-xl">
                         {currentUserProfile.username.charAt(0).toUpperCase()}
@@ -270,7 +271,7 @@ export default async function SocialPage() {
                       <div className="flex items-start gap-3">
                         <div className="w-8 h-8 rounded-full bg-black overflow-hidden border border-white/10 shrink-0 group-hover:border-[#00e5ff]/50 transition-colors">
                           {p.author?.avatar_url ? (
-                            <img src={p.author.avatar_url} alt="" className="w-full h-full object-cover" />
+                            <img loading="lazy" decoding="async" src={avatarSrc(p.author.avatar_url)} alt="" className="w-full h-full object-cover" />
                           ) : (
                             <span className="w-full h-full flex items-center justify-center text-[10px] font-bold text-[#00e5ff]">{p.author?.username?.charAt(0)?.toUpperCase()}</span>
                           )}
@@ -297,7 +298,7 @@ export default async function SocialPage() {
                   <Link href={`/oyuncular/${ap.username}`} key={ap.id} className="flex items-center gap-3 group min-w-0 p-1.5 -m-1.5 hover:bg-white/5 rounded-lg transition-colors">
                     <div className="w-8 h-8 rounded-full bg-black overflow-hidden border border-white/10 shrink-0 group-hover:border-[#00e5ff]/50 transition-colors">
                       {ap.avatar_url ? (
-                        <img src={ap.avatar_url} alt="" className="w-full h-full object-cover" />
+                        <img loading="lazy" decoding="async" src={avatarSrc(ap.avatar_url)} alt="" className="w-full h-full object-cover" />
                       ) : (
                         <span className="w-full h-full flex items-center justify-center text-[10px] font-bold text-gray-500">{ap.username?.charAt(0)?.toUpperCase()}</span>
                       )}
@@ -327,7 +328,7 @@ export default async function SocialPage() {
                   <Link href={`/oyuncular/${ap.username}`} key={ap.id} className="flex items-center gap-3 group min-w-0 p-1.5 -m-1.5 hover:bg-white/5 rounded-lg transition-colors">
                     <div className="w-8 h-8 rounded-full bg-black overflow-hidden border border-white/10 shrink-0 group-hover:border-[#00e5ff]/50 transition-colors">
                       {ap.avatar_url ? (
-                        <img src={ap.avatar_url} alt="" className="w-full h-full object-cover" />
+                        <img loading="lazy" decoding="async" src={avatarSrc(ap.avatar_url)} alt="" className="w-full h-full object-cover" />
                       ) : (
                         <span className="w-full h-full flex items-center justify-center text-[10px] font-bold text-gray-500">{ap.username?.charAt(0)?.toUpperCase()}</span>
                       )}

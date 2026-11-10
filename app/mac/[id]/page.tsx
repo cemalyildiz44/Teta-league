@@ -8,6 +8,7 @@ import { slugify } from "@/app/lig/utils";
 export const revalidate = 60;
 
 import { getMatchById, getTeamById } from "@/lib/fetchers";
+import { avatarSrc } from '@/lib/avatar';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = await params;
@@ -116,7 +117,7 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
                   <Link href={(s.profiles as any)?.username ? `/oyuncular/${(s.profiles as any).username}` : "#"} prefetch={false} className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-black/40 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center">
                       {avatar ? (
-                        <img src={avatar} alt={uname} className="w-full h-full object-cover" />
+                        <img loading="lazy" decoding="async" src={avatarSrc(avatar)} alt={uname} className="w-full h-full object-cover" />
                       ) : (
                         <span className="text-[11px] font-[900] text-[#00e5ff] uppercase">{uname.substring(0, 2)}</span>
                       )}

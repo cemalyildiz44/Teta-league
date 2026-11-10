@@ -4,6 +4,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { cancelInviteAction } from './actions';
+import { avatarSrc } from '@/lib/avatar';
 
 export interface TransferProfile {
   id?: string;
@@ -239,7 +240,7 @@ export function TeamTransfersSection({ transfers, isWindowOpen = true }: TeamTra
                         <div className="flex items-center gap-3">
                           {profile?.avatar_url ? (
                                                         <img
-                              src={profile.avatar_url}
+                              src={avatarSrc(profile.avatar_url)}
                               alt=""
                               className="w-9 h-9 rounded-full object-cover border border-white/10"
                             />
@@ -327,7 +328,7 @@ export function TeamTransfersSection({ transfers, isWindowOpen = true }: TeamTra
                         <div className="flex items-center gap-3">
                           {profile?.avatar_url ? (
                             <img
-                              src={profile.avatar_url}
+                              src={avatarSrc(profile.avatar_url)}
                               alt=""
                               className="w-10 h-10 rounded-full object-cover border border-yellow-500/30"
                             />

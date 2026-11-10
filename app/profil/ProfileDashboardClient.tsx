@@ -7,6 +7,7 @@ import { updateProfileAction } from './actions';
 import { PLATFORM_OPTIONS, POSITION_OPTIONS } from '../oyuncular/PlayerRankingsClient';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
+import { avatarSrc } from '@/lib/avatar';
 
 export type ProfileDashboardProps = {
   profile: {
@@ -176,7 +177,7 @@ export default function ProfileDashboardClient({
           {/* Avatar */}
           <div className="w-40 h-40 shrink-0 rounded-2xl bg-[#060d18] border border-white/10 p-2 relative shadow-[0_0_30px_rgba(0,229,255,0.15)] flex items-center justify-center overflow-hidden">
             {profile.avatar_url ? (
-              <img src={profile.avatar_url} alt={profile.username} className="w-full h-full object-cover rounded-xl" />
+              <img src={avatarSrc(profile.avatar_url, 320)} alt={profile.username} className="w-full h-full object-cover rounded-xl" />
             ) : (
               <span className="text-5xl font-black text-[#00e5ff] opacity-80">{profile.username.substring(0, 2).toUpperCase()}</span>
             )}

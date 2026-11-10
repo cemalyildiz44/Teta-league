@@ -7,6 +7,7 @@ import { getPositionLabel } from "@/app/utils/positions";
 
 export const revalidate = 60;
 import TeamLogo from "@/components/TeamLogo";
+import { avatarSrc } from '@/lib/avatar';
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }) {
   const resolvedParams = await params;
@@ -542,7 +543,7 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
             <div className="flex gap-4 md:gap-6 items-start">
               <div className="w-24 h-24 md:w-28 md:h-28 rounded-2xl bg-[#0a1628] border border-white/10 overflow-hidden shrink-0 shadow-lg">
                 {profile.avatar_url ? (
-                  <img src={profile.avatar_url} alt={profile.username} className="w-full h-full object-cover" />
+                  <img src={avatarSrc(profile.avatar_url, 256)} alt={profile.username} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#00e5ff]/10 to-transparent">
                     <span className="text-3xl md:text-4xl font-[900] text-[#00e5ff]/40">{profile.username.charAt(0).toUpperCase()}</span>

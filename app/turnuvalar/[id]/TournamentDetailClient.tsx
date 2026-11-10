@@ -41,6 +41,7 @@ import TournamentKnockoutBracket from '@/components/TournamentKnockoutBracket';
 
 import { calculateGroupStandings, getTournamentStageLabel } from '@/lib/tournament-engine';
 import { formatTournamentDate } from '@/lib/date-utils';
+import { avatarSrc } from '@/lib/avatar';
 
 interface TournamentDetailClientProps {
   tournament: any;
@@ -1012,7 +1013,7 @@ export default function TournamentDetailClient({
                             className="flex items-center gap-2 hover:text-[#00e5ff] transition-colors"
                           >
                             {app.applicant?.avatar_url ? (
-                              <img alt="" src={app.applicant.avatar_url} className="w-5 h-5 rounded-full object-cover" />
+                              <img loading="lazy" decoding="async" alt="" src={avatarSrc(app.applicant.avatar_url)} className="w-5 h-5 rounded-full object-cover" />
                             ) : (
                               <User className="w-5 h-5 p-1 bg-white/10 rounded-full text-zinc-400" />
                             )}
@@ -1036,7 +1037,7 @@ export default function TournamentDetailClient({
                                   className="px-2 py-1 rounded-lg bg-white/5 hover:bg-cyan-500/10 border border-white/5 hover:border-cyan-500/20 text-[10px] font-bold text-zinc-300 transition-colors flex items-center gap-1.5"
                                 >
                                   {p.profile?.avatar_url ? (
-                                    <img alt="" src={p.profile.avatar_url} className="w-3.5 h-3.5 rounded-full object-cover" />
+                                    <img loading="lazy" decoding="async" alt="" src={avatarSrc(p.profile.avatar_url)} className="w-3.5 h-3.5 rounded-full object-cover" />
                                   ) : (
                                     <User className="w-3 h-3 text-zinc-500" />
                                   )}
@@ -1691,7 +1692,7 @@ export default function TournamentDetailClient({
                             }`}
                           >
                             {p.avatar_url ? (
-                              <img alt="" src={p.avatar_url} className="w-6 h-6 rounded-full object-cover shrink-0" />
+                              <img loading="lazy" decoding="async" alt="" src={avatarSrc(p.avatar_url)} className="w-6 h-6 rounded-full object-cover shrink-0" />
                             ) : (
                               <User className="w-6 h-6 p-1 bg-black/50 rounded-full shrink-0" />
                             )}
@@ -1881,7 +1882,7 @@ export default function TournamentDetailClient({
                     <div className="flex items-center gap-3">
                       {captainEditApp.applicant?.avatar_url ? (
                         <img alt=""
-                          src={captainEditApp.applicant.avatar_url}
+                          src={avatarSrc(captainEditApp.applicant.avatar_url)}
                           className="w-8 h-8 rounded-full object-cover border border-[#00e5ff]/40"
                         />
                       ) : (
@@ -1929,7 +1930,7 @@ export default function TournamentDetailClient({
                         <div className="flex items-center gap-3">
                           {p.profile?.avatar_url ? (
                             <img alt=""
-                              src={p.profile.avatar_url}
+                              src={avatarSrc(p.profile.avatar_url)}
                               className="w-8 h-8 rounded-full object-cover border border-white/10"
                             />
                           ) : (
@@ -2018,7 +2019,7 @@ export default function TournamentDetailClient({
                               <div className="flex items-center gap-2.5 min-w-0">
                                 {prof.avatar_url ? (
                                   <img alt=""
-                                    src={prof.avatar_url}
+                                    src={avatarSrc(prof.avatar_url)}
                                     className="w-7 h-7 rounded-full object-cover border border-white/10 shrink-0"
                                   />
                                 ) : (

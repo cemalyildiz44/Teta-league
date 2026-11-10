@@ -1,6 +1,7 @@
 'use client';
 
 import { History, User, ArrowRight, Image as ImageIcon, FileText, CheckCircle } from 'lucide-react';
+import { avatarSrc } from '@/lib/avatar';
 
 export interface MatchAuditRecord {
   id: string;
@@ -70,7 +71,7 @@ export function MatchAuditHistory({ logs }: MatchAuditHistoryProps) {
                 <div className="flex items-center gap-2.5">
                   <div className="w-7 h-7 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
                     {log.actor?.avatar_url ? (
-                      <img src={log.actor.avatar_url} alt="" className="w-full h-full object-cover" />
+                      <img loading="lazy" decoding="async" src={avatarSrc(log.actor.avatar_url)} alt="" className="w-full h-full object-cover" />
                     ) : (
                       <User className="w-3.5 h-3.5 text-zinc-500" />
                     )}

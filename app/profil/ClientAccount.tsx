@@ -11,6 +11,7 @@ import { acceptTeamInviteAction, rejectTeamInviteAction } from './team-actions';
 import { PLATFORM_OPTIONS, POSITION_FILTER_OPTIONS, getPositionLabel } from '@/app/utils/positions';
 
 import imageCompression from 'browser-image-compression';
+import { avatarSrc } from '@/lib/avatar';
 
 export default function ClientAccount({ profile, authUser, team, league, isCaptain, achievements, pendingInvites }: any) {
   const supabase = createClient();
@@ -124,18 +125,19 @@ export default function ClientAccount({ profile, authUser, team, league, isCapta
 
       setProfileMsg({ type: 'success', text: 'Fotoğraf optimize ediliyor...' });
 
+      // Avatars are shown at 160 px at most (and served resized via lib/avatar.ts), so 512 px is plenty
       const options = {
-        maxSizeMB: 1,
-        maxWidthOrHeight: 1024,
+        maxSizeMB: 0.25,
+        maxWidthOrHeight: 512,
         useWebWorker: true,
         fileType: 'image/webp',
-        initialQuality: 0.90,
+        initialQuality: 0.85,
       };
 
       let compressedFile = await imageCompression(file, options);
-      
-      // Failsafe if still over 1MB
-      if (compressedFile.size > 1024 * 1024) {
+
+      // Failsafe if still over 250 KB
+      if (compressedFile.size > 250 * 1024) {
         options.initialQuality = 0.70;
         compressedFile = await imageCompression(file, options);
       }
@@ -216,7 +218,7 @@ export default function ClientAccount({ profile, authUser, team, league, isCapta
         <div className="relative group shrink-0">
           <div className="w-24 h-24 rounded-2xl bg-black/40 border border-white/10 overflow-hidden flex items-center justify-center">
             {avatarUrl ? (
-              <img src={avatarUrl} alt={profile?.username} className="w-full h-full object-cover" />
+              <img src={avatarSrc(avatarUrl, 192)} alt={profile?.username} className="w-full h-full object-cover" />
             ) : (
               <span className="text-[24px] font-[900] text-[#00e5ff] uppercase">{profile?.username?.substring(0, 2)}</span>
             )}

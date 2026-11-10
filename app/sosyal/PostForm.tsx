@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { createPostAction } from './actions';
+import { avatarSrc } from '@/lib/avatar';
 
 export function PostForm({
   userProfile,
@@ -54,7 +55,7 @@ export function PostForm({
         <div className="flex gap-4 items-start">
           <div className="w-10 h-10 md:w-12 md:h-12 rounded-full overflow-hidden bg-black border border-white/10 shrink-0">
             {userProfile?.avatar_url ? (
-              <img src={userProfile.avatar_url} alt="" className="w-full h-full object-cover" />
+              <img src={avatarSrc(userProfile.avatar_url)} alt="" className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-[14px] font-bold text-[#00e5ff]">
                 {userProfile?.username?.charAt(0)?.toUpperCase() || '?'}

@@ -4,6 +4,7 @@ import { ArrowRight, ArrowRightLeft } from 'lucide-react';
 import TeamLogo from '@/components/TeamLogo';
 
 import { getActiveSeason, getAllTeams } from '@/lib/fetchers';
+import { avatarSrc } from '@/lib/avatar';
 
 export default async function RecentTransfers() {
   // 1. Get active season (memoized)
@@ -78,7 +79,7 @@ export default async function RecentTransfers() {
                 <div className="w-10 h-10 rounded-full bg-[#0a1628] border border-white/10 overflow-hidden shrink-0 flex items-center justify-center group-hover:scale-105 transition-transform duration-200">
                   {transfer.avatarUrl ? (
                     <img
-                      src={transfer.avatarUrl}
+                      src={avatarSrc(transfer.avatarUrl)}
                       alt={transfer.playerName}
                       className="w-full h-full object-cover"
                     />

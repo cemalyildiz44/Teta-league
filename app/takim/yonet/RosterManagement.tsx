@@ -2,6 +2,7 @@
 
 import { useTransition, useState } from 'react';
 import { kickPlayerAction } from './actions';
+import { avatarSrc } from '@/lib/avatar';
 
 export function RosterManagement({ 
   memberships, 
@@ -54,7 +55,7 @@ export function RosterManagement({
             <div key={mem.id} className="flex items-center justify-between p-3 bg-[#060d18] border border-white/5 rounded-lg">
               <div className="flex items-center gap-3">
                 {profile.avatar_url ? (
-                  <img src={profile.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover" />
+                  <img loading="lazy" decoding="async" src={avatarSrc(profile.avatar_url)} alt="" className="w-10 h-10 rounded-full object-cover" />
                 ) : (
                   <div className="w-10 h-10 rounded-full bg-[#0a1628] flex items-center justify-center text-xs font-bold text-gray-500">
                     {profile.username.slice(0, 2).toUpperCase()}

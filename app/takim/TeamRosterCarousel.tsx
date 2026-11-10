@@ -2,6 +2,7 @@
 
 import { useRef } from 'react';
 import Link from 'next/link';
+import { avatarSrc } from '@/lib/avatar';
 
 type PlayerStat = {
   matches: number;
@@ -117,7 +118,7 @@ export default function TeamRosterCarousel({ players }: { players: RosterPlayer[
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full border border-white/10 bg-black flex items-center justify-center overflow-hidden shrink-0">
                     {p.avatar_url ? (
-                      <img src={p.avatar_url} alt={p.username} className="w-full h-full object-cover" />
+                      <img loading="lazy" decoding="async" src={avatarSrc(p.avatar_url)} alt={p.username} className="w-full h-full object-cover" />
                     ) : (
                       <span className="text-[12px] font-[900] text-[#00e5ff]">{p.username.substring(0, 2).toUpperCase()}</span>
                     )}

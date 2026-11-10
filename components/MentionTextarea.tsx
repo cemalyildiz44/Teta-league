@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { User, Loader2, AtSign } from 'lucide-react';
 import { searchPlayersForMentionAction } from '@/app/admin/news/actions';
+import { avatarSrc } from '@/lib/avatar';
 
 interface PlayerMentionResult {
   id: string;
@@ -219,7 +220,7 @@ export default function MentionTextarea({
                 >
                   <div className="w-6 h-6 rounded-full bg-black/40 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center">
                     {player.avatar_url ? (
-                      <img src={player.avatar_url} alt="" className="w-full h-full object-cover" />
+                      <img loading="lazy" decoding="async" src={avatarSrc(player.avatar_url)} alt="" className="w-full h-full object-cover" />
                     ) : (
                       <User className="w-3.5 h-3.5 text-gray-500" />
                     )}

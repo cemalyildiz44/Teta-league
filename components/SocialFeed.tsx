@@ -1,5 +1,6 @@
 import { createPublicClient } from '@/utils/supabase/public';
 import Link from 'next/link';
+import { avatarSrc } from '@/lib/avatar';
 
 export default async function SocialFeed() {
   const supabase = createPublicClient();
@@ -41,7 +42,7 @@ export default async function SocialFeed() {
             <div className="flex items-start gap-4 p-4 rounded-xl hover:bg-[#060d18] border border-transparent hover:border-[#00e5ff]/20 transition-all">
               <div className="relative">
                 {post.author?.avatar_url ? (
-                  <img src={post.author.avatar_url} alt="" className="w-12 h-12 rounded-full border border-white/10" />
+                  <img loading="lazy" decoding="async" src={avatarSrc(post.author.avatar_url)} alt="" className="w-12 h-12 rounded-full border border-white/10" />
                 ) : (
                   <div className="w-12 h-12 rounded-full bg-[#132338] border border-white/10 flex items-center justify-center font-bold text-[#00e5ff]">
                     {(post.author?.username || '?').charAt(0).toUpperCase()}

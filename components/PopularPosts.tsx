@@ -1,4 +1,5 @@
 import { createPublicClient } from '@/utils/supabase/public';
+import { avatarSrc } from '@/lib/avatar';
 
 export default async function PopularPosts() {
   const supabase = createPublicClient();
@@ -50,7 +51,7 @@ export default async function PopularPosts() {
             </div>
             <div className="flex items-center gap-3 mb-2">
               {post.author.avatar_url ? (
-                <img src={post.author.avatar_url} alt="" className="w-8 h-8 rounded-full border border-white/10" />
+                <img loading="lazy" decoding="async" src={avatarSrc(post.author.avatar_url)} alt="" className="w-8 h-8 rounded-full border border-white/10" />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-[#132338] border border-white/10 flex items-center justify-center font-bold text-purple-400 text-xs">
                   {post.author.username.charAt(0).toUpperCase()}

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { searchPlayers, invitePlayer } from './actions';
+import { avatarSrc } from '@/lib/avatar';
 
 export function PlayerSearch({ 
   teamId, 
@@ -88,7 +89,7 @@ export function PlayerSearch({
             <div key={player.id} className="flex items-center justify-between p-3 bg-[#060d18] border border-white/5 rounded-lg hover:border-[#00e5ff]/30 transition-colors">
               <div className="flex items-center gap-3">
                 {player.avatar_url ? (
-                  <img src={player.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover" />
+                  <img loading="lazy" decoding="async" src={avatarSrc(player.avatar_url)} alt="" className="w-10 h-10 rounded-full object-cover" />
                 ) : (
                   <div className="w-10 h-10 rounded-full bg-[#0a1628] flex items-center justify-center text-xs font-bold text-gray-500">
                     {player.username.slice(0, 2).toUpperCase()}

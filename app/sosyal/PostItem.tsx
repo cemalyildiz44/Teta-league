@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toggleLikeAction, deletePostAction, createCommentAction, deleteCommentAction } from './actions';
+import { avatarSrc } from '@/lib/avatar';
 
 function timeAgo(dateString: string) {
   const diff = Date.now() - new Date(dateString).getTime();
@@ -175,7 +176,7 @@ export function PostItem({ post, currentUser, onDeletePost }: PostItemProps) {
         <Link href={`/oyuncular/${post.author?.username}`} className="flex items-center gap-3 group min-w-0 flex-1">
           <div className="w-10 h-10 md:w-11 md:h-11 rounded-full overflow-hidden bg-black border border-white/10 shrink-0 group-hover:border-[#00e5ff]/50 transition-colors shadow-sm">
             {post.author?.avatar_url ? (
-              <img src={post.author.avatar_url} alt="" className="w-full h-full object-cover" />
+              <img loading="lazy" decoding="async" src={avatarSrc(post.author.avatar_url)} alt="" className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center font-bold text-[#00e5ff] text-[14px]">
                 {post.author?.username?.charAt(0)?.toUpperCase() || '?'}
@@ -316,7 +317,7 @@ export function PostItem({ post, currentUser, onDeletePost }: PostItemProps) {
                 <div key={comment.id} className="flex items-start gap-3 group/comment bg-white/[0.02] p-3 rounded-lg border border-white/5">
                   <Link href={`/oyuncular/${comment.author?.username}`} className="shrink-0">
                     {comment.author?.avatar_url ? (
-                      <img src={comment.author.avatar_url} alt="" className="w-8 h-8 rounded-full border border-white/10 object-cover" />
+                      <img loading="lazy" decoding="async" src={avatarSrc(comment.author.avatar_url)} alt="" className="w-8 h-8 rounded-full border border-white/10 object-cover" />
                     ) : (
                       <div className="w-8 h-8 rounded-full bg-[#0a1628] border border-white/10 flex items-center justify-center font-bold text-[10px] text-[#00e5ff]">
                         {comment.author?.username?.charAt(0)?.toUpperCase() || '?'}

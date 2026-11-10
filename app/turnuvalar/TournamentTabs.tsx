@@ -8,6 +8,7 @@ import imageCompression from 'browser-image-compression';
 import { submitNightCupApplicationAction, searchEligibleTournamentPlayersAction } from './actions';
 import TeamLogo from '@/components/TeamLogo';
 import { formatTournamentDate } from '@/lib/date-utils';
+import { avatarSrc } from '@/lib/avatar';
 
 export default function TournamentTabs({
   tournaments, winners, applications, profiles, currentUser
@@ -343,7 +344,7 @@ export default function TournamentTabs({
                       </div>
                       <Link href={`/oyuncular/${tWinners[0].profiles?.username}`} className='flex items-center gap-3 p-3 rounded-xl bg-yellow-500/5 hover:bg-yellow-500/10 border border-yellow-500/10 transition-colors'>
                         {tWinners[0].profiles?.avatar_url ? (
-                          <img alt="" src={tWinners[0].profiles.avatar_url} className='w-10 h-10 rounded-full' />
+                          <img loading="lazy" decoding="async" alt="" src={avatarSrc(tWinners[0].profiles.avatar_url)} className='w-10 h-10 rounded-full' />
                         ) : (
                           <User className='w-10 h-10 text-zinc-500 p-2 bg-black/40 rounded-full' />
                         )}
@@ -362,7 +363,7 @@ export default function TournamentTabs({
                       <div className='grid grid-cols-2 gap-2'>
                         {tWinners.map((w: any) => (
                           <Link key={w.id} href={`/oyuncular/${w.profiles?.username}`} className='flex items-center gap-2 p-2 rounded-lg bg-black/20 hover:bg-[#00e5ff]/10 border border-white/5 hover:border-[#00e5ff]/20 transition-colors'>
-                            {w.profiles?.avatar_url ? <img alt="" src={w.profiles.avatar_url} className='w-5 h-5 rounded-full' /> : <User className='w-5 h-5 p-1 bg-zinc-800 rounded-full text-zinc-400'/>}
+                            {w.profiles?.avatar_url ? <img loading="lazy" decoding="async" alt="" src={avatarSrc(w.profiles.avatar_url)} className='w-5 h-5 rounded-full' /> : <User className='w-5 h-5 p-1 bg-zinc-800 rounded-full text-zinc-400'/>}
                             <span className='text-[10px] font-bold text-zinc-300 truncate'>@{w.profiles?.username}</span>
                           </Link>
                         ))}
@@ -614,7 +615,7 @@ export default function TournamentTabs({
                           className={`p-2 rounded-lg border text-[11px] cursor-pointer flex items-center gap-2 transition-all ${ncProfiles.includes(p.id) ? 'bg-[#00e5ff]/20 border-[#00e5ff]/50 text-[#00e5ff] font-black' : 'bg-white/5 border-transparent text-zinc-400 font-bold hover:bg-white/10'}`}
                         >
                           {p.avatar_url ? (
-                            <img alt="" src={p.avatar_url} className='w-6 h-6 rounded-full object-cover shrink-0'/>
+                            <img loading="lazy" decoding="async" alt="" src={avatarSrc(p.avatar_url)} className='w-6 h-6 rounded-full object-cover shrink-0'/>
                           ) : (
                             <User className='w-6 h-6 p-1 bg-black/50 rounded-full shrink-0'/>
                           )}
