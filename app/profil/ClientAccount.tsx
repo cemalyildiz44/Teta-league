@@ -12,8 +12,11 @@ import { PLATFORM_OPTIONS, POSITION_FILTER_OPTIONS, getPositionLabel } from '@/a
 
 import imageCompression from 'browser-image-compression';
 import { avatarSrc } from '@/lib/avatar';
+import { useConfirm, useToast } from '@/components/feedback/FeedbackProvider';
 
 export default function ClientAccount({ profile, authUser, team, league, isCaptain, achievements, pendingInvites }: any) {
+  const confirm = useConfirm();
+  const toast = useToast();
   const supabase = createClient();
   
   // Profile Update State
@@ -193,20 +196,20 @@ export default function ClientAccount({ profile, authUser, team, league, isCapta
   };
 
   const handleAcceptInvite = async (transferId: string) => {
-    if (!confirm('Bu daveti kabul etmek ve takıma katılmak istiyor musun?')) return;
+    if (!(await confirm({ message: 'Bu daveti kabul etmek ve takıma katılmak istiyor musun?', confirmLabel: 'Kabul Et' }))) return;
     setResolvingInvite(transferId);
     const res = await acceptTeamInviteAction(transferId);
-    if (res?.error) alert(res.error);
-    else if (res?.success) alert(res.success);
+    if (res?.error) toast.error(res.error);
+    else if (res?.success) toast.success(res.success);
     setResolvingInvite(null);
   };
 
   const handleRejectInvite = async (transferId: string) => {
-    if (!confirm('Bu daveti reddetmek istediğine emin misin?')) return;
+    if (!(await confirm({ message: 'Bu daveti reddetmek istediğine emin misin?', confirmLabel: 'Reddet', danger: true }))) return;
     setResolvingInvite(transferId);
     const res = await rejectTeamInviteAction(transferId);
-    if (res?.error) alert(res.error);
-    else if (res?.success) alert(res.success);
+    if (res?.error) toast.error(res.error);
+    else if (res?.success) toast.success(res.success);
     setResolvingInvite(null);
   };
 
@@ -560,11 +563,11 @@ export default function ClientAccount({ profile, authUser, team, league, isCapta
             <h2 className="text-[12px] font-[900] text-gray-500 tracking-[0.2em] uppercase mb-4">HESAP DETAYLARI</h2>
             <div className="space-y-4">
               <div>
-                <span className="block text-[9px] font-[900] text-gray-600 tracking-widest uppercase mb-1">E-POSTA ADRESİ</span>
+                <span className="block text-[10px] font-[900] text-gray-600 tracking-widest uppercase mb-1">E-POSTA ADRESİ</span>
                 <span className="text-[13px] font-[700] text-white truncate block">{authUser.email}</span>
               </div>
               <div>
-                <span className="block text-[9px] font-[900] text-gray-600 tracking-widest uppercase mb-1">DOĞRULAMA DURUMU</span>
+                <span className="block text-[10px] font-[900] text-gray-600 tracking-widest uppercase mb-1">DOĞRULAMA DURUMU</span>
                 {authUser.email_confirmed_at ? (
                   <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-[900] tracking-widest uppercase rounded">
                     ✓ DOĞRULANDI
@@ -576,7 +579,7 @@ export default function ClientAccount({ profile, authUser, team, league, isCapta
                 )}
               </div>
               <div>
-                <span className="block text-[9px] font-[900] text-gray-600 tracking-widest uppercase mb-1">KAYIT TARİHİ</span>
+                <span className="block text-[10px] font-[900] text-gray-600 tracking-widest uppercase mb-1">KAYIT TARİHİ</span>
                 <span className="text-[12px] font-[700] text-gray-400">{new Date(authUser.created_at).toLocaleDateString('tr-TR')}</span>
               </div>
             </div>
@@ -593,15 +596,15 @@ export default function ClientAccount({ profile, authUser, team, league, isCapta
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="bg-white/[0.02] border border-white/5 rounded-lg py-3">
                   <span className="block text-[16px] font-[900] text-white mb-1">{achievements.type1V1}</span>
-                  <span className="block text-[8px] font-[900] text-gray-500 tracking-widest uppercase">1V1</span>
+                  <span className="block text-[10px] font-[900] text-gray-500 tracking-widest uppercase">1V1</span>
                 </div>
                 <div className="bg-white/[0.02] border border-white/5 rounded-lg py-3">
                   <span className="block text-[16px] font-[900] text-white mb-1">{achievements.typeKarma}</span>
-                  <span className="block text-[8px] font-[900] text-gray-500 tracking-widest uppercase">KARMA</span>
+                  <span className="block text-[10px] font-[900] text-gray-500 tracking-widest uppercase">KARMA</span>
                 </div>
                 <div className="bg-white/[0.02] border border-white/5 rounded-lg py-3">
                   <span className="block text-[16px] font-[900] text-white mb-1">{achievements.typeNC}</span>
-                  <span className="block text-[8px] font-[900] text-gray-500 tracking-widest uppercase">N. CUP</span>
+                  <span className="block text-[10px] font-[900] text-gray-500 tracking-widest uppercase">N. CUP</span>
                 </div>
               </div>
             ) : (

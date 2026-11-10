@@ -139,7 +139,7 @@ export default function Header() {
                 <Link href="/bildirimler" className="relative p-2 text-gray-400 hover:text-[#00e5ff] transition-colors rounded-full hover:bg-white/5">
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
                   {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white shadow-lg shadow-red-500/50">
+                    <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-lg shadow-red-500/50">
                       {unreadCount}
                     </span>
                   )}
@@ -162,7 +162,7 @@ export default function Header() {
                     <span className="text-[12px] font-[900] text-white tracking-widest truncate group-hover:text-[#00e5ff] transition-colors uppercase leading-tight">
                       {userProfile.username}
                     </span>
-                    <span className="text-[9px] font-[800] text-gray-500 tracking-[0.2em] uppercase truncate leading-tight mt-0.5 group-hover:text-gray-400 transition-colors">
+                    <span className="text-[10px] font-[800] text-gray-500 tracking-[0.2em] uppercase truncate leading-tight mt-0.5 group-hover:text-gray-400 transition-colors">
                       {activeTeam ? activeTeam.name : "Takımsız"}
                     </span>
                   </div>

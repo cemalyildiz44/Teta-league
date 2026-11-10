@@ -968,13 +968,13 @@ export function FixturesManager({ initialFixtures, seasons, leagues, leagueTeams
                           <span className='font-mono'>👟 {s.assists}</span>
                           <span className='font-mono text-cyan-400 font-bold'>★ {s.rating || '-'}</span>
                           {s.extra_stats?.roster_status === 'VALID' && (
-                            <span className='px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'>LİSANSLI</span>
+                            <span className='px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'>LİSANSLI</span>
                           )}
                           {s.extra_stats?.roster_status === 'ROSTER_MISMATCH' && (
-                            <span className='px-2 py-0.5 rounded text-[9px] font-bold bg-red-500/10 text-red-400 border border-red-500/20'>KADRO UYUŞMAZLIĞI</span>
+                            <span className='px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/20'>KADRO UYUŞMAZLIĞI</span>
                           )}
                           {(!s.player_id || s.extra_stats?.roster_status === 'UNMATCHED') && (
-                            <span className='px-2 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20'>EŞLEŞMEDİ</span>
+                            <span className='px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20'>EŞLEŞMEDİ</span>
                           )}
                         </div>
                       </div>

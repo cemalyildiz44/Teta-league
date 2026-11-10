@@ -1014,7 +1014,7 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
                                         <div className='min-w-0'>
                                           <div className='flex items-center gap-2 flex-wrap'>
                                             <h4 className='text-base font-black text-white uppercase tracking-wider truncate'>{app.team_name}</h4>
-                                            <span className={'px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ' +
+                                            <span className={'px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ' +
                                               (app.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' :
                                                app.status === 'PENDING' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' :
                                                app.status === 'REJECTED' ? 'bg-red-500/10 text-red-400 border border-red-500/30' :
@@ -1763,7 +1763,7 @@ export function TournamentsManager({ tournaments, winners, applications, seasons
                       <div>
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs font-bold text-white">@{currentApp.profiles?.username || 'Kaptan'}</span>
-                          <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-amber-500/20 text-amber-300">KAPTAN</span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase bg-amber-500/20 text-amber-300">KAPTAN</span>
                         </div>
                         {currentApp.profiles?.full_name && (
                           <span className="text-[10px] text-zinc-400 block">{currentApp.profiles.full_name}</span>

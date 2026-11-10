@@ -135,7 +135,7 @@ export default async function RecentTransfers() {
               {/* TRANSFER Rozeti & Oklar */}
               <div className="flex items-center gap-1 shrink-0">
                 <ArrowRight className="w-3 h-3 text-gray-600 shrink-0" />
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] sm:text-[9px] font-[900] tracking-widest uppercase bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/30 shadow-[0_0_8px_rgba(0,229,255,0.15)] shrink-0">
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] sm:text-[10px] font-[900] tracking-widest uppercase bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/30 shadow-[0_0_8px_rgba(0,229,255,0.15)] shrink-0">
                   <ArrowRightLeft className="w-2.5 h-2.5 shrink-0" />
                   TRANSFER
                 </span>

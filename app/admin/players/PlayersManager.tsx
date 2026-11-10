@@ -471,11 +471,11 @@ export function PlayersManager({ players, teams, seasons = [], leagueTeams = [],
                           <div className="font-bold text-white flex items-center gap-1.5">
                             @{player.username}
                             {player.status === 'BANNED' ? (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 font-black border border-red-500/20">
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 font-black border border-red-500/20">
                                 BANLI
                               </span>
                             ) : player.status === 'SUSPENDED' || !player.is_active ? (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20">
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20">
                                 ASKIDA
                               </span>
                             ) : null}
@@ -852,10 +852,10 @@ export function PlayersManager({ players, teams, seasons = [], leagueTeams = [],
                                   <div>
                                     <div className="flex flex-wrap items-center gap-2">
                                       <span className="text-sm font-black text-white">{live.team_name}</span>
-                                      <span className="text-[9px] font-black px-2 py-0.5 rounded bg-[#00e5ff]/15 text-[#00e5ff] border border-[#00e5ff]/30 tracking-wider">
+                                      <span className="text-[10px] font-black px-2 py-0.5 rounded bg-[#00e5ff]/15 text-[#00e5ff] border border-[#00e5ff]/30 tracking-wider">
                                         GÜNCEL SEZON (CANLI MAÇLAR)
                                       </span>
-                                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-white/10 tracking-wider">
+                                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-white/10 tracking-wider">
                                         SALT OKUNUR
                                       </span>
                                     </div>
@@ -881,23 +881,23 @@ export function PlayersManager({ players, teams, seasons = [], leagueTeams = [],
 
                               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-3 text-center">
                                 <div className="bg-black/30 p-2 rounded-lg border border-white/5">
-                                  <div className="text-[9px] font-bold text-zinc-500 uppercase">Maç</div>
+                                  <div className="text-[10px] font-bold text-zinc-500 uppercase">Maç</div>
                                   <div className="text-xs font-black text-white mt-0.5">{live.matches_played}</div>
                                 </div>
                                 <div className="bg-black/30 p-2 rounded-lg border border-white/5">
-                                  <div className="text-[9px] font-bold text-zinc-500 uppercase">Gol</div>
+                                  <div className="text-[10px] font-bold text-zinc-500 uppercase">Gol</div>
                                   <div className="text-xs font-black text-white mt-0.5">{live.goals}</div>
                                 </div>
                                 <div className="bg-black/30 p-2 rounded-lg border border-white/5">
-                                  <div className="text-[9px] font-bold text-zinc-500 uppercase">Asist</div>
+                                  <div className="text-[10px] font-bold text-zinc-500 uppercase">Asist</div>
                                   <div className="text-xs font-black text-white mt-0.5">{live.assists}</div>
                                 </div>
                                 <div className="bg-black/30 p-2 rounded-lg border border-white/5">
-                                  <div className="text-[9px] font-bold text-zinc-500 uppercase">Ort. Rating</div>
+                                  <div className="text-[10px] font-bold text-zinc-500 uppercase">Ort. Rating</div>
                                   <div className="text-xs font-black text-[#00e5ff] mt-0.5">★ {Number(live.rating_avg).toFixed(2)}</div>
                                 </div>
                                 <div className="bg-black/30 p-2 rounded-lg border border-white/5 col-span-2 sm:col-span-1">
-                                  <div className="text-[9px] font-bold text-zinc-500 uppercase">Katkı / Maç</div>
+                                  <div className="text-[10px] font-bold text-zinc-500 uppercase">Katkı / Maç</div>
                                   <div className="text-xs font-black text-emerald-400 mt-0.5">
                                     {live.matches_played > 0 ? ((live.goals + live.assists) / live.matches_played).toFixed(2) : '0.00'}
                                   </div>
@@ -925,15 +925,15 @@ export function PlayersManager({ players, teams, seasons = [], leagueTeams = [],
                                       <div className="flex flex-wrap items-center gap-2">
                                         <span className="text-sm font-black text-white">{stat.team_name}</span>
                                         {isSeason6 ? (
-                                          <span className="text-[9px] font-black px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 tracking-wider">
+                                          <span className="text-[10px] font-black px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 tracking-wider">
                                             GÜNCEL SEZON (MANUEL KAYIT)
                                           </span>
                                         ) : stat.team_id ? (
-                                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
                                             SİSTEM TAKIMI
                                           </span>
                                         ) : (
-                                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-white/5">
+                                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-white/5">
                                             TARİHSEL / ÖZEL
                                           </span>
                                         )}
@@ -967,23 +967,23 @@ export function PlayersManager({ players, teams, seasons = [], leagueTeams = [],
 
                                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-3 text-center">
                                   <div className="bg-black/30 p-2 rounded-lg border border-white/5">
-                                    <div className="text-[9px] font-bold text-zinc-500 uppercase">Maç</div>
+                                    <div className="text-[10px] font-bold text-zinc-500 uppercase">Maç</div>
                                     <div className="text-xs font-black text-white mt-0.5">{stat.matches_played}</div>
                                   </div>
                                   <div className="bg-black/30 p-2 rounded-lg border border-white/5">
-                                    <div className="text-[9px] font-bold text-zinc-500 uppercase">Gol</div>
+                                    <div className="text-[10px] font-bold text-zinc-500 uppercase">Gol</div>
                                     <div className="text-xs font-black text-white mt-0.5">{stat.goals}</div>
                                   </div>
                                   <div className="bg-black/30 p-2 rounded-lg border border-white/5">
-                                    <div className="text-[9px] font-bold text-zinc-500 uppercase">Asist</div>
+                                    <div className="text-[10px] font-bold text-zinc-500 uppercase">Asist</div>
                                     <div className="text-xs font-black text-white mt-0.5">{stat.assists}</div>
                                   </div>
                                   <div className="bg-black/30 p-2 rounded-lg border border-white/5">
-                                    <div className="text-[9px] font-bold text-zinc-500 uppercase">Ort. Rating</div>
+                                    <div className="text-[10px] font-bold text-zinc-500 uppercase">Ort. Rating</div>
                                     <div className="text-xs font-black text-[#00e5ff] mt-0.5">★ {Number(stat.rating_avg).toFixed(2)}</div>
                                   </div>
                                   <div className="bg-black/30 p-2 rounded-lg border border-white/5 col-span-2 sm:col-span-1">
-                                    <div className="text-[9px] font-bold text-zinc-500 uppercase">Katkı / Maç</div>
+                                    <div className="text-[10px] font-bold text-zinc-500 uppercase">Katkı / Maç</div>
                                     <div className="text-xs font-black text-emerald-400 mt-0.5">{contribution}</div>
                                   </div>
                                 </div>

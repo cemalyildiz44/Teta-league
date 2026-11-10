@@ -146,7 +146,7 @@ export function MatchScreenshotUpload({
               {uploading && (
                 <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex flex-col items-center justify-center gap-1">
                   <Loader2 className="w-6 h-6 text-[#00e5ff] animate-spin" />
-                  <span className="text-[9px] font-black text-white uppercase tracking-wider">Yükleniyor</span>
+                  <span className="text-[10px] font-black text-white uppercase tracking-wider">Yükleniyor</span>
                 </div>
               )}
             </div>

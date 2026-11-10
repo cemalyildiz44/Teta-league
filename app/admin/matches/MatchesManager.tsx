@@ -660,7 +660,7 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                           {m.home_score} - {m.away_score}
                         </span>
                         {m.ea_match_id ? (
-                          <span className={`inline-flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.2 rounded border ${
+                          <span className={`inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.2 rounded border ${
                             isScoreEdited
                               ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
                               : 'bg-purple-500/10 text-purple-400 border-purple-500/20'
@@ -669,7 +669,7 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                             {isScoreEdited && ' (Düzeltildi)'}
                           </span>
                         ) : (
-                          <span className='text-[9px] text-zinc-500 font-mono'>
+                          <span className='text-[10px] text-zinc-500 font-mono'>
                             {m.source || 'MANUAL'}
                           </span>
                         )}
@@ -688,7 +688,7 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                     <div className='flex flex-col gap-1'>
                       <StatusBadge status={m.status} />
                       {(m.home_report || m.away_report) && (
-                        <div className='flex items-center gap-1 text-[9px] font-bold'>
+                        <div className='flex items-center gap-1 text-[10px] font-bold'>
                           <span className={m.home_report?.status === 'APPROVED' ? 'text-emerald-400' : m.home_report?.status === 'PENDING_REVIEW' ? 'text-amber-400' : 'text-zinc-500'}>
                             Ev: {m.home_report ? m.home_report.status : 'Yok'}
                           </span>
@@ -828,7 +828,7 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                                     )}
                                   </div>
                                 ) : (
-                                  <span className='inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30 w-fit'>
+                                  <span className='inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30 w-fit'>
                                     <AlertTriangle className='w-2.5 h-2.5' /> PROFİL EŞLEŞMEDİ
                                   </span>
                                 )}
@@ -837,22 +837,22 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                                 </span>
                                 <div className='pt-0.5'>
                                   {rosterStatus === 'VALID' && (
-                                    <span className='inline-flex items-center gap-1 text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20'>
+                                    <span className='inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20'>
                                       <Check className='w-2.5 h-2.5' /> Lisanslı
                                     </span>
                                   )}
                                   {rosterStatus === 'ROSTER_MISMATCH' && (
-                                    <span className='inline-flex items-center gap-1 text-[9px] font-black text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20'>
+                                    <span className='inline-flex items-center gap-1 text-[10px] font-black text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20'>
                                       <ShieldAlert className='w-2.5 h-2.5' /> Kadro Uyuşmazlığı ({registeredName || 'Başka Takım'})
                                     </span>
                                   )}
                                   {rosterStatus === 'UNLICENSED' && (
-                                    <span className='inline-flex items-center gap-1 text-[9px] font-black text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20'>
+                                    <span className='inline-flex items-center gap-1 text-[10px] font-black text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20'>
                                       <AlertCircle className='w-2.5 h-2.5' /> Lisanssız
                                     </span>
                                   )}
                                   {(!s.player_id || rosterStatus === 'UNMATCHED') && (
-                                    <span className='inline-flex items-center gap-1 text-[9px] font-bold text-amber-300/80 bg-white/5 px-1.5 py-0.5 rounded border border-white/10'>
+                                    <span className='inline-flex items-center gap-1 text-[10px] font-bold text-amber-300/80 bg-white/5 px-1.5 py-0.5 rounded border border-white/10'>
                                       <UserX className='w-2.5 h-2.5' /> Profil Yok
                                     </span>
                                   )}
@@ -1078,7 +1078,7 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                         <div className='flex flex-col items-center gap-1 px-4 sm:px-6 py-2 bg-[#0a1628] border border-cyan-500/40 rounded-xl shadow-xl'>
                           <div className='flex items-center gap-2.5'>
                             <div className='flex flex-col items-center'>
-                              <span className='text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5'>Ev Sahibi</span>
+                              <span className='text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5'>Ev Sahibi</span>
                               <input
                                 type='number'
                                 min='0'
@@ -1092,7 +1092,7 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                             </div>
                             <span className='text-zinc-600 font-sans text-2xl sm:text-4xl font-black mt-3'>-</span>
                             <div className='flex flex-col items-center'>
-                              <span className='text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5'>Deplasman</span>
+                              <span className='text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5'>Deplasman</span>
                               <input
                                 type='number'
                                 min='0'
@@ -1105,7 +1105,7 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                               />
                             </div>
                           </div>
-                          <span className='text-[9px] text-cyan-300 font-medium'>
+                          <span className='text-[10px] text-cyan-300 font-medium'>
                             Skorları düzenliyorsunuz
                           </span>
                         </div>
@@ -1127,7 +1127,7 @@ export function MatchesManager({ initialMatches, seasons, leagues }: any) {
                             </span>
                             <Edit2 className='w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400/80 group-hover:text-cyan-300 transition-colors ml-1' />
                           </div>
-                          <span className='text-[9px] sm:text-[10px] text-zinc-400 group-hover:text-cyan-300 transition-colors font-medium'>
+                          <span className='text-[10px] sm:text-[10px] text-zinc-400 group-hover:text-cyan-300 transition-colors font-medium'>
                             Skor &amp; istatistikleri düzenlemek için tıklayın
                           </span>
                         </button>

@@ -331,12 +331,12 @@ function PlayerProfileCombobox({
                           </span>
                         )}
                         {isCandidate && (
-                          <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
                             Benzer Aday
                           </span>
                         )}
                         {isInactive && (
-                          <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-red-500/20 text-red-300">
+                          <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-red-500/20 text-red-300">
                             {prof.status}
                           </span>
                         )}

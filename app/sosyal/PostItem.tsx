@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toggleLikeAction, deletePostAction, createCommentAction, deleteCommentAction } from './actions';
 import { avatarSrc } from '@/lib/avatar';
+import { useConfirm, useToast } from '@/components/feedback/FeedbackProvider';
 
 function timeAgo(dateString: string) {
   const diff = Date.now() - new Date(dateString).getTime();
@@ -23,6 +24,8 @@ interface PostItemProps {
 }
 
 export function PostItem({ post, currentUser, onDeletePost }: PostItemProps) {
+  const confirm = useConfirm();
+  const toast = useToast();
   const router = useRouter();
 
   // Likes state
@@ -129,20 +132,20 @@ export function PostItem({ post, currentUser, onDeletePost }: PostItemProps) {
   // Handle Delete Comment without Page Reload
   const handleDeleteComment = async (commentId: string) => {
     if (deletingCommentId) return;
-    if (!confirm('Yorumu silmek istediğinize emin misiniz?')) return;
+    if (!(await confirm({ message: 'Yorumu silmek istediğinize emin misiniz?', confirmLabel: 'Sil', danger: true }))) return;
     setDeletingCommentId(commentId);
 
     try {
       const res = await deleteCommentAction(commentId);
       if (res?.error) {
-        alert('Yorum silinemedi: ' + res.error);
+        toast.error('Yorum silinemedi: ' + res.error);
       } else {
         setComments((prev) => prev.filter((c) => c.id !== commentId));
         setCommentCount((prev) => Math.max(0, prev - 1));
         router.refresh();
       }
     } catch {
-      alert('Yorum silinirken hata oluştu.');
+      toast.error('Yorum silinirken hata oluştu.');
     } finally {
       setDeletingCommentId(null);
     }
@@ -150,7 +153,7 @@ export function PostItem({ post, currentUser, onDeletePost }: PostItemProps) {
 
   // Handle Delete Post
   const handleDelete = async () => {
-    if (!confirm('Bu gönderiyi kalıcı olarak silmek istediğinize emin misiniz?')) return;
+    if (!(await confirm({ message: 'Bu gönderiyi kalıcı olarak silmek istediğinize emin misiniz?', confirmLabel: 'Sil', danger: true }))) return;
     setIsDeleting(true);
     setDeleteError('');
     const res = await deletePostAction(post.id);
@@ -189,7 +192,7 @@ export function PostItem({ post, currentUser, onDeletePost }: PostItemProps) {
                 {post.author?.username}
               </h3>
               {post.author?.primary_position && (
-                <span className="px-1.5 py-0.5 rounded bg-[#00e5ff]/10 border border-[#00e5ff]/20 text-[9px] font-[900] tracking-widest text-[#00e5ff] uppercase shrink-0">
+                <span className="px-1.5 py-0.5 rounded bg-[#00e5ff]/10 border border-[#00e5ff]/20 text-[10px] font-[900] tracking-widest text-[#00e5ff] uppercase shrink-0">
                   {post.author.primary_position}
                 </span>
               )}
@@ -233,6 +236,8 @@ export function PostItem({ post, currentUser, onDeletePost }: PostItemProps) {
             disabled={!currentUser || isLiking}
             className={`flex items-center gap-2 text-[12px] font-bold tracking-widest transition-colors group ${hasLiked ? 'text-pink-500' : 'text-gray-500 hover:text-pink-400'} disabled:opacity-75`}
             title={!currentUser ? 'Beğenmek için giriş yapın' : (hasLiked ? 'Beğeniyi geri al' : 'Beğen')}
+            aria-label={!currentUser ? 'Beğenmek için giriş yapın' : (hasLiked ? 'Beğeniyi geri al' : 'Beğen')}
+            aria-pressed={hasLiked}
           >
             <div className={`p-2 rounded-lg transition-colors ${hasLiked ? 'bg-pink-500/10' : 'group-hover:bg-pink-500/10'}`}>
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill={hasLiked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path></svg>
@@ -242,6 +247,8 @@ export function PostItem({ post, currentUser, onDeletePost }: PostItemProps) {
 
           <button 
             onClick={() => setShowComments(!showComments)}
+            aria-label={showComments ? 'Yorumları gizle' : 'Yorumları göster'}
+            aria-expanded={showComments}
             className={`flex items-center gap-2 text-[12px] font-bold tracking-widest transition-colors group ${showComments ? 'text-[#00e5ff]' : 'text-gray-500 hover:text-[#00e5ff]'}`}
           >
             <div className={`p-2 rounded-lg transition-colors ${showComments ? 'bg-[#00e5ff]/10' : 'group-hover:bg-[#00e5ff]/10'}`}>
@@ -251,13 +258,14 @@ export function PostItem({ post, currentUser, onDeletePost }: PostItemProps) {
           </button>
 
           <button 
+            aria-label="Gönderiyi paylaş"
             className="flex items-center gap-2 text-[12px] font-bold tracking-widest transition-colors group text-gray-500 hover:text-emerald-400"
             onClick={() => {
               if (navigator.share) {
                 navigator.share({ title: `${post.author?.username} Gönderisi`, url: `${window.location.origin}/sosyal#post-${post.id}` });
               } else {
                 navigator.clipboard.writeText(`${window.location.origin}/sosyal#post-${post.id}`);
-                alert('Gönderi bağlantısı kopyalandı.');
+                toast.success('Gönderi bağlantısı kopyalandı.');
               }
             }}
           >
@@ -329,7 +337,7 @@ export function PostItem({ post, currentUser, onDeletePost }: PostItemProps) {
                       <Link href={`/oyuncular/${comment.author?.username}`} className="font-bold text-white text-[12px] hover:text-[#00e5ff] transition-colors truncate">
                         {comment.author?.username}
                       </Link>
-                      <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest shrink-0">
+                      <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest shrink-0">
                         {timeAgo(comment.created_at)}
                       </span>
                     </div>

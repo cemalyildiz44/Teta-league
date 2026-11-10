@@ -3,13 +3,15 @@
 import { useTransition, useState } from 'react';
 import { respondToTransfer } from './actions';
 import TeamLogo from '@/components/TeamLogo';
+import { useConfirm } from '@/components/feedback/FeedbackProvider';
 
 export function TransferInbox({ transfers }: { transfers: any[] }) {
+  const confirm = useConfirm();
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState('');
 
-  const handleResponse = (transferId: string, accept: boolean) => {
-    if (!confirm(accept ? 'Teklifi kabul etmek istiyor musunuz?' : 'Teklifi reddetmek istiyor musunuz?')) return;
+  const handleResponse = async (transferId: string, accept: boolean) => {
+    if (!(await confirm({ message: accept ? 'Teklifi kabul etmek istiyor musunuz?' : 'Teklifi reddetmek istiyor musunuz?', confirmLabel: 'Kabul Et', danger: true }))) return;
     
     startTransition(async () => {
       const formData = new FormData();

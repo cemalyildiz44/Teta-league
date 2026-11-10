@@ -307,7 +307,7 @@ export default function ProfileDashboardClient({
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
                           <div className="w-6 h-6 rounded bg-black flex items-center justify-center overflow-hidden">
-                            {perf.team.logo ? <Image src={perf.team.logo} alt={perf.team.name} width={24} height={24} /> : <span className="text-[8px] font-bold text-gray-500">{perf.team.name.substring(0,2)}</span>}
+                            {perf.team.logo ? <Image src={perf.team.logo} alt={perf.team.name} width={24} height={24} /> : <span className="text-[10px] font-bold text-gray-500">{perf.team.name.substring(0,2)}</span>}
                           </div>
                           <span className="text-[13px] font-[700] text-white">{perf.team.name}</span>
                         </div>
@@ -340,7 +340,7 @@ export default function ProfileDashboardClient({
                 {transferHistory.map((th, idx) => (
                   <div key={idx} className="relative flex items-center gap-4 group">
                     <div className="w-8 h-8 rounded-full bg-[#03070c] border border-white/20 flex items-center justify-center shrink-0 z-10 p-1 group-hover:border-[#00e5ff]/50 transition-colors">
-                      {th.logo ? <Image src={th.logo} alt={th.teamName} width={24} height={24} className="object-contain" /> : <span className="text-[9px] font-bold text-gray-500">{th.teamName.substring(0,2)}</span>}
+                      {th.logo ? <Image src={th.logo} alt={th.teamName} width={24} height={24} className="object-contain" /> : <span className="text-[10px] font-bold text-gray-500">{th.teamName.substring(0,2)}</span>}
                     </div>
                     <div className="flex flex-col min-w-0 bg-white/[0.02] border border-white/5 rounded-xl p-3 flex-1">
                       <span className="text-[13px] font-[800] text-white truncate min-w-0 group-hover:text-[#00e5ff] transition-colors">{th.teamName}</span>

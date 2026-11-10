@@ -826,12 +826,12 @@ export default function TournamentGroupsAdminModal({
                             </span>
                           )}
                           {isPendingReview && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse">
                               İncelemede
                             </span>
                           )}
                           {isRejected && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-red-500/20 text-red-400 border border-red-500/30">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase bg-red-500/20 text-red-400 border border-red-500/30">
                               Reddedildi
                             </span>
                           )}
@@ -1129,7 +1129,7 @@ export default function TournamentGroupsAdminModal({
                                 <span className="text-xs font-black text-white uppercase truncate block">
                                   {t.team_name}
                                 </span>
-                                <span className="text-[9px] text-zinc-400 block">
+                                <span className="text-[10px] text-zinc-400 block">
                                   {t.group_name} {t.rank}.si ({t.points}p)
                                 </span>
                               </div>
@@ -1149,11 +1149,11 @@ export default function TournamentGroupsAdminModal({
                               <div className="flex items-center gap-2 flex-1 min-w-0">
                                 <TeamLogo src={p.home.logo_url} name={p.home.name} size="xs" />
                                 <span className="text-xs font-black text-white uppercase truncate">{p.home.name}</span>
-                                <span className="text-[9px] text-zinc-500">({p.home.group} {p.home.rank}.)</span>
+                                <span className="text-[10px] text-zinc-500">({p.home.group} {p.home.rank}.)</span>
                               </div>
                               <span className="px-2 text-zinc-500 font-bold text-xs">vs</span>
                               <div className="flex items-center gap-2 flex-1 justify-end min-w-0">
-                                <span className="text-[9px] text-zinc-500">({p.away.group} {p.away.rank}.)</span>
+                                <span className="text-[10px] text-zinc-500">({p.away.group} {p.away.rank}.)</span>
                                 <span className="text-xs font-black text-white uppercase truncate text-right">{p.away.name}</span>
                                 <TeamLogo src={p.away.logo_url} name={p.away.name} size="xs" />
                               </div>
@@ -1174,7 +1174,7 @@ export default function TournamentGroupsAdminModal({
                                 <TeamLogo src={b.logo_url} name={b.name} size="xs" />
                                 <div className="min-w-0 flex-1">
                                   <span className="text-xs font-black text-emerald-400 uppercase truncate block">{b.name}</span>
-                                  <span className="text-[9px] text-zinc-400 block">{b.group} {b.rank}.si</span>
+                                  <span className="text-[10px] text-zinc-400 block">{b.group} {b.rank}.si</span>
                                 </div>
                               </div>
                             ))}

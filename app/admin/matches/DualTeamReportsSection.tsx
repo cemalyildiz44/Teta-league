@@ -257,7 +257,7 @@ export function DualTeamReportsSection({
 
           <div className="flex items-center gap-2">
             {report.is_stats_applied && (
-              <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+              <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
                 İstatistikler İşlendi
               </span>
             )}
@@ -284,7 +284,7 @@ export function DualTeamReportsSection({
           {/* Metadata Grid: Match/Week, Captain, Reported Score, Timestamp */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bg-[#0a1628]/70 p-3 rounded-lg border border-white/5 text-xs">
             <div>
-              <span className="text-[9px] font-black text-zinc-500 uppercase block">
+              <span className="text-[10px] font-black text-zinc-500 uppercase block">
                 Maç / Hafta
               </span>
               <span className="font-bold text-white">
@@ -292,7 +292,7 @@ export function DualTeamReportsSection({
               </span>
             </div>
             <div>
-              <span className="text-[9px] font-black text-zinc-500 uppercase block">
+              <span className="text-[10px] font-black text-zinc-500 uppercase block">
                 Raporlayan Kaptan
               </span>
               <span className="font-bold text-cyan-400 truncate block">
@@ -300,7 +300,7 @@ export function DualTeamReportsSection({
               </span>
             </div>
             <div>
-              <span className="text-[9px] font-black text-zinc-500 uppercase block">
+              <span className="text-[10px] font-black text-zinc-500 uppercase block">
                 Bildirilen Skor
               </span>
               <span
@@ -312,7 +312,7 @@ export function DualTeamReportsSection({
               </span>
             </div>
             <div>
-              <span className="text-[9px] font-black text-zinc-500 uppercase block">
+              <span className="text-[10px] font-black text-zinc-500 uppercase block">
                 Gönderim Tarihi
               </span>
               <span className="text-[11px] font-medium text-zinc-300 flex items-center gap-1">
@@ -385,7 +385,7 @@ export function DualTeamReportsSection({
             {players.length > 0 ? (
               <div className="overflow-x-auto rounded-lg border border-white/5 bg-[#081220]">
                 <table className="w-full text-left text-[11px]">
-                  <thead className="bg-[#0a1628] text-[9px] uppercase font-black text-zinc-400 border-b border-white/5">
+                  <thead className="bg-[#0a1628] text-[10px] uppercase font-black text-zinc-400 border-b border-white/5">
                     <tr>
                       <th className="px-2.5 py-2">Oyuncu</th>
                       <th className="px-1.5 py-2 text-center">Mev</th>

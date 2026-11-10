@@ -640,7 +640,7 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
                       {idx + 1}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">
                         Oyuncu Seçimi ({myTeamName})
                       </label>
                       <select
@@ -673,7 +673,7 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
                     <>
                       <div className="sm:col-span-3 flex items-center gap-2">
                         <div className="flex-1">
-                          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">
+                          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">
                             Mevki
                           </label>
                           <select
@@ -692,7 +692,7 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
                         </div>
 
                         <div className="w-24">
-                          <label className="block text-[9px] font-black text-yellow-400 uppercase tracking-widest mb-0.5">
+                          <label className="block text-[10px] font-black text-yellow-400 uppercase tracking-widest mb-0.5">
                             Reyting
                           </label>
                           <input
@@ -744,7 +744,7 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
                 {slot.player_id && (
                 <div className="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-12 gap-2">
                   <div>
-                    <label className="block text-[9px] font-black text-emerald-400 uppercase tracking-wider mb-0.5">
+                    <label className="block text-[10px] font-black text-emerald-400 uppercase tracking-wider mb-0.5">
                       Gol
                     </label>
                     <input
@@ -757,7 +757,7 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
                   </div>
 
                   <div>
-                    <label className="block text-[9px] font-black text-sky-400 uppercase tracking-wider mb-0.5">
+                    <label className="block text-[10px] font-black text-sky-400 uppercase tracking-wider mb-0.5">
                       Asist
                     </label>
                     <input
@@ -770,7 +770,7 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
                   </div>
 
                   <div>
-                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
                       Şut
                     </label>
                     <input
@@ -783,7 +783,7 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
                   </div>
 
                   <div>
-                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
                       İsb. Pas
                     </label>
                     <input
@@ -796,7 +796,7 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
                   </div>
 
                   <div>
-                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
                       Top. Pas
                     </label>
                     <input
@@ -809,7 +809,7 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
                   </div>
 
                   <div>
-                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
                       Bşr. Çalma
                     </label>
                     <input
@@ -822,7 +822,7 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
                   </div>
 
                   <div>
-                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
                       Çalma Gir.
                     </label>
                     <input
@@ -835,7 +835,7 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
                   </div>
 
                   <div>
-                    <label className="block text-[9px] font-bold text-purple-400 uppercase tracking-wider mb-0.5">
+                    <label className="block text-[10px] font-bold text-purple-400 uppercase tracking-wider mb-0.5">
                       Kurtarış
                     </label>
                     <input
@@ -848,7 +848,7 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
                   </div>
 
                   <div>
-                    <label className="block text-[9px] font-bold text-orange-400 uppercase tracking-wider mb-0.5">
+                    <label className="block text-[10px] font-bold text-orange-400 uppercase tracking-wider mb-0.5">
                       Yen. Gol
                     </label>
                     <input
@@ -861,7 +861,7 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
                   </div>
 
                   <div>
-                    <label className="block text-[9px] font-bold text-teal-400 uppercase tracking-wider mb-0.5">
+                    <label className="block text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-0.5">
                       CS (GK)
                     </label>
                     <input
@@ -875,7 +875,7 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
                   </div>
 
                   <div>
-                    <label className="block text-[9px] font-bold text-teal-400 uppercase tracking-wider mb-0.5">
+                    <label className="block text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-0.5">
                       CS (DEF)
                     </label>
                     <input
@@ -889,7 +889,7 @@ export function SubmitMatchForm({ fixture, homeTeam, awayTeam, teamId }: SubmitM
                   </div>
 
                   <div>
-                    <label className="block text-[9px] font-bold text-red-400 uppercase tracking-wider mb-0.5">
+                    <label className="block text-[10px] font-bold text-red-400 uppercase tracking-wider mb-0.5">
                       Kırmızı
                     </label>
                     <input

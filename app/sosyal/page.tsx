@@ -222,15 +222,15 @@ export default async function SocialPage() {
                   <div className="flex w-full divide-x divide-white/5 border-t border-white/5 pt-4">
                     <div className="flex-1 flex flex-col items-center">
                       <span className="text-[16px] font-[900] text-white">{userPostCount}</span>
-                      <span className="text-[9px] text-gray-500 font-[800] tracking-widest uppercase mt-0.5">PAYLAŞIM</span>
+                      <span className="text-[10px] text-gray-500 font-[800] tracking-widest uppercase mt-0.5">PAYLAŞIM</span>
                     </div>
                     <div className="flex-1 flex flex-col items-center">
                       <span className="text-[16px] font-[900] text-white">{userTotalLikes}</span>
-                      <span className="text-[9px] text-gray-500 font-[800] tracking-widest uppercase mt-0.5">BEĞENİ</span>
+                      <span className="text-[10px] text-gray-500 font-[800] tracking-widest uppercase mt-0.5">BEĞENİ</span>
                     </div>
                     <div className="flex-1 flex flex-col items-center opacity-50">
                       <span className="text-[16px] font-[900] text-white">—</span>
-                      <span className="text-[9px] text-gray-500 font-[800] tracking-widest uppercase mt-0.5">TAKİPÇİ</span>
+                      <span className="text-[10px] text-gray-500 font-[800] tracking-widest uppercase mt-0.5">TAKİPÇİ</span>
                     </div>
                   </div>
                 </div>
@@ -306,8 +306,8 @@ export default async function SocialPage() {
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
                       <span className="text-[13px] font-[800] text-white truncate group-hover:text-[#00e5ff] transition-colors">{ap.username}</span>
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        {ap.primary_position && <span className="text-[9px] text-[#00e5ff] font-[900] uppercase tracking-widest">{ap.primary_position}</span>}
-                        {ap.platform && <span className="text-[9px] text-gray-500 font-[800] uppercase tracking-widest before:content-['·'] before:mr-1.5 before:text-gray-700">{ap.platform}</span>}
+                        {ap.primary_position && <span className="text-[10px] text-[#00e5ff] font-[900] uppercase tracking-widest">{ap.primary_position}</span>}
+                        {ap.platform && <span className="text-[10px] text-gray-500 font-[800] uppercase tracking-widest before:content-['·'] before:mr-1.5 before:text-gray-700">{ap.platform}</span>}
                       </div>
                     </div>
                   </Link>
@@ -336,8 +336,8 @@ export default async function SocialPage() {
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
                       <span className="text-[13px] font-[800] text-white truncate group-hover:text-[#00e5ff] transition-colors">{ap.username}</span>
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        {ap.primary_position && <span className="text-[9px] text-white font-[900] uppercase tracking-widest">{ap.primary_position}</span>}
-                        {ap.platform && <span className="text-[9px] text-gray-500 font-[800] uppercase tracking-widest before:content-['·'] before:mr-1.5 before:text-gray-700">{ap.platform}</span>}
+                        {ap.primary_position && <span className="text-[10px] text-white font-[900] uppercase tracking-widest">{ap.primary_position}</span>}
+                        {ap.platform && <span className="text-[10px] text-gray-500 font-[800] uppercase tracking-widest before:content-['·'] before:mr-1.5 before:text-gray-700">{ap.platform}</span>}
                       </div>
                     </div>
                   </Link>

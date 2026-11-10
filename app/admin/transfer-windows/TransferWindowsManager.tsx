@@ -277,11 +277,11 @@ export function TransferWindowsManager({ initialWindows, seasons }: Props) {
                             <span className="font-extrabold">{w.name}</span>
                             <div className="mt-0.5">
                               {w.is_unlimited ? (
-                                <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-black tracking-wider bg-purple-500/10 text-purple-400 border border-purple-500/30">
+                                <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-black tracking-wider bg-purple-500/10 text-purple-400 border border-purple-500/30">
                                   SINIRSIZ TRANSFER
                                 </span>
                               ) : (
-                                <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider bg-zinc-800 text-zinc-400 border border-zinc-700">
+                                <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider bg-zinc-800 text-zinc-400 border border-zinc-700">
                                   STANDART (5 KOTA)
                                 </span>
                               )}

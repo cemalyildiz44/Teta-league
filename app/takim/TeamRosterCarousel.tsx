@@ -106,7 +106,7 @@ export default function TeamRosterCarousel({ players }: { players: RosterPlayer[
                     </span>
                   )}
                   {p.role === 'CAPTAIN' && (
-                    <span className="px-2 py-1 rounded bg-amber-500/90 text-black font-[900] text-[8px] tracking-widest flex items-center justify-center uppercase shadow-lg">
+                    <span className="px-2 py-1 rounded bg-amber-500/90 text-black font-[900] text-[10px] tracking-widest flex items-center justify-center uppercase shadow-lg">
                       KAPTAN
                     </span>
                   )}
@@ -133,19 +133,19 @@ export default function TeamRosterCarousel({ players }: { players: RosterPlayer[
                 <div className="mt-auto pt-4 border-t border-white/5">
                   <div className="grid grid-cols-4 gap-1 text-center">
                     <div className="flex flex-col">
-                      <span className="text-[9px] text-gray-600 font-[900] tracking-widest uppercase mb-1">MAÇ</span>
+                      <span className="text-[10px] text-gray-600 font-[900] tracking-widest uppercase mb-1">MAÇ</span>
                       <span className="text-[13px] text-white font-[800]">{p.stats.matches}</span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[9px] text-gray-600 font-[900] tracking-widest uppercase mb-1">GOL</span>
+                      <span className="text-[10px] text-gray-600 font-[900] tracking-widest uppercase mb-1">GOL</span>
                       <span className="text-[13px] text-white font-[800]">{p.stats.goals}</span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[9px] text-gray-600 font-[900] tracking-widest uppercase mb-1">ASİST</span>
+                      <span className="text-[10px] text-gray-600 font-[900] tracking-widest uppercase mb-1">ASİST</span>
                       <span className="text-[13px] text-white font-[800]">{p.stats.assists}</span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[9px] text-[#00e5ff] font-[900] tracking-widest uppercase mb-1">RTG</span>
+                      <span className="text-[10px] text-[#00e5ff] font-[900] tracking-widest uppercase mb-1">RTG</span>
                       <span className="text-[13px] text-[#00e5ff] font-[800]">{p.stats.avgRating}</span>
                     </div>
                   </div>

@@ -5,6 +5,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { cancelInviteAction } from './actions';
 import { avatarSrc } from '@/lib/avatar';
+import { useConfirm } from '@/components/feedback/FeedbackProvider';
 
 export interface TransferProfile {
   id?: string;
@@ -36,6 +37,7 @@ interface TeamTransfersSectionProps {
 }
 
 export function TeamTransfersSection({ transfers, isWindowOpen = true }: TeamTransfersSectionProps) {
+  const confirm = useConfirm();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'pending' | 'history' | 'all'>('all');
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -98,12 +100,12 @@ export function TeamTransfersSection({ transfers, isWindowOpen = true }: TeamTra
     }
   };
 
-  const handleCancelInvite = (transferId: string, playerName?: string) => {
+  const handleCancelInvite = async (transferId: string, playerName?: string) => {
     const confirmText = playerName
       ? `"${playerName}" adlı oyuncuya gönderilen transfer teklifini geri çekmek istediğinizden emin misiniz?\n\nBu işlem teklifi iptal edecek ve takımınızın transfer slotunu anında iade edecektir.`
       : 'Bu transfer teklifini geri çekmek istediğinizden emin misiniz? Transfer slotunuz iade edilecektir.';
 
-    if (!confirm(confirmText)) return;
+    if (!(await confirm({ message: confirmText, confirmLabel: 'Geri Çek', danger: true }))) return;
 
     setCancellingId(transferId);
     setSuccessMessage(null);
@@ -342,7 +344,7 @@ export function TeamTransfersSection({ transfers, isWindowOpen = true }: TeamTra
                             <div className="font-bold text-white text-sm flex items-center gap-2">
                               <span>{profile?.username || 'Bilinmeyen Oyuncu'}</span>
                               {profile?.primary_position && (
-                                <span className="px-1.5 py-0.5 bg-white/5 border border-white/10 text-gray-300 rounded text-[9px] font-bold">
+                                <span className="px-1.5 py-0.5 bg-white/5 border border-white/10 text-gray-300 rounded text-[10px] font-bold">
                                   {profile.primary_position}
                                 </span>
                               )}

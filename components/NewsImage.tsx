@@ -29,7 +29,7 @@ export default function NewsImage({
         <Newspaper className="w-10 h-10 text-[#00e5ff]/30" />
         {category && (
           <div className="absolute top-3 left-3 z-20 pointer-events-none">
-            <span className="badge-cyan bg-[#00E5FF]/20 text-[#00E5FF] border-[#00E5FF]/30 backdrop-blur-md font-black tracking-widest text-[9px] sm:text-[10px] px-2.5 py-1 uppercase shadow-[0_0_10px_rgba(0,229,255,0.2)]">
+            <span className="badge-cyan bg-[#00E5FF]/20 text-[#00E5FF] border-[#00E5FF]/30 backdrop-blur-md font-black tracking-widest text-[10px] sm:text-[10px] px-2.5 py-1 uppercase shadow-[0_0_10px_rgba(0,229,255,0.2)]">
               {category}
             </span>
           </div>
@@ -90,7 +90,7 @@ export default function NewsImage({
       {/* Category badge */}
       {category && (
         <div className="absolute top-3 left-3 z-20 pointer-events-none">
-          <span className="badge-cyan bg-[#00E5FF]/20 text-[#00E5FF] border-[#00E5FF]/30 backdrop-blur-md font-black tracking-widest text-[9px] sm:text-[10px] px-2.5 py-1 uppercase shadow-[0_0_10px_rgba(0,229,255,0.2)]">
+          <span className="badge-cyan bg-[#00E5FF]/20 text-[#00E5FF] border-[#00E5FF]/30 backdrop-blur-md font-black tracking-widest text-[10px] sm:text-[10px] px-2.5 py-1 uppercase shadow-[0_0_10px_rgba(0,229,255,0.2)]">
             {category}
           </span>
         </div>

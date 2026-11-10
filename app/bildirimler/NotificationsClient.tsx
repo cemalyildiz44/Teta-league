@@ -3,8 +3,11 @@
 import { useState } from 'react';
 import { markNotificationReadAction } from '@/app/profil/team-actions';
 import { acceptTeamInviteAction, rejectTeamInviteAction } from '@/app/profil/team-actions';
+import { useConfirm, useToast } from '@/components/feedback/FeedbackProvider';
 
 export default function NotificationsClient({ notifications }: { notifications: any[] }) {
+  const confirm = useConfirm();
+  const toast = useToast();
   const [localNotifs, setLocalNotifs] = useState(notifications);
   const [resolving, setResolving] = useState<string | null>(null);
 
@@ -16,12 +19,12 @@ export default function NotificationsClient({ notifications }: { notifications: 
 
   const handleAccept = async (e: React.MouseEvent, transferId: string, notifId: string) => {
     e.stopPropagation();
-    if (!confirm('Bu daveti kabul etmek ve takıma katılmak istiyor musun?')) return;
+    if (!(await confirm({ message: 'Bu daveti kabul etmek ve takıma katılmak istiyor musun?', confirmLabel: 'Kabul Et' }))) return;
     setResolving(transferId);
     const res = await acceptTeamInviteAction(transferId);
-    if (res?.error) alert(res.error);
+    if (res?.error) toast.error(res.error);
     else if (res?.success) {
-      alert(res.success);
+      toast.success(res.success);
       setLocalNotifs(prev => prev.map(n => n.id === notifId ? { ...n, is_read: true, transfer: { ...n.transfer, status: 'APPROVED' } } : n));
     }
     setResolving(null);
@@ -29,12 +32,12 @@ export default function NotificationsClient({ notifications }: { notifications: 
 
   const handleReject = async (e: React.MouseEvent, transferId: string, notifId: string) => {
     e.stopPropagation();
-    if (!confirm('Bu daveti reddetmek istediğine emin misin?')) return;
+    if (!(await confirm({ message: 'Bu daveti reddetmek istediğine emin misin?', confirmLabel: 'Reddet', danger: true }))) return;
     setResolving(transferId);
     const res = await rejectTeamInviteAction(transferId);
-    if (res?.error) alert(res.error);
+    if (res?.error) toast.error(res.error);
     else if (res?.success) {
-      alert(res.success);
+      toast.success(res.success);
       setLocalNotifs(prev => prev.map(n => n.id === notifId ? { ...n, is_read: true, transfer: { ...n.transfer, status: 'REJECTED' } } : n));
     }
     setResolving(null);

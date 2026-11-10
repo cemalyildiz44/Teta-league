@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import CookieBanner from "@/components/CookieBanner";
 import NavigationProgress from "@/components/NavigationProgress";
+import { FeedbackProvider } from "@/components/feedback/FeedbackProvider";
 import { Suspense } from "react";
 
 import { getCanonicalSiteUrl } from "@/lib/site-url";
@@ -54,10 +55,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Suspense fallback={null}>
           <NavigationProgress />
         </Suspense>
-        <Header />
-        <main className="flex-1">{children}</main>
-        <Footer />
-        <CookieBanner />
+        {/* Keyboard / screen-reader shortcut past the header; visible only while focused */}
+        <a
+          href="#icerik"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[130] focus:px-4 focus:py-2 focus:rounded-lg focus:bg-[#00e5ff] focus:text-[#050a0f] focus:text-xs focus:font-black focus:uppercase focus:tracking-wider"
+        >
+          Ana içeriğe geç
+        </a>
+        <FeedbackProvider>
+          <Header />
+          <main id="icerik" tabIndex={-1} className="flex-1 focus:outline-none">{children}</main>
+          <Footer />
+          <CookieBanner />
+        </FeedbackProvider>
       </body>
     </html>
   );

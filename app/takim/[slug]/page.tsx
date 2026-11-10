@@ -190,7 +190,7 @@ export default async function TeamPage({ params }: Props) {
                             {cap.avatar_url ? (
                               <img loading="lazy" decoding="async" src={avatarSrc(cap.avatar_url)} alt={cap.username} className="w-full h-full object-cover" />
                             ) : (
-                              <span className="text-[9px] font-[900] text-amber-400">
+                              <span className="text-[10px] font-[900] text-amber-400">
                                 {cap.username.substring(0, 2).toUpperCase()}
                               </span>
                             )}
@@ -281,7 +281,7 @@ export default async function TeamPage({ params }: Props) {
             { label: "AVERAJ", value: stats.goal_difference }
           ].map((stat, i) => (
             <div key={i} className={`client-glass rounded-xl border p-4 text-center flex flex-col justify-center hover:-translate-y-0.5 transition-all duration-200 ${stat.highlight ? 'border-[#00e5ff]/30 bg-[#00e5ff]/5 shadow-[0_0_15px_rgba(0,229,255,0.08)]' : 'border-white/5 bg-[#03070c] hover:border-white/10'}`}>
-              <span className={`text-[9px] font-[900] tracking-[0.2em] uppercase mb-2 ${stat.highlight ? 'text-[#00e5ff]' : 'text-gray-500'}`}>{stat.label}</span>
+              <span className={`text-[10px] font-[900] tracking-[0.2em] uppercase mb-2 ${stat.highlight ? 'text-[#00e5ff]' : 'text-gray-500'}`}>{stat.label}</span>
               <span className={`text-xl lg:text-2xl font-[900] ${stat.highlight ? 'text-[#00e5ff] drop-shadow-[0_0_10px_rgba(0,229,255,0.4)]' : (stat.color || 'text-white')}`}>
                 {stat.value}
               </span>
@@ -359,7 +359,7 @@ export default async function TeamPage({ params }: Props) {
                     {/* Top row: Category Badge & Repeat Count */}
                     <div className="w-full flex items-center justify-between mb-3 gap-1.5">
                       {tr?.category ? (
-                        <span className="text-[9px] font-black tracking-widest uppercase px-2 py-0.5 rounded-full bg-white/5 text-gray-400 border border-white/5 group-hover:border-amber-400/30 group-hover:text-amber-300 transition-colors truncate">
+                        <span className="text-[10px] font-black tracking-widest uppercase px-2 py-0.5 rounded-full bg-white/5 text-gray-400 border border-white/5 group-hover:border-amber-400/30 group-hover:text-amber-300 transition-colors truncate">
                           {tr.category}
                         </span>
                       ) : (
@@ -459,8 +459,8 @@ export default async function TeamPage({ params }: Props) {
                           {timeStr}
                         </span>
                       </div>
-                      <div className="flex-1 flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 truncate">
+                      <div className="flex-1 min-w-0 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0 truncate">
                           <TeamLogo src={opponent?.logo_url} name={opponent?.name} size="sm" className="group-hover:scale-[1.04] transition-transform duration-200" />
                           <Link href={opponent?.slug ? `/takim/${opponent.slug}` : "#"} className="text-[14px] font-[800] text-gray-300 hover:text-[#00e5ff] truncate transition-colors">
                             {opponent?.name || 'Rakip Takım'}
@@ -511,12 +511,12 @@ export default async function TeamPage({ params }: Props) {
                         <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">
                           {dateStr}
                         </span>
-                        <span className="text-[9px] font-bold text-gray-500 uppercase">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase">
                           {match.isHome ? 'EV' : 'DEP'}
                         </span>
                       </div>
-                      <div className="flex-1 flex items-center justify-between">
-                        <div className="flex items-center gap-3 truncate">
+                      <div className="flex-1 min-w-0 flex items-center justify-between">
+                        <div className="flex items-center gap-3 min-w-0 truncate">
                           <TeamLogo src={opponent?.logo_url} name={opponent?.name} size="sm" className="group-hover:scale-[1.04] transition-transform duration-200" />
                           <span className="text-[14px] font-[800] text-gray-300 truncate group-hover:text-[#00e5ff] transition-colors">
                             {opponent?.name || 'Rakip Takım'}

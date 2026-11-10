@@ -210,7 +210,7 @@ export default function FixtureWeekBrowser({ fixtures, initialWeek }: FixtureWee
                   </div>
                   {badge && (
                     <span
-                      className={`text-[9px] font-black tracking-widest uppercase mt-1 px-2.5 py-0.5 rounded-md ${badge.className}`}
+                      className={`text-[10px] font-black tracking-widest uppercase mt-1 px-2.5 py-0.5 rounded-md ${badge.className}`}
                     >
                       {badge.label}
                     </span>

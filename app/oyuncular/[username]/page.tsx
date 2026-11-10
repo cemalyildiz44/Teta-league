@@ -889,7 +889,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                                           {s.leagueName}
                                         </span>
                                         {s.isLegacy && (
-                                          <span className="px-1.5 py-0.5 rounded text-[9px] font-[900] tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/30 uppercase">
+                                          <span className="px-1.5 py-0.5 rounded text-[10px] font-[900] tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/30 uppercase">
                                             ARŞİV
                                           </span>
                                         )}
@@ -976,8 +976,8 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                             <div className="flex flex-col min-w-0 flex-1 pt-0.5">
                               <div className="flex items-center gap-3 mb-1">
                                 <span className={`text-[16px] font-[900] ${e.isLegacy ? "text-amber-400" : "text-[#00e5ff]/80"}`}>{e.joinedFmt}</span>
-                                {e.isCurrent && <span className="text-[9px] font-[900] tracking-widest text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded uppercase">AKTİF KULÜP</span>}
-                                {e.isLegacy && <span className="text-[9px] font-[900] tracking-widest text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 uppercase">ESKİ DÖNEM</span>}
+                                {e.isCurrent && <span className="text-[10px] font-[900] tracking-widest text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded uppercase">AKTİF KULÜP</span>}
+                                {e.isLegacy && <span className="text-[10px] font-[900] tracking-widest text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 uppercase">ESKİ DÖNEM</span>}
                               </div>
                               <div className="flex items-center justify-between gap-4 bg-white/[0.02] border border-white/5 rounded-xl p-4 mt-2 max-w-lg hover:bg-white/[0.04] transition-colors">
                                 <div className="flex items-center gap-4 min-w-0">
@@ -1080,7 +1080,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                               {/* Top row: Category badge & Repeat Count (1x, 2x, etc.) */}
                               <div className="w-full flex items-center justify-between mb-3 gap-2">
                                 {tr?.category ? (
-                                  <span className="text-[9px] font-black tracking-widest uppercase px-2.5 py-0.5 rounded-full bg-white/5 text-gray-400 border border-white/5 group-hover:border-amber-400/30 group-hover:text-amber-300 transition-colors truncate">
+                                  <span className="text-[10px] font-black tracking-widest uppercase px-2.5 py-0.5 rounded-full bg-white/5 text-gray-400 border border-white/5 group-hover:border-amber-400/30 group-hover:text-amber-300 transition-colors truncate">
                                     {tr.category}
                                   </span>
                                 ) : (

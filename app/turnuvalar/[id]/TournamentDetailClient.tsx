@@ -1005,7 +1005,7 @@ export default function TournamentDetailClient({
 
                         {/* Captain row */}
                         <div className="p-3 rounded-xl bg-black/40 border border-white/5 mb-4">
-                          <span className="text-[9px] font-[900] text-gray-500 uppercase tracking-[0.2em] block mb-1">
+                          <span className="text-[10px] font-[900] text-gray-500 uppercase tracking-[0.2em] block mb-1">
                             TAKIM KAPTANI
                           </span>
                           <Link
@@ -1026,7 +1026,7 @@ export default function TournamentDetailClient({
                         {/* Squad members */}
                         {app.players && app.players.length > 0 && (
                           <div>
-                            <span className="text-[9px] font-[900] text-gray-500 uppercase tracking-[0.2em] block mb-2">
+                            <span className="text-[10px] font-[900] text-gray-500 uppercase tracking-[0.2em] block mb-2">
                               KADRO ({app.players.length} Oyuncu)
                             </span>
                             <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto no-scrollbar">
@@ -1204,7 +1204,7 @@ export default function TournamentDetailClient({
                                         {row.team_name}
                                       </span>
                                       {isAdvancing && (
-                                        <span className="hidden sm:inline px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-400">
+                                        <span className="hidden sm:inline px-1.5 py-0.5 rounded text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-400">
                                           Eleme Potası
                                         </span>
                                       )}
@@ -1801,7 +1801,7 @@ export default function TournamentDetailClient({
                     <span className="text-[#00e5ff] text-[10px] font-[900] uppercase tracking-[0.2em]">
                       KAPTAN KADRO YÖNETİMİ
                     </span>
-                    <span className="px-2 py-0.5 rounded-md bg-cyan-500/15 border border-cyan-500/30 text-[#00e5ff] text-[9px] font-black uppercase">
+                    <span className="px-2 py-0.5 rounded-md bg-cyan-500/15 border border-cyan-500/30 text-[#00e5ff] text-[10px] font-black uppercase">
                       Night Cup
                     </span>
                   </div>
@@ -1895,7 +1895,7 @@ export default function TournamentDetailClient({
                           <span className="text-xs font-black text-white">
                             @{captainEditApp.applicant?.username || 'Kaptan'}
                           </span>
-                          <span className="px-1.5 py-0.5 rounded bg-[#00e5ff]/20 text-[#00e5ff] text-[9px] font-black uppercase">
+                          <span className="px-1.5 py-0.5 rounded bg-[#00e5ff]/20 text-[#00e5ff] text-[10px] font-black uppercase">
                             KAPTAN
                           </span>
                         </div>

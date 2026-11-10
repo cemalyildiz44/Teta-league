@@ -3,6 +3,7 @@
 import { useTransition, useState } from 'react';
 import { kickPlayerAction } from './actions';
 import { avatarSrc } from '@/lib/avatar';
+import { useConfirm } from '@/components/feedback/FeedbackProvider';
 
 export function RosterManagement({ 
   memberships, 
@@ -15,11 +16,12 @@ export function RosterManagement({
   isWindowOpen: boolean,
   captainIds?: string[]
 }) {
+  const confirm = useConfirm();
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState('');
 
-  const handleKick = (playerId: string) => {
-    if (!confirm('Bu oyuncuyu takımdan çıkarmak istediğinize emin misiniz?')) return;
+  const handleKick = async (playerId: string) => {
+    if (!(await confirm({ message: 'Bu oyuncuyu takımdan çıkarmak istediğinize emin misiniz?', confirmLabel: 'Çıkar', danger: true }))) return;
     
     startTransition(async () => {
       const formData = new FormData();
@@ -64,7 +66,7 @@ export function RosterManagement({
                 <div>
                   <div className="font-bold text-white text-sm flex items-center gap-2">
                     {profile.username}
-                    {isCaptain && <span className="px-1.5 py-0.5 bg-yellow-500/20 text-yellow-500 text-[9px] rounded uppercase tracking-wider">Kaptan</span>}
+                    {isCaptain && <span className="px-1.5 py-0.5 bg-yellow-500/20 text-yellow-500 text-[10px] rounded uppercase tracking-wider">Kaptan</span>}
                   </div>
                   <div className="text-[10px] font-medium text-gray-400 flex items-center gap-2">
                     <span>EA ID: {profile.current_ea_player_id || '-'}</span>

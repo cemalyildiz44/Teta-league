@@ -177,7 +177,7 @@ export function SocialModerationManager({ kpis, initialPosts, initialComments, t
                         <div>
                           <div className='flex items-center gap-2'>
                             <span className='text-sm font-black text-white'>@{post.profiles?.username}</span>
-                            {post.is_deleted && <span className='px-2 py-0.5 rounded bg-red-500/20 text-red-400 text-[9px] font-black uppercase tracking-widest'>Silinmiş</span>}
+                            {post.is_deleted && <span className='px-2 py-0.5 rounded bg-red-500/20 text-red-400 text-[10px] font-black uppercase tracking-widest'>Silinmiş</span>}
                           </div>
                           <span className='text-[10px] text-zinc-500 uppercase tracking-widest'>{formatDate(post.created_at)}</span>
                         </div>
@@ -217,7 +217,7 @@ export function SocialModerationManager({ kpis, initialPosts, initialComments, t
                         <div>
                           <div className='flex items-center gap-2'>
                             <span className='text-sm font-black text-white'>@{comment.profiles?.username}</span>
-                            {comment.is_deleted && <span className='px-2 py-0.5 rounded bg-red-500/20 text-red-400 text-[9px] font-black uppercase tracking-widest'>Silinmiş</span>}
+                            {comment.is_deleted && <span className='px-2 py-0.5 rounded bg-red-500/20 text-red-400 text-[10px] font-black uppercase tracking-widest'>Silinmiş</span>}
                           </div>
                           <span className='text-[10px] text-zinc-500 uppercase tracking-widest'>{formatDate(comment.created_at)}</span>
                         </div>

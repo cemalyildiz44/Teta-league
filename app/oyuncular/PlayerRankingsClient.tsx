@@ -410,16 +410,16 @@ export default function PlayerRankingsClient({ rankings }: { rankings: PlayerRan
                                 {player.username}
                               </span>
                               {player.isSuspended && (
-                                <span className="px-1.5 py-0.5 rounded text-[9px] font-[900] tracking-widest bg-amber-500/15 text-amber-400 border border-amber-500/30 uppercase shrink-0">
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-[900] tracking-widest bg-amber-500/15 text-amber-400 border border-amber-500/30 uppercase shrink-0">
                                   ASKIDA
                                 </span>
                               )}
                             </div>
                             <div className="flex flex-wrap items-center gap-2 mt-1">
-                              <span className="data-label !text-[9px] !px-1.5">{formatPosition(player.position)}</span>
+                              <span className="data-label !text-[10px] !px-1.5">{formatPosition(player.position)}</span>
                               {player.alternativePositions && player.alternativePositions.length > 0 && (
                                 <span
-                                  className="text-[9px] font-semibold text-gray-400 bg-white/5 px-1.5 py-0.5 rounded border border-white/10"
+                                  className="text-[10px] font-semibold text-gray-400 bg-white/5 px-1.5 py-0.5 rounded border border-white/10"
                                   title={`Yan Pozisyonlar: ${player.alternativePositions.map(p => getPositionLabel(p)).join(', ')}`}
                                 >
                                   YAN: {player.alternativePositions.join(', ')}

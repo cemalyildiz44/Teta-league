@@ -2,13 +2,15 @@
 
 import { useTransition, useState } from 'react';
 import { leaveTeamAction } from './actions';
+import { useConfirm } from '@/components/feedback/FeedbackProvider';
 
 export function LeaveTeamButton({ seasonId, isWindowOpen }: { seasonId: string, isWindowOpen: boolean }) {
+  const confirm = useConfirm();
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState('');
 
-  const handleLeave = () => {
-    if (!confirm('Takımdan ayrılmak istediğinize emin misiniz? Bu işlem geri alınamaz.')) return;
+  const handleLeave = async () => {
+    if (!(await confirm({ message: 'Takımdan ayrılmak istediğinize emin misiniz? Bu işlem geri alınamaz.', confirmLabel: 'Ayrıl', danger: true }))) return;
     
     startTransition(async () => {
       const formData = new FormData();

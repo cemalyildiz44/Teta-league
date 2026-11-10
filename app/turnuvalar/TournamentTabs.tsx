@@ -406,7 +406,7 @@ export default function TournamentTabs({
                                 {approvedApps.length} / {tour.max_teams || '∞'} Onaylı Takım
                               </span>
                               {tApps.length > approvedApps.length && (
-                                <span className='block text-[9px] text-zinc-500 font-semibold'>({tApps.length} toplam başvuru)</span>
+                                <span className='block text-[10px] text-zinc-500 font-semibold'>({tApps.length} toplam başvuru)</span>
                               )}
                             </div>
                             <span className={`px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest ${isOpen ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>

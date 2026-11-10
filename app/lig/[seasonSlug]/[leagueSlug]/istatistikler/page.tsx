@@ -44,7 +44,7 @@ const PlayerRow = ({ player, idx, val, label }: { player: any, idx: number, val:
     </div>
     <div className="flex flex-col items-end">
       <span className="text-[18px] font-black text-[#00e5ff]">{val}</span>
-      <span className="text-[9px] font-black tracking-widest text-gray-600 uppercase">{label}</span>
+      <span className="text-[10px] font-black tracking-widest text-gray-600 uppercase">{label}</span>
     </div>
   </div>
 );
@@ -66,7 +66,7 @@ const TeamRow = ({ team, idx, val, label }: { team: any, idx: number, val: numbe
     </div>
     <div className="flex flex-col items-end">
       <span className="text-[18px] font-black text-[#00e5ff]">{val}</span>
-      <span className="text-[9px] font-black tracking-widest text-gray-600 uppercase">{label}</span>
+      <span className="text-[10px] font-black tracking-widest text-gray-600 uppercase">{label}</span>
     </div>
   </div>
 );
@@ -87,7 +87,7 @@ const EmptyRow = ({ label }: { label: string }) => (
     </div>
     <div className="flex flex-col items-end">
       <span className="text-[18px] font-black text-gray-700">—</span>
-      <span className="text-[9px] font-black tracking-widest text-gray-700 uppercase">{label}</span>
+      <span className="text-[10px] font-black tracking-widest text-gray-700 uppercase">{label}</span>
     </div>
   </div>
 );

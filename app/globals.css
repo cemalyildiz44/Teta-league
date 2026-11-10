@@ -14,6 +14,26 @@
   --color-accent-danger: #ff3b30;
 }
 
+/* Muted text colours, lightened so small labels reach WCAG AA (4.5:1) on the dark card backgrounds.
+   Tailwind's defaults were 4.2:1 (gray-500), 2.7:1 (gray-600) and 2.0:1 (gray-700). The order
+   500 > 600 > 700 is kept so the visual hierarchy between them is preserved. */
+@theme {
+  --color-gray-500: #8892a3;
+  --color-gray-600: #7b8494;
+  --color-gray-700: #737d8e;
+  --color-zinc-500: #8c8c96;
+  --color-zinc-600: #7e7e88;
+  --color-zinc-700: #787885;
+}
+
+/* Phones: 10px labels are too small to read comfortably, so they render at 11px (8/9px labels were raised
+   to 10px in the markup and become 11px here too). Unlayered on purpose; only affects the exact size class. */
+@media (max-width: 639px) {
+  .text-\[10px\] {
+    font-size: 11px;
+  }
+}
+
 :root {
   --bg-color: #050a0f; 
   --text-main: #ffffff;

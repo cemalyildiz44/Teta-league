@@ -558,7 +558,7 @@ export default function TotwManager({
                 <h1 className="text-lg sm:text-xl font-black text-white tracking-tight">
                   TOTW (Haftanın Takımı)
                 </h1>
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-black tracking-widest uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black tracking-widest uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                   İÇERİK YÖNETİMİ
                 </span>
               </div>
@@ -965,18 +965,18 @@ export default function TotwManager({
                       {/* Top Row: Position Badge + Rating Badge */}
                       <div className="flex items-center justify-between gap-1 mb-1">
                         <span
-                          className={`px-1 sm:px-1.5 py-0.5 rounded text-[8px] sm:text-[9px] font-black tracking-wider border ${
+                          className={`px-1 sm:px-1.5 py-0.5 rounded text-[10px] sm:text-[10px] font-black tracking-wider border ${
                             ROLE_BADGE_STYLES[slot.roleGroup]
                           }`}
                         >
                           {slot.positionLabel}
                         </span>
                         {player ? (
-                          <span className="px-1 sm:px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] sm:text-[10px] font-black">
+                          <span className="px-1 sm:px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] sm:text-[10px] font-black">
                             {ratingLabel}
                           </span>
                         ) : (
-                          <span className="text-[8px] sm:text-[9px] font-bold text-amber-300/80">
+                          <span className="text-[10px] sm:text-[10px] font-bold text-amber-300/80">
                             Boş
                           </span>
                         )}
@@ -1017,7 +1017,7 @@ export default function TotwManager({
 
                           {/* Team Name */}
                           <div
-                            className="text-[8px] sm:text-[10px] font-semibold text-gray-400 text-center truncate leading-tight mt-0.5"
+                            className="text-[10px] sm:text-[10px] font-semibold text-gray-400 text-center truncate leading-tight mt-0.5"
                             title={player.teamName || 'Takımsız'}
                           >
                             {player.teamName || '—'}
@@ -1028,10 +1028,10 @@ export default function TotwManager({
                           <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-amber-500/15 border border-amber-500/35 flex items-center justify-center mx-auto mb-1 text-amber-300 text-[10px] sm:text-xs font-black">
                             +
                           </div>
-                          <div className="text-[9px] sm:text-[10px] font-bold text-amber-300 truncate">
+                          <div className="text-[10px] sm:text-[10px] font-bold text-amber-300 truncate">
                             Boş Pozisyon
                           </div>
-                          <div className="text-[8px] sm:text-[9px] text-gray-400 truncate">
+                          <div className="text-[10px] sm:text-[10px] text-gray-400 truncate">
                             {ROLE_GROUP_LABELS[slot.roleGroup]}
                           </div>
                         </div>
@@ -1043,7 +1043,7 @@ export default function TotwManager({
                       <button
                         type="button"
                         onClick={() => handleOpenReplaceModal(slot.slotKey)}
-                        className="mt-1 px-2 sm:px-2.5 py-0.5 rounded-full bg-[#0a1628]/95 hover:bg-[#00e5ff] text-gray-200 hover:text-[#060d18] border border-white/20 hover:border-[#00e5ff] text-[9px] sm:text-[10px] font-black tracking-wide transition-colors shadow"
+                        className="mt-1 px-2 sm:px-2.5 py-0.5 rounded-full bg-[#0a1628]/95 hover:bg-[#00e5ff] text-gray-200 hover:text-[#060d18] border border-white/20 hover:border-[#00e5ff] text-[10px] sm:text-[10px] font-black tracking-wide transition-colors shadow"
                       >
                         Değiştir
                       </button>
@@ -1216,7 +1216,7 @@ export default function TotwManager({
                                 {player.username}
                               </span>
                               {isManualOverride && !isLocked && (
-                                <span className="text-[9px] px-1 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold">
+                                <span className="text-[10px] px-1 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold">
                                   Manuel
                                 </span>
                               )}
@@ -1371,7 +1371,7 @@ export default function TotwManager({
                             </span>
                             {cand.roleGroup && (
                               <span
-                                className={`px-1.5 py-0.5 rounded text-[9px] font-black border ${
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-black border ${
                                   ROLE_BADGE_STYLES[cand.roleGroup]
                                 }`}
                               >
@@ -1499,7 +1499,7 @@ export default function TotwManager({
                       className="flex items-center gap-2 p-1.5 rounded-lg bg-white/5"
                     >
                       <span
-                        className={`px-1.5 py-0.5 rounded text-[9px] font-black border ${
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-black border ${
                           ROLE_BADGE_STYLES[slot.roleGroup]
                         }`}
                       >

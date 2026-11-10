@@ -896,7 +896,7 @@ export default function AchievementsClient({
                             <div>
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-black text-white">{label}</span>
-                                <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-white/5 border border-white/10 text-zinc-400">
+                                <span className="px-1.5 py-0.2 rounded text-[10px] font-black uppercase bg-white/5 border border-white/10 text-zinc-400">
                                   {winner.winner_type}
                                 </span>
                               </div>

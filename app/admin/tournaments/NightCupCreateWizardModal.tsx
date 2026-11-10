@@ -331,7 +331,7 @@ export default function NightCupCreateWizardModal({
                   <span className="text-[10px] font-black uppercase tracking-widest text-[#00e5ff]">
                     TURNUVA YÖNETİMİ
                   </span>
-                  <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
                     Sihirbaz Modu
                   </span>
                 </div>
@@ -387,7 +387,7 @@ export default function NightCupCreateWizardModal({
                     <span className="block text-[11px] font-black tracking-tight truncate leading-tight">
                       {step.title}
                     </span>
-                    <span className="block text-[9px] uppercase tracking-wider text-zinc-400">
+                    <span className="block text-[10px] uppercase tracking-wider text-zinc-400">
                       Adım {step.id}
                     </span>
                   </div>

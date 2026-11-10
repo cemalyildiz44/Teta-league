@@ -56,7 +56,7 @@ export default function LiveStream() {
 
         {/* Bottom Corner Badge */}
         <div className="absolute bottom-4 left-4 z-20">
-          <span className="px-2.5 py-1.5 bg-[#01060b]/80 backdrop-blur-md rounded border border-white/5 text-[9px] md:text-[10px] font-bold text-gray-400 tracking-widest uppercase flex items-center gap-2 transition-colors group-hover:text-gray-200 group-hover:border-white/15">
+          <span className="px-2.5 py-1.5 bg-[#01060b]/80 backdrop-blur-md rounded border border-white/5 text-[10px] md:text-[10px] font-bold text-gray-400 tracking-widest uppercase flex items-center gap-2 transition-colors group-hover:text-gray-200 group-hover:border-white/15">
             <span className="w-1.5 h-1.5 rounded-full bg-[#53FC18] shadow-[0_0_8px_rgba(83,252,24,0.5)]"></span>
             KICK.COM/TETALEAGUE
           </span>

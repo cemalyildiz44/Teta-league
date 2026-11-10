@@ -221,7 +221,7 @@ export default async function LeagueStandingsPage({
                           {team?.name || 'Bilinmeyen Takım'}
                         </span>
                         {isExpelled && (
-                          <span className="px-1.5 py-0.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded text-[9px] font-bold uppercase tracking-wider shrink-0">
+                          <span className="px-1.5 py-0.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded text-[10px] font-bold uppercase tracking-wider shrink-0">
                             İHRAÇ
                           </span>
                         )}
