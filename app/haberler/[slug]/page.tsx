@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
+import { cache } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Calendar, User } from 'lucide-react';
 import type { Metadata } from 'next';
@@ -14,16 +15,32 @@ interface NewsDetailPageProps {
   params: Promise<{ slug: string }>;
 }
 
-export async function generateMetadata({ params }: NewsDetailPageProps): Promise<Metadata> {
-  const { slug } = await params;
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
-
-  const { data: news } = await supabase
+// One article read per request, shared by generateMetadata and the page. The page stays cookie-based (dynamic)
+// because admins open unpublished drafts here from the news manager.
+const getArticle = cache(async (slug: string) => {
+  const supabase = createClient(await cookies());
+  const { data } = await supabase
     .from('news')
-    .select('title, summary, image_url')
+    .select('*, profiles(username, avatar_url)')
     .eq('slug', slug)
     .single();
+  return data;
+});
+
+const getLatestPublished = cache(async () => {
+  const supabase = createClient(await cookies());
+  const { data } = await supabase
+    .from('news')
+    .select('id, title, slug, category, published_at, image_url')
+    .eq('is_published', true)
+    .order('published_at', { ascending: false })
+    .limit(4);
+  return data || [];
+});
+
+export async function generateMetadata({ params }: NewsDetailPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const news = await getArticle(slug);
 
   if (!news) {
     return {
@@ -51,11 +68,8 @@ export default async function NewsDetailPage({ params }: NewsDetailPageProps) {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  const { data: news } = await supabase
-    .from('news')
-    .select('*, profiles(username, avatar_url)')
-    .eq('slug', slug)
-    .single();
+  // The article and the "other news" list are independent, so both are read in one round trip
+  const [news, latestNews] = await Promise.all([getArticle(slug), getLatestPublished()]);
 
   if (!news) {
     notFound();
@@ -77,14 +91,8 @@ export default async function NewsDetailPage({ params }: NewsDetailPageProps) {
     if (!adminRole) notFound();
   }
 
-  // Fetch 3 other latest news
-  const { data: otherNews } = await supabase
-    .from('news')
-    .select('id, title, slug, category, published_at, image_url')
-    .eq('is_published', true)
-    .neq('id', news.id)
-    .order('published_at', { ascending: false })
-    .limit(3);
+  // 3 other latest news (4 were read so that excluding this article still leaves 3)
+  const otherNews = latestNews.filter((item) => item.id !== news.id).slice(0, 3);
 
   const formattedDate = new Date(news.published_at || news.created_at).toLocaleDateString('tr-TR', {
     day: 'numeric',

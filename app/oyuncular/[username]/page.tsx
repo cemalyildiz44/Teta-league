@@ -6,8 +6,14 @@ import { calculateMarketValue, formatEuro, MarketValueInput } from "@/app/utils/
 import { getPositionLabel } from "@/app/utils/positions";
 
 export const revalidate = 60;
+
+// Render each profile on its first visit and cache it (ISR); tabs are client-side, so no searchParams are read.
+export async function generateStaticParams() {
+  return [];
+}
 import TeamLogo from "@/components/TeamLogo";
 import { avatarSrc } from '@/lib/avatar';
+import ProfileTabs from './ProfileTabs';
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }) {
   const resolvedParams = await params;
@@ -19,11 +25,9 @@ export async function generateMetadata({ params }: { params: Promise<{ username:
 
 // Visuals removed as per market value requirement
 
-export default async function PlayerProfilePage({ params, searchParams }: { params: Promise<{ username: string }>, searchParams: Promise<{ tab?: string }> }) {
+export default async function PlayerProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const resolvedParams = await params;
   const paramVal = decodeURIComponent(resolvedParams.username);
-  const resolvedSearchParams = await searchParams;
-  const activeTab = resolvedSearchParams.tab || 'genel';
 
   const supabase = createPublicClient();
 
@@ -66,20 +70,11 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   }
 
   // ── 2. Parallel Fetches ────────────────────────────────────────────
-  let playerStats: any[] = [];
-  let approvedMatches: any[] = [];
-  const { data: statsWithMatches } = await supabase
-    .from("match_player_stats")
-    .select("match_id, team_id, position, rating, goals, assists, shots, passes_made, pass_attempts, tackles_made, tackle_attempts, saves, goals_conceded, is_mom, red_cards, cleansheets_gk, cleansheets_def, matches!inner(id, home_team_id, away_team_id, home_score, away_score, season_id, league_id, played_at, status, fixtures(week_number))")
-    .eq("player_id", profile.id)
-    .eq("matches.status", "APPROVED");
-
-  if (statsWithMatches) {
-    playerStats = statsWithMatches;
-    approvedMatches = statsWithMatches.map((s: any) => s.matches);
-  }
-
+  // Everything below depends only on profile.id, so it runs in one parallel round trip (the teams table is small,
+  // so all teams are read up front instead of waiting for the ids found in the other results).
   const [
+    { data: statsWithMatches },
+    { data: allTeamsData },
     { data: membershipsData },
     { data: allSeasonsData },
     { data: allLeaguesData },
@@ -87,6 +82,12 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     { data: legacyStatsData },
     { data: dynamicTrophiesData }
   ] = await Promise.all([
+    supabase
+      .from("match_player_stats")
+      .select("match_id, team_id, position, rating, goals, assists, shots, passes_made, pass_attempts, tackles_made, tackle_attempts, saves, goals_conceded, is_mom, red_cards, cleansheets_gk, cleansheets_def, matches!inner(id, home_team_id, away_team_id, home_score, away_score, season_id, league_id, played_at, status, fixtures(week_number))")
+      .eq("player_id", profile.id)
+      .eq("matches.status", "APPROVED"),
+    supabase.from("teams").select("id, name, slug, logo_url, is_active"),
     supabase.from("team_memberships").select("team_id, league_id, season_id, joined_at, left_at").eq("player_id", profile.id).order("joined_at", { ascending: false }),
     supabase.from("seasons").select("id, name, slug"),
     supabase.from("leagues").select("id, name, season_id"),
@@ -95,6 +96,8 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     supabase.from('trophy_winners').select('id, awarded_at, notes, trophy:trophies(id, title, description, image_url, category, season_name, season:seasons(name))').eq('player_id', profile.id).order('awarded_at', { ascending: false })
   ]);
 
+  const playerStats: any[] = statsWithMatches || [];
+  const approvedMatches: any[] = playerStats.map((s: any) => s.matches);
   const dynamicTrophies = (dynamicTrophiesData || []) as any[];
 
   const legacyStats = legacyStatsData || [];
@@ -105,11 +108,6 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
   const leaguesMap = new Map((allLeaguesData || []).map((l) => [l.id, l]));
 
   // Teams
-  const teamIds = new Set<string>();
-  approvedMatches.forEach((m) => { teamIds.add(m.home_team_id); teamIds.add(m.away_team_id); });
-  memberships.forEach((m) => { if (m.team_id) teamIds.add(m.team_id); });
-  legacyStats.forEach((l: any) => { if (l.team_id) teamIds.add(l.team_id); });
-  const { data: allTeamsData } = await supabase.from("teams").select("id, name, slug, logo_url, is_active").in("id", teamIds.size > 0 ? Array.from(teamIds) : ["00000000-0000-0000-0000-000000000000"]);
   const teamsMap = new Map((allTeamsData || []).map((t) => [t.id, t]));
 
   const activeTeamRaw = activeMembership ? teamsMap.get(activeMembership.team_id) : null;
@@ -521,13 +519,6 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
     });
   }
 
-  const tabs = [
-    { id: 'genel', label: 'GENEL' },
-    { id: 'maclar', label: 'MAÇLAR' },
-    { id: 'sezonlar', label: 'SEZONLAR' },
-    { id: 'kariyer', label: 'KARİYER' },
-    { id: 'basarilar', label: 'BAŞARILAR' },
-  ];
 
   return (
     <main className="min-h-screen bg-[#01060b] pt-8 pb-20">
@@ -723,481 +714,443 @@ export default async function PlayerProfilePage({ params, searchParams }: { para
           ))}
         </section>
 
-        {/* ════════════════════════════════════════════════════════════ */}
-        {/* TAB NAVIGATION                                               */}
-        {/* ════════════════════════════════════════════════════════════ */}
-        <nav className="mt-8 sticky top-[60px] z-40 bg-[#01060b]/95 backdrop-blur-md border-b border-white/10 -mx-4 lg:-mx-6 px-4 lg:px-6 mb-6">
-          <div className="flex gap-1 md:gap-2 overflow-x-auto custom-scrollbar py-0">
-            {tabs.map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
-                <Link
-                  key={tab.id}
-                  href={`?tab=${tab.id}`}
-                  scroll={false}
-                  className={`px-4 py-4 text-[11px] font-[900] tracking-widest uppercase whitespace-nowrap transition-all border-b-2 ${
-                    isActive
-                      ? 'text-[#00e5ff] border-[#00e5ff] bg-[#00e5ff]/5 drop-shadow-[0_0_8px_rgba(0,229,255,0.3)]'
-                      : 'text-gray-500 hover:text-gray-300 border-transparent hover:border-white/20'
-                  }`}
-                >
-                  {tab.label}
-                </Link>
-              );
-            })}
-          </div>
-        </nav>
-
-        {/* ════════════════════════════════════════════════════════════ */}
-        {/* TAB CONTENTS                                                 */}
-        {/* ════════════════════════════════════════════════════════════ */}
-        <div key={activeTab} className="tab-pane-enter">
-
-          {/* GENEL TAB */}
-          {activeTab === 'genel' && (
-            <div className="space-y-6">
-              {/* SON FORM (ÖZET GRAFİK) */}
-              <section>
-                <h2 className="text-[14px] font-[900] text-gray-500 tracking-widest uppercase mb-3">SON 12 MAÇ FORMU</h2>
-                {recent12.length > 0 ? (
-                  <div className="bg-[#03070c] border border-white/5 rounded-2xl overflow-hidden p-6">
-                    <div className="flex flex-col md:flex-row gap-8">
-                      <div className="flex flex-col justify-center min-w-[160px]">
-                        <div className="flex flex-col gap-2 text-[14px] font-[700]">
-                          <div className="flex justify-between text-emerald-400"><span>Galibiyet</span><span>{r12W}</span></div>
-                          <div className="flex justify-between text-amber-400"><span>Beraberlik</span><span>{r12D}</span></div>
-                          <div className="flex justify-between text-red-400"><span>Mağlubiyet</span><span>{r12L}</span></div>
-                          <div className="flex justify-between text-white mt-2 pt-2 border-t border-white/10"><span>Ort. Rating</span><span className="text-[#00e5ff] font-[900] text-[16px]">{r12Avg.toFixed(2)}</span></div>
+        {/* TABS: switched client-side by ProfileTabs (all panels are rendered here, so the page stays cacheable) */}
+        <ProfileTabs
+          genel={(
+                <div className="space-y-6">
+                  {/* SON FORM (ÖZET GRAFİK) */}
+                  <section>
+                    <h2 className="text-[14px] font-[900] text-gray-500 tracking-widest uppercase mb-3">SON 12 MAÇ FORMU</h2>
+                    {recent12.length > 0 ? (
+                      <div className="bg-[#03070c] border border-white/5 rounded-2xl overflow-hidden p-6">
+                        <div className="flex flex-col md:flex-row gap-8">
+                          <div className="flex flex-col justify-center min-w-[160px]">
+                            <div className="flex flex-col gap-2 text-[14px] font-[700]">
+                              <div className="flex justify-between text-emerald-400"><span>Galibiyet</span><span>{r12W}</span></div>
+                              <div className="flex justify-between text-amber-400"><span>Beraberlik</span><span>{r12D}</span></div>
+                              <div className="flex justify-between text-red-400"><span>Mağlubiyet</span><span>{r12L}</span></div>
+                              <div className="flex justify-between text-white mt-2 pt-2 border-t border-white/10"><span>Ort. Rating</span><span className="text-[#00e5ff] font-[900] text-[16px]">{r12Avg.toFixed(2)}</span></div>
+                            </div>
+                          </div>
+                          <div className="flex-1 flex flex-col justify-end md:border-l border-white/5 md:pl-8 min-h-[120px]">
+                            <div className="flex items-end justify-between h-[100px] w-full gap-[3px]">
+                              {recent12.slice().reverse().map((m, i) => {
+                                const h = Math.max(((m.rating - 4) / 6) * 100, 10);
+                                const bg = m.rating >= 8 ? "bg-[#00e5ff]" : m.rating >= 7 ? "bg-emerald-400" : m.rating >= 6 ? "bg-amber-400" : "bg-red-400";
+                                return (
+                                  <div key={i} className="flex-1 flex flex-col items-center group relative h-full justify-end">
+                                    <span className={`text-[10px] font-[900] opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5 ${bg.replace("bg-", "text-")}`}>{m.rating.toFixed(1)}</span>
+                                    <div className={`w-full ${bg} opacity-80 group-hover:opacity-100 transition-all rounded-t`} style={{ height: `${h}%` }} />
+                                    <div className={`w-2 h-2 rounded-full mt-2 ${m.result === "W" ? "bg-emerald-400" : m.result === "D" ? "bg-amber-400" : "bg-red-400"}`} />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex-1 flex flex-col justify-end md:border-l border-white/5 md:pl-8 min-h-[120px]">
-                        <div className="flex items-end justify-between h-[100px] w-full gap-[3px]">
-                          {recent12.slice().reverse().map((m, i) => {
-                            const h = Math.max(((m.rating - 4) / 6) * 100, 10);
-                            const bg = m.rating >= 8 ? "bg-[#00e5ff]" : m.rating >= 7 ? "bg-emerald-400" : m.rating >= 6 ? "bg-amber-400" : "bg-red-400";
-                            return (
-                              <div key={i} className="flex-1 flex flex-col items-center group relative h-full justify-end">
-                                <span className={`text-[10px] font-[900] opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5 ${bg.replace("bg-", "text-")}`}>{m.rating.toFixed(1)}</span>
-                                <div className={`w-full ${bg} opacity-80 group-hover:opacity-100 transition-all rounded-t`} style={{ height: `${h}%` }} />
-                                <div className={`w-2 h-2 rounded-full mt-2 ${m.result === "W" ? "bg-emerald-400" : m.result === "D" ? "bg-amber-400" : "bg-red-400"}`} />
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-[#03070c] border border-white/5 rounded-2xl px-6 py-8 text-center text-[12px] font-[700] text-gray-600">Henüz maç verisi yok.</div>
-                )}
-              </section>
+                    ) : (
+                      <div className="bg-[#03070c] border border-white/5 rounded-2xl px-6 py-8 text-center text-[12px] font-[700] text-gray-600">Henüz maç verisi yok.</div>
+                    )}
+                  </section>
 
-              {/* DETAYLI İSTATİSTİKLER */}
-              <section>
-                <h2 className="text-[14px] font-[900] text-gray-500 tracking-widest uppercase mb-3">DETAYLI İSTATİSTİKLER</h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
-                  {[
-                    { label: "ŞUT", value: tSh, sub: null },
-                    { label: "PAS İSABETİ", value: `${passAcc}%`, sub: `${tPM}/${tPA}` },
-                    { label: "MÜDAHALE", value: `${tackleAcc}%`, sub: `${tTM}/${tTA}` },
-                    { label: "KURTARIŞ", value: tSv, sub: null },
-                    { label: "YENEN GOL", value: tGC, sub: null, danger: true },
-                    { label: "KIRMIZI KART", value: combinedTotalRedCards, sub: null, danger: true },
-                    { label: "MAÇIN ADAMI", value: tMOM, sub: null, accent: true },
-                    { label: "TOPLAM KATKI", value: combinedTotalGoals + combinedTotalAssists, sub: `${combinedTotalGoals}G + ${combinedTotalAssists}A` },
-                  ].map((s, i) => (
-                    <div key={i} className="bg-[#03070c] border border-white/5 rounded-2xl p-5 hover:border-[#00e5ff]/30 hover:shadow-[0_0_15px_rgba(0,229,255,0.08)] hover:-translate-y-1 transition-all duration-200 text-center">
-                      <div className="text-[10px] font-[900] tracking-[0.15em] text-gray-600 uppercase mb-2">{s.label}</div>
-                      <div className={`text-[24px] font-[900] leading-none ${(s as any).danger ? "text-red-400" : (s as any).accent ? "text-amber-400" : "text-white"}`}>
-                        {s.value}
-                      </div>
-                      {s.sub && <div className="text-[11px] font-[700] text-gray-500 mt-1.5">{s.sub}</div>}
+                  {/* DETAYLI İSTATİSTİKLER */}
+                  <section>
+                    <h2 className="text-[14px] font-[900] text-gray-500 tracking-widest uppercase mb-3">DETAYLI İSTATİSTİKLER</h2>
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
+                      {[
+                        { label: "ŞUT", value: tSh, sub: null },
+                        { label: "PAS İSABETİ", value: `${passAcc}%`, sub: `${tPM}/${tPA}` },
+                        { label: "MÜDAHALE", value: `${tackleAcc}%`, sub: `${tTM}/${tTA}` },
+                        { label: "KURTARIŞ", value: tSv, sub: null },
+                        { label: "YENEN GOL", value: tGC, sub: null, danger: true },
+                        { label: "KIRMIZI KART", value: combinedTotalRedCards, sub: null, danger: true },
+                        { label: "MAÇIN ADAMI", value: tMOM, sub: null, accent: true },
+                        { label: "TOPLAM KATKI", value: combinedTotalGoals + combinedTotalAssists, sub: `${combinedTotalGoals}G + ${combinedTotalAssists}A` },
+                      ].map((s, i) => (
+                        <div key={i} className="bg-[#03070c] border border-white/5 rounded-2xl p-5 hover:border-[#00e5ff]/30 hover:shadow-[0_0_15px_rgba(0,229,255,0.08)] hover:-translate-y-1 transition-all duration-200 text-center">
+                          <div className="text-[10px] font-[900] tracking-[0.15em] text-gray-600 uppercase mb-2">{s.label}</div>
+                          <div className={`text-[24px] font-[900] leading-none ${(s as any).danger ? "text-red-400" : (s as any).accent ? "text-amber-400" : "text-white"}`}>
+                            {s.value}
+                          </div>
+                          {s.sub && <div className="text-[11px] font-[700] text-gray-500 mt-1.5">{s.sub}</div>}
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </section>
                 </div>
-              </section>
-            </div>
           )}
-
-          {/* MAÇLAR TAB */}
-          {activeTab === 'maclar' && (
-            <div className="space-y-4">
-              <h2 className="text-[14px] font-[900] text-gray-500 tracking-widest uppercase mb-3">TÜM MAÇ GEÇMİŞİ</h2>
-              {allMatchesSorted.length > 0 ? (
-                <div className="bg-[#03070c] border border-white/5 rounded-2xl overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left min-w-[640px]">
-                      <thead className="text-[10px] text-gray-500 uppercase font-[900] tracking-widest border-b border-white/5 bg-[#01060b]">
-                        <tr>
-                          <th className="py-3 pl-6 pr-3">TARİH</th>
-                          <th className="px-3 py-3 text-center">HF</th>
-                          <th className="px-3 py-3">RAKİP</th>
-                          <th className="px-3 py-3 text-center">SKOR</th>
-                          <th className="px-3 py-3 text-center text-[#00e5ff]">RTG</th>
-                          <th className="px-3 py-3 text-center">G</th>
-                          <th className="px-3 py-3 text-center">A</th>
-                          <th className="pl-3 pr-6 py-3 text-center">MOM</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/[0.03]">
-                        {allMatchesSorted.map((m) => {
-                          const opp = teamsMap.get(m.opponentId);
-                          const rc = m.result === "W" ? "text-emerald-400" : m.result === "L" ? "text-red-400" : "text-amber-400";
-                          return (
-                            <tr key={m.matchId} className="hover:bg-white/[0.04] transition-colors text-[13px] group">
-                              <td className="py-3 pl-6 pr-3">
-                                <Link href={`/mac/${m.matchId}`} className="font-[700] text-gray-400 hover:text-white transition-colors">
-                                  {new Date(m.playedAt).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" })}
-                                </Link>
-                              </td>
-                              <td className="px-3 py-3 text-center font-[900] text-gray-600">{m.weekNumber || "-"}</td>
-                              <td className="px-3 py-3">
-                                <Link href={opp?.slug ? `/takim/${opp.slug}` : "#"} className="flex items-center gap-3">
-                                  <TeamLogo src={opp?.logo_url} name={opp?.name} size="xs" className="group-hover:scale-110 transition-transform duration-200" />
-                                  <span className="font-[800] text-gray-300 group-hover:text-[#00e5ff] transition-colors truncate">{opp?.name || "?"}</span>
-                                </Link>
-                              </td>
-                              <td className="px-3 py-3 text-center">
-                                <span className={`font-[900] tracking-wide ${rc}`}>{m.myScore} - {m.oppScore}</span>
-                              </td>
-                              <td className="px-3 py-3 text-center">
-                                <span className={`font-[900] ${m.rating >= 8 ? "text-[#00e5ff]" : m.rating >= 7 ? "text-emerald-400" : m.rating >= 6 ? "text-amber-400" : "text-red-400"}`}>{m.rating.toFixed(1)}</span>
-                              </td>
-                              <td className="px-3 py-3 text-center font-[900] text-white">{m.goals || <span className="text-gray-700">-</span>}</td>
-                              <td className="px-3 py-3 text-center font-[900] text-white">{m.assists || <span className="text-gray-700">-</span>}</td>
-                              <td className="pl-3 pr-6 py-3 text-center">{m.isMom ? <span className="text-amber-400 text-[11px]">⭐</span> : <span className="text-gray-700">-</span>}</td>
+          maclar={(
+                <div className="space-y-4">
+                  <h2 className="text-[14px] font-[900] text-gray-500 tracking-widest uppercase mb-3">TÜM MAÇ GEÇMİŞİ</h2>
+                  {allMatchesSorted.length > 0 ? (
+                    <div className="bg-[#03070c] border border-white/5 rounded-2xl overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left min-w-[640px]">
+                          <thead className="text-[10px] text-gray-500 uppercase font-[900] tracking-widest border-b border-white/5 bg-[#01060b]">
+                            <tr>
+                              <th className="py-3 pl-6 pr-3">TARİH</th>
+                              <th className="px-3 py-3 text-center">HF</th>
+                              <th className="px-3 py-3">RAKİP</th>
+                              <th className="px-3 py-3 text-center">SKOR</th>
+                              <th className="px-3 py-3 text-center text-[#00e5ff]">RTG</th>
+                              <th className="px-3 py-3 text-center">G</th>
+                              <th className="px-3 py-3 text-center">A</th>
+                              <th className="pl-3 pr-6 py-3 text-center">MOM</th>
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                          </thead>
+                          <tbody className="divide-y divide-white/[0.03]">
+                            {allMatchesSorted.map((m) => {
+                              const opp = teamsMap.get(m.opponentId);
+                              const rc = m.result === "W" ? "text-emerald-400" : m.result === "L" ? "text-red-400" : "text-amber-400";
+                              return (
+                                <tr key={m.matchId} className="hover:bg-white/[0.04] transition-colors text-[13px] group">
+                                  <td className="py-3 pl-6 pr-3">
+                                    <Link href={`/mac/${m.matchId}`} className="font-[700] text-gray-400 hover:text-white transition-colors">
+                                      {new Date(m.playedAt).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                                    </Link>
+                                  </td>
+                                  <td className="px-3 py-3 text-center font-[900] text-gray-600">{m.weekNumber || "-"}</td>
+                                  <td className="px-3 py-3">
+                                    <Link href={opp?.slug ? `/takim/${opp.slug}` : "#"} className="flex items-center gap-3">
+                                      <TeamLogo src={opp?.logo_url} name={opp?.name} size="xs" className="group-hover:scale-110 transition-transform duration-200" />
+                                      <span className="font-[800] text-gray-300 group-hover:text-[#00e5ff] transition-colors truncate">{opp?.name || "?"}</span>
+                                    </Link>
+                                  </td>
+                                  <td className="px-3 py-3 text-center">
+                                    <span className={`font-[900] tracking-wide ${rc}`}>{m.myScore} - {m.oppScore}</span>
+                                  </td>
+                                  <td className="px-3 py-3 text-center">
+                                    <span className={`font-[900] ${m.rating >= 8 ? "text-[#00e5ff]" : m.rating >= 7 ? "text-emerald-400" : m.rating >= 6 ? "text-amber-400" : "text-red-400"}`}>{m.rating.toFixed(1)}</span>
+                                  </td>
+                                  <td className="px-3 py-3 text-center font-[900] text-white">{m.goals || <span className="text-gray-700">-</span>}</td>
+                                  <td className="px-3 py-3 text-center font-[900] text-white">{m.assists || <span className="text-gray-700">-</span>}</td>
+                                  <td className="pl-3 pr-6 py-3 text-center">{m.isMom ? <span className="text-amber-400 text-[11px]">⭐</span> : <span className="text-gray-700">-</span>}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-[#03070c] border border-white/5 rounded-2xl px-6 py-12 text-center text-[13px] font-[700] text-gray-600">Henüz resmi maç bulunmuyor.</div>
+                  )}
                 </div>
-              ) : (
-                <div className="bg-[#03070c] border border-white/5 rounded-2xl px-6 py-12 text-center text-[13px] font-[700] text-gray-600">Henüz resmi maç bulunmuyor.</div>
-              )}
-            </div>
           )}
+          sezonlar={(
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-[14px] font-[900] text-gray-500 tracking-widest uppercase">SEZON PERFORMANSLARI</h2>
+                    {allSeasonStats.length > 0 && (
+                      <span className="text-[11px] font-bold text-gray-600 font-mono">
+                        {allSeasonStats.length} SEZON KAYDI
+                      </span>
+                    )}
+                  </div>
 
-          {/* SEZONLAR TAB */}
-          {activeTab === 'sezonlar' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-[14px] font-[900] text-gray-500 tracking-widest uppercase">SEZON PERFORMANSLARI</h2>
-                {allSeasonStats.length > 0 && (
-                  <span className="text-[11px] font-bold text-gray-600 font-mono">
-                    {allSeasonStats.length} SEZON KAYDI
-                  </span>
-                )}
-              </div>
+                  {allSeasonStats.length > 0 ? (
+                    <div className="bg-[#03070c] border border-white/10 rounded-2xl overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.4)]">
+                      <div className="overflow-x-auto custom-scrollbar">
+                        <table className="w-full text-left min-w-[760px] border-collapse">
+                          <thead className="bg-[#01060b] border-b border-white/10 text-[11px] font-[900] text-gray-400 tracking-wider uppercase">
+                            <tr>
+                              <th className="py-4 pl-6 pr-4">SEZON</th>
+                              <th className="py-4 px-4">KULÜP</th>
+                              <th className="py-4 px-4 text-center">MAÇ</th>
+                              <th className="py-4 px-4 text-center">GOL</th>
+                              <th className="py-4 px-4 text-center">ASİST</th>
+                              <th className="py-4 px-4 text-center text-[#00e5ff]">ORT. REYTING</th>
+                              <th className="py-4 pr-6 pl-4 text-center text-emerald-400">KATKI / MAÇ</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/[0.04]">
+                            {allSeasonStats.map((s, idx) => {
+                              const contribution = s.matches > 0
+                                ? ((s.goals + s.assists) / s.matches).toFixed(2)
+                                : "-";
+                              const formattedRating = s.avgRating > 0
+                                ? s.avgRating.toFixed(2)
+                                : "-";
 
-              {allSeasonStats.length > 0 ? (
-                <div className="bg-[#03070c] border border-white/10 rounded-2xl overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.4)]">
-                  <div className="overflow-x-auto custom-scrollbar">
-                    <table className="w-full text-left min-w-[760px] border-collapse">
-                      <thead className="bg-[#01060b] border-b border-white/10 text-[11px] font-[900] text-gray-400 tracking-wider uppercase">
-                        <tr>
-                          <th className="py-4 pl-6 pr-4">SEZON</th>
-                          <th className="py-4 px-4">KULÜP</th>
-                          <th className="py-4 px-4 text-center">MAÇ</th>
-                          <th className="py-4 px-4 text-center">GOL</th>
-                          <th className="py-4 px-4 text-center">ASİST</th>
-                          <th className="py-4 px-4 text-center text-[#00e5ff]">ORT. REYTING</th>
-                          <th className="py-4 pr-6 pl-4 text-center text-emerald-400">KATKI / MAÇ</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/[0.04]">
-                        {allSeasonStats.map((s, idx) => {
-                          const contribution = s.matches > 0
-                            ? ((s.goals + s.assists) / s.matches).toFixed(2)
-                            : "-";
-                          const formattedRating = s.avgRating > 0
-                            ? s.avgRating.toFixed(2)
-                            : "-";
+                              return (
+                                <tr
+                                  key={idx}
+                                  className="hover:bg-white/[0.02] transition-colors group"
+                                >
+                                  {/* SEZON */}
+                                  <td className="py-4 pl-6 pr-4">
+                                    <div className="flex flex-col">
+                                      <span className="text-[14px] font-[900] text-white tracking-wide group-hover:text-white transition-colors">
+                                        {s.seasonName}
+                                      </span>
+                                      <div className="flex items-center gap-2 mt-0.5">
+                                        <span className={`text-[11px] font-[800] uppercase tracking-wider ${s.isLegacy ? 'text-amber-400/90' : 'text-gray-400'}`}>
+                                          {s.leagueName}
+                                        </span>
+                                        {s.isLegacy && (
+                                          <span className="px-1.5 py-0.5 rounded text-[9px] font-[900] tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/30 uppercase">
+                                            ARŞİV
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
 
-                          return (
-                            <tr
-                              key={idx}
-                              className="hover:bg-white/[0.02] transition-colors group"
-                            >
-                              {/* SEZON */}
-                              <td className="py-4 pl-6 pr-4">
-                                <div className="flex flex-col">
-                                  <span className="text-[14px] font-[900] text-white tracking-wide group-hover:text-white transition-colors">
-                                    {s.seasonName}
-                                  </span>
-                                  <div className="flex items-center gap-2 mt-0.5">
-                                    <span className={`text-[11px] font-[800] uppercase tracking-wider ${s.isLegacy ? 'text-amber-400/90' : 'text-gray-400'}`}>
-                                      {s.leagueName}
+                                  {/* KULÜP */}
+                                  <td className="py-4 px-4">
+                                    <div className="flex items-center gap-3">
+                                      <TeamLogo src={s.teamLogo} name={s.teamName} size="lg" />
+                                      {s.teamSlug ? (
+                                        <Link
+                                          href={`/takim/${s.teamSlug}`}
+                                          className="font-[800] text-[13px] text-zinc-200 hover:text-[#00e5ff] transition-colors truncate max-w-[180px]"
+                                        >
+                                          {s.teamName}
+                                        </Link>
+                                      ) : (
+                                        <span className="font-[800] text-[13px] text-zinc-200 truncate max-w-[180px]">
+                                          {s.teamName}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+
+                                  {/* MAÇ */}
+                                  <td className="py-4 px-4 text-center">
+                                    <span className="text-[15px] font-[900] text-white">
+                                      {s.matches}
                                     </span>
-                                    {s.isLegacy && (
-                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-[900] tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/30 uppercase">
-                                        ARŞİV
+                                  </td>
+
+                                  {/* GOL */}
+                                  <td className="py-4 px-4 text-center">
+                                    <span className="text-[15px] font-[900] text-white">
+                                      {s.goals}
+                                    </span>
+                                  </td>
+
+                                  {/* ASİST */}
+                                  <td className="py-4 px-4 text-center">
+                                    <span className="text-[15px] font-[900] text-white">
+                                      {s.assists}
+                                    </span>
+                                  </td>
+
+                                  {/* ORT. REYTING */}
+                                  <td className="py-4 px-4 text-center">
+                                    <span className="inline-block px-2.5 py-1 rounded-lg font-[900] text-[13px] font-mono bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/25 drop-shadow-[0_0_8px_rgba(0,229,255,0.2)]">
+                                      {formattedRating}
+                                    </span>
+                                  </td>
+
+                                  {/* KATKI / MAÇ */}
+                                  <td className="py-4 pr-6 pl-4 text-center">
+                                    <span className="font-[900] text-[14px] font-mono text-emerald-400">
+                                      {contribution}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-[#03070c] border border-white/5 rounded-2xl px-6 py-12 text-center text-[13px] font-[700] text-gray-600">Henüz sezon istatistiği bulunmuyor.</div>
+                  )}
+                </div>
+          )}
+          kariyer={(
+                <div className="space-y-4">
+                  <h2 className="text-[14px] font-[900] text-gray-500 tracking-widest uppercase mb-3">TAKIM GEÇMİŞİ</h2>
+                  {fullTimeline.length > 0 ? (
+                    <div className="bg-[#03070c] border border-white/5 rounded-2xl p-8 lg:p-10">
+                      <div className="flex flex-col relative before:absolute before:top-2 before:bottom-2 before:left-[15px] before:w-0.5 before:bg-gradient-to-b before:from-[#00e5ff]/50 before:via-white/10 before:to-transparent">
+                        {fullTimeline.map((e, idx) => (
+                          <div key={idx} className="relative flex gap-6 pb-10 last:pb-0 group">
+                            <div className={`w-8 h-8 rounded-full border-4 flex items-center justify-center shrink-0 z-10 ${e.isCurrent ? "border-[#00e5ff] bg-[#00e5ff]/10" : e.isLegacy ? "border-amber-500/50 bg-amber-500/10 ring-2 ring-amber-500/20" : "border-[#03070c] bg-gray-800 ring-2 ring-white/10"} transition-colors`}>
+                              <div className={`w-2 h-2 rounded-full ${e.isCurrent ? "bg-[#00e5ff]" : e.isLegacy ? "bg-amber-400" : "bg-white/30"}`} />
+                            </div>
+                            <div className="flex flex-col min-w-0 flex-1 pt-0.5">
+                              <div className="flex items-center gap-3 mb-1">
+                                <span className={`text-[16px] font-[900] ${e.isLegacy ? "text-amber-400" : "text-[#00e5ff]/80"}`}>{e.joinedFmt}</span>
+                                {e.isCurrent && <span className="text-[9px] font-[900] tracking-widest text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded uppercase">AKTİF KULÜP</span>}
+                                {e.isLegacy && <span className="text-[9px] font-[900] tracking-widest text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 uppercase">ESKİ DÖNEM</span>}
+                              </div>
+                              <div className="flex items-center justify-between gap-4 bg-white/[0.02] border border-white/5 rounded-xl p-4 mt-2 max-w-lg hover:bg-white/[0.04] transition-colors">
+                                <div className="flex items-center gap-4 min-w-0">
+                                  <TeamLogo src={e.teamLogo} name={e.teamName} size="lg" />
+                                  <div className="flex flex-col min-w-0">
+                                    {e.teamSlug ? (
+                                      <Link href={`/takim/${e.teamSlug}`} className="text-[18px] font-[900] text-white hover:text-[#00e5ff] transition-colors leading-tight truncate">
+                                        {e.teamName}
+                                      </Link>
+                                    ) : (
+                                      <span className="text-[18px] font-[900] text-white leading-tight truncate">
+                                        {e.teamName}
                                       </span>
                                     )}
+                                    {e.leagueName && <span className="text-[12px] font-[700] text-gray-500 mt-1 uppercase truncate">{e.leagueName}</span>}
                                   </div>
                                 </div>
-                              </td>
-
-                              {/* KULÜP */}
-                              <td className="py-4 px-4">
-                                <div className="flex items-center gap-3">
-                                  <TeamLogo src={s.teamLogo} name={s.teamName} size="lg" />
-                                  {s.teamSlug ? (
-                                    <Link
-                                      href={`/takim/${s.teamSlug}`}
-                                      className="font-[800] text-[13px] text-zinc-200 hover:text-[#00e5ff] transition-colors truncate max-w-[180px]"
-                                    >
-                                      {s.teamName}
-                                    </Link>
-                                  ) : (
-                                    <span className="font-[800] text-[13px] text-zinc-200 truncate max-w-[180px]">
-                                      {s.teamName}
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-
-                              {/* MAÇ */}
-                              <td className="py-4 px-4 text-center">
-                                <span className="text-[15px] font-[900] text-white">
-                                  {s.matches}
-                                </span>
-                              </td>
-
-                              {/* GOL */}
-                              <td className="py-4 px-4 text-center">
-                                <span className="text-[15px] font-[900] text-white">
-                                  {s.goals}
-                                </span>
-                              </td>
-
-                              {/* ASİST */}
-                              <td className="py-4 px-4 text-center">
-                                <span className="text-[15px] font-[900] text-white">
-                                  {s.assists}
-                                </span>
-                              </td>
-
-                              {/* ORT. REYTING */}
-                              <td className="py-4 px-4 text-center">
-                                <span className="inline-block px-2.5 py-1 rounded-lg font-[900] text-[13px] font-mono bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/25 drop-shadow-[0_0_8px_rgba(0,229,255,0.2)]">
-                                  {formattedRating}
-                                </span>
-                              </td>
-
-                              {/* KATKI / MAÇ */}
-                              <td className="py-4 pr-6 pl-4 text-center">
-                                <span className="font-[900] text-[14px] font-mono text-emerald-400">
-                                  {contribution}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-[#03070c] border border-white/5 rounded-2xl px-6 py-12 text-center text-[13px] font-[700] text-gray-600">Henüz sezon istatistiği bulunmuyor.</div>
-              )}
-            </div>
-          )}
-
-          {/* KARİYER TAB */}
-          {activeTab === 'kariyer' && (
-            <div className="space-y-4">
-              <h2 className="text-[14px] font-[900] text-gray-500 tracking-widest uppercase mb-3">TAKIM GEÇMİŞİ</h2>
-              {fullTimeline.length > 0 ? (
-                <div className="bg-[#03070c] border border-white/5 rounded-2xl p-8 lg:p-10">
-                  <div className="flex flex-col relative before:absolute before:top-2 before:bottom-2 before:left-[15px] before:w-0.5 before:bg-gradient-to-b before:from-[#00e5ff]/50 before:via-white/10 before:to-transparent">
-                    {fullTimeline.map((e, idx) => (
-                      <div key={idx} className="relative flex gap-6 pb-10 last:pb-0 group">
-                        <div className={`w-8 h-8 rounded-full border-4 flex items-center justify-center shrink-0 z-10 ${e.isCurrent ? "border-[#00e5ff] bg-[#00e5ff]/10" : e.isLegacy ? "border-amber-500/50 bg-amber-500/10 ring-2 ring-amber-500/20" : "border-[#03070c] bg-gray-800 ring-2 ring-white/10"} transition-colors`}>
-                          <div className={`w-2 h-2 rounded-full ${e.isCurrent ? "bg-[#00e5ff]" : e.isLegacy ? "bg-amber-400" : "bg-white/30"}`} />
-                        </div>
-                        <div className="flex flex-col min-w-0 flex-1 pt-0.5">
-                          <div className="flex items-center gap-3 mb-1">
-                            <span className={`text-[16px] font-[900] ${e.isLegacy ? "text-amber-400" : "text-[#00e5ff]/80"}`}>{e.joinedFmt}</span>
-                            {e.isCurrent && <span className="text-[9px] font-[900] tracking-widest text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded uppercase">AKTİF KULÜP</span>}
-                            {e.isLegacy && <span className="text-[9px] font-[900] tracking-widest text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 uppercase">ESKİ DÖNEM</span>}
-                          </div>
-                          <div className="flex items-center justify-between gap-4 bg-white/[0.02] border border-white/5 rounded-xl p-4 mt-2 max-w-lg hover:bg-white/[0.04] transition-colors">
-                            <div className="flex items-center gap-4 min-w-0">
-                              <TeamLogo src={e.teamLogo} name={e.teamName} size="lg" />
-                              <div className="flex flex-col min-w-0">
-                                {e.teamSlug ? (
-                                  <Link href={`/takim/${e.teamSlug}`} className="text-[18px] font-[900] text-white hover:text-[#00e5ff] transition-colors leading-tight truncate">
-                                    {e.teamName}
-                                  </Link>
-                                ) : (
-                                  <span className="text-[18px] font-[900] text-white leading-tight truncate">
-                                    {e.teamName}
-                                  </span>
+                                {e.isLegacy && e.matches !== undefined && (
+                                  <div className="text-right shrink-0">
+                                    <div className="text-[10px] font-bold text-gray-500 uppercase">{e.matches} MAÇ</div>
+                                    <div className="text-xs font-black text-emerald-400">{e.goals}G <span className="text-gray-600 font-normal">/</span> {e.assists}A</div>
+                                  </div>
                                 )}
-                                {e.leagueName && <span className="text-[12px] font-[700] text-gray-500 mt-1 uppercase truncate">{e.leagueName}</span>}
                               </div>
                             </div>
-                            {e.isLegacy && e.matches !== undefined && (
-                              <div className="text-right shrink-0">
-                                <div className="text-[10px] font-bold text-gray-500 uppercase">{e.matches} MAÇ</div>
-                                <div className="text-xs font-black text-emerald-400">{e.goals}G <span className="text-gray-600 font-normal">/</span> {e.assists}A</div>
-                              </div>
-                            )}
                           </div>
-                        </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="bg-[#03070c] border border-white/5 rounded-2xl px-6 py-12 text-center text-[13px] font-[700] text-gray-600">Henüz takım geçmişi bulunmuyor.</div>
+                  )}
                 </div>
-              ) : (
-                <div className="bg-[#03070c] border border-white/5 rounded-2xl px-6 py-12 text-center text-[13px] font-[700] text-gray-600">Henüz takım geçmişi bulunmuyor.</div>
-              )}
-            </div>
           )}
-
-          {/* BASARILAR TAB */}
-          {activeTab === 'basarilar' && (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-[14px] font-[900] text-gray-400 tracking-widest uppercase flex items-center gap-2">
-                    <span className="w-1.5 h-4 bg-amber-400 rounded-full" />
-                    KİŞİSEL BAŞARILAR VE KUPALAR
-                  </h2>
-                  <p className="text-[12px] text-gray-500 font-medium mt-0.5">
-                    Bu oyuncuya özel olarak takdim edilen resmi lig kupaları ve bireysel başarılar
-                  </p>
-                </div>
-                {validDynamicTrophies.length > 0 && (
-                  <span className="self-start sm:self-auto px-3 py-1 rounded-full text-xs font-black bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider font-mono">
-                    {validDynamicTrophies.length} Ödül
-                  </span>
-                )}
-              </div>
-
-              {validDynamicTrophies.length > 0 ? (() => {
-                const groupedDynamicTrophies = Array.from(
-                  validDynamicTrophies.reduce((map: Map<string, any>, dt: any) => {
-                    const tid = dt.trophy?.id || dt.id;
-                    if (!map.has(tid)) {
-                      map.set(tid, {
-                        id: dt.id,
-                        trophy: dt.trophy,
-                        count: 0,
-                        awarded_at: dt.awarded_at,
-                        notes: [] as string[],
-                      });
-                    }
-                    const entry = map.get(tid);
-                    entry.count += 1;
-                    if (dt.notes && !entry.notes.includes(dt.notes)) {
-                      entry.notes.push(dt.notes);
-                    }
-                    if (dt.awarded_at && (!entry.awarded_at || new Date(dt.awarded_at) > new Date(entry.awarded_at))) {
-                      entry.awarded_at = dt.awarded_at;
-                    }
-                    return map;
-                  }, new Map<string, any>()).values()
-                );
-
-                return (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {groupedDynamicTrophies.map((item: any) => {
-                      const tr = item.trophy;
-                      const seasonDisplay = tr?.season?.name || tr?.season_name;
-                      const dateDisplay = item.awarded_at
-                        ? new Intl.DateTimeFormat('tr-TR', {
-                            timeZone: 'Europe/Istanbul',
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                          }).format(new Date(item.awarded_at))
-                        : null;
-
-                      return (
-                        <div
-                          key={item.id}
-                          className="group relative bg-[#03070c] border border-white/5 hover:border-amber-400/40 rounded-2xl p-6 flex flex-col items-center justify-between text-center transition-all duration-300 hover:shadow-[0_0_25px_rgba(245,158,11,0.15)] hover:-translate-y-0.5 overflow-hidden"
-                        >
-                          <div className="absolute inset-0 bg-gradient-to-b from-amber-500/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-
-                          {/* Top row: Category badge & Repeat Count (1x, 2x, etc.) */}
-                          <div className="w-full flex items-center justify-between mb-3 gap-2">
-                            {tr?.category ? (
-                              <span className="text-[9px] font-black tracking-widest uppercase px-2.5 py-0.5 rounded-full bg-white/5 text-gray-400 border border-white/5 group-hover:border-amber-400/30 group-hover:text-amber-300 transition-colors truncate">
-                                {tr.category}
-                              </span>
-                            ) : (
-                              <span />
-                            )}
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-black shadow-sm font-mono shrink-0">
-                              {item.count}x
-                            </span>
-                          </div>
-
-                          {/* Trophy visual */}
-                          <div className="w-24 h-24 my-2 flex items-center justify-center relative">
-                            {tr?.image_url ? (
-                              <img
-                                src={tr.image_url}
-                                alt={tr.title}
-                                className="max-h-full max-w-full object-contain filter drop-shadow-[0_4px_16px_rgba(0,0,0,0.8)] group-hover:scale-105 transition-transform duration-300 select-none"
-                              />
-                            ) : (
-                              <span className="text-5xl select-none">🏆</span>
-                            )}
-                          </div>
-
-                          {/* Title, Season & Notes */}
-                          <div className="mt-2 w-full">
-                            <h3 className="text-[14px] font-[900] text-white tracking-wide uppercase line-clamp-2 group-hover:text-amber-300 transition-colors">
-                              {tr?.title || 'Kupa'}
-                            </h3>
-                            {seasonDisplay && (
-                              <span className="inline-block mt-1.5 px-2.5 py-0.5 rounded bg-black/60 border border-white/10 text-[10px] font-black text-amber-300 uppercase tracking-wider">
-                                {seasonDisplay}
-                              </span>
-                            )}
-                            {tr?.description && (
-                              <p className="text-[11px] text-gray-400 font-medium line-clamp-2 mt-2 leading-relaxed">
-                                {tr.description}
-                              </p>
-                            )}
-                            {item.notes.length > 0 && (
-                              <div className="mt-3 pt-2.5 border-t border-white/5 text-[11px] font-semibold text-cyan-300/90 truncate" title={item.notes.join(' • ')}>
-                                🎖️ {item.notes.join(' • ')}
-                              </div>
-                            )}
-                            {dateDisplay && (
-                              <div className="text-[10px] text-gray-600 font-mono mt-1.5">
-                                {dateDisplay}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+          basarilar={(
+                <div className="space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-[14px] font-[900] text-gray-400 tracking-widest uppercase flex items-center gap-2">
+                        <span className="w-1.5 h-4 bg-amber-400 rounded-full" />
+                        KİŞİSEL BAŞARILAR VE KUPALAR
+                      </h2>
+                      <p className="text-[12px] text-gray-500 font-medium mt-0.5">
+                        Bu oyuncuya özel olarak takdim edilen resmi lig kupaları ve bireysel başarılar
+                      </p>
+                    </div>
+                    {validDynamicTrophies.length > 0 && (
+                      <span className="self-start sm:self-auto px-3 py-1 rounded-full text-xs font-black bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider font-mono">
+                        {validDynamicTrophies.length} Ödül
+                      </span>
+                    )}
                   </div>
-                );
-              })() : (
-                <div className="bg-[#03070c] border border-white/5 rounded-2xl p-12 text-center flex flex-col items-center justify-center">
-                  <div className="w-16 h-16 rounded-2xl bg-white/[0.02] border border-white/10 flex items-center justify-center text-3xl mb-4 text-gray-600">
-                    🏆
-                  </div>
-                  <h3 className="text-base font-[900] text-white uppercase tracking-wide mb-1">
-                    Henüz Kazanılmış Kupa Yok
-                  </h3>
-                  <p className="text-xs text-gray-500 font-medium max-w-sm">
-                    Henüz bu oyuncuya atanmış resmi bir bireysel kupa veya başarı bulunmuyor.
-                  </p>
+
+                  {validDynamicTrophies.length > 0 ? (() => {
+                    const groupedDynamicTrophies = Array.from(
+                      validDynamicTrophies.reduce((map: Map<string, any>, dt: any) => {
+                        const tid = dt.trophy?.id || dt.id;
+                        if (!map.has(tid)) {
+                          map.set(tid, {
+                            id: dt.id,
+                            trophy: dt.trophy,
+                            count: 0,
+                            awarded_at: dt.awarded_at,
+                            notes: [] as string[],
+                          });
+                        }
+                        const entry = map.get(tid);
+                        entry.count += 1;
+                        if (dt.notes && !entry.notes.includes(dt.notes)) {
+                          entry.notes.push(dt.notes);
+                        }
+                        if (dt.awarded_at && (!entry.awarded_at || new Date(dt.awarded_at) > new Date(entry.awarded_at))) {
+                          entry.awarded_at = dt.awarded_at;
+                        }
+                        return map;
+                      }, new Map<string, any>()).values()
+                    );
+
+                    return (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {groupedDynamicTrophies.map((item: any) => {
+                          const tr = item.trophy;
+                          const seasonDisplay = tr?.season?.name || tr?.season_name;
+                          const dateDisplay = item.awarded_at
+                            ? new Intl.DateTimeFormat('tr-TR', {
+                                timeZone: 'Europe/Istanbul',
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                              }).format(new Date(item.awarded_at))
+                            : null;
+
+                          return (
+                            <div
+                              key={item.id}
+                              className="group relative bg-[#03070c] border border-white/5 hover:border-amber-400/40 rounded-2xl p-6 flex flex-col items-center justify-between text-center transition-all duration-300 hover:shadow-[0_0_25px_rgba(245,158,11,0.15)] hover:-translate-y-0.5 overflow-hidden"
+                            >
+                              <div className="absolute inset-0 bg-gradient-to-b from-amber-500/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                              {/* Top row: Category badge & Repeat Count (1x, 2x, etc.) */}
+                              <div className="w-full flex items-center justify-between mb-3 gap-2">
+                                {tr?.category ? (
+                                  <span className="text-[9px] font-black tracking-widest uppercase px-2.5 py-0.5 rounded-full bg-white/5 text-gray-400 border border-white/5 group-hover:border-amber-400/30 group-hover:text-amber-300 transition-colors truncate">
+                                    {tr.category}
+                                  </span>
+                                ) : (
+                                  <span />
+                                )}
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-black shadow-sm font-mono shrink-0">
+                                  {item.count}x
+                                </span>
+                              </div>
+
+                              {/* Trophy visual */}
+                              <div className="w-24 h-24 my-2 flex items-center justify-center relative">
+                                {tr?.image_url ? (
+                                  <img
+                                    src={tr.image_url}
+                                    alt={tr.title}
+                                    className="max-h-full max-w-full object-contain filter drop-shadow-[0_4px_16px_rgba(0,0,0,0.8)] group-hover:scale-105 transition-transform duration-300 select-none"
+                                  />
+                                ) : (
+                                  <span className="text-5xl select-none">🏆</span>
+                                )}
+                              </div>
+
+                              {/* Title, Season & Notes */}
+                              <div className="mt-2 w-full">
+                                <h3 className="text-[14px] font-[900] text-white tracking-wide uppercase line-clamp-2 group-hover:text-amber-300 transition-colors">
+                                  {tr?.title || 'Kupa'}
+                                </h3>
+                                {seasonDisplay && (
+                                  <span className="inline-block mt-1.5 px-2.5 py-0.5 rounded bg-black/60 border border-white/10 text-[10px] font-black text-amber-300 uppercase tracking-wider">
+                                    {seasonDisplay}
+                                  </span>
+                                )}
+                                {tr?.description && (
+                                  <p className="text-[11px] text-gray-400 font-medium line-clamp-2 mt-2 leading-relaxed">
+                                    {tr.description}
+                                  </p>
+                                )}
+                                {item.notes.length > 0 && (
+                                  <div className="mt-3 pt-2.5 border-t border-white/5 text-[11px] font-semibold text-cyan-300/90 truncate" title={item.notes.join(' • ')}>
+                                    🎖️ {item.notes.join(' • ')}
+                                  </div>
+                                )}
+                                {dateDisplay && (
+                                  <div className="text-[10px] text-gray-600 font-mono mt-1.5">
+                                    {dateDisplay}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })() : (
+                    <div className="bg-[#03070c] border border-white/5 rounded-2xl p-12 text-center flex flex-col items-center justify-center">
+                      <div className="w-16 h-16 rounded-2xl bg-white/[0.02] border border-white/10 flex items-center justify-center text-3xl mb-4 text-gray-600">
+                        🏆
+                      </div>
+                      <h3 className="text-base font-[900] text-white uppercase tracking-wide mb-1">
+                        Henüz Kazanılmış Kupa Yok
+                      </h3>
+                      <p className="text-xs text-gray-500 font-medium max-w-sm">
+                        Henüz bu oyuncuya atanmış resmi bir bireysel kupa veya başarı bulunmuyor.
+                      </p>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
           )}
-
-        </div>
+        />
       </div>
     </main>
   );
