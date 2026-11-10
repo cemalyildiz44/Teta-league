@@ -9,12 +9,14 @@ const initialState = {
   error: '',
 };
 
-function LoginForm() {
+interface LoginFormProps {
+  errorParam?: string | null;
+  messageParam?: string | null;
+  redirectTo?: string;
+}
+
+function LoginForm({ errorParam = null, messageParam = null, redirectTo = '' }: LoginFormProps) {
   const [state, formAction, isPending] = useActionState(loginAction as any, initialState);
-  const searchParams = useSearchParams();
-  const errorParam = searchParams.get('error');
-  const messageParam = searchParams.get('message');
-  const redirectTo = searchParams.get('redirectTo') || searchParams.get('next') || '';
   let urlError = '';
   if (errorParam === 'invalid_link' || errorParam === 'expired_link') urlError = 'Şifre sıfırlama bağlantısı geçersiz veya süresi dolmuş.';
   if (errorParam === 'invalid_verification') urlError = 'E-posta doğrulama bağlantısı geçersiz, kullanılmış veya süresi dolmuş.';
@@ -103,11 +105,24 @@ function LoginForm() {
   );
 }
 
+function LoginFormWithParams() {
+  const searchParams = useSearchParams();
+  return (
+    <LoginForm
+      errorParam={searchParams.get('error')}
+      messageParam={searchParams.get('message')}
+      redirectTo={searchParams.get('redirectTo') || searchParams.get('next') || ''}
+    />
+  );
+}
+
 export default function LoginPage() {
+  // The fallback is the same form without URL params, so the prerendered HTML already shows the form
+  // instead of a "Yükleniyor..." placeholder; the params are applied once the page hydrates.
   return (
     <div className="min-h-[calc(100vh-64px)] flex items-center justify-center p-4">
-      <Suspense fallback={<div className="text-white text-sm">Yükleniyor...</div>}>
-        <LoginForm />
+      <Suspense fallback={<LoginForm />}>
+        <LoginFormWithParams />
       </Suspense>
     </div>
   );

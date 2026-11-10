@@ -230,13 +230,14 @@ a, button, summary, [role="button"], [role="tab"] {
   font-weight: 500;
 }
 
-/* Animations & Stagger Helpers */
+/* Animations & Stagger Helpers. Use fill-mode "both": with only "forwards", an element with animation-delay
+   is fully visible during the delay, then snaps to opacity 0 and fades in again (a visible flash). */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
 .fade-in-up {
-  animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes pageFadeIn {
@@ -244,7 +245,7 @@ a, button, summary, [role="button"], [role="tab"] {
   to { opacity: 1; transform: translateY(0); }
 }
 .page-enter {
-  animation: pageFadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: pageFadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes cardFadeIn {
@@ -266,7 +267,7 @@ a, button, summary, [role="button"], [role="tab"] {
 
 /* Tab panel transitions */
 .tab-pane-enter {
-  animation: pageFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: pageFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* Utilities */

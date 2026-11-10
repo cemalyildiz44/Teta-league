@@ -4,6 +4,8 @@ import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import CookieBanner from "@/components/CookieBanner";
+import NavigationProgress from "@/components/NavigationProgress";
+import { Suspense } from "react";
 
 import { getCanonicalSiteUrl } from "@/lib/site-url";
 import { DEFAULT_OG_IMAGE, HOME_DESCRIPTION, HOME_TITLE, SITE_NAME } from "@/lib/seo";
@@ -48,6 +50,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${exo2.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
+        {/* Suspense: useSearchParams in a layout would otherwise opt static pages out of prerendering */}
+        <Suspense fallback={null}>
+          <NavigationProgress />
+        </Suspense>
         <Header />
         <main className="flex-1">{children}</main>
         <Footer />

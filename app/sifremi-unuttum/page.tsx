@@ -11,10 +11,8 @@ const initialState = {
   success: '',
 };
 
-function ForgotPasswordContent() {
+function ForgotPasswordContent({ errorParam = null }: { errorParam?: string | null }) {
   const [state, formAction, isPending] = useActionState(forgotPasswordAction as any, initialState);
-  const searchParams = useSearchParams();
-  const errorParam = searchParams.get('error');
 
   let bannerMessage = '';
   if (errorParam === 'expired_link') {
@@ -100,17 +98,17 @@ function ForgotPasswordContent() {
   );
 }
 
+function ForgotPasswordWithParams() {
+  const searchParams = useSearchParams();
+  return <ForgotPasswordContent errorParam={searchParams.get('error')} />;
+}
+
 export default function ForgotPasswordPage() {
+  // The fallback is the same form without the ?error banner, so the prerendered HTML already shows the form
   return (
     <div className="min-h-[calc(100vh-64px)] flex items-center justify-center p-4">
-      <Suspense
-        fallback={
-          <div className="text-center py-8 text-gray-400 text-xs">
-            Yükleniyor...
-          </div>
-        }
-      >
-        <ForgotPasswordContent />
+      <Suspense fallback={<ForgotPasswordContent />}>
+        <ForgotPasswordWithParams />
       </Suspense>
     </div>
   );
