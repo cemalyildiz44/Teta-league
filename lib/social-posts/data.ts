@@ -73,9 +73,16 @@ export async function getLatestPlayedWeek(supabase: SupabaseClient, league: Post
 // Standings after the given fixture week, rebuilt from approved matches the same way the database builds
 // team_season_stats (recalculate_season_stats). Matches without a fixture have no week, so they count only
 // from the latest played week on; penalties count once they were issued before the week's last result.
+// The query for replaced teams fails harmlessly (no successors) until the team replacement migration is applied.
 export async function getStandingsPostRows(supabase: SupabaseClient, league: PostLeague, week: number): Promise<StandingsPostRow[]> {
-  const [leagueTeamsRes, matches, penaltiesRes, seasonRes] = await Promise.all([
+  const [leagueTeamsRes, replacedRes, matches, penaltiesRes, seasonRes] = await Promise.all([
     supabase.from('league_teams').select('team_id, team:teams!team_id(name)').eq('league_id', league.id).eq('is_active', true),
+    supabase
+      .from('league_teams')
+      .select('team_id, replaced_by_team_id')
+      .eq('league_id', league.id)
+      .eq('season_id', league.season_id)
+      .not('replaced_by_team_id', 'is', null),
     getApprovedMatches(supabase, league),
     supabase
       .from('team_penalties')
@@ -109,9 +116,19 @@ export async function getStandingsPostRows(supabase: SupabaseClient, league: Pos
     t.points += gf > ga ? winPts : gf === ga ? drawPts : lossPts;
     tally.set(teamId, t);
   };
+  // A team that withdrew mid-season hands its results to the team that replaced it (Takım Değişimi),
+  // as recalculate_season_stats does for team_season_stats
+  const replacedBy = new Map((replacedRes.data || []).map((r) => [r.team_id as string, r.replaced_by_team_id as string]));
+  const credit = (teamId: string, gf: number, ga: number) => {
+    const seen = new Set<string>();
+    for (let id: string | undefined = teamId; id && !seen.has(id); id = replacedBy.get(id)) {
+      seen.add(id);
+      add(id, gf, ga);
+    }
+  };
   for (const m of included) {
-    add(m.home_team_id, m.home_score, m.away_score);
-    add(m.away_team_id, m.away_score, m.home_score);
+    credit(m.home_team_id, m.home_score, m.away_score);
+    credit(m.away_team_id, m.away_score, m.home_score);
   }
 
   const penaltyPoints = new Map<string, number>();

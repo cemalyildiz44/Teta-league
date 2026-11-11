@@ -1,6 +1,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
+import Link from 'next/link';
 import { TeamsManager } from './TeamsManager';
 
 export default async function AdminTeamsPage() {
@@ -42,6 +43,12 @@ export default async function AdminTeamsPage() {
           <h1 className='text-2xl font-black text-white tracking-widest'>TAKIM YÖNETİM MERKEZİ</h1>
           <p className='text-sm text-zinc-400 mt-1'>Resmî TETA League takımlarını, kaptanları ve kadroları profesyonel şekilde yönetin</p>
         </div>
+        <Link
+          href='/admin/teams/degisim'
+          className='shrink-0 px-4 py-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs font-black tracking-widest hover:bg-amber-500/20 transition-colors'
+        >
+          TAKIM DEĞİŞİMİ
+        </Link>
       </div>
 
       <TeamsManager
