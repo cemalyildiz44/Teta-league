@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   alternates: { canonical: '/istatistikler' },
 };
 
-export const revalidate = 60;
+export const revalidate = 300; // 5 min; admin changes refresh the page right away (revalidatePath/Tag)
 
 export default async function GlobalStatsPage({ searchParams }: { searchParams: Promise<{ season?: string, league?: string }> }) {
   const resolvedParams = await searchParams;
@@ -37,7 +37,7 @@ export default async function GlobalStatsPage({ searchParams }: { searchParams: 
   const renderTeam = (team: PublicPlayerStatItem["team"]) => {
     if (!team) return <span className="text-gray-600 text-xs">-</span>;
     return (
-      <Link href={`/takim/${team.slug}`} className="flex items-center gap-2 group">
+      <Link prefetch={false} href={`/takim/${team.slug}`} className="flex items-center gap-2 group">
         <TeamLogo src={team.logo_url} name={team.name} size="xs" />
         <span className="text-xs font-bold text-gray-300 group-hover:text-[#00e5ff] transition-colors truncate max-w-[120px]">{team.name}</span>
       </Link>
@@ -45,7 +45,7 @@ export default async function GlobalStatsPage({ searchParams }: { searchParams: 
   };
 
   const renderPlayer = (p: PublicPlayerStatItem) => (
-    <Link href={`/oyuncular/${encodeURIComponent(p.username)}`} className="font-bold text-white text-xs hover:text-[#00e5ff] hover:underline transition-colors">
+    <Link prefetch={false} href={`/oyuncular/${encodeURIComponent(p.username)}`} className="font-bold text-white text-xs hover:text-[#00e5ff] hover:underline transition-colors">
       {p.username}
     </Link>
   );

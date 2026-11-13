@@ -79,3 +79,14 @@ export async function revalidateMatchDependencies(supabase: any, matchId: string
     }
   }
 }
+
+// Refreshes every public page at once. For changes that touch many matches/teams at a time (EA import,
+// fixture import, penalties) where per-page invalidation would be easy to get wrong.
+export function revalidatePublicSite() {
+  revalidatePath('/', 'layout');
+  try {
+    revalidateTag('player-rankings', 'max');
+    revalidateTag('public-statistics', 'max');
+    revalidateTag('public-team-page', 'max');
+  } catch {}
+}

@@ -80,7 +80,7 @@ export const getCachedFilterOptions = unstable_cache(
   ['public-statistics-filters'],
   {
     tags: ['public-statistics'],
-    revalidate: 60,
+    revalidate: 300,
   }
 );
 
@@ -301,7 +301,7 @@ export async function getCachedStatsData(seasonId?: string, leagueId?: string): 
     ['public-statistics-data', seasonId, leagueId],
     {
       tags: ['public-statistics', `stats-${seasonId}-${leagueId}`],
-      revalidate: 60,
+      revalidate: 300,
     }
   );
 

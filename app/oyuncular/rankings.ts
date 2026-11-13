@@ -237,7 +237,7 @@ export const getCachedPlayerRankings = unstable_cache(
   ['player-rankings-leaderboard'],
   {
     tags: ['player-rankings'],
-    revalidate: 60,
+    revalidate: 300,
   }
 );
 

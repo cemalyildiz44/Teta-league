@@ -559,7 +559,7 @@ export default function Hero() {
             TAKIMINI OLUŞTUR
           </a>
           
-          <Link 
+          <Link prefetch={false} 
             href="/ligler"
             className="w-full sm:w-auto px-8 py-4 lg:py-4.5 bg-white/[0.04] border border-white/10 text-white font-extrabold text-[13px] tracking-[0.15em] uppercase rounded-lg hover:bg-white/[0.08] hover:border-white/20 hover:text-[#00e5ff] transition-all duration-200 hover:scale-[1.02] active:scale-95 flex items-center justify-center"
           >

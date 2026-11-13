@@ -61,7 +61,7 @@ export async function generateMetadata({ params }: NewsDetailPageProps): Promise
   };
 }
 
-export const revalidate = 60; // ISR 60s
+export const revalidate = 300; // 5 min; admin changes refresh the page right away (revalidatePath/Tag)
 
 export default async function NewsDetailPage({ params }: NewsDetailPageProps) {
   const { slug } = await params;

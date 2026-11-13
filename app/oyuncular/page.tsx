@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   alternates: { canonical: '/oyuncular' },
 };
 
-export const revalidate = 60; // 1 min cache
+export const revalidate = 300; // 5 min; admin changes refresh the page right away (revalidatePath/Tag)
 
 export default async function PlayersPage() {
   const rankingsArray = await getCachedPlayerRankings();

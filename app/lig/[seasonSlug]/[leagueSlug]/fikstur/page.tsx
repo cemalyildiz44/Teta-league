@@ -5,7 +5,7 @@ import { Calendar } from 'lucide-react';
 import FixtureWeekBrowser, { type FixtureTeamView, type FixtureView } from './FixtureWeekBrowser';
 import { buildLeagueMetadata } from "../league-metadata";
 
-export const revalidate = 60;
+export const revalidate = 300; // 5 min; admin changes refresh the page right away (revalidatePath/Tag)
 
 const dateFormatter = new Intl.DateTimeFormat('tr-TR', {
   timeZone: 'Europe/Istanbul',

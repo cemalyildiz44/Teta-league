@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { revalidatePublicSite } from '@/lib/match-revalidation';
 import { logAdminAudit } from '@/lib/audit';
 
 // ──────────────────────────────────────────────────
@@ -213,7 +214,7 @@ export async function issuePenaltyAction(formData: FormData) {
 
     // 12. Revalidate
     revalidatePath('/admin/penalties');
-    revalidatePath('/lig');
+    revalidatePublicSite();
     revalidatePath('/takim/yonet');
 
     const typeLabels: Record<string, string> = {
@@ -325,7 +326,7 @@ export async function revokePenaltyAction(formData: FormData) {
 
     // 7. Revalidate
     revalidatePath('/admin/penalties');
-    revalidatePath('/lig');
+    revalidatePublicSite();
     revalidatePath('/takim/yonet');
 
     return { success: 'Ceza başarıyla iptal edildi.' };

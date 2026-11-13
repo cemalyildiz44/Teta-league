@@ -599,7 +599,7 @@ export async function getCachedTeamPageData(slug: string): Promise<TeamPageData 
     ['public-team-page-data', slug],
     {
       tags: ['public-team-page', `team-${slug}`],
-      revalidate: 60,
+      revalidate: 300,
     }
   );
 

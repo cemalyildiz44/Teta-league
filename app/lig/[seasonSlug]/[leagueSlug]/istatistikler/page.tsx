@@ -5,7 +5,7 @@ import Link from "next/link";
 import TeamLogo from "@/components/TeamLogo";
 import { isDefenderPosition, isGoalkeeperPosition } from "@/app/utils/positions";
 
-export const revalidate = 60;
+export const revalidate = 300; // 5 min; admin changes refresh the page right away (revalidatePath/Tag)
 
 // Render each path on its first visit and cache it (ISR); without this the route renders on every request.
 export async function generateStaticParams() {
@@ -31,11 +31,11 @@ const PlayerRow = ({ player, idx, val, label }: { player: any, idx: number, val:
     <div className="flex items-center gap-4">
       <span className={`text-[16px] font-[900] w-5 text-center ${idx === 0 ? 'text-[#00e5ff] drop-shadow-[0_0_5px_rgba(0,229,255,0.5)]' : 'text-gray-600'}`}>{idx + 1}</span>
       <div className="flex items-center gap-3">
-        <Link href={`/takim/${player.teamSlug}`} className="shrink-0 group-hover:drop-shadow-[0_0_8px_rgba(0,229,255,0.4)] transition-all">
+        <Link prefetch={false} href={`/takim/${player.teamSlug}`} className="shrink-0 group-hover:drop-shadow-[0_0_8px_rgba(0,229,255,0.4)] transition-all">
           <TeamLogo src={player.teamLogo} name={player.teamName} size="sm" />
         </Link>
         <div className="flex flex-col">
-          <Link href={`/oyuncular/${player.username}`} className="text-[15px] font-[800] text-white hover:text-[#00e5ff] transition-colors tracking-wide">
+          <Link prefetch={false} href={`/oyuncular/${player.username}`} className="text-[15px] font-[800] text-white hover:text-[#00e5ff] transition-colors tracking-wide">
             {player.username}
           </Link>
           <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">{player.teamName}</span>
@@ -54,11 +54,11 @@ const TeamRow = ({ team, idx, val, label }: { team: any, idx: number, val: numbe
     <div className="flex items-center gap-4">
       <span className={`text-[16px] font-[900] w-5 text-center ${idx === 0 ? 'text-[#00e5ff] drop-shadow-[0_0_5px_rgba(0,229,255,0.5)]' : 'text-gray-600'}`}>{idx + 1}</span>
       <div className="flex items-center gap-3">
-        <Link href={`/takim/${team.slug}`} className="shrink-0 flex items-center justify-center">
+        <Link prefetch={false} href={`/takim/${team.slug}`} className="shrink-0 flex items-center justify-center">
           <TeamLogo src={team.logo} name={team.name} size="sm" />
         </Link>
         <div className="flex flex-col">
-          <Link href={`/takim/${team.slug}`} className="text-[15px] font-[800] text-white hover:text-[#00e5ff] transition-colors tracking-wide">
+          <Link prefetch={false} href={`/takim/${team.slug}`} className="text-[15px] font-[800] text-white hover:text-[#00e5ff] transition-colors tracking-wide">
             {team.name}
           </Link>
         </div>

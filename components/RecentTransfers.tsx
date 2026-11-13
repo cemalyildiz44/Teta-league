@@ -145,7 +145,7 @@ export default async function RecentTransfers() {
               {/* Hedef Takım Adı & Logosu */}
               <div className="flex items-center justify-end gap-1.5 min-w-0 flex-1">
                 {transfer.toTeamSlug ? (
-                  <Link
+                  <Link prefetch={false}
                     href={`/takim/${transfer.toTeamSlug}`}
                     className="text-white hover:text-[#00e5ff] transition-colors truncate text-right font-extrabold text-[11px] block"
                     title={transfer.toTeamName}

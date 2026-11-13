@@ -63,7 +63,7 @@ export default function StandingsClient({ superLig, ecl }: StandingsClientProps)
           PUAN <span className="text-[#00e5ff]">DURUMU</span>
         </h2>
 
-        <Link
+        <Link prefetch={false}
           href={fullStandingsUrl}
           className="text-xs font-bold text-zinc-400 hover:text-[#00e5ff] transition-colors tracking-wider uppercase inline-flex items-center gap-1 group"
         >

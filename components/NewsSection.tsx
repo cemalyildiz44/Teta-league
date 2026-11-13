@@ -26,7 +26,7 @@ export default async function NewsSection() {
     <div className="space-y-4 sm:space-y-5">
       <div className="flex items-center justify-between">
         <h2 className="text-[24px] sm:text-[28px] font-[800] tracking-wide text-white">HABERLER</h2>
-        <Link href="/haberler" className="text-xs sm:text-[13px] font-[800] text-[#00E5FF] hover:text-white transition-colors tracking-widest uppercase max-sm:py-2.5 max-sm:-my-2.5">
+        <Link prefetch={false} href="/haberler" className="text-xs sm:text-[13px] font-[800] text-[#00E5FF] hover:text-white transition-colors tracking-widest uppercase max-sm:py-2.5 max-sm:-my-2.5">
           TÜM HABERLER &rarr;
         </Link>
       </div>
@@ -51,7 +51,7 @@ export default async function NewsSection() {
                 key={item.id}
                 className="client-glass-interactive group overflow-hidden flex flex-col h-full border border-white/5 hover:border-[#00E5FF]/40 transition-all rounded-xl"
               >
-                <Link href={`/haberler/${item.slug}`} className="block">
+                <Link prefetch={false} href={`/haberler/${item.slug}`} className="block">
                   <NewsImage
                     src={item.image_url}
                     alt={item.title}
@@ -63,7 +63,7 @@ export default async function NewsSection() {
                 <div className="p-4 sm:p-5 flex flex-col flex-1 bg-gradient-to-b from-[#050a0f] to-[#01060b]">
                   <span className="data-label mb-1.5 block !text-[10px]">{formattedDate}</span>
                   <h3 className="text-[17px] sm:text-[18px] md:text-[19px] font-[800] text-white leading-snug mb-2 drop-shadow-md">
-                    <Link href={`/haberler/${item.slug}`} className="hover:text-[#00E5FF] transition-colors line-clamp-2">
+                    <Link prefetch={false} href={`/haberler/${item.slug}`} className="hover:text-[#00E5FF] transition-colors line-clamp-2">
                       {item.title}
                     </Link>
                   </h3>

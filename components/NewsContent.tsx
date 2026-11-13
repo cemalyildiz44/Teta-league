@@ -25,7 +25,7 @@ export default function NewsContent({
       {tokens.map((token, index) => {
         if (token.type === 'mention' && token.username) {
           return (
-            <Link
+            <Link prefetch={false}
               key={index}
               href={`/oyuncular/${token.username}`}
               className="text-[#00e5ff] font-bold hover:underline hover:text-white transition-colors cursor-pointer inline-flex items-baseline break-all"

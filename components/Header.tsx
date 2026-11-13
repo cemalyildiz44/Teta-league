@@ -12,18 +12,20 @@ interface NavLink {
   label: string;
   href: string;
   locked?: boolean;
+  // Dynamic page: not prefetched, so every page view does not run a function for these menu links
+  dynamic?: boolean;
 }
 
 const leftLinks: NavLink[] = [
   { label: 'LİGLER', href: '/ligler' },
-  { label: 'TURNUVALAR', href: '/turnuvalar' },
+  { label: 'TURNUVALAR', href: '/turnuvalar', dynamic: true },
   { label: 'TAKIMLAR', href: '/takimlar' },
   { label: 'OYUNCULAR', href: '/oyuncular' },
 ];
 
 const rightLinks: NavLink[] = [
   { label: 'HABERLER', href: '/haberler' },
-  { label: 'SOSYAL', href: '/sosyal' },
+  { label: 'SOSYAL', href: '/sosyal', dynamic: true },
   { label: 'MAĞAZA', href: '/magaza', locked: true },
 ];
 
@@ -51,7 +53,7 @@ export default function Header() {
           {leftLinks.map((link) => {
             const isActive = pathname === link.href || pathname.startsWith(link.href + '/');
             return (
-              <Link
+              <Link prefetch={link.dynamic ? false : undefined}
                 key={link.href}
                 href={link.href}
                 className={`relative text-[14px] font-[800] uppercase tracking-[0.1em] transition-all duration-300 ${isActive ? 'text-[#00E5FF] drop-shadow-[0_0_8px_rgba(0,229,255,0.5)]' : 'text-gray-300 hover:text-[#00E5FF]'}`}
@@ -95,7 +97,7 @@ export default function Header() {
             }
             const isActive = pathname === link.href || pathname.startsWith(link.href + '/');
             return (
-              <Link
+              <Link prefetch={link.dynamic ? false : undefined}
                 key={link.href}
                 href={link.href}
                 className={`relative text-[14px] font-[800] uppercase tracking-[0.1em] transition-all duration-300 ${isActive ? 'text-[#00E5FF] drop-shadow-[0_0_8px_rgba(0,229,255,0.5)]' : 'text-gray-300 hover:text-[#00E5FF]'}`}
@@ -121,7 +123,7 @@ export default function Header() {
               )}
             </Link>
           ) : (
-            <Link
+            <Link prefetch={false}
               href="/giris"
               className="flex items-center gap-1.5 text-[14px] font-[800] uppercase tracking-[0.1em] text-gray-500 hover:text-[#00E5FF] transition-colors duration-300 opacity-70 hover:opacity-100"
             >
@@ -136,7 +138,7 @@ export default function Header() {
               <div className="h-[44px] w-[180px] rounded-full bg-white/5 border border-white/5 animate-pulse" aria-hidden="true" />
             ) : user && userProfile ? (
               <div className="flex items-center gap-3">
-                <Link href="/bildirimler" className="relative p-2 text-gray-400 hover:text-[#00e5ff] transition-colors rounded-full hover:bg-white/5">
+                <Link prefetch={false} href="/bildirimler" className="relative p-2 text-gray-400 hover:text-[#00e5ff] transition-colors rounded-full hover:bg-white/5">
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
                   {unreadCount > 0 && (
                     <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-lg shadow-red-500/50">
@@ -144,7 +146,7 @@ export default function Header() {
                     </span>
                   )}
                 </Link>
-                <Link 
+                <Link prefetch={false} 
                   href="/profil" 
                   className="client-glass flex items-center gap-3 p-1.5 pr-4 rounded-full border border-white/5 bg-[#03070c]/50 hover:border-[#00e5ff]/40 hover:bg-[#00e5ff]/5 transition-all group shrink-0"
                   title="Hesap Ayarları"
@@ -187,7 +189,7 @@ export default function Header() {
                 </button>
               </div>
             ) : (
-              <Link
+              <Link prefetch={false}
                 href="/giris"
                 className="flat-button flat-button-solid px-6 py-2 text-[13px]"
               >
@@ -229,7 +231,7 @@ export default function Header() {
               }
               const isActive = pathname === link.href || pathname.startsWith(link.href + '/');
               return (
-                <Link
+                <Link prefetch={link.dynamic ? false : undefined}
                   key={link.href}
                   href={link.href}
                   onClick={() => setMobileOpen(false)}
@@ -242,7 +244,7 @@ export default function Header() {
             
             {user ? (
               <>
-                <Link
+                <Link prefetch={false}
                   href="/bildirimler"
                   onClick={() => setMobileOpen(false)}
                   className={`flex items-center justify-between text-[16px] font-[800] uppercase tracking-widest ${pathname === '/bildirimler' ? 'text-[#00E5FF] drop-shadow-[0_0_8px_rgba(0,229,255,0.5)]' : 'text-gray-300 hover:text-[#00E5FF]'}`}
@@ -267,7 +269,7 @@ export default function Header() {
                 </Link>
               </>
             ) : (
-              <Link
+              <Link prefetch={false}
                 href="/giris"
                 onClick={() => setMobileOpen(false)}
                 className="flex items-center gap-2 text-[16px] font-[800] uppercase tracking-widest text-gray-500 hover:text-[#00E5FF]"
@@ -283,7 +285,7 @@ export default function Header() {
               <div className="h-[72px] rounded-xl bg-white/5 border border-white/5 animate-pulse" aria-hidden="true" />
             ) : user && userProfile ? (
               <div className="flex flex-col gap-4">
-                <Link 
+                <Link prefetch={false} 
                   href="/profil"
                   onClick={() => setMobileOpen(false)}
                   className="client-glass flex items-center justify-between p-3 rounded-xl border border-white/5 bg-[#03070c]/50 hover:border-[#00e5ff]/40 transition-all group"
@@ -335,7 +337,7 @@ export default function Header() {
                 </button>
               </div>
             ) : (
-              <Link
+              <Link prefetch={false}
                 href="/giris"
                 onClick={() => setMobileOpen(false)}
                 className="flat-button flat-button-solid w-full py-4 text-[14px]"

@@ -12,7 +12,7 @@ interface Props {
   params: Promise<{ slug: string }>;
 }
 
-export const revalidate = 60; // 1 min public cache
+export const revalidate = 300; // 5 min; admin changes refresh the page right away (revalidatePath/Tag)
 
 // Render each path on its first visit and cache it (ISR); without this the route renders on every request.
 export async function generateStaticParams() {
@@ -152,7 +152,7 @@ export default async function TeamPage({ params }: Props) {
                   <div className="px-5 py-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-xl flex flex-col">
                     <span className="text-[10px] text-gray-500 font-[900] uppercase tracking-[0.2em] mb-1">Aktif Lig</span>
                     {activeSeason.slug ? (
-                      <Link href={`/lig/${activeSeason.slug}/${slugify(activeLeague.name)}`} className="text-[14px] text-white font-[800] tracking-widest uppercase hover:text-[#00e5ff] transition-colors">
+                      <Link prefetch={false} href={`/lig/${activeSeason.slug}/${slugify(activeLeague.name)}`} className="text-[14px] text-white font-[800] tracking-widest uppercase hover:text-[#00e5ff] transition-colors">
                         {activeLeague.name}
                       </Link>
                     ) : (
@@ -181,7 +181,7 @@ export default async function TeamPage({ params }: Props) {
                     {captains.map((cap, idx) => (
                       <div key={cap.id} className="flex items-center gap-2">
                         {idx > 0 && <span className="text-white/20 text-[12px] font-bold">•</span>}
-                        <Link
+                        <Link prefetch={false}
                           href={`/oyuncular/${encodeURIComponent(cap.username)}`}
                           className="inline-flex items-center gap-1.5 text-[14px] text-white font-[800] tracking-wider uppercase hover:text-amber-400 transition-colors group/cap"
                           title={`Kaptan Profili: ${cap.username}`}
@@ -462,7 +462,7 @@ export default async function TeamPage({ params }: Props) {
                       <div className="flex-1 min-w-0 flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0 truncate">
                           <TeamLogo src={opponent?.logo_url} name={opponent?.name} size="sm" className="group-hover:scale-[1.04] transition-transform duration-200" />
-                          <Link href={opponent?.slug ? `/takim/${opponent.slug}` : "#"} className="text-[14px] font-[800] text-gray-300 hover:text-[#00e5ff] truncate transition-colors">
+                          <Link prefetch={false} href={opponent?.slug ? `/takim/${opponent.slug}` : "#"} className="text-[14px] font-[800] text-gray-300 hover:text-[#00e5ff] truncate transition-colors">
                             {opponent?.name || 'Rakip Takım'}
                           </Link>
                         </div>
@@ -506,7 +506,7 @@ export default async function TeamPage({ params }: Props) {
                     : `${match.week_number}. Hafta`;
 
                   return (
-                    <Link href={`/mac/${match.id}`} key={match.id} className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] hover:border-[#00e5ff]/30 transition-all duration-200 group">
+                    <Link prefetch={false} href={`/mac/${match.id}`} key={match.id} className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] hover:border-[#00e5ff]/30 transition-all duration-200 group">
                       <div className="flex flex-col items-center justify-center min-w-[65px] pr-4 border-r border-white/10">
                         <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">
                           {dateStr}

@@ -5,7 +5,7 @@ import { ChevronRight } from "lucide-react";
 import TeamLogo from "@/components/TeamLogo";
 import { slugify } from "@/app/lig/utils";
 
-export const revalidate = 60;
+export const revalidate = 300; // 5 min; admin changes refresh the page right away (revalidatePath/Tag)
 
 import { getMatchById, getTeamById } from "@/lib/fetchers";
 import { avatarSrc } from '@/lib/avatar';
@@ -155,11 +155,11 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
 
         {/* BREADCRUMB */}
         <div className="flex items-center gap-2 mb-8 text-[10px] font-[800] tracking-[0.2em] uppercase text-gray-600 overflow-x-auto whitespace-nowrap">
-          <Link href="/ligler" className="hover:text-[#00e5ff] transition-colors">LİGLER</Link>
+          <Link prefetch={false} href="/ligler" className="hover:text-[#00e5ff] transition-colors">LİGLER</Link>
           <ChevronRight className="w-3 h-3 text-gray-700" />
           {leagueData && (
             <>
-              <Link href={`/lig/${seasonData?.slug}/${slugify(leagueData.name)}`} className="hover:text-[#00e5ff] transition-colors">{leagueData.name}</Link>
+              <Link prefetch={false} href={`/lig/${seasonData?.slug}/${slugify(leagueData.name)}`} className="hover:text-[#00e5ff] transition-colors">{leagueData.name}</Link>
               <ChevronRight className="w-3 h-3 text-gray-700" />
             </>
           )}
@@ -191,7 +191,7 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
             <div className="w-full flex items-center justify-between md:justify-center md:gap-24 lg:gap-32">
               
               {/* HOME TEAM */}
-              <Link href={`/takim/${homeTeam?.slug}`} className="flex flex-col items-center group flex-1 md:flex-none">
+              <Link prefetch={false} href={`/takim/${homeTeam?.slug}`} className="flex flex-col items-center group flex-1 md:flex-none">
                 <div className="mb-4 md:mb-6">
                   <TeamLogo src={homeTeam?.logo_url} name={homeTeam?.name} size="hero" className="w-24 h-24 md:w-36 md:h-36" />
                 </div>
@@ -209,7 +209,7 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
               </div>
 
               {/* AWAY TEAM */}
-              <Link href={`/takim/${awayTeam?.slug}`} className="flex flex-col items-center group flex-1 md:flex-none">
+              <Link prefetch={false} href={`/takim/${awayTeam?.slug}`} className="flex flex-col items-center group flex-1 md:flex-none">
                 <div className="mb-4 md:mb-6">
                   <TeamLogo src={awayTeam?.logo_url} name={awayTeam?.name} size="hero" className="w-24 h-24 md:w-36 md:h-36" />
                 </div>
@@ -229,7 +229,7 @@ export default async function PublicMatchDetailPage({ params, searchParams }: { 
             {tabs.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
-                <Link 
+                <Link prefetch={false} 
                   key={tab.id}
                   href={`?tab=${tab.id}`} 
                   scroll={false}

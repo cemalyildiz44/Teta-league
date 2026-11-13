@@ -12,7 +12,7 @@ export const metadata = {
   alternates: { canonical: '/haberler' },
 };
 
-export const revalidate = 60; // ISR cache revalidation every 60s
+export const revalidate = 300; // 5 min; admin changes refresh the page right away (revalidatePath/Tag)
 
 export default async function HaberlerPage({
   searchParams,
@@ -72,7 +72,7 @@ export default async function HaberlerPage({
           const isActive = currentCategory === cat.value;
           const href = cat.value === 'ALL' ? '/haberler' : `/haberler?category=${encodeURIComponent(cat.value)}`;
           return (
-            <Link
+            <Link prefetch={false}
               key={cat.value}
               href={href}
               className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-[11px] sm:text-xs font-[800] uppercase tracking-wider whitespace-nowrap transition-all duration-200 border ${
@@ -100,7 +100,7 @@ export default async function HaberlerPage({
               : 'Lig duyuruları ve haber bültenleri yayınlandığında burada görüntülenecektir.'}
           </p>
           {currentCategory !== 'ALL' && (
-            <Link
+            <Link prefetch={false}
               href="/haberler"
               className="inline-block px-5 py-2.5 rounded-xl bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/30 text-xs font-bold uppercase tracking-wider hover:bg-[#00e5ff]/20 transition-all glow-cyan-sm"
             >
@@ -125,7 +125,7 @@ export default async function HaberlerPage({
               className="group flex flex-col overflow-hidden rounded-2xl bg-[#060d18] border border-white/5 hover:border-[#00e5ff]/40 transition-all duration-300 hover:shadow-[0_0_30px_rgba(0,229,255,0.12)] hover:-translate-y-1"
             >
               {/* Image */}
-              <Link href={`/haberler/${item.slug}`} className="block relative overflow-hidden">
+              <Link prefetch={false} href={`/haberler/${item.slug}`} className="block relative overflow-hidden">
                 <NewsImage
                   src={item.image_url}
                   alt={item.title}
@@ -148,7 +148,7 @@ export default async function HaberlerPage({
                 </div>
 
                 <h2 className="text-[17px] sm:text-[18px] font-bold text-white leading-snug mb-3">
-                  <Link
+                  <Link prefetch={false}
                     href={`/haberler/${item.slug}`}
                     className="hover:text-[#00e5ff] transition-colors line-clamp-2"
                   >
@@ -163,7 +163,7 @@ export default async function HaberlerPage({
                 )}
 
                 <div className="pt-4 mt-auto border-t border-white/5 flex items-center justify-between text-xs font-bold text-[#00e5ff]">
-                  <Link
+                  <Link prefetch={false}
                     href={`/haberler/${item.slug}`}
                     className="inline-flex items-center gap-1.5 hover:underline group-hover:translate-x-1 transition-transform"
                   >

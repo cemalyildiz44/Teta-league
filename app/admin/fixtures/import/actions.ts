@@ -2,6 +2,7 @@
 
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { revalidatePublicSite } from '@/lib/match-revalidation';
 import { createClient } from '@/utils/supabase/server';
 import { logAdminAudit } from '@/lib/audit';
 import {
@@ -86,5 +87,6 @@ export async function applyFixtureImportAction(formData: FormData) {
   });
   revalidatePath('/admin/fixtures');
   revalidatePath('/admin/fixtures/import');
+  revalidatePublicSite();
   return { success: true as const, applied: result.applied };
 }

@@ -112,7 +112,7 @@ export default function TeamRankingsClient({ rankings }: { rankings: TeamRanking
                       
                       {/* TEAM INFO */}
                       <td className="py-4 px-2 sm:px-6">
-                        <Link 
+                        <Link prefetch={false} 
                           href={`/takim/${team.slug}`}
                           className="flex items-center gap-2.5 sm:gap-4 group-hover:drop-shadow-[0_0_10px_rgba(0,229,255,0.3)] transition-all"
                         >

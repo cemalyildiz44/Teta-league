@@ -71,7 +71,7 @@ export default async function SocialFeed() {
         ))}
       </div>
       
-      <Link 
+      <Link prefetch={false} 
         href="/sosyal"
         className="mt-6 shrink-0 block w-full py-3 text-center text-[13px] flat-button"
       >

@@ -10,7 +10,7 @@ import type { Metadata } from "next";
 import { getCanonicalSiteUrl } from "@/lib/site-url";
 import { buildOpenGraph, HOME_DESCRIPTION, HOME_TITLE, SITE_NAME } from "@/lib/seo";
 
-export const revalidate = 60;
+export const revalidate = 300; // 5 min; admin changes refresh the page right away (revalidatePath/Tag)
 
 export const metadata: Metadata = {
   title: HOME_TITLE,

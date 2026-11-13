@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   alternates: { canonical: '/takimlar' },
 };
 
-export const revalidate = 60; // Cache for 1 min
+export const revalidate = 300; // 5 min; admin changes refresh the page right away (revalidatePath/Tag)
 
 export default async function TeamsPage() {
   const supabase = createPublicClient();

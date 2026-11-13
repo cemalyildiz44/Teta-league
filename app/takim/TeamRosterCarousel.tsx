@@ -74,7 +74,7 @@ export default function TeamRosterCarousel({ players }: { players: RosterPlayer[
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {players.map((p) => (
-          <Link 
+          <Link prefetch={false} 
             href={`/oyuncular/${p.username}`} 
             key={p.id}
             className="shrink-0 w-[240px] md:w-[260px] snap-center group/card cursor-pointer"

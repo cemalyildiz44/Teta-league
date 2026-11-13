@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { revalidatePublicSite } from '@/lib/match-revalidation';
 import { logAdminAudit } from '@/lib/audit';
 import { fetchClubMatches } from '@/lib/ea/client';
 import { normalizeMatch } from '@/lib/ea/normalizer';
@@ -365,5 +366,6 @@ export async function importEaMatchAction(matchData: EAPreviewMatch, seasonId: s
   });
 
   revalidatePath('/admin/matches');
+  revalidatePublicSite();
   return { success: true };
 }

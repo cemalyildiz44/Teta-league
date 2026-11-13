@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import LeagueRulesButton from "@/components/LeagueRulesButton";
 
-export const revalidate = 60;
+export const revalidate = 300; // 5 min; admin changes refresh the page right away (revalidatePath/Tag)
 import { slugify } from "@/app/lig/utils";
 
 export const metadata = {
@@ -177,13 +177,13 @@ export default async function LiglerPage() {
 
               {/* CARD ACTION BUTTONS */}
               <div className="p-6 md:p-8 bg-black/60 grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 relative z-20">
-                <Link 
+                <Link prefetch={false} 
                   href={`/lig/${league.seasonSlug}/${slugify(league.name)}`} 
                   className={`flex items-center justify-center py-4 px-4 rounded-xl ${theme.bgAccent} ${theme.bgAccentHover} border ${theme.borderAccent} ${theme.text} font-black text-[12px] md:text-[11px] tracking-widest uppercase transition-all shadow-[0_0_15px_rgba(0,0,0,0.5)]`}
                 >
                   LİG MERKEZİ
                 </Link>
-                <Link 
+                <Link prefetch={false} 
                   href={`/lig/${league.seasonSlug}/${slugify(league.name)}`} 
                   className="flex items-center justify-center py-4 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black text-[12px] md:text-[11px] tracking-widest uppercase transition-all"
                 >

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import LeagueRulesViewer from "@/components/LeagueRulesViewer";
 import { buildLeagueMetadata } from "../league-metadata";
 
-export const revalidate = 60;
+export const revalidate = 300; // 5 min; admin changes refresh the page right away (revalidatePath/Tag)
 
 // Render each path on its first visit and cache it (ISR); without this the route renders on every request.
 export async function generateStaticParams() {

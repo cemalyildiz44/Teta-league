@@ -5,7 +5,7 @@ import { ShieldAlert } from "lucide-react";
 import { calculateMarketValue, formatEuro, MarketValueInput } from "@/app/utils/marketValueCalculator";
 import { getPositionLabel } from "@/app/utils/positions";
 
-export const revalidate = 60;
+export const revalidate = 300; // 5 min; admin changes refresh the page right away (revalidatePath/Tag)
 
 // Render each profile on its first visit and cache it (ISR); tabs are client-side, so no searchParams are read.
 export async function generateStaticParams() {
@@ -60,7 +60,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
             <span className="font-bold text-white">@{profile.username}</span> adlı oyuncunun hesabı TETA League kuralları gereğince yasaklanmıştır (BANLI).
           </p>
           <div className="pt-2">
-            <Link href="/oyuncular" className="px-5 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-lg text-xs font-bold inline-flex items-center gap-2 transition-colors">
+            <Link prefetch={false} href="/oyuncular" className="px-5 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-lg text-xs font-bold inline-flex items-center gap-2 transition-colors">
               Oyuncu Listesine Dön
             </Link>
           </div>
@@ -662,7 +662,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                 <div className="mb-4">
                   <TeamLogo src={activeTeam.logo_url} name={activeTeam.name} size="xl" />
                 </div>
-                <Link href={`/takim/${activeTeam.slug}`} className="text-[18px] md:text-[20px] font-[900] text-white hover:text-[#00e5ff] transition-colors uppercase tracking-wide">
+                <Link prefetch={false} href={`/takim/${activeTeam.slug}`} className="text-[18px] md:text-[20px] font-[900] text-white hover:text-[#00e5ff] transition-colors uppercase tracking-wide">
                   {activeTeam.name}
                 </Link>
                 {currentLeague && <div className="text-[12px] font-[700] text-[#00e5ff]/70 mt-1.5 uppercase tracking-wider">{(currentLeague as any).name}</div>}
@@ -806,13 +806,13 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                               return (
                                 <tr key={m.matchId} className="hover:bg-white/[0.04] transition-colors text-[13px] group">
                                   <td className="py-3 pl-6 pr-3">
-                                    <Link href={`/mac/${m.matchId}`} className="font-[700] text-gray-400 hover:text-white transition-colors">
+                                    <Link prefetch={false} href={`/mac/${m.matchId}`} className="font-[700] text-gray-400 hover:text-white transition-colors">
                                       {new Date(m.playedAt).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" })}
                                     </Link>
                                   </td>
                                   <td className="px-3 py-3 text-center font-[900] text-gray-600">{m.weekNumber || "-"}</td>
                                   <td className="px-3 py-3">
-                                    <Link href={opp?.slug ? `/takim/${opp.slug}` : "#"} className="flex items-center gap-3">
+                                    <Link prefetch={false} href={opp?.slug ? `/takim/${opp.slug}` : "#"} className="flex items-center gap-3">
                                       <TeamLogo src={opp?.logo_url} name={opp?.name} size="xs" className="group-hover:scale-110 transition-transform duration-200" />
                                       <span className="font-[800] text-gray-300 group-hover:text-[#00e5ff] transition-colors truncate">{opp?.name || "?"}</span>
                                     </Link>
@@ -902,7 +902,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                                     <div className="flex items-center gap-3">
                                       <TeamLogo src={s.teamLogo} name={s.teamName} size="lg" />
                                       {s.teamSlug ? (
-                                        <Link
+                                        <Link prefetch={false}
                                           href={`/takim/${s.teamSlug}`}
                                           className="font-[800] text-[13px] text-zinc-200 hover:text-[#00e5ff] transition-colors truncate max-w-[180px]"
                                         >
@@ -984,7 +984,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                                   <TeamLogo src={e.teamLogo} name={e.teamName} size="lg" />
                                   <div className="flex flex-col min-w-0">
                                     {e.teamSlug ? (
-                                      <Link href={`/takim/${e.teamSlug}`} className="text-[18px] font-[900] text-white hover:text-[#00e5ff] transition-colors leading-tight truncate">
+                                      <Link prefetch={false} href={`/takim/${e.teamSlug}`} className="text-[18px] font-[900] text-white hover:text-[#00e5ff] transition-colors leading-tight truncate">
                                         {e.teamName}
                                       </Link>
                                     ) : (
