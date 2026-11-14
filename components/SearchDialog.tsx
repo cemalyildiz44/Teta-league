@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import TeamLogo from '@/components/TeamLogo';
 import { avatarSrc } from '@/lib/avatar';
@@ -42,11 +43,42 @@ function rank(haystack: string, query: string) {
   return index === 0 ? 0 : haystack[index - 1] === ' ' ? 1 : 2;
 }
 
+// Colours the matched part of a title (skipped if folding changed the text length)
+function Highlight({ text, query }: { text: string; query: string }) {
+  const folded = fold(text);
+  const at = query && folded.length === text.length ? folded.indexOf(query) : -1;
+  if (at < 0) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, at)}
+      <span className="text-[#00e5ff]">{text.slice(at, at + query.length)}</span>
+      {text.slice(at + query.length)}
+    </>
+  );
+}
+
 type Result =
   | { kind: 'team'; key: string; href: string; title: string; sub: string; logo: string | null }
   | { kind: 'player'; key: string; href: string; title: string; sub: string; avatar: string | null };
 
 const LIMIT = 6;
+const QUICK_LINKS = [
+  { label: 'Ligler', href: '/ligler' },
+  { label: 'Takımlar', href: '/takimlar' },
+  { label: 'Oyuncular', href: '/oyuncular' },
+  { label: 'Haberler', href: '/haberler' },
+];
+
+function playerResult(player: SearchIndex['players'][number]): Result {
+  return {
+    kind: 'player',
+    key: `p-${player.u}`,
+    href: `/oyuncular/${encodeURIComponent(player.u)}`,
+    title: player.u,
+    sub: [player.p, player.t].filter(Boolean).join(' · ') || 'Oyuncu',
+    avatar: player.a,
+  };
+}
 
 export default function SearchDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
@@ -73,12 +105,16 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
     };
   }, [open]);
 
+  const folded = fold(query.trim());
+  const hasQuery = folded.length > 0;
+
+  // With no query: the most valuable players (the index is already in ranking order) as suggestions
   const results = useMemo<Result[]>(() => {
-    const q = fold(query.trim());
-    if (!index || q.length === 0) return [];
+    if (!index) return [];
+    if (!hasQuery) return index.players.slice(0, 4).map(playerResult);
 
     const teams = index.teams
-      .map((team) => ({ team, score: rank(fold(team.n), q) }))
+      .map((team) => ({ team, score: rank(fold(team.n), folded) }))
       .filter((entry) => entry.score >= 0)
       .sort((a, b) => a.score - b.score || a.team.n.localeCompare(b.team.n, 'tr'))
       .slice(0, LIMIT)
@@ -92,28 +128,21 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
       }));
 
     const players = index.players
-      .map((player) => ({ player, score: rank(fold(player.u), q) }))
+      .map((player) => ({ player, score: rank(fold(player.u), folded) }))
       .filter((entry) => entry.score >= 0)
       .sort((a, b) => a.score - b.score || a.player.u.localeCompare(b.player.u, 'tr'))
       .slice(0, LIMIT)
-      .map<Result>(({ player }) => ({
-        kind: 'player',
-        key: `p-${player.u}`,
-        href: `/oyuncular/${encodeURIComponent(player.u)}`,
-        title: player.u,
-        sub: [player.p, player.t].filter(Boolean).join(' · ') || 'Oyuncu',
-        avatar: player.a,
-      }));
+      .map<Result>(({ player }) => playerResult(player));
 
     return [...teams, ...players];
-  }, [index, query]);
+  }, [index, folded, hasQuery]);
 
   if (!open) return null;
 
-  const go = (result: Result | undefined) => {
-    if (!result) return;
+  const go = (href: string | undefined) => {
+    if (!href) return;
     onClose();
-    router.push(result.href);
+    router.push(href);
   };
 
   const onKeyDown = (event: React.KeyboardEvent) => {
@@ -128,13 +157,12 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
       setActive((i) => (results.length ? (i + results.length - 1) % results.length : 0));
     } else if (event.key === 'Enter') {
       event.preventDefault();
-      go(results[active]);
+      go(results[active]?.href);
     }
   };
 
   const teamResults = results.filter((r) => r.kind === 'team');
   const playerResults = results.filter((r) => r.kind === 'player');
-  const hasQuery = query.trim().length > 0;
 
   const renderRow = (result: Result) => {
     const position = results.indexOf(result);
@@ -143,34 +171,46 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
       <li key={result.key} role="option" id={`search-opt-${position}`} aria-selected={selected}>
         <button
           type="button"
-          onClick={() => go(result)}
+          onClick={() => go(result.href)}
           onMouseMove={() => setActive(position)}
-          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors ${
+          className={`relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
             selected ? 'bg-[#00e5ff]/10' : 'hover:bg-white/5'
           }`}
         >
+          {selected && <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-[#00e5ff] shadow-[0_0_8px_rgba(0,229,255,0.8)]" aria-hidden="true" />}
           {result.kind === 'team' ? (
-            <TeamLogo src={result.logo} name={result.title} className="w-8 h-8" />
+            <TeamLogo src={result.logo} name={result.title} className="w-9 h-9" />
           ) : result.avatar ? (
             // eslint-disable-next-line @next/next/no-img-element -- tiny avatar already resized by avatarSrc
-            <img src={avatarSrc(result.avatar, 64)} alt="" className="h-8 w-8 rounded-full object-cover bg-black" />
+            <img src={avatarSrc(result.avatar, 72)} alt="" className="h-9 w-9 rounded-full object-cover bg-black ring-1 ring-white/10" />
           ) : (
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-xs font-black text-[#00e5ff]">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-sm font-black text-[#00e5ff] ring-1 ring-white/10">
               {result.title.charAt(0).toUpperCase()}
             </span>
           )}
-          <span className="min-w-0">
-            <span className="block truncate text-sm font-black uppercase tracking-wide text-white">{result.title}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[15px] font-black uppercase tracking-wide text-white">
+              {hasQuery ? <Highlight text={result.title} query={folded} /> : result.title}
+            </span>
             <span className="block truncate text-[11px] font-bold text-gray-500">{result.sub}</span>
+          </span>
+          <span
+            className={`shrink-0 rounded-md border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${
+              result.kind === 'team' ? 'border-amber-400/30 text-amber-300/80' : 'border-[#00e5ff]/30 text-[#00e5ff]/80'
+            }`}
+          >
+            {result.kind === 'team' ? 'Takım' : 'Oyuncu'}
           </span>
         </button>
       </li>
     );
   };
 
-  return (
+  // Rendered into <body>: the header uses backdrop-filter, which would otherwise make this "fixed" overlay
+  // cover only the header instead of the whole screen (and clicks outside would never reach it).
+  return createPortal(
     <div
-      className="fixed inset-0 z-[110] flex items-start justify-center bg-black/70 px-4 pt-[12vh] backdrop-blur-sm"
+      className="fixed inset-0 z-[110] flex items-start justify-center bg-black/70 px-4 pt-[10vh] backdrop-blur-md sm:pt-[14vh]"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -180,10 +220,11 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
         aria-modal="true"
         aria-label="Arama"
         onKeyDown={onKeyDown}
-        className="w-full max-w-xl overflow-hidden rounded-2xl border border-[#00e5ff]/20 bg-[#060d18] shadow-[0_0_50px_rgba(0,0,0,0.7)]"
+        className="fade-in-up w-full max-w-2xl overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-[#0b1628] to-[#060d18] shadow-[0_0_80px_rgba(0,229,255,0.08),0_30px_70px_rgba(0,0,0,0.65)]"
       >
-        <div className="flex items-center gap-3 border-b border-white/5 px-4">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-gray-400" aria-hidden="true">
+        <div className="h-px w-full bg-gradient-to-r from-transparent via-[#00e5ff]/60 to-transparent" aria-hidden="true" />
+        <div className="flex items-center gap-3 border-b border-white/5 px-5">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-[#00e5ff]" aria-hidden="true">
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
@@ -200,41 +241,75 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
             aria-activedescendant={results.length ? `search-opt-${active}` : undefined}
             placeholder="Oyuncu veya takım ara…"
             autoComplete="off"
-            className="h-14 w-full bg-transparent text-[15px] font-bold text-white placeholder-gray-500 outline-none"
+            className="h-16 w-full bg-transparent text-[17px] font-bold text-white placeholder-gray-500 outline-none"
           />
-          <kbd className="hidden shrink-0 rounded border border-white/10 px-1.5 py-0.5 text-[10px] font-black text-gray-500 sm:block">ESC</kbd>
+          <kbd className="hidden shrink-0 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-black text-gray-400 sm:block">ESC</kbd>
         </div>
 
         <div className="max-h-[55vh] overflow-y-auto p-2">
           {failed ? (
-            <p className="px-3 py-8 text-center text-sm font-bold text-gray-400">Arama şu an yüklenemedi. Biraz sonra tekrar deneyin.</p>
+            <p className="px-3 py-10 text-center text-sm font-bold text-gray-400">Arama şu an yüklenemedi. Biraz sonra tekrar deneyin.</p>
           ) : !index ? (
-            <div className="space-y-2 p-2" aria-hidden="true">
+            <div className="space-y-3 p-3" aria-hidden="true">
               {[0, 1, 2].map((i) => (
                 <div key={i} className="flex items-center gap-3">
-                  <div className="h-8 w-8 animate-pulse rounded-full bg-white/5" />
-                  <div className="h-3 w-40 animate-pulse rounded bg-white/5" />
+                  <div className="h-9 w-9 animate-pulse rounded-full bg-white/5" />
+                  <div className="space-y-1.5">
+                    <div className="h-3 w-40 animate-pulse rounded bg-white/5" />
+                    <div className="h-2.5 w-24 animate-pulse rounded bg-white/5" />
+                  </div>
                 </div>
               ))}
             </div>
-          ) : !hasQuery ? (
-            <p className="px-3 py-8 text-center text-sm font-bold text-gray-500">Bir oyuncu ya da takım adı yazın.</p>
-          ) : results.length === 0 ? (
-            <p className="px-3 py-8 text-center text-sm font-bold text-gray-400">“{query.trim()}” için sonuç bulunamadı.</p>
+          ) : hasQuery && results.length === 0 ? (
+            <div className="px-3 py-10 text-center">
+              <p className="text-sm font-bold text-gray-300">“{query.trim()}” için sonuç bulunamadı.</p>
+              <p className="mt-1 text-xs font-bold text-gray-500">Yazımı değiştirip tekrar deneyin.</p>
+            </div>
           ) : (
             <ul id="search-results" role="listbox" aria-label="Arama sonuçları" className="space-y-1">
+              {!hasQuery && (
+                <li role="presentation" className="px-3 pb-1 pt-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">
+                  En değerli oyuncular
+                </li>
+              )}
               {teamResults.length > 0 && (
                 <li role="presentation" className="px-3 pb-1 pt-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Takımlar</li>
               )}
               {teamResults.map(renderRow)}
-              {playerResults.length > 0 && (
+              {hasQuery && playerResults.length > 0 && (
                 <li role="presentation" className="px-3 pb-1 pt-3 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Oyuncular</li>
               )}
               {playerResults.map(renderRow)}
             </ul>
           )}
+
+          {!hasQuery && index && !failed && (
+            <div className="mt-2 border-t border-white/5 px-3 pb-2 pt-4">
+              <p className="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Hızlı erişim</p>
+              <div className="flex flex-wrap gap-2">
+                {QUICK_LINKS.map((link) => (
+                  <button
+                    key={link.href}
+                    type="button"
+                    onClick={() => go(link.href)}
+                    className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-black uppercase tracking-wider text-gray-300 transition-colors hover:border-[#00e5ff]/40 hover:text-[#00e5ff]"
+                  >
+                    {link.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="hidden items-center gap-4 border-t border-white/5 bg-black/20 px-5 py-2.5 text-[11px] font-bold text-gray-500 sm:flex">
+          <span><kbd className="rounded border border-white/10 px-1.5">↑</kbd> <kbd className="rounded border border-white/10 px-1.5">↓</kbd> gezin</span>
+          <span><kbd className="rounded border border-white/10 px-1.5">↵</kbd> aç</span>
+          <span><kbd className="rounded border border-white/10 px-1.5">esc</kbd> kapat</span>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

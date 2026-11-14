@@ -734,18 +734,9 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                           </div>
                           <div className="flex-1 flex flex-col justify-end md:border-l border-white/5 md:pl-8 min-h-[120px]">
                             {/* One column per match, oldest to newest: rating bar, opponent logo and result. Hover/focus shows the details. */}
-                            <div className="relative pl-6">
-                              <div className="relative h-[110px]" aria-hidden="true">
-                                {[6, 8].map((r) => (
-                                  <div key={r} className="absolute left-0 right-0 border-t border-dashed border-white/10" style={{ bottom: `${((r - 4) / 6) * 100}%` }}>
-                                    <span className="absolute -left-6 -translate-y-1/2 text-[9px] font-[800] text-gray-600">{r}</span>
-                                  </div>
-                                ))}
-                                {r12Avg > 0 && (
-                                  <div className="absolute left-0 right-0 border-t border-dashed border-[#00e5ff]/40" style={{ bottom: `${Math.min(Math.max(((r12Avg - 4) / 6) * 100, 0), 100)}%` }} />
-                                )}
-                              </div>
-                              <div className="absolute inset-0 pl-6 flex items-end justify-between gap-[3px]">
+                            <div className="relative">
+                              <div className="h-[110px]" aria-hidden="true" />
+                              <div className="absolute inset-0 flex items-end justify-between gap-[3px]">
                                 {recent12.slice().reverse().map((m, i, list) => {
                                   const h = m.rating > 0 ? Math.min(Math.max(((m.rating - 4) / 6) * 100, 8), 100) : 8;
                                   const bg = m.rating >= 8 ? "bg-[#00e5ff]" : m.rating >= 7 ? "bg-emerald-400" : m.rating >= 6 ? "bg-amber-400" : "bg-red-400";
@@ -772,7 +763,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                                 })}
                               </div>
                             </div>
-                            <div className="flex justify-between gap-[3px] pl-6 mt-2">
+                            <div className="flex justify-between gap-[3px] mt-2">
                               {recent12.slice().reverse().map((m, i) => {
                                 const opp = teamsMap.get(m.opponentId);
                                 const resClass = m.result === "W" ? "bg-emerald-400/20 text-emerald-300" : m.result === "D" ? "bg-amber-400/20 text-amber-300" : "bg-red-400/20 text-red-300";
@@ -784,7 +775,6 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                                 );
                               })}
                             </div>
-                            <p className="mt-2 pl-6 text-[10px] font-[700] text-gray-600">Kesikli çizgiler: reyting 6 ve 8 · turkuaz çizgi: son 12 maç ortalaması</p>
                           </div>
                         </div>
                       </div>
