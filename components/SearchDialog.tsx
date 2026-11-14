@@ -108,10 +108,9 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
   const folded = fold(query.trim());
   const hasQuery = folded.length > 0;
 
-  // With no query: the most valuable players (the index is already in ranking order) as suggestions
   const results = useMemo<Result[]>(() => {
     if (!index) return [];
-    if (!hasQuery) return index.players.slice(0, 4).map(playerResult);
+    if (!hasQuery) return [];
 
     const teams = index.teams
       .map((team) => ({ team, score: rank(fold(team.n), folded) }))
@@ -261,18 +260,13 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
                 </div>
               ))}
             </div>
-          ) : hasQuery && results.length === 0 ? (
+          ) : !hasQuery ? null : results.length === 0 ? (
             <div className="px-3 py-10 text-center">
               <p className="text-sm font-bold text-gray-300">“{query.trim()}” için sonuç bulunamadı.</p>
               <p className="mt-1 text-xs font-bold text-gray-500">Yazımı değiştirip tekrar deneyin.</p>
             </div>
           ) : (
             <ul id="search-results" role="listbox" aria-label="Arama sonuçları" className="space-y-1">
-              {!hasQuery && (
-                <li role="presentation" className="px-3 pb-1 pt-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">
-                  En değerli oyuncular
-                </li>
-              )}
               {teamResults.length > 0 && (
                 <li role="presentation" className="px-3 pb-1 pt-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Takımlar</li>
               )}
@@ -285,7 +279,7 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
           )}
 
           {!hasQuery && index && !failed && (
-            <div className="mt-2 border-t border-white/5 px-3 pb-2 pt-4">
+            <div className="px-3 pb-3 pt-3">
               <p className="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Hızlı erişim</p>
               <div className="flex flex-wrap gap-2">
                 {QUICK_LINKS.map((link) => (
@@ -301,12 +295,6 @@ export default function SearchDialog({ open, onClose }: { open: boolean; onClose
               </div>
             </div>
           )}
-        </div>
-
-        <div className="hidden items-center gap-4 border-t border-white/5 bg-black/20 px-5 py-2.5 text-[11px] font-bold text-gray-500 sm:flex">
-          <span><kbd className="rounded border border-white/10 px-1.5">↑</kbd> <kbd className="rounded border border-white/10 px-1.5">↓</kbd> gezin</span>
-          <span><kbd className="rounded border border-white/10 px-1.5">↵</kbd> aç</span>
-          <span><kbd className="rounded border border-white/10 px-1.5">esc</kbd> kapat</span>
         </div>
       </div>
     </div>,
