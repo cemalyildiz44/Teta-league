@@ -722,7 +722,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                   <section>
                     <h2 className="text-[14px] font-[900] text-gray-500 tracking-widest uppercase mb-3">SON 12 MAÇ FORMU</h2>
                     {recent12.length > 0 ? (
-                      <div className="bg-[#03070c] border border-white/5 rounded-2xl overflow-hidden p-6">
+                      <div className="bg-[#03070c] border border-white/5 rounded-2xl p-6 pt-10">
                         <div className="flex flex-col md:flex-row gap-8">
                           <div className="flex flex-col justify-center min-w-[160px]">
                             <div className="flex flex-col gap-2 text-[14px] font-[700]">
@@ -733,19 +733,58 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                             </div>
                           </div>
                           <div className="flex-1 flex flex-col justify-end md:border-l border-white/5 md:pl-8 min-h-[120px]">
-                            <div className="flex items-end justify-between h-[100px] w-full gap-[3px]">
+                            {/* One column per match, oldest to newest: rating bar, opponent logo and result. Hover/focus shows the details. */}
+                            <div className="relative pl-6">
+                              <div className="relative h-[110px]" aria-hidden="true">
+                                {[6, 8].map((r) => (
+                                  <div key={r} className="absolute left-0 right-0 border-t border-dashed border-white/10" style={{ bottom: `${((r - 4) / 6) * 100}%` }}>
+                                    <span className="absolute -left-6 -translate-y-1/2 text-[9px] font-[800] text-gray-600">{r}</span>
+                                  </div>
+                                ))}
+                                {r12Avg > 0 && (
+                                  <div className="absolute left-0 right-0 border-t border-dashed border-[#00e5ff]/40" style={{ bottom: `${Math.min(Math.max(((r12Avg - 4) / 6) * 100, 0), 100)}%` }} />
+                                )}
+                              </div>
+                              <div className="absolute inset-0 pl-6 flex items-end justify-between gap-[3px]">
+                                {recent12.slice().reverse().map((m, i, list) => {
+                                  const h = m.rating > 0 ? Math.min(Math.max(((m.rating - 4) / 6) * 100, 8), 100) : 8;
+                                  const bg = m.rating >= 8 ? "bg-[#00e5ff]" : m.rating >= 7 ? "bg-emerald-400" : m.rating >= 6 ? "bg-amber-400" : "bg-red-400";
+                                  const opp = teamsMap.get(m.opponentId);
+                                                                    const tipAlign = i < 2 ? "left-0" : i > list.length - 3 ? "right-0" : "left-1/2 -translate-x-1/2";
+                                  return (
+                                    <Link
+                                      key={m.matchId || i}
+                                      href={`/mac/${m.matchId}`}
+                                      prefetch={false}
+                                      aria-label={`${opp?.name || "Rakip"} ${m.myScore}-${m.oppScore}, reyting ${m.rating > 0 ? m.rating.toFixed(1) : "yok"}`}
+                                      className="group/bar relative flex-1 min-w-0 h-[110px] flex flex-col items-center justify-end outline-none"
+                                    >
+                                      <span className="text-[9px] font-[900] text-gray-400 mb-0.5 group-hover/bar:text-white">{m.rating > 0 ? m.rating.toFixed(1) : "–"}</span>
+                                      <div className={`w-full ${bg} opacity-80 group-hover/bar:opacity-100 group-focus-visible/bar:opacity-100 transition-opacity rounded-t`} style={{ height: `${h}%` }} />
+                                      <div className={`pointer-events-none absolute bottom-full mb-1 z-20 hidden group-hover/bar:block group-focus-visible/bar:block w-max max-w-[190px] rounded-lg border border-white/10 bg-[#060d18] px-3 py-2 text-[11px] font-[700] text-white shadow-xl ${tipAlign}`}>
+                                        <span className="block text-gray-400">{m.weekNumber ? `${m.weekNumber}. hafta` : "Maç"}</span>
+                                        <span className="block truncate">vs {opp?.name || "Rakip"}</span>
+                                        <span className="block text-[13px] font-[900]">{m.myScore} - {m.oppScore}</span>
+                                        <span className="block text-gray-300">{m.goals}G {m.assists}A{m.rating > 0 ? ` · ${m.rating.toFixed(1)}` : ""}{m.isMom ? " · MOM" : ""}</span>
+                                      </div>
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                            <div className="flex justify-between gap-[3px] pl-6 mt-2">
                               {recent12.slice().reverse().map((m, i) => {
-                                const h = Math.max(((m.rating - 4) / 6) * 100, 10);
-                                const bg = m.rating >= 8 ? "bg-[#00e5ff]" : m.rating >= 7 ? "bg-emerald-400" : m.rating >= 6 ? "bg-amber-400" : "bg-red-400";
+                                const opp = teamsMap.get(m.opponentId);
+                                const resClass = m.result === "W" ? "bg-emerald-400/20 text-emerald-300" : m.result === "D" ? "bg-amber-400/20 text-amber-300" : "bg-red-400/20 text-red-300";
                                 return (
-                                  <div key={i} className="flex-1 flex flex-col items-center group relative h-full justify-end">
-                                    <span className={`text-[10px] font-[900] opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5 ${bg.replace("bg-", "text-")}`}>{m.rating.toFixed(1)}</span>
-                                    <div className={`w-full ${bg} opacity-80 group-hover:opacity-100 transition-all rounded-t`} style={{ height: `${h}%` }} />
-                                    <div className={`w-2 h-2 rounded-full mt-2 ${m.result === "W" ? "bg-emerald-400" : m.result === "D" ? "bg-amber-400" : "bg-red-400"}`} />
+                                  <div key={m.matchId || i} className="flex-1 min-w-0 flex flex-col items-center gap-1">
+                                    <TeamLogo src={opp?.logo_url} name={opp?.name} className="w-4 h-4 sm:w-5 sm:h-5" />
+                                    <span className={`text-[9px] font-[900] rounded px-1 ${resClass}`}>{m.result === "W" ? "G" : m.result === "D" ? "B" : "M"}</span>
                                   </div>
                                 );
                               })}
                             </div>
+                            <p className="mt-2 pl-6 text-[10px] font-[700] text-gray-600">Kesikli çizgiler: reyting 6 ve 8 · turkuaz çizgi: son 12 maç ortalaması</p>
                           </div>
                         </div>
                       </div>

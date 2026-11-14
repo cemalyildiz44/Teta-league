@@ -48,7 +48,7 @@ export default async function TurnuvalarPage() {
         </p>
       </div>
 
-      <div className='fade-in-up' style={{ animationDelay: '0.2s' }}>
+      <div className='fade-in-up'>
         <TournamentTabs 
           tournaments={tData} 
           winners={wData} 

@@ -28,7 +28,7 @@ export default async function PlayersPage() {
         </p>
       </div>
 
-      <div className="fade-in-up" style={{ animationDelay: '0.2s' }}>
+      <div className="fade-in-up">
         <PlayerRankingsClient rankings={rankingsArray} />
       </div>
     </div>

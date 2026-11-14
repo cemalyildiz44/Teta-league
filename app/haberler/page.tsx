@@ -67,7 +67,7 @@ export default async function HaberlerPage({
       </div>
 
       {/* CATEGORY TABS */}
-      <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-2.5 mb-10 md:mb-12 fade-in-up" style={{ animationDelay: '0.1s' }}>
+      <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-2.5 mb-10 md:mb-12 fade-in-up">
         {categories.map((cat) => {
           const isActive = currentCategory === cat.value;
           const href = cat.value === 'ALL' ? '/haberler' : `/haberler?category=${encodeURIComponent(cat.value)}`;
@@ -89,7 +89,7 @@ export default async function HaberlerPage({
 
       {/* ARTICLES LIST / GRID */}
       {articles.length === 0 ? (
-        <div className="client-glass max-w-xl mx-auto rounded-3xl p-12 border border-white/5 text-center shadow-[0_0_30px_rgba(0,229,255,0.03)] relative overflow-hidden group my-8 fade-in-up" style={{ animationDelay: '0.2s' }}>
+        <div className="client-glass max-w-xl mx-auto rounded-3xl p-12 border border-white/5 text-center shadow-[0_0_30px_rgba(0,229,255,0.03)] relative overflow-hidden group my-8 fade-in-up">
           <div className="w-16 h-16 rounded-2xl bg-[#00e5ff]/10 text-[#00e5ff] flex items-center justify-center mx-auto border border-[#00e5ff]/20 mb-4 shadow-[0_0_20px_rgba(0,229,255,0.15)]">
             <Newspaper className="w-8 h-8" />
           </div>
@@ -117,7 +117,6 @@ export default async function HaberlerPage({
               ? 'grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-w-5xl mx-auto'
               : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8'
           }`}
-          style={{ animationDelay: '0.2s' }}
         >
           {articles.map((item) => (
             <article

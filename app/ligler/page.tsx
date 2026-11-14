@@ -121,8 +121,7 @@ export default async function LiglerPage() {
           return (
             <div 
               key={league.id} 
-              className={`fade-in-up flex flex-col client-glass p-0 rounded-3xl border border-white/5 ${theme.borderHover} transition-all duration-500 overflow-hidden relative group shadow-2xl`}
-              style={{ animationDelay: `${0.1 * idx}s` }}
+              className={`fade-in-up flex flex-col client-glass p-0 rounded-3xl border border-white/5 ${theme.borderHover} transition-all duration-500 overflow-hidden relative group shadow-2xl`} style={{ animationDelay: `${Math.min(idx, 6) * 15}ms` }}
             >
               {/* Blur behind logo */}
               <div 
@@ -210,7 +209,7 @@ export default async function LiglerPage() {
 
       {/* 4 FEATURE AREAS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="client-glass p-6 md:p-8 rounded-2xl border border-white/5 flex flex-col items-center text-center fade-in-up" style={{ animationDelay: "0.2s" }}>
+        <div className="client-glass p-6 md:p-8 rounded-2xl border border-white/5 flex flex-col items-center text-center fade-in-up">
           <div className="w-14 h-14 rounded-full bg-[#00e5ff]/10 border border-[#00e5ff]/20 text-[#00e5ff] flex items-center justify-center mb-5">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg>
           </div>
@@ -218,7 +217,7 @@ export default async function LiglerPage() {
           <p className="text-[#a0b0c0] text-[13px] leading-relaxed font-medium">Süperlig ve ECL 1. Lig olmak üzere iki ayrı seviyede profesyonel sanal futbol deneyimi.</p>
         </div>
 
-        <div className="client-glass p-6 md:p-8 rounded-2xl border border-white/5 flex flex-col items-center text-center fade-in-up" style={{ animationDelay: "0.3s" }}>
+        <div className="client-glass p-6 md:p-8 rounded-2xl border border-white/5 flex flex-col items-center text-center fade-in-up">
           <div className="w-14 h-14 rounded-full bg-[#00e5ff]/10 border border-[#00e5ff]/20 text-[#00e5ff] flex items-center justify-center mb-5">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 16 4 4 4-4"></path><path d="M7 20V4"></path><path d="m21 8-4-4-4 4"></path><path d="M17 4v16"></path></svg>
           </div>
@@ -226,7 +225,7 @@ export default async function LiglerPage() {
           <p className="text-[#a0b0c0] text-[13px] leading-relaxed font-medium">Başarılı takımlar bir üst lige terfi ederken, başarısız olanlar küme düşme heyecanını yaşar.</p>
         </div>
 
-        <div className="client-glass p-6 md:p-8 rounded-2xl border border-white/5 flex flex-col items-center text-center fade-in-up" style={{ animationDelay: "0.4s" }}>
+        <div className="client-glass p-6 md:p-8 rounded-2xl border border-white/5 flex flex-col items-center text-center fade-in-up">
           <div className="w-14 h-14 rounded-full bg-[#00e5ff]/10 border border-[#00e5ff]/20 text-[#00e5ff] flex items-center justify-center mb-5">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>
           </div>
@@ -234,7 +233,7 @@ export default async function LiglerPage() {
           <p className="text-[#a0b0c0] text-[13px] leading-relaxed font-medium">Katı kurallar, disiplinli yönetim ve şeffaf istatistiklerle %100 adil e-spor ortamı.</p>
         </div>
 
-        <div className="client-glass p-6 md:p-8 rounded-2xl border border-white/5 flex flex-col items-center text-center fade-in-up" style={{ animationDelay: "0.5s" }}>
+        <div className="client-glass p-6 md:p-8 rounded-2xl border border-white/5 flex flex-col items-center text-center fade-in-up">
           <div className="w-14 h-14 rounded-full bg-[#00e5ff]/10 border border-[#00e5ff]/20 text-[#00e5ff] flex items-center justify-center mb-5">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 15V3"></path><path d="m8.5 6.5 3.5-3.5 3.5 3.5"></path><path d="M2 21h20"></path></svg>
           </div>

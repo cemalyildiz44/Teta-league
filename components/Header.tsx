@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { Lock } from 'lucide-react';
 import { useHeaderSession } from './useHeaderSession';
 import { avatarSrc } from '@/lib/avatar';
+import SearchDialog from '@/components/SearchDialog';
 
 interface NavLink {
   label: string;
@@ -32,6 +33,7 @@ const rightLinks: NavLink[] = [
 export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const pathname = usePathname();
   // Session data is loaded client-side so the root layout does not read cookies (keeps public pages cacheable)
   const { user, userProfile, activeTeam, unreadCount, loading, signOut } = useHeaderSession(pathname);
@@ -42,6 +44,18 @@ export default function Header() {
     };
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Ctrl+K / Cmd+K opens the search from anywhere
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setSearchOpen((open) => !open);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
   return (
@@ -132,6 +146,17 @@ export default function Header() {
             </Link>
           )}
 
+          {/* Search */}
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            aria-label="Ara (Ctrl+K)"
+            title="Ara (Ctrl+K)"
+            className="ml-2 flex h-10 w-10 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-white/5 hover:text-[#00e5ff]"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          </button>
+
           {/* Action Buttons */}
           <div className="ml-4 flex items-center min-w-0">
             {loading ? (
@@ -199,10 +224,20 @@ export default function Header() {
           </div>
         </div>
 
-        {/* Mobile hamburger */}
+        {/* Mobile search + hamburger */}
+        <div className="xl:hidden flex items-center z-50">
+        <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            aria-label="Ara (Ctrl+K)"
+            title="Ara (Ctrl+K)"
+            className="flex h-11 w-11 items-center justify-center text-gray-300 hover:text-[#00e5ff]"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          </button>
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="xl:hidden flex flex-col items-center justify-center gap-1.5 w-11 h-11 z-50"
+          className="flex flex-col items-center justify-center gap-1.5 w-11 h-11"
           aria-label="Menü"
           aria-expanded={mobileOpen}
         >
@@ -210,6 +245,7 @@ export default function Header() {
           <span className={`block h-0.5 w-6 bg-white transition-opacity ${mobileOpen ? 'opacity-0' : ''}`} />
           <span className={`block h-0.5 w-6 bg-white transition-transform ${mobileOpen ? '-rotate-45 -translate-y-2' : ''}`} />
         </button>
+        </div>
       </div>
 
       {/* Mobile menu */}
@@ -348,6 +384,7 @@ export default function Header() {
           </nav>
         </div>
       )}
+      <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
     </header>
   );
 }

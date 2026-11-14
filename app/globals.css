@@ -250,44 +250,45 @@ a, button, summary, [role="button"], [role="tab"] {
   font-weight: 500;
 }
 
-/* Animations & Stagger Helpers. Use fill-mode "both": with only "forwards", an element with animation-delay
-   is fully visible during the delay, then snaps to opacity 0 and fades in again (a visible flash). */
+/* Entrance helpers. Content is fully visible from the first paint: only a short slide runs, never an
+   opacity fade, so a slow or throttled animation can never leave a page looking empty. Fill-mode "both"
+   keeps the start offset during an animation-delay instead of flashing. */
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { transform: translateY(6px); }
+  to { transform: translateY(0); }
 }
 .fade-in-up {
-  animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: fadeInUp 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes pageFadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { transform: translateY(4px); }
+  to { transform: translateY(0); }
 }
 .page-enter {
-  animation: pageFadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pageFadeIn 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes cardFadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { transform: translateY(4px); }
+  to { transform: translateY(0); }
 }
 .animate-card-in {
-  animation: cardFadeIn 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: cardFadeIn 0.14s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.stagger-1 { animation-delay: 30ms; }
-.stagger-2 { animation-delay: 60ms; }
-.stagger-3 { animation-delay: 90ms; }
-.stagger-4 { animation-delay: 120ms; }
-.stagger-5 { animation-delay: 150ms; }
-.stagger-6 { animation-delay: 180ms; }
-.stagger-7 { animation-delay: 210ms; }
-.stagger-8 { animation-delay: 240ms; }
+.stagger-1 { animation-delay: 10ms; }
+.stagger-2 { animation-delay: 20ms; }
+.stagger-3 { animation-delay: 30ms; }
+.stagger-4 { animation-delay: 40ms; }
+.stagger-5 { animation-delay: 50ms; }
+.stagger-6 { animation-delay: 60ms; }
+.stagger-7 { animation-delay: 70ms; }
+.stagger-8 { animation-delay: 80ms; }
 
 /* Tab panel transitions */
 .tab-pane-enter {
-  animation: pageFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pageFadeIn 0.14s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* Utilities */

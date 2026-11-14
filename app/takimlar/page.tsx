@@ -85,7 +85,8 @@ export default async function TeamsPage() {
   }
 
   // Convert map to array (all teams in active leagues will be shown even with 0 matches)
-  const rankingsArray = Array.from(teamsMap.values());
+  // Teams that have not played an approved match yet (e.g. a newly added team) appear once they have
+  const rankingsArray = Array.from(teamsMap.values()).filter((team) => team.played > 0);
 
   // 4. Sort Rankings
   // Primary: Points (DESC)
@@ -116,7 +117,7 @@ export default async function TeamsPage() {
         </p>
       </div>
 
-      <div className="fade-in-up" style={{ animationDelay: '0.2s' }}>
+      <div className="fade-in-up">
         <TeamRankingsClient rankings={rankingsArray} />
       </div>
     </div>
