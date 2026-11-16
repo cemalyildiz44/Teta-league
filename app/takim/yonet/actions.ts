@@ -68,7 +68,7 @@ export async function invitePlayer(formData: FormData) {
       return { error: 'Transfer penceresi şu anda kapalı.' };
     }
     if (error.message.includes('transfer slotu dolmuştur') || error.message.includes('Transfer kotanız dolmuştur')) {
-      return { error: 'Bu transfer dönemi için maksimum transfer kotanıza (5) ulaştınız.' };
+      return { error: 'Bu transfer dönemi için maksimum transfer kotanıza (5) ulaştınız. (Daha önce hiçbir takımda oynamamış oyunculara teklif göndermek kotadan düşmez.)' };
     }
     return { error: 'Teklif gönderilemedi: ' + error.message };
   }
@@ -228,13 +228,24 @@ export async function searchPlayers(query: string, seasonId: string) {
 
   const membershipMap = new Map((memberships || []).map(m => [m.player_id, m.team_id]));
 
+  // First-timers (never in any team, current or archived seasons) do not use a transfer slot when invited
+  const [{ data: anyMemberships }, { data: legacyRows }] = await Promise.all([
+    supabase.from('team_memberships').select('player_id').in('player_id', playerIds),
+    supabase.from('player_legacy_career_stats').select('player_id').in('player_id', playerIds).is('deleted_at', null),
+  ]);
+  const hasPlayedBefore = new Set([
+    ...(anyMemberships || []).map(m => m.player_id),
+    ...(legacyRows || []).map(l => l.player_id),
+  ]);
+
   return profiles.map(p => {
     const playerTeamId = membershipMap.get(p.id);
     const teamData = playerTeamId ? teamsMap.get(playerTeamId) : null;
     return {
       ...p,
       team_name: teamData?.name || 'Free Agent',
-      is_free_agent: !playerTeamId
+      is_free_agent: !playerTeamId,
+      is_first_timer: !hasPlayedBefore.has(p.id)
     };
   });
 }

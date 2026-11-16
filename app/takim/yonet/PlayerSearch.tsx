@@ -102,6 +102,11 @@ export function PlayerSearch({
                     <span>•</span>
                     <span>{player.team_name}</span>
                   </div>
+                  {player.is_first_timer && (
+                    <span className="mt-1 inline-block rounded border border-emerald-400/30 bg-emerald-400/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-emerald-300">
+                      Yeni oyuncu · slot yemez
+                    </span>
+                  )}
                 </div>
               </div>
               <button 

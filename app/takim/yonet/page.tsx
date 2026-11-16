@@ -124,6 +124,7 @@ export default async function TeamManagementPage() {
       created_at,
       requested_by,
       player_id,
+      quota_exempt,
       profiles:player_id (
         id,
         username,

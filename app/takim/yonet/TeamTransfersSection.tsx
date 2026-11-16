@@ -27,6 +27,8 @@ export interface TransferRecord {
   created_at: string;
   requested_by: string;
   player_id: string;
+  /** First-time player: this offer does not use a transfer slot */
+  quota_exempt?: boolean | null;
   profiles?: TransferProfile | TransferProfile[] | null;
   from_team?: TransferTeam | TransferTeam[] | null;
 }
@@ -100,10 +102,10 @@ export function TeamTransfersSection({ transfers, isWindowOpen = true }: TeamTra
     }
   };
 
-  const handleCancelInvite = async (transferId: string, playerName?: string) => {
+  const handleCancelInvite = async (transferId: string, playerName?: string, usesSlot = true) => {
     const confirmText = playerName
-      ? `"${playerName}" adlı oyuncuya gönderilen transfer teklifini geri çekmek istediğinizden emin misiniz?\n\nBu işlem teklifi iptal edecek ve takımınızın transfer slotunu anında iade edecektir.`
-      : 'Bu transfer teklifini geri çekmek istediğinizden emin misiniz? Transfer slotunuz iade edilecektir.';
+      ? `"${playerName}" adlı oyuncuya gönderilen transfer teklifini geri çekmek istediğinizden emin misiniz?\n\nBu işlem teklifi iptal edecek${usesSlot ? ' ve takımınızın transfer slotunu anında iade edecektir' : ''}.`
+      : 'Bu transfer teklifini geri çekmek istediğinizden emin misiniz?' + (usesSlot ? ' Transfer slotunuz iade edilecektir.' : '');
 
     if (!(await confirm({ message: confirmText, confirmLabel: 'Geri Çek', danger: true }))) return;
 
@@ -120,7 +122,7 @@ export function TeamTransfersSection({ transfers, isWindowOpen = true }: TeamTra
         if (res?.error) {
           setErrorMessage(res.error);
         } else {
-          setSuccessMessage('Transfer teklifi başarıyla geri çekildi. 1 transfer slotu iade edildi.');
+          setSuccessMessage(usesSlot ? 'Transfer teklifi başarıyla geri çekildi. 1 transfer slotu iade edildi.' : 'Transfer teklifi başarıyla geri çekildi.');
           router.refresh();
         }
       } catch (err: unknown) {
@@ -376,7 +378,7 @@ export function TeamTransfersSection({ transfers, isWindowOpen = true }: TeamTra
                         <button
                           type="button"
                           disabled={isProcessing}
-                          onClick={() => handleCancelInvite(tx.id, profile?.username)}
+                          onClick={() => handleCancelInvite(tx.id, profile?.username, !tx.quota_exempt)}
                           className="px-3.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 active:scale-95 text-red-400 hover:text-red-300 border border-red-500/30 rounded-lg text-xs font-black tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 shadow-sm"
                         >
                           {isProcessing ? (
@@ -432,7 +434,7 @@ export function TeamTransfersSection({ transfers, isWindowOpen = true }: TeamTra
 
           <div className="px-2">
             <p className="text-[11px] text-gray-500 italic">
-              ℹ Teklif geri çekildiğinde oyuncuya iletilen davet iptal edilir ve takımınızın transfer kotası anında serbest kalır (+1). {!isWindowOpen && "(Transfer dönemi kapalı olsa bile bekleyen tekliflerinizi geri çekebilirsiniz.)"}
+              ℹ Teklif geri çekildiğinde oyuncuya iletilen davet iptal edilir ve takımınızın transfer kotası anında serbest kalır (+1). Daha önce hiçbir takımda oynamamış oyunculara gönderilen teklifler transfer kotasından düşmez. {!isWindowOpen && "(Transfer dönemi kapalı olsa bile bekleyen tekliflerinizi geri çekebilirsiniz.)"}
             </p>
           </div>
         </div>
