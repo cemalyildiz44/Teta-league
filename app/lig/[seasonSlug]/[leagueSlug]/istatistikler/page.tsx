@@ -257,25 +257,44 @@ export default async function LeagueStatsPage({ params }: { params: Promise<{ se
     .slice(0, 5);
 
   // TAKIM İSTATİSTİKLERİ HESAPLAMA
-  const { data: teamStatsData } = await supabase
-    .from("team_season_stats")
-    .select("team_id, wins, goals_for, points, goals_against, matches_played, teams(id, name, slug, logo_url)")
-    .eq("league_id", league.id);
-    
-  const teamStats = (teamStatsData || []).map(ts => {
-    const tm = ts.teams as any;
-    return {
-      id: tm?.id,
-      name: tm?.name,
-      slug: tm?.slug,
-      logo: tm?.logo_url,
-      wins: ts.wins,
-      goalsFor: ts.goals_for,
-      points: ts.points,
-      goalsAgainst: ts.goals_against,
-      matches: ts.matches_played
-    };
-  });
+  // team_season_stats has no direct relationship to teams (it references league_teams with a composite key), so
+  // an embedded teams(...) select fails and the lists came out empty: read the teams separately.
+  // Only teams that are active in the league are listed (a withdrawn team's slot is carried by its replacement).
+  const [{ data: teamStatsData }, { data: activeLeagueTeams }] = await Promise.all([
+    supabase
+      .from("team_season_stats")
+      .select("team_id, wins, goals_for, points, goals_against, matches_played")
+      .eq("league_id", league.id),
+    supabase
+      .from("league_teams")
+      .select("team_id")
+      .eq("league_id", league.id)
+      .eq("season_id", league.season_id)
+      .eq("is_active", true),
+  ]);
+  const activeTeamIds = new Set((activeLeagueTeams || []).map((lt: any) => lt.team_id));
+  const statTeamIds = Array.from(new Set((teamStatsData || []).map((ts: any) => ts.team_id).filter((id: string) => activeTeamIds.has(id))));
+  const { data: statTeams } = statTeamIds.length > 0
+    ? await supabase.from("teams").select("id, name, slug, logo_url").in("id", statTeamIds)
+    : { data: [] as any[] };
+  const teamLookup = new Map((statTeams || []).map((t: any) => [t.id, t]));
+
+  const teamStats = (teamStatsData || [])
+    .filter((ts: any) => teamLookup.has(ts.team_id))
+    .map((ts: any) => {
+      const tm = teamLookup.get(ts.team_id) as any;
+      return {
+        id: tm.id,
+        name: tm.name,
+        slug: tm.slug,
+        logo: tm.logo_url,
+        wins: ts.wins,
+        goalsFor: ts.goals_for,
+        points: ts.points,
+        goalsAgainst: ts.goals_against,
+        matches: ts.matches_played
+      };
+    });
 
   const mostWinsTeams = [...teamStats].filter(t => t.wins > 0).sort((a, b) => b.wins - a.wins).slice(0, 5);
   const mostGoalsTeams = [...teamStats].filter(t => t.goalsFor > 0).sort((a, b) => b.goalsFor - a.goalsFor).slice(0, 5);
