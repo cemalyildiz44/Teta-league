@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { unstable_cache, revalidateTag, revalidatePath } from 'next/cache';
 import { isGoalkeeperPosition } from '@/app/utils/positions';
+import { fetchAllRowsByIds } from '@/lib/fetch-all-rows';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
@@ -124,12 +125,15 @@ export async function fetchRawStatsData(seasonId?: string, leagueId?: string): P
   }
 
   // 2. Fetch raw match_player_stats for those matches
-  const { data: stats } = await publicSupabase
-    .from('match_player_stats')
-    .select('match_id, player_id, ea_player_id, team_id, position, goals, assists, rating, saves, goals_conceded')
-    .in('match_id', matchIds);
-
-  const rawStats = stats || [];
+  // Every page of rows: a league has well over 1000 of them and a single query would silently drop the rest
+  const rawStats = await fetchAllRowsByIds<any>('season match_player_stats', matchIds, (chunk, from, to) =>
+    publicSupabase
+      .from('match_player_stats')
+      .select('match_id, player_id, ea_player_id, team_id, position, goals, assists, rating, saves, goals_conceded')
+      .in('match_id', chunk)
+      .order('id')
+      .range(from, to)
+  );
   if (rawStats.length === 0) {
     return emptyResult;
   }

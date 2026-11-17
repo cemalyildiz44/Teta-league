@@ -4,6 +4,7 @@ import { getLeagueBySlugs } from "../../../utils";
 import Link from "next/link";
 import TeamLogo from "@/components/TeamLogo";
 import { isDefenderPosition, isGoalkeeperPosition } from "@/app/utils/positions";
+import { fetchAllRowsByIds } from "@/lib/fetch-all-rows";
 
 export const revalidate = 300; // 5 min; admin changes refresh the page right away (revalidatePath/Tag)
 
@@ -116,14 +117,17 @@ export default async function LeagueStatsPage({ params }: { params: Promise<{ se
   }
 
   // 2. MATCH PLAYER STATS AL (boş olsa da hata vermez, [] döner)
-  let rawStats: any[] = [];
-  if (matchIds.length > 0) {
-    const { data: statsData } = await supabase
-      .from("match_player_stats")
-      .select("match_id, team_id, player_id, ea_player_id, goals, assists, saves, goals_conceded, cleansheets_gk, cleansheets_def, position, rating, profiles(id, username), teams(id, name, slug, logo_url)")
-      .in("match_id", matchIds);
-    rawStats = statsData || [];
-  }
+  // Every page of rows: a league has well over 1000 of them and a single query would silently drop the rest
+  const rawStats: any[] = matchIds.length > 0
+    ? await fetchAllRowsByIds<any>("league match_player_stats", matchIds, (chunk, from, to) =>
+        supabase
+          .from("match_player_stats")
+          .select("match_id, team_id, player_id, ea_player_id, goals, assists, saves, goals_conceded, cleansheets_gk, cleansheets_def, position, rating, profiles(id, username), teams(id, name, slug, logo_url)")
+          .in("match_id", chunk)
+          .order("id")
+          .range(from, to)
+      )
+    : [];
   const stats = rawStats;
 
   // 2b. OYUNCULARIN AKTİF TAKIM ÜYELİKLERİNİ AL (Transfer olan oyuncuların güncel takımını göstermek için)
@@ -189,6 +193,7 @@ export default async function LeagueStatsPage({ params }: { params: Promise<{ se
         assists: 0,
         wins: 0,
         cleansheets: 0,
+        gkMatches: 0,
         goalsConceded: 0,
         ratingSum: 0
       });
@@ -216,6 +221,7 @@ export default async function LeagueStatsPage({ params }: { params: Promise<{ se
     ps.goals += (s.goals || 0);
     ps.assists += (s.assists || 0);
     ps.cleansheets += (s.cleansheets_gk || 0);
+    if (isGoalkeeperPosition(s.position)) ps.gkMatches += 1;
     ps.goalsConceded += (s.goals_conceded || 0);
     ps.ratingSum += (parseFloat(s.rating) || 0);
 
@@ -239,9 +245,10 @@ export default async function LeagueStatsPage({ params }: { params: Promise<{ se
   const mostMatchesPlayers = [...allPlayers].sort((a, b) => b.matches - a.matches || b.goals - a.goals).slice(0, 5);
   const mostWinsPlayers = [...allPlayers].filter(p => p.wins > 0).sort((a, b) => b.wins - a.wins || a.matches - b.matches).slice(0, 5);
   
+  // Anyone who played in goal counts, whatever position they played last; only clean sheets earned in goal are summed
   const goalkeepers = [...allPlayers]
-    .filter(p => isGoalkeeperPosition(p.position))
-    .sort((a, b) => b.cleansheets - a.cleansheets || b.matches - a.matches)
+    .filter(p => p.gkMatches > 0 && p.cleansheets > 0)
+    .sort((a, b) => b.cleansheets - a.cleansheets || a.gkMatches - b.gkMatches)
     .slice(0, 5);
 
   const bestDefenders = [...allPlayers]
