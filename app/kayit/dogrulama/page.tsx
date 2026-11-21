@@ -44,8 +44,19 @@ function VerificationContent({ searchParamsPromise }: { searchParamsPromise: Pro
       </div>
 
       <form action={formAction} className="space-y-4">
-        <input type="hidden" name="email" value={email} />
-        
+        {email ? (
+          <input type="hidden" name="email" value={email} />
+        ) : (
+          // Reached from an expired link on the login page: ask for the address
+          <input
+            type="email"
+            name="email"
+            required
+            placeholder="ornek@email.com"
+            className="w-full bg-[#060d18] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#00e5ff]/50 transition-all placeholder:text-gray-600"
+          />
+        )}
+
         {state?.error && (
           <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3 text-center text-xs font-bold text-red-500">
             {state.error}
@@ -63,7 +74,7 @@ function VerificationContent({ searchParamsPromise }: { searchParamsPromise: Pro
           className="w-full bg-white/5 hover:bg-white/10 text-white font-medium h-12 rounded-lg flex items-center justify-center gap-2 transition-all border border-white/10 disabled:opacity-50"
         >
           <Send className="w-4 h-4" />
-          {isPending ? 'GÖNDERİLİYOR...' : 'E-POSTAYI TEKRAR GÖNDER'}
+          {isPending ? 'GÖNDERİLİYOR...' : email ? 'E-POSTAYI TEKRAR GÖNDER' : 'DOĞRULAMA E-POSTASI GÖNDER'}
         </button>
       </form>
 

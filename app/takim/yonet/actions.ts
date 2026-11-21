@@ -244,6 +244,7 @@ export async function searchPlayers(query: string, seasonId: string) {
     return {
       ...p,
       team_name: teamData?.name || 'Free Agent',
+      team_id: playerTeamId || null,
       is_free_agent: !playerTeamId,
       is_first_timer: !hasPlayedBefore.has(p.id)
     };

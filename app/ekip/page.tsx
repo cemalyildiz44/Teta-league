@@ -3,6 +3,7 @@ import { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Ekip | TETA League',
   description: 'TETA League yönetim ve organizasyon ekibi.',
+  alternates: { canonical: '/ekip' },
 };
 
 interface TeamMember {

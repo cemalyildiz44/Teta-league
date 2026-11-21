@@ -1,21 +1,20 @@
 
 import { Metadata } from 'next';
-import { createClient } from '@/utils/supabase/server';
-import { cookies } from 'next/headers';
+import { createPublicClient } from '@/utils/supabase/public';
 import TournamentTabs from './TournamentTabs';
-import { getCachedUser } from '@/lib/fetchers';
 
 export const metadata: Metadata = {
   title: 'Turnuvalar | TETA League',
   description: 'TETA League\'in en prestijli turnuvalarını ve efsaneleşmiş kazananlarını keşfet.',
+  alternates: { canonical: '/turnuvalar' },
 };
 
-export const revalidate = 0;
+// Public data only, so the page is cached like the rest of the site; the signed-in user is read in the browser.
+// Tournament actions call revalidatePath('/turnuvalar'), so applications show up right away.
+export const revalidate = 300;
 
 export default async function TurnuvalarPage() {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
-  const user = await getCachedUser();
+  const supabase = createPublicClient();
 
   const [
     { data: tournamentsData },
@@ -53,8 +52,7 @@ export default async function TurnuvalarPage() {
           tournaments={tData} 
           winners={wData} 
           applications={aData} 
-          profiles={pData} 
-          currentUser={user} 
+          profiles={pData}
         />
       </div>
     </div>

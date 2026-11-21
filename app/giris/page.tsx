@@ -19,7 +19,8 @@ function LoginForm({ errorParam = null, messageParam = null, redirectTo = '' }: 
   const [state, formAction, isPending] = useActionState(loginAction as any, initialState);
   let urlError = '';
   if (errorParam === 'invalid_link' || errorParam === 'expired_link') urlError = 'Şifre sıfırlama bağlantısı geçersiz veya süresi dolmuş.';
-  if (errorParam === 'invalid_verification') urlError = 'E-posta doğrulama bağlantısı geçersiz, kullanılmış veya süresi dolmuş.';
+  const isVerificationError = errorParam === 'invalid_verification';
+  if (isVerificationError) urlError = 'E-posta doğrulama bağlantısı geçersiz, kullanılmış veya süresi dolmuş. Hesabın zaten doğrulandıysa giriş yapabilirsin.';
 
   return (
     <div className="w-full max-w-md relative">
@@ -35,6 +36,11 @@ function LoginForm({ errorParam = null, messageParam = null, redirectTo = '' }: 
         {urlError && (
           <div className="mb-6 bg-red-500/10 border border-red-500/50 rounded-lg p-3 text-center text-xs font-bold text-red-500">
             {urlError}
+            {isVerificationError && (
+              <Link href="/kayit/dogrulama" className="mt-2 block text-[#00e5ff] hover:text-white transition-colors">
+                Yeni doğrulama e-postası iste
+              </Link>
+            )}
           </div>
         )}
 

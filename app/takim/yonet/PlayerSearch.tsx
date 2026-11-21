@@ -85,7 +85,10 @@ export function PlayerSearch({
 
       {results.length > 0 && (
         <div className="space-y-2 mt-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-          {results.map((player) => (
+          {results.map((player) => {
+            // Players already on this team cannot be invited again
+            const isTeammate = player.team_id === teamId;
+            return (
             <div key={player.id} className="flex items-center justify-between p-3 bg-[#060d18] border border-white/5 rounded-lg hover:border-[#00e5ff]/30 transition-colors">
               <div className="flex items-center gap-3">
                 {player.avatar_url ? (
@@ -102,21 +105,28 @@ export function PlayerSearch({
                     <span>•</span>
                     <span>{player.team_name}</span>
                   </div>
-                  {player.is_first_timer && (
+                  {player.is_first_timer && !isTeammate && (
                     <span className="mt-1 inline-block rounded border border-emerald-400/30 bg-emerald-400/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-emerald-300">
                       Yeni oyuncu · slot yemez
                     </span>
                   )}
                 </div>
               </div>
-              <button 
+              {isTeammate ? (
+                <span className="px-4 py-1.5 border border-white/10 rounded text-xs font-bold tracking-widest text-gray-500">
+                  TAKIMINIZDA
+                </span>
+              ) : (
+              <button
                 onClick={() => handleInvite(player.id)}
                 className="px-4 py-1.5 bg-[#00e5ff]/10 hover:bg-[#00e5ff]/20 text-[#00e5ff] border border-[#00e5ff]/30 rounded text-xs font-bold tracking-widest transition-colors"
               >
                 DAVET ET
               </button>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

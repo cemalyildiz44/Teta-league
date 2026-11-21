@@ -410,7 +410,8 @@ export async function addPlayerToTeam(team_id: string, player_id: string, league
   await logAdminAudit({
     action: 'ADD_PLAYER_TO_TEAM',
     entity_type: 'team_memberships',
-    entity_id: `${team_id}_${player_id}`,
+    // entity_id is a uuid column; the player id stays in new_data
+    entity_id: team_id,
     entity_label: `${playerProf?.username ? '@' + playerProf.username : 'Oyuncu'} -> ${team?.name || 'Takım'}`,
     new_data: { team_id, player_id, league_id, season_id, team_name: team?.name, username: playerProf?.username },
     description: `@${playerProf?.username || player_id} adlı oyuncu "${team?.name || team_id}" takımına eklendi.`,

@@ -18,10 +18,8 @@ export async function GET(request: Request) {
     if (isRecoveryFlow) {
       return NextResponse.redirect(`${siteUrl}/sifremi-unuttum?error=expired_link`);
     }
-    if (errorCode === 'otp_expired') {
-      return NextResponse.redirect(`${siteUrl}/giris?error=invalid_verification`);
-    }
-    return NextResponse.redirect(`${siteUrl}/giris?error=invalid_link`);
+    // Not a password reset, so this was an email verification link
+    return NextResponse.redirect(`${siteUrl}/giris?error=invalid_verification`);
   }
 
   if (code) {
@@ -39,12 +37,12 @@ export async function GET(request: Request) {
     if (isRecoveryFlow) {
       return NextResponse.redirect(`${siteUrl}/sifremi-unuttum?error=expired_link`);
     }
-    return NextResponse.redirect(`${siteUrl}/giris?error=invalid_link`);
+    return NextResponse.redirect(`${siteUrl}/giris?error=invalid_verification`);
   }
 
   // Fallback if no code or error provided
   if (isRecoveryFlow) {
     return NextResponse.redirect(`${siteUrl}/sifremi-unuttum?error=expired_link`);
   }
-  return NextResponse.redirect(`${siteUrl}/giris?error=invalid_link`);
+  return NextResponse.redirect(`${siteUrl}/giris?error=invalid_verification`);
 }

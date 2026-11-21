@@ -57,9 +57,10 @@ export default function Loading() {
         <span className="text-[10px] font-[900] tracking-[0.3em] text-[#00e5ff] uppercase mb-4 px-3 py-1 bg-[#00e5ff]/10 border border-[#00e5ff]/20 rounded-full shadow-[0_0_15px_rgba(0,229,255,0.15)]">
           COMMUNITY HUB
         </span>
-        <h1 className="text-4xl md:text-5xl lg:text-6xl font-[900] text-white tracking-tighter uppercase mb-4 drop-shadow-[0_0_20px_rgba(255,255,255,0.1)]">
+        {/* Not an h1: this skeleton is streamed before the page, which has its own h1 */}
+        <div className="text-4xl md:text-5xl lg:text-6xl font-[900] text-white tracking-tighter uppercase mb-4 drop-shadow-[0_0_20px_rgba(255,255,255,0.1)]">
           TETA <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00e5ff] to-[#00aaff] drop-shadow-[0_0_12px_rgba(0,229,255,0.4)]">NETWORK</span>
-        </h1>
+        </div>
         <p className="text-gray-400 text-[15px] md:text-[16px] font-[500] tracking-wide max-w-lg px-4">
           TETA League topluluğunun buluşma noktası.
         </p>

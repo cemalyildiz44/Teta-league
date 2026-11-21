@@ -9,11 +9,20 @@ import { submitNightCupApplicationAction, searchEligibleTournamentPlayersAction 
 import TeamLogo from '@/components/TeamLogo';
 import { formatTournamentDate } from '@/lib/date-utils';
 import { avatarSrc } from '@/lib/avatar';
+import { createClient } from '@/utils/supabase/client';
 
 export default function TournamentTabs({
-  tournaments, winners, applications, profiles, currentUser
+  tournaments, winners, applications, profiles
 }: any) {
   const router = useRouter();
+  // The page is cached for everyone, so the signed-in user comes from the browser session (UI only;
+  // the server actions check the user again)
+  const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null);
+  useEffect(() => {
+    createClient().auth.getSession().then(({ data }) => {
+      setCurrentUser(data.session?.user ? { id: data.session.user.id } : null);
+    });
+  }, []);
   const [activeTab, setActiveTab] = useState<'NIGHT_CUP' | '1V1' | 'KARMA'>('NIGHT_CUP');
   const filteredTournaments = tournaments.filter((t: any) => t.type === activeTab);
 

@@ -539,7 +539,8 @@ export default function Hero() {
 
         {/* Headline */}
         <h1 className="text-[36px] sm:text-5xl md:text-6xl lg:text-[74px] font-black text-white leading-[1.05] uppercase tracking-tight mb-6 md:mb-8 drop-shadow-xl flex flex-col items-center">
-          <span className="block">REKABETİN MERKEZİ</span>
+          {/* The space is not rendered in the flex column, but keeps the words apart in search snippets */}
+          <span className="block">REKABETİN MERKEZİ</span>{' '}
           <span className="block">TETA LEAGUE.</span>
         </h1>
 
@@ -557,8 +558,8 @@ export default function Hero() {
             className="w-full sm:w-auto px-8 py-4 lg:py-4.5 bg-[#00e5ff] text-black font-extrabold text-[13px] tracking-[0.15em] uppercase rounded-lg hover:bg-white transition-all duration-200 shadow-[0_0_20px_rgba(0,229,255,0.25)] hover:shadow-[0_0_30px_rgba(0,229,255,0.45)] hover:scale-[1.02] active:scale-95 flex items-center justify-center"
           >
             TAKIMINI OLUŞTUR
-          </a>
-          
+          </a>{' '}
+
           <Link prefetch={false} 
             href="/ligler"
             className="w-full sm:w-auto px-8 py-4 lg:py-4.5 bg-white/[0.04] border border-white/10 text-white font-extrabold text-[13px] tracking-[0.15em] uppercase rounded-lg hover:bg-white/[0.08] hover:border-white/20 hover:text-[#00e5ff] transition-all duration-200 hover:scale-[1.02] active:scale-95 flex items-center justify-center"

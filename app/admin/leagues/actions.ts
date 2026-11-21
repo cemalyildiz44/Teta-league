@@ -313,7 +313,8 @@ export async function assignTeamToLeague(league_id: string, season_id: string, t
   await logAdminAudit({
     action: 'ASSIGN_TEAM_TO_LEAGUE',
     entity_type: 'league_teams',
-    entity_id: `${league_id}_${team_id}`,
+    // entity_id is a uuid column; the league id stays in new_data
+    entity_id: team_id,
     entity_label: `${teamName} -> ${leagueName}`,
     new_data: { league_id, season_id, team_id, league_name: leagueName, team_name: teamName },
     description: `"${teamName}" takımı "${leagueName}" ligine atandı.`,
@@ -401,7 +402,7 @@ export async function removeTeamFromLeague(league_id: string, team_id: string) {
   await logAdminAudit({
     action: 'REMOVE_TEAM_FROM_LEAGUE',
     entity_type: 'league_teams',
-    entity_id: `${league_id}_${team_id}`,
+    entity_id: team_id,
     entity_label: `${teamName} - ${leagueName}`,
     old_data: { league_id, team_id, league_name: leagueName, team_name: teamName },
     description: `"${teamName}" takımı "${leagueName}" liginden çıkarıldı.`,

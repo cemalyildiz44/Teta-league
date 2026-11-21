@@ -29,9 +29,10 @@ export function SkHero({ badge, title, subtitle }: { badge: string; title: React
       <span className="text-[#00e5ff] text-[11px] font-[900] tracking-[0.3em] uppercase bg-[#00e5ff]/10 px-4 py-1.5 rounded-full border border-[#00e5ff]/30 mb-5 shadow-[0_0_20px_rgba(0,229,255,0.2)]">
         {badge}
       </span>
-      <h1 className="text-[38px] sm:text-[46px] md:text-[60px] font-[900] text-white tracking-widest uppercase mb-4 drop-shadow-[0_0_15px_rgba(0,229,255,0.4)] leading-tight">
+      {/* Not an h1: the loading skeleton is streamed before the page, which has its own h1 */}
+      <div className="text-[38px] sm:text-[46px] md:text-[60px] font-[900] text-white tracking-widest uppercase mb-4 drop-shadow-[0_0_15px_rgba(0,229,255,0.4)] leading-tight">
         {title}
-      </h1>
+      </div>
       <p className="text-[#a0b0c0] font-medium max-w-2xl mx-auto text-[15px] md:text-[16px] leading-relaxed">{subtitle}</p>
     </div>
   );

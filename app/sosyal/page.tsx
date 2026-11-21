@@ -5,6 +5,13 @@ import { SocialFeed } from './SocialFeed';
 import { fetchSocialFeedAction } from './actions';
 import { getCachedUser } from '@/lib/fetchers';
 import { avatarSrc } from '@/lib/avatar';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'TETA Network | TETA League',
+  description: 'TETA League oyuncularının paylaşımları, maç yorumları ve topluluk akışı.',
+  alternates: { canonical: '/sosyal' },
+};
 
 export const revalidate = 0;
 
