@@ -128,20 +128,21 @@ export default function ClientAccount({ profile, authUser, team, league, isCapta
 
       setProfileMsg({ type: 'success', text: 'Fotoğraf optimize ediliyor...' });
 
-      // Avatars are shown at 160 px at most (and served resized via lib/avatar.ts), so 512 px is plenty
+      // Avatars are shown at 160 px at most and served as they are (no image transformation), so they are stored
+      // small: 320 px covers high-density screens and keeps each file to a few tens of KB
       const options = {
-        maxSizeMB: 0.25,
-        maxWidthOrHeight: 512,
+        maxSizeMB: 0.06,
+        maxWidthOrHeight: 320,
         useWebWorker: true,
         fileType: 'image/webp',
-        initialQuality: 0.85,
+        initialQuality: 0.8,
       };
 
       let compressedFile = await imageCompression(file, options);
 
-      // Failsafe if still over 250 KB
-      if (compressedFile.size > 250 * 1024) {
-        options.initialQuality = 0.70;
+      // Failsafe if still over 80 KB
+      if (compressedFile.size > 80 * 1024) {
+        options.initialQuality = 0.6;
         compressedFile = await imageCompression(file, options);
       }
 

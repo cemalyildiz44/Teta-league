@@ -1,16 +1,10 @@
 /**
- * Returns a resized avatar URL. Uploaded avatars average ~330 KB (up to 1 MB) but are shown at 20-160 px, so
- * Supabase Storage URLs are rewritten to its image transformation endpoint, which serves a small cached copy
- * (a 167 KB avatar becomes ~3 KB at 96 px). Any other URL (blob: previews, external images) is returned as-is.
+ * Returns the avatar URL to display. Avatars are stored already small (see the upload in app/profil/ClientAccount.tsx:
+ * 320 px WebP, a few tens of KB), so the URL is used as it is. Supabase's image transformation endpoint is not used:
+ * it is billed per distinct image and does not exist on the Free plan.
  *
- * `size` is the requested pixel width/height; pass about 2x the displayed CSS size for sharp results on
- * high-density screens.
+ * `size` is kept so call sites can still say how large the image is shown; it is not used for the URL.
  */
-const STORAGE_PUBLIC_PATH = '/storage/v1/object/public/';
-const STORAGE_RENDER_PATH = '/storage/v1/render/image/public/';
-
-export function avatarSrc(url: string | null | undefined, size = 96): string | undefined {
-  if (!url) return undefined;
-  if (!url.includes(STORAGE_PUBLIC_PATH) || url.includes('?')) return url;
-  return `${url.replace(STORAGE_PUBLIC_PATH, STORAGE_RENDER_PATH)}?width=${size}&height=${size}&resize=cover&quality=75`;
+export function avatarSrc(url: string | null | undefined, _size = 96): string | undefined {
+  return url || undefined;
 }
